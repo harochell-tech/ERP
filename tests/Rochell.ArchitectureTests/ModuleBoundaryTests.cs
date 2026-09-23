@@ -39,7 +39,8 @@ public sealed class ModuleBoundaryTests
         var csproj = XDocument.Load(Path.Combine(Repo.Src, $"Rochell.{module}", $"Rochell.{module}.csproj"));
 
         var references = csproj.Descendants("ProjectReference")
-            .Select(r => Path.GetFileName((string?)r.Attribute("Include") ?? string.Empty))
+            // csproj paths use '\' on every OS; normalize so Path.GetFileName works on Linux CI too.
+            .Select(r => Path.GetFileName(((string?)r.Attribute("Include") ?? string.Empty).Replace('\\', '/')))
             .ToList();
 
         Assert.Equal(["Rochell.Platform.csproj"], references);
