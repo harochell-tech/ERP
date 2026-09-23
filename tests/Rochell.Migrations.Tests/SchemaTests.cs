@@ -1,10 +1,11 @@
 using Npgsql;
 using Rochell.Migrations.Tests.Infrastructure;
+using Rochell.TestInfrastructure;
 using Xunit;
 
 namespace Rochell.Migrations.Tests;
 
-/// <summary>PR-01 schema must match the frozen baseline exactly: btree_gist + md.company, nothing else.</summary>
+/// <summary>PR-01 schema (btree_gist + md.company) must match the frozen baseline; the table inventory grows only with listed PRs.</summary>
 [Collection(PostgresTestGroup.Name)]
 public sealed class SchemaTests(PostgresFixture postgres)
 {
@@ -85,7 +86,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task No_tables_outside_pr01_scope_exist()
+    public async Task No_tables_outside_authorized_prs_exist()
     {
         var cs = await MigratedDatabaseAsync();
 
@@ -95,6 +96,9 @@ public sealed class SchemaTests(PostgresFixture postgres)
             WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'migrations')
             """);
 
-        Assert.Equal("md.company", tables);
+        // PR-01: md.company. PR-02: core.*, obs.request_log.
+        Assert.Equal(
+            "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.outbox,core.state_history,md.company,obs.request_log",
+            tables);
     }
 }

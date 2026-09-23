@@ -1,4 +1,5 @@
 using Rochell.Migrations.Tests.Infrastructure;
+using Rochell.TestInfrastructure;
 using Xunit;
 
 namespace Rochell.Migrations.Tests;
@@ -10,7 +11,8 @@ public sealed class MigrationDiscoveryTests
     {
         var scripts = MigrationDiscovery.Discover(TestPaths.MainSource);
 
-        Assert.Equal(["0001__extensions.sql", "0002__md_company.sql"], scripts.Select(s => s.FileName));
+        Assert.Equal(TestPaths.MainMigrationFiles, scripts.Select(s => s.FileName));
+        Assert.Equal(["0001__extensions.sql", "0002__md_company.sql", "0003__core_platform.sql"], scripts.Take(3).Select(s => s.FileName));
     }
 
     [Fact]
@@ -26,9 +28,9 @@ public sealed class MigrationDiscoveryTests
 
     [Theory]
     [InlineData("3__bad.sql")]
-    [InlineData("0003_single_underscore.sql")]
-    [InlineData("0003__CamelCase.sql")]
-    [InlineData("0003__trailing_.sql")]
+    [InlineData("0099_single_underscore.sql")]
+    [InlineData("0099__CamelCase.sql")]
+    [InlineData("0099__trailing_.sql")]
     public void Invalid_file_names_are_rejected(string fileName)
     {
         using var scratch = new ScratchMigrations();
@@ -52,7 +54,7 @@ public sealed class MigrationDiscoveryTests
     public void Gaps_in_versions_are_rejected()
     {
         using var scratch = new ScratchMigrations();
-        scratch.Write("0004__skipped_three.sql", "SELECT 1;");
+        scratch.Write(ScratchMigrations.NextFile("skipped_one", offset: 1), "SELECT 1;");
 
         var ex = Assert.Throws<MigrationException>(() => MigrationDiscovery.Discover(scratch.Source));
         Assert.Contains("contiguous", ex.Message, StringComparison.Ordinal);
@@ -62,7 +64,7 @@ public sealed class MigrationDiscoveryTests
     public void Empty_migrations_are_rejected()
     {
         using var scratch = new ScratchMigrations();
-        scratch.Write("0003__empty.sql", "  \n");
+        scratch.Write(ScratchMigrations.NextFile("empty"), "  \n");
 
         var ex = Assert.Throws<MigrationException>(() => MigrationDiscovery.Discover(scratch.Source));
         Assert.Contains("is empty", ex.Message, StringComparison.Ordinal);
@@ -74,6 +76,6 @@ public sealed class MigrationDiscoveryTests
         using var scratch = new ScratchMigrations();
         scratch.Write("README.md", "notes");
 
-        Assert.Equal(2, MigrationDiscovery.Discover(scratch.Source).Count);
+        Assert.Equal(TestPaths.MainMigrationFiles.Count, MigrationDiscovery.Discover(scratch.Source).Count);
     }
 }

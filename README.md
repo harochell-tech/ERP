@@ -14,13 +14,15 @@ Contradictions or ambiguities are reported as a proposed erratum; they are never
 
 | Path | Content |
 | --- | --- |
-| `src/Rochell.Platform` | Shared kernel (PR-02+). Today: supported hosting environments only |
+| `src/Rochell.Platform` | Shared kernel, provider-agnostic (ADO.NET): command pipeline, idempotency, domain events, outbox/inbox, request log, canonical hashing, clock, ids |
 | `src/Rochell.{Identity,MasterData,Finance,Inventory,Procurement,Tax,Audit,Reconciliation}` | Bounded contexts; may reference only Platform |
 | `src/Rochell.Migrations`, `src/Rochell.Migrations.Cli` | Forward-only migration runner and CLI |
 | `src/Rochell.Api` | ASP.NET Core host (empty until PR-18) |
 | `db/migrations` | Production schema migrations |
 | `tests/migrations` | Test-only migrations |
-| `tests/Rochell.Migrations.Tests` | Runner + schema tests on PostgreSQL 17 (Testcontainers) |
+| `tests/Rochell.TestInfrastructure` | Shared PostgreSQL 17 fixture (Testcontainers), app-role login |
+| `tests/Rochell.Migrations.Tests` | Runner + schema tests on PostgreSQL 17 |
+| `tests/Rochell.Platform.Tests` | Platform tests (ID-01…07, CMD-01…03, hashing golden vectors, environment, privileges) |
 | `tests/Rochell.ArchitectureTests` | Guardrails: no floating point, module boundaries, repository conventions |
 
 ## Environments
@@ -28,4 +30,4 @@ Contradictions or ambiguities are reported as a proposed erratum; they are never
 `Development`, `Test`, `Staging` (`ASPNETCORE_ENVIRONMENT` / `DOTNET_ENVIRONMENT`). Any other value fails at startup.
 Credentials for Test/Staging come only from environment variables. The fiscal production gate does **not** use these settings (Patch 1.1, correction 3).
 
-See `docs/engineering/migrations.md` and `docs/engineering/ci.md`.
+See `docs/engineering/migrations.md`, `docs/engineering/platform.md` and `docs/engineering/ci.md`.

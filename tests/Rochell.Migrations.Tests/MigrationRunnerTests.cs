@@ -1,5 +1,6 @@
 using Npgsql;
 using Rochell.Migrations.Tests.Infrastructure;
+using Rochell.TestInfrastructure;
 using Xunit;
 
 namespace Rochell.Migrations.Tests;
@@ -7,6 +8,8 @@ namespace Rochell.Migrations.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class MigrationRunnerTests(PostgresFixture postgres)
 {
+    private static int MainCount => TestPaths.MainMigrationFiles.Count;
+
     [Fact]
     public async Task Empty_database_gets_all_main_migrations_in_order()
     {
@@ -15,8 +18,8 @@ public sealed class MigrationRunnerTests(PostgresFixture postgres)
         var result = await Db.Runner(cs).MigrateAsync(TestPaths.MainSource);
 
         Assert.Equal(0, result.AlreadyApplied);
-        Assert.Equal(["0001__extensions.sql", "0002__md_company.sql"], result.AppliedNow);
-        Assert.Equal(2L, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration WHERE source = 'main'"));
+        Assert.Equal(TestPaths.MainMigrationFiles, result.AppliedNow);
+        Assert.Equal((long)MainCount, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration WHERE source = 'main'"));
     }
 
     [Fact]
@@ -28,7 +31,7 @@ public sealed class MigrationRunnerTests(PostgresFixture postgres)
 
         var second = await runner.MigrateAsync(TestPaths.MainSource);
 
-        Assert.Equal(2, second.AlreadyApplied);
+        Assert.Equal(MainCount, second.AlreadyApplied);
         Assert.Empty(second.AppliedNow);
     }
 
@@ -39,7 +42,7 @@ public sealed class MigrationRunnerTests(PostgresFixture postgres)
 
         var result = await Db.Runner(cs).VerifyAsync(TestPaths.MainSource);
 
-        Assert.Equal(2, result.Pending.Count);
+        Assert.Equal(MainCount, result.Pending.Count);
         Assert.Null(await Db.ScalarAsync<string>(cs, "SELECT to_regclass('md.company')::text"));
     }
 
@@ -61,10 +64,11 @@ public sealed class MigrationRunnerTests(PostgresFixture postgres)
     {
         var cs = await postgres.CreateEmptyDatabaseAsync();
         using var scratch = new ScratchMigrations();
-        scratch.Write("0003__extra.sql", "CREATE TABLE md.pr01_scratch (id integer);");
+        var extra = ScratchMigrations.NextFile("extra");
+        scratch.Write(extra, "CREATE TABLE md.scratch_extra (id integer);");
         await Db.Runner(cs).MigrateAsync(scratch.Source);
 
-        scratch.Delete("0003__extra.sql");
+        scratch.Delete(extra);
 
         var ex = await Assert.ThrowsAsync<MigrationException>(() => Db.Runner(cs).MigrateAsync(scratch.Source));
         Assert.Contains("no longer exists on disk", ex.Message, StringComparison.Ordinal);
@@ -75,13 +79,14 @@ public sealed class MigrationRunnerTests(PostgresFixture postgres)
     {
         var cs = await postgres.CreateEmptyDatabaseAsync();
         using var scratch = new ScratchMigrations();
-        scratch.Write("0003__broken.sql", "CREATE TABLE md.pr01_partial (id integer);\nSELECT 1 / 0;");
+        var broken = ScratchMigrations.NextFile("broken");
+        scratch.Write(broken, "CREATE TABLE md.scratch_partial (id integer);\nSELECT 1 / 0;");
 
         var ex = await Assert.ThrowsAsync<MigrationException>(() => Db.Runner(cs).MigrateAsync(scratch.Source));
 
-        Assert.Contains("0003__broken.sql", ex.Message, StringComparison.Ordinal);
-        Assert.Null(await Db.ScalarAsync<string>(cs, "SELECT to_regclass('md.pr01_partial')::text"));
-        Assert.Equal(2, await Db.ScalarAsync<int>(cs, "SELECT max(version) FROM migrations.applied_migration WHERE source = 'main'"));
+        Assert.Contains(broken, ex.Message, StringComparison.Ordinal);
+        Assert.Null(await Db.ScalarAsync<string>(cs, "SELECT to_regclass('md.scratch_partial')::text"));
+        Assert.Equal(MainCount, await Db.ScalarAsync<int>(cs, "SELECT max(version) FROM migrations.applied_migration WHERE source = 'main'"));
     }
 
     [Fact]
@@ -94,8 +99,21 @@ public sealed class MigrationRunnerTests(PostgresFixture postgres)
             Db.Runner(cs).MigrateAsync(TestPaths.MainSource),
             Db.Runner(cs).MigrateAsync(TestPaths.MainSource));
 
-        Assert.Equal(2, results.Sum(r => r.AppliedNow.Count));
-        Assert.Equal(2L, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration"));
+        Assert.Equal(MainCount, results.Sum(r => r.AppliedNow.Count));
+        Assert.Equal((long)MainCount, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration"));
+    }
+
+    [Fact]
+    public async Task Main_and_test_sources_are_journaled_separately()
+    {
+        var cs = await postgres.CreateEmptyDatabaseAsync();
+        var runner = Db.Runner(cs);
+
+        await runner.MigrateAsync(TestPaths.MainSource);
+        await runner.MigrateAsync(TestPaths.TestSource);
+
+        Assert.Equal(0L, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration WHERE source = 'test'"));
+        Assert.Equal((long)MainCount, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration WHERE source = 'main'"));
     }
 
     [Theory]

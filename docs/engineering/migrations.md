@@ -23,4 +23,13 @@ dotnet run --project src/Rochell.Migrations.Cli -- status    # checksums + pendi
 dotnet run --project src/Rochell.Migrations.Cli -- migrate
 ```
 
+After the first migration of a database, record its deployment environment once (Patch 1.1, correction 3):
+
+```bash
+dotnet run --project src/Rochell.Migrations.Cli -- init-environment TEST          # Development, Test, Staging databases
+dotnet run --project src/Rochell.Migrations.Cli -- init-environment PRODUCTION    # production database only
+```
+
+The value can never be changed afterwards (the command refuses a different value; the table rejects UPDATE/DELETE).
+
 Exit codes: `0` OK, `1` usage/configuration error, `2` migration error (modified, deleted, out-of-order or failing script).

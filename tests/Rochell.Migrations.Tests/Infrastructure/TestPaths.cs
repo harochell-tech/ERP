@@ -1,11 +1,7 @@
+using System.Globalization;
+using Rochell.TestInfrastructure;
+
 namespace Rochell.Migrations.Tests.Infrastructure;
-
-internal static class TestPaths
-{
-    public static string MainMigrations => Path.Combine(AppContext.BaseDirectory, "migrations", MigrationSource.Main);
-
-    public static MigrationSource MainSource => new(MigrationSource.Main, MainMigrations);
-}
 
 /// <summary>Temporary copy of the main migrations that a test can edit, delete or extend.</summary>
 internal sealed class ScratchMigrations : IDisposable
@@ -22,7 +18,16 @@ internal sealed class ScratchMigrations : IDisposable
 
     public string DirectoryPath { get; }
 
-    public MigrationSource Source => new(MigrationSource.Main, DirectoryPath);
+    public Rochell.Migrations.MigrationSource Source => new(Rochell.Migrations.MigrationSource.Main, DirectoryPath);
+
+    /// <summary>Number of the first version after the real main migrations.</summary>
+    public static int NextVersion => TestPaths.MainMigrationFiles.Count + 1;
+
+    /// <summary>File name for the version <paramref name="offset"/> positions after the last real migration (0 = next).</summary>
+    public static string NextFile(string name, int offset = 0)
+        => $"{(NextVersion + offset).ToString("D4", CultureInfo.InvariantCulture)}__{name}.sql";
+
+    public static string LastRealFile => TestPaths.MainMigrationFiles[^1];
 
     public void Write(string fileName, string sql) => File.WriteAllText(Path.Combine(DirectoryPath, fileName), sql);
 
