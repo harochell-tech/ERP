@@ -3,7 +3,7 @@ using Npgsql;
 using Rochell.Migrations;
 using Rochell.Platform.Hosting;
 
-// Usage: rochell-migrate <migrate|verify|status>
+// Usage: rochell-migrate <migrate|verify|status|init-environment TEST|PRODUCTION>
 // Environment: DOTNET_ENVIRONMENT = Development | Test | Staging
 // Connection:  ConnectionStrings:Rochell (appsettings.Development.json or env var ConnectionStrings__Rochell).
 //              Must use the deployment role (schema owner), never the application role.
@@ -52,8 +52,42 @@ try
                 return 0;
             }
 
+        case "init-environment":
+            {
+                // Patch 1.1, correction 3: written once per database by the deployment role; never changed.
+                var value = args.Length > 1 ? args[1] : string.Empty;
+                if (value is not ("TEST" or "PRODUCTION"))
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate init-environment TEST|PRODUCTION");
+                    return 1;
+                }
+
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                await using var insert = new NpgsqlCommand(
+                    """
+                    INSERT INTO core.deployment_environment (environment, set_by, set_at)
+                    VALUES (@environment, current_user, now())
+                    ON CONFLICT (singleton) DO NOTHING
+                    """,
+                    connection);
+                insert.Parameters.AddWithValue("environment", value);
+                await insert.ExecuteNonQueryAsync();
+
+                await using var select = new NpgsqlCommand("SELECT environment FROM core.deployment_environment", connection);
+                var current = (string?)await select.ExecuteScalarAsync();
+                if (current != value)
+                {
+                    await Console.Error.WriteLineAsync($"Deployment environment is already '{current}' and cannot be changed to '{value}'.");
+                    return 2;
+                }
+
+                Console.WriteLine($"Deployment environment: {current}.");
+                return 0;
+            }
+
         default:
-            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status>");
+            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment TEST|PRODUCTION>");
             return 1;
     }
 }

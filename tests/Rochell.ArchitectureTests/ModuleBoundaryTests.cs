@@ -32,6 +32,27 @@ public sealed class ModuleBoundaryTests
         Assert.True(result.IsSuccessful, $"Rochell.Platform depends on a module: {string.Join(", ", result.FailingTypeNames ?? [])}");
     }
 
+    [Fact]
+    public void Platform_stays_provider_agnostic()
+    {
+        var csproj = XDocument.Load(Path.Combine(Repo.Src, "Rochell.Platform", "Rochell.Platform.csproj"));
+
+        Assert.Empty(csproj.Descendants("PackageReference"));
+        Assert.Empty(csproj.Descendants("ProjectReference"));
+    }
+
+    [Fact]
+    public void Test_only_commands_do_not_exist_in_production_assemblies()
+    {
+        var offenders = Repo.ProductionAssemblies
+            .SelectMany(a => a.GetTypes())
+            .Where(t => t.Name.StartsWith("Ping", StringComparison.Ordinal))
+            .Select(t => t.FullName)
+            .ToList();
+
+        Assert.True(offenders.Count == 0, "Test-only types found in production: " + string.Join(", ", offenders));
+    }
+
     [Theory]
     [MemberData(nameof(Modules))]
     public void Module_project_references_only_platform(string module)
