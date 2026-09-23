@@ -1,0 +1,3 @@
+T:System.Double;ADR-015: use decimal (money, quantities, rates). Floating point is not allowed in Rochell production code.
+T:System.Single;ADR-015: use decimal (money, quantities, rates). Floating point is not allowed in Rochell production code.
+T:System.Half;ADR-015: use decimal (money, quantities, rates). Floating point is not allowed in Rochell production code.

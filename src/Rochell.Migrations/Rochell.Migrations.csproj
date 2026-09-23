@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Rochell.Migrations</RootNamespace>
+  </PropertyGroup>
+  <!-- Provider-agnostic on purpose: depends only on System.Data.Common. Npgsql is supplied by the host (CLI, tests). -->
+</Project>

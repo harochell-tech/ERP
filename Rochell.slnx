@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Rochell.Platform/Rochell.Platform.csproj" />
+    <Project Path="src/Rochell.Identity/Rochell.Identity.csproj" />
+    <Project Path="src/Rochell.MasterData/Rochell.MasterData.csproj" />
+    <Project Path="src/Rochell.Finance/Rochell.Finance.csproj" />
+    <Project Path="src/Rochell.Inventory/Rochell.Inventory.csproj" />
+    <Project Path="src/Rochell.Procurement/Rochell.Procurement.csproj" />
+    <Project Path="src/Rochell.Tax/Rochell.Tax.csproj" />
+    <Project Path="src/Rochell.Audit/Rochell.Audit.csproj" />
+    <Project Path="src/Rochell.Reconciliation/Rochell.Reconciliation.csproj" />
+    <Project Path="src/Rochell.Migrations/Rochell.Migrations.csproj" />
+    <Project Path="src/Rochell.Migrations.Cli/Rochell.Migrations.Cli.csproj" />
+    <Project Path="src/Rochell.Api/Rochell.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Rochell.Migrations.Tests/Rochell.Migrations.Tests.csproj" />
+    <Project Path="tests/Rochell.ArchitectureTests/Rochell.ArchitectureTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# Migration checksums are computed over LF-normalized text; keep them LF in every checkout.
+*.sql text eol=lf
