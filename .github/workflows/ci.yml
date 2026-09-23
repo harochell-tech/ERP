@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    # Job name is the required status check in branch protection: "ci / build-test".
+    name: build-test
+    runs-on: ubuntu-24.04   # Docker is available for Testcontainers (PostgreSQL 17).
+    timeout-minutes: 30
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+      DOTNET_ENVIRONMENT: Test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Rochell.slnx
+
+      - name: Format (whitespace)
+        run: dotnet format whitespace Rochell.slnx --verify-no-changes
+
+      - name: Build (warnings are errors)
+        run: dotnet build Rochell.slnx -c Release --no-restore
+
+      - name: Test (unit, architecture, PostgreSQL 17 integration)
+        run: >
+          dotnet test Rochell.slnx -c Release --no-build
+          --logger "trx;LogFilePrefix=results"
+          --results-directory TestResults
+          --blame-hang-timeout 5m
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: warn

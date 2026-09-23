@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Rochell.MasterData</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Module rule: a module may reference only Rochell.Platform (ArchitectureTests). -->
+    <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+  </ItemGroup>
+</Project>
