@@ -84,7 +84,7 @@ public sealed class CloseTests(PostgresFixture postgres)
         Assert.Equal("CLOSED", await StatusAsync(h, LastMonth(h), "INV-MOV"));
         Assert.True(await h.ScalarAsync<bool>(
             "SELECT s.snapshot_hash = n.content_hash FROM fin.close_component_state s JOIN fin.close_snapshot n USING (period_id, component) WHERE s.component = 'INV-MOV' AND s.status = 'CLOSED'"));
-        Assert.Equal($"{FirstOfThisMonth(h):yyyy-MM-dd}|t", await h.ScalarAsync<string>(
+        Assert.Equal($"{FirstOfThisMonth(h):yyyy-MM-dd}|true", await h.ScalarAsync<string>(
             "SELECT posting_date::text || '|' || late_entry FROM fin.gl_journal ORDER BY occurred_at DESC LIMIT 1"));
     }
 
@@ -118,7 +118,7 @@ public sealed class CloseTests(PostgresFixture postgres)
         await posting.WaitAsync(TimeSpan.FromSeconds(30));
 
         Assert.True(waited);
-        Assert.Equal($"{FirstOfThisMonth(h):yyyy-MM-dd}|t", await h.ScalarAsync<string>("SELECT posting_date::text || '|' || late_entry FROM fin.gl_journal"));
+        Assert.Equal($"{FirstOfThisMonth(h):yyyy-MM-dd}|true", await h.ScalarAsync<string>("SELECT posting_date::text || '|' || late_entry FROM fin.gl_journal"));
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public sealed class CloseTests(PostgresFixture postgres)
 
         Assert.Equal(ReconciliationErrors.ReopenAlreadyRequested, duplicate.Code);
         Assert.Equal(AuthorizationErrors.NotAuthorized, self.Code);
-        Assert.Equal($"{LastMonth(h):yyyy-MM-dd}|f", await h.ScalarAsync<string>("SELECT posting_date::text || '|' || late_entry FROM fin.gl_journal"));
+        Assert.Equal($"{LastMonth(h):yyyy-MM-dd}|false", await h.ScalarAsync<string>("SELECT posting_date::text || '|' || late_entry FROM fin.gl_journal"));
         Assert.Equal(2L, await h.ScalarAsync<long>("SELECT count(*) FROM fin.close_snapshot"));
         Assert.Equal("CLOSED|APPROVED,REJECTED", await h.ScalarAsync<string>(
             "SELECT (SELECT status FROM fin.close_component_state WHERE period_id = @p AND component = 'INV-MOV') || '|' || string_agg(status, ',' ORDER BY status) FROM fin.reopen_request",

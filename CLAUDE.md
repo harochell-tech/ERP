@@ -88,7 +88,9 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
    posting event; **ADR-027** every status change has its `core.state_history` row in the same transaction.
 10. Every command must write its result (`command_log.result_payload`) before COMMIT — the pipeline does it; hand-written SQL
     simulations must too.
-11. Before each commit, re-derive expected test values by hand (the R-02B, R-03B, R-05, R-07B tests have worked examples).
+11. `bool || text` in PostgreSQL gives `true` / `false` (psql only *displays* `t` / `f`): assertions on concatenated SQL use the
+    full words.
+12. Before each commit, re-derive expected test values by hand (the R-02B, R-03B, R-05, R-07B tests have worked examples).
 
 ## 6. Handy SQL
 
