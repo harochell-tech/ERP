@@ -152,10 +152,10 @@ public sealed class FinanceSchemaTests(PostgresFixture postgres)
         var (h, _, _) = await PostedAsync(postgres);
         await using (h)
         {
-            Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync("UPDATE fin.posting_rule_version SET definition = '{\"lines\": []}' WHERE version = 1"))?.SqlState);
-            Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync("UPDATE fin.posting_rule_version SET status = 'DRAFT', approved_by = NULL WHERE version = 1"))?.SqlState);
-            Assert.Null(await h.AdminExecuteAsync("UPDATE fin.posting_rule_version SET effective_to = DATE '2099-01-01' WHERE version = 1"));
-            Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync("UPDATE fin.posting_rule_version SET effective_to = DATE '2098-01-01' WHERE version = 1"))?.SqlState);
+            Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync("UPDATE fin.posting_rule_version SET definition = '{\"lines\": []}' WHERE posting_rule_id = '0192f000-0000-7000-8000-0000000000e1' AND version = 1"))?.SqlState);
+            Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync("UPDATE fin.posting_rule_version SET status = 'DRAFT', approved_by = NULL WHERE posting_rule_id = '0192f000-0000-7000-8000-0000000000e1' AND version = 1"))?.SqlState);
+            Assert.Null(await h.AdminExecuteAsync("UPDATE fin.posting_rule_version SET effective_to = DATE '2099-01-01' WHERE posting_rule_id = '0192f000-0000-7000-8000-0000000000e1' AND version = 1"));
+            Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync("UPDATE fin.posting_rule_version SET effective_to = DATE '2098-01-01' WHERE posting_rule_id = '0192f000-0000-7000-8000-0000000000e1' AND version = 1"))?.SqlState);
             Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync("DELETE FROM fin.account_role_map"))?.SqlState);
         }
     }
