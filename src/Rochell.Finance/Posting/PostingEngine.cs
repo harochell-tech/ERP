@@ -177,15 +177,16 @@ public sealed class PostingEngine
         await InsertJournalAsync(context, journal, cancellationToken).ConfigureAwait(false);
 
         var originalEntries = await ReadEntriesAsync(context, plan.OriginalJournalId, cancellationToken).ConfigureAwait(false);
+        var inverse = new Dictionary<Guid, Guid>();
+        foreach (var e in originalEntries.Where(e => e.InvValueEntryId is not null))
+        {
+            inverse[e.GlEntryId] = await InverseValueEntryAsync(context, e, valueEntryMap, cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"Entry {e.GlEntryId} references an inventory value entry; its inverse value entry must be supplied (Patch 1 P-1).");
+        }
+
         var entries = originalEntries.Select(e =>
         {
-            Guid? valueEntry = null;
-            if (e.InvValueEntryId is not null)
-            {
-                valueEntry = valueEntryMap is not null && valueEntryMap.TryGetValue(e.InvValueEntryId.Value, out var mapped)
-                    ? mapped
-                    : throw new InvalidOperationException($"Entry {e.GlEntryId} references an inventory value entry; its inverse value entry must be supplied (Patch 1 P-1).");
-            }
+            Guid? valueEntry = e.InvValueEntryId is null ? null : inverse[e.GlEntryId];
 
             return e with
             {
@@ -203,6 +204,64 @@ public sealed class PostingEngine
 
         await WriteEntriesAsync(context, plan.PeriodId, entries, cancellationToken).ConfigureAwait(false);
         return new PostedJournal(journal.JournalId, plan.PostingDate, plan.LateEntry, entries.Select(e => e.GlEntryId).ToList());
+    }
+
+    /// <summary>The key under which a repost (R-REP, E-PR14-3) records, per inventory line, the value entry it replaces.</summary>
+    public const string RepostsValueEntryInput = "reposts_value_entry_id";
+
+    /// <summary>
+    /// The inverse value entry of an inventory line. Callers map the document's original value entries; after one or more reposts
+    /// the line references a REPOST value entry instead, so the chain recorded in <see cref="RepostsValueEntryInput"/> is followed
+    /// back to the value entry the caller knows.
+    /// </summary>
+    private static async Task<Guid?> InverseValueEntryAsync(CommandContext context, GlEntryRow entry, IReadOnlyDictionary<Guid, Guid>? map, CancellationToken cancellationToken)
+    {
+        if (map is null)
+        {
+            return null;
+        }
+
+        var current = entry.InvValueEntryId!.Value;
+        var inputs = entry.DeterminationInputs;
+        for (var hop = 0; hop < 64; hop++)
+        {
+            if (map.TryGetValue(current, out var mapped))
+            {
+                return mapped;
+            }
+
+            var replaced = RepostedValueEntry(inputs);
+            if (replaced is null)
+            {
+                return null;
+            }
+
+            current = replaced.Value;
+            inputs = await ScalarAsync<string>(
+                context,
+                "SELECT determination_inputs::text FROM fin.gl_entry WHERE company_id = @c AND inv_value_entry_id = @v",
+                cancellationToken,
+                ("c", context.CompanyId),
+                ("v", current)) ?? string.Empty;
+        }
+
+        return null;
+    }
+
+    private static Guid? RepostedValueEntry(string determinationInputs)
+    {
+        if (string.IsNullOrEmpty(determinationInputs))
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(determinationInputs);
+        return document.RootElement.TryGetProperty("inputs", out var inputs)
+               && inputs.ValueKind == JsonValueKind.Object
+               && inputs.TryGetProperty(RepostsValueEntryInput, out var value)
+               && Guid.TryParse(value.GetString(), out var id)
+            ? id
+            : null;
     }
 
     private static void ValidateShape(RuleLine rule, PostingLineInput input)

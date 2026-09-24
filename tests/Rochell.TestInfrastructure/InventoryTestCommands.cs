@@ -91,3 +91,43 @@ public sealed class TestIssueStockHandler : ICommandHandler<TestIssueStock>
         return JsonSerializer.Serialize(new { value = reservation.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) });
     }
 }
+
+/// <summary>Test-only value adjustment (TEST.VALUE) of an area × item: lets tests build a consistent orphan value for R-06.</summary>
+public sealed record TestAdjustValue(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ValuationAreaId, Guid PlantId, Guid ItemId, decimal Amount, DateOnly BusinessDate) : ICommand;
+
+[RequiresPermission("test:ping")]
+public sealed class TestAdjustValueHandler : ICommandHandler<TestAdjustValue>
+{
+    private readonly PostingEngine _engine = new();
+    private readonly InventoryLedger _ledger = new();
+
+    public string CommandType => "Test.AdjustValue";
+
+    public async Task<string> HandleAsync(TestAdjustValue command, CommandContext context, CancellationToken cancellationToken)
+    {
+        await _ledger.LockValuationAsync(context, command.ValuationAreaId, command.ItemId, cancellationToken);
+        var valueEntryId = context.Ids.NewId();
+        var amount = Math.Abs(command.Amount);
+        var plan = await _engine.PrepareAsync(
+            context,
+            new PostingRequest("TEST.VALUE", command.BusinessDate, context.Clock.UtcNow,
+                command.Amount > 0
+                    ?
+                    [
+                        new PostingLineInput("TV-DR-INV", "adjustment", amount, PlantId: command.PlantId, ItemId: command.ItemId, SubledgerRef: valueEntryId, InvValueEntryId: valueEntryId),
+                        new PostingLineInput("TV-CR", "adjustment", amount),
+                    ]
+                    :
+                    [
+                        new PostingLineInput("TV-CR-INV", "adjustment", amount, PlantId: command.PlantId, ItemId: command.ItemId, SubledgerRef: valueEntryId, InvValueEntryId: valueEntryId),
+                        new PostingLineInput("TV-DR", "adjustment", amount),
+                    ]),
+            cancellationToken);
+        var eventId = await context.AppendEventAsync(new EventDraft("TestValueAdjusted", 1, "TestValue", context.ResultRef, 1, "{}", Publish: false, BusinessDate: command.BusinessDate), cancellationToken);
+        await _ledger.PostValueAdjustmentAsync(
+            context, MovementTypes.ValuationAdjustment, command.ValuationAreaId, command.PlantId, command.ItemId, command.Amount, valueEntryId, null,
+            new MovementSource(eventId, "TEST_VALUE", context.ResultRef), new MovementDates(context.Clock.UtcNow, command.BusinessDate, plan.PostingDate), cancellationToken);
+        await _engine.WriteAsync(context, plan, eventId, cancellationToken);
+        return "{}";
+    }
+}

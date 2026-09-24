@@ -87,6 +87,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR13b-1 | PR-13b | Voiding a POSTING_BLOCKED invoice returns its accounting status to NOT_POSTED (nothing was ever posted); the event keeps the previous status. |
 | E-PR13b-2 | PR-13b | R-04 dimensions: GRNI plant + supplier; AP_CONTROL supplier + AP subledger (the AP document); WITHHOLDING_PAYABLE supplier; ITBIS_RECOVERABLE plant. |
 | E-PR13b-3 | PR-13b | A supplier invoice reversal is posted on the reversal date; the part of the price difference that cannot return to inventory goes to PPV through R-07B (seeded DRAFT). |
+| E-PR14-1 | PR-14 | Patch 1 P-1 prevails over AT-05: a goods receipt is never POSTING_BLOCKED (a missing prerequisite rolls back, PR-09); the repost part of AT-05 is replaced by AT-06. Only a supplier invoice can be POSTING_BLOCKED (SI-08); it is retried with PostSupplierInvoice. |
+| E-PR14-2 | PR-14 | RepostEvent reverses generation n exactly and posts n + 1 of the same event and rule with the rule and mappings in force, same lines, dimensions and amounts, at the event's business date (late entry if the component is closed); reason and step-up. |
+| E-PR14-3 | PR-14 | New value-only movement REPOST (any sign): the reversal points to the original value entry, generation n + 1 gets a new entry of the same amount; valuation unchanged, P-1 kept. |
+| E-PR14-4 | PR-14 | R-06 only removes orphan value (quantity 0, value ≠ 0) down to zero; other VAL-RESIDUAL findings are reported (PR-16), not adjusted by R-06 in VS#1. |
+| E-PR14-5 | PR-14 | INVENTORY policy parameter `valuation_residual_account_role` (PURCHASE_PRICE_VARIANCE or INVENTORY_ADJUSTMENT) chooses R-06's counter-account; new value-only movement RESIDUAL_ADJUSTMENT; R-06 seeded DRAFT. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -116,4 +121,7 @@ Implementation rules derived from the above (no architectural change):
 - R-04 and R-05 are separate journals of one event and each balances: R-04 credits AP with Q·P + T − W, R-05 credits (or debits) AP with the price difference D; both AP lines reference the same AP document, so the payable is Q·P′ + T − W.
 - Posting re-checks, under lock, that each line bills no more than received − invoiced (CC-03); the database CHECK `qty_invoiced ≤ qty_received` is the last guard.
 - The R-05 price differences (D, Q_base, covered share, value entry) are kept in the SupplierInvoicePosted event payload; the reversal (R-07/R-07B) reads them from there.
+- A value entry may be reversed once by its document and once by a repost (two partial unique indexes, migration 0017).
+- Each inventory line posted by a repost records, in its determination inputs, the value entry it replaces (`reposts_value_entry_id`); document reversals map their original value entries and the Posting Engine follows that chain, so a reposted receipt or invoice still reverses.
+- RepostEvent and the residual adjustment live in Procurement: under the module graph (E-PR08-1) it is the only module that may use Finance and Inventory together.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
