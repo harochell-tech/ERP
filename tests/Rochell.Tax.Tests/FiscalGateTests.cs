@@ -106,7 +106,7 @@ public sealed class FiscalGateTests(PostgresFixture postgres)
         var lateSource = await h.RegisterTestSourceAsync(actors, "late", effectiveFrom: new DateOnly(2026, 3, 1));
 
         var badHash = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
-            new RegisterFiscalSource(h.CompanyId, actors.Analyst, "hash", "TEST", "Norma", "v1", new DateOnly(2025, 12, 1), h.Clock.UtcNow, new DateOnly(2025, 12, 1), null, "ref", "file", "not-a-hash"),
+            new RegisterFiscalSource(h.CompanyId, actors.Analyst, "hash", "TEST", "Norma", "v1", new DateOnly(2025, 12, 1), h.Clock.UtcNow, new DateOnly(2025, 12, 1), null, "ref", "file", "not-a-hash", FiscalSourceEnvironments.Test),
             new RegisterFiscalSourceHandler()));
         var notInForce = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new LinkFiscalSource(h.CompanyId, actors.Analyst, "lnk", version, lateSource), new LinkFiscalSourceHandler()));
         var kind = await Assert.ThrowsAsync<DomainException>(() => h.ConfigureAsync(actors, "kind", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseWithholding, TaxSetup.WithholdingDefinition, From));

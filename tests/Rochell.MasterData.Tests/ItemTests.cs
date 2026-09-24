@@ -119,6 +119,7 @@ public sealed class ItemTests(PostgresFixture postgres)
         Assert.Equal(MasterDataErrors.ConversionInvalid, ex.Code);
     }
 
+    [Trait("Acceptance", "TMP-01")]
     [Fact]
     public async Task TMP01_overlapping_conversions_are_rejected_by_the_database()
     {

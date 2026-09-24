@@ -12,6 +12,7 @@ public static class TaxErrors
     public const string VersionNotReady = "FISCAL_RULE_VERSION_NOT_READY";
     public const string ActivatorIsConfigurer = "ACTIVATOR_IS_CONFIGURER";
     public const string AnotherItbisRuleActive = "ANOTHER_ITBIS_RULE_ACTIVE";
+    public const string ProductionSourceRequired = "FISCAL_PRODUCTION_SOURCE_REQUIRED";
     public const string CasesRequired = "TEST_CASES_REQUIRED";
     public const string FiscalGateClosed = "FISCAL_GATE_CLOSED";
     public const string SubjectInvalid = "TAX_SUBJECT_INVALID";

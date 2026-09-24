@@ -19,6 +19,7 @@ public sealed class PostingEngineTests(PostgresFixture postgres)
     private static Guid JournalOf(CommandResult result)
         => System.Text.Json.JsonDocument.Parse(result.ResultPayload).RootElement.GetProperty("journalId").GetGuid();
 
+    [Trait("Acceptance", "AT-04")]
     [Fact]
     public async Task AT04_posting_writes_a_balanced_journal_lines_and_balances()
     {
@@ -110,6 +111,7 @@ public sealed class PostingEngineTests(PostgresFixture postgres)
         Assert.Equal(0L, await h.CountAsync("fin.gl_entry"));
     }
 
+    [Trait("Acceptance", "PD-01")]
     [Fact]
     public async Task PD01_closed_component_moves_the_posting_to_the_next_open_period_as_late_entry()
     {
@@ -150,6 +152,7 @@ public sealed class PostingEngineTests(PostgresFixture postgres)
         Assert.False(await h.ScalarAsync<bool>("SELECT late_entry FROM fin.gl_journal WHERE journal_id = @j", ("j", journal)));
     }
 
+    [Trait("Acceptance", "REV-01")]
     [Fact]
     public async Task REV01_reversal_is_the_exact_inverse_and_happens_once()
     {

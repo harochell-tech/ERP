@@ -105,6 +105,11 @@ public sealed class RegisterFiscalSourceHandler : ICommandHandler<RegisterFiscal
             throw new DomainException(TaxErrors.SourceInvalid, "FileSha256 must be the 64 hexadecimal characters of the document's SHA-256.");
         }
 
+        if (command.Environment is not (FiscalSourceEnvironments.Test or FiscalSourceEnvironments.Production))
+        {
+            throw new DomainException(TaxErrors.SourceInvalid, "Environment must be TEST or PRODUCTION (P-7).");
+        }
+
         var consultedAt = Platform.Time.Precision.ToMicroseconds(command.ConsultedAt);
         if (consultedAt > context.Clock.UtcNow)
         {
@@ -125,7 +130,7 @@ public sealed class RegisterFiscalSourceHandler : ICommandHandler<RegisterFiscal
                 "FiscalRuleSource",
                 sourceId,
                 1,
-                JsonSerializer.Serialize(new { sourceId, officialSource = command.OfficialSource, documentTitle = command.DocumentTitle, documentVersion = command.DocumentVersion, fileSha256 = hashText }),
+                JsonSerializer.Serialize(new { sourceId, officialSource = command.OfficialSource, documentTitle = command.DocumentTitle, documentVersion = command.DocumentVersion, fileSha256 = hashText, environment = command.Environment }),
                 Publish: false),
             cancellationToken).ConfigureAwait(false);
         _ = eventId;
@@ -134,8 +139,8 @@ public sealed class RegisterFiscalSourceHandler : ICommandHandler<RegisterFiscal
             context.Transaction,
             """
             INSERT INTO tax.fiscal_rule_source (source_id, company_id, official_source, document_title, document_version, publication_date, consulted_at,
-                                                effective_from, effective_to, url_or_reference, file_object_key, file_hash, approved_by, approved_at)
-            VALUES (@id, @c, @official, @title, @docVersion, @published, @consulted, @from, @to, @url, @file, @hash, @by, @at)
+                                                effective_from, effective_to, url_or_reference, file_object_key, file_hash, approved_by, approved_at, environment)
+            VALUES (@id, @c, @official, @title, @docVersion, @published, @consulted, @from, @to, @url, @file, @hash, @by, @at, @environment)
             """,
             cancellationToken,
             ("id", sourceId),
@@ -151,7 +156,8 @@ public sealed class RegisterFiscalSourceHandler : ICommandHandler<RegisterFiscal
             ("file", FiscalRuleStore.RequireText(command.FileReference, "FileReference")),
             ("hash", Convert.FromHexString(hashText)),
             ("by", registrar),
-            ("at", context.Clock.UtcNow)).ConfigureAwait(false);
+            ("at", context.Clock.UtcNow),
+            ("environment", command.Environment)).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { sourceId });
     }
 }
@@ -382,6 +388,24 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
         if (activator == version.ConfiguredBy)
         {
             throw new DomainException(TaxErrors.ActivatorIsConfigurer, "The person who configured the version cannot activate it.");
+        }
+
+        // P-7 condition 2 (E-PR19-9): in production a version needs at least one PRODUCTION source. The database gate enforces
+        // the same rule; checking here first turns it into a business rejection.
+        await using (var production = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT core.current_environment() IS DISTINCT FROM 'PRODUCTION' OR EXISTS (
+              SELECT 1 FROM tax.fiscal_rule_version_source vs JOIN tax.fiscal_rule_source s ON s.source_id = vs.source_id
+              WHERE vs.rule_version_id = @v AND s.environment = 'PRODUCTION')
+            """,
+            ("v", command.RuleVersionId)))
+        {
+            if (await production.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
+            {
+                throw new DomainException(TaxErrors.ProductionSourceRequired, "In production a fiscal rule version is activated only with at least one PRODUCTION source (P-7).");
+            }
         }
 
         if (version.RuleKind == FiscalRuleKinds.PurchaseItbis)

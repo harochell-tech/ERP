@@ -66,6 +66,7 @@ public sealed class CloseTests(PostgresFixture postgres)
         Assert.Equal(0L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_exception"));
     }
 
+    [Trait("Acceptance", "PD-02")]
     [Fact]
     public async Task PD02_an_unsealed_group_of_the_period_blocks_the_close_until_the_sealer_runs()
     {
@@ -87,6 +88,50 @@ public sealed class CloseTests(PostgresFixture postgres)
             "SELECT posting_date::text || '|' || late_entry FROM fin.gl_journal ORDER BY occurred_at DESC LIMIT 1"));
     }
 
+    [Trait("Acceptance", "INT-02")]
+    [Fact]
+    public async Task INT02_a_group_altered_before_sealing_is_a_SEAL_ERROR_that_blocks_the_close()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await h.CreateStockSetupAsync();
+        var controller = await h.SessionWithRolesAsync("CONTROLLER");
+        await Receive(h, s, "last-month", LastMonth(h));
+        var journal = await h.ScalarAsync<Guid>("SELECT journal_id FROM fin.gl_journal");
+        await Tamper(h, $"UPDATE fin.gl_entry SET rule_line_code = rule_line_code || 'X' WHERE journal_id = '{journal}'");
+
+        await SealAsync(h);
+        var blocked = await Assert.ThrowsAsync<DomainException>(() => Close(h, controller, LastMonth(h), "INV-MOV", "c"));
+
+        Assert.Equal("SEAL_ERROR", await h.ScalarAsync<string>("SELECT integrity_status FROM audit.integrity_state WHERE ledger = 'GL' AND group_ref = @g", ("g", journal)));
+        Assert.Equal(ReconciliationErrors.IntegrityNotSealed, blocked.Code);
+        Assert.Equal("OPEN", await StatusAsync(h, LastMonth(h), "INV-MOV"));
+    }
+
+    [Trait("Acceptance", "INT-03")]
+    [Fact]
+    public async Task INT03_one_unsealed_domain_event_of_the_period_blocks_the_close_until_it_is_sealed()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await h.CreateStockSetupAsync();
+        var controller = await h.SessionWithRolesAsync("CONTROLLER");
+        await Receive(h, s, "last-month", LastMonth(h));
+        await SealAsync(h);
+
+        // A command with only a domain event (no ledger rows) whose business date falls in the period.
+        var lastMonthUtc = LastMonth(h).ToDateTime(new TimeOnly(15, 0), DateTimeKind.Utc);
+        await h.RunAsync(h.Ping("event-only", occurredAt: lastMonthUtc), new PingHandler());
+        var pending = await h.ScalarAsync<string>(
+            "SELECT string_agg(ledger || ':' || integrity_status || ':' || (posting_date IS NULL), ',') FROM audit.integrity_state WHERE integrity_status <> 'SEALED'");
+        var blocked = await Assert.ThrowsAsync<DomainException>(() => Close(h, controller, LastMonth(h), "INV-MOV", "c1"));
+        await SealAsync(h);
+        await Close(h, controller, LastMonth(h), "INV-MOV", "c2");
+
+        Assert.Equal("DOMAIN_EVENT:PENDING_SEAL:true", pending);
+        Assert.Equal(ReconciliationErrors.IntegrityNotSealed, blocked.Code);
+        Assert.Equal("CLOSED", await StatusAsync(h, LastMonth(h), "INV-MOV"));
+    }
+
+    [Trait("Acceptance", "CC-05")]
     [Fact]
     public async Task CC05_a_posting_into_a_period_being_closed_waits_and_lands_as_a_late_entry()
     {
@@ -120,6 +165,7 @@ public sealed class CloseTests(PostgresFixture postgres)
         Assert.Equal($"{FirstOfThisMonth(h):yyyy-MM-dd}|true", await h.ScalarAsync<string>("SELECT posting_date::text || '|' || late_entry FROM fin.gl_journal"));
     }
 
+    [Trait("Acceptance", "IV-03")]
     [Fact]
     public async Task IV03_an_orphan_value_blocks_INV_MOV_until_R06_removes_it()
     {
@@ -146,6 +192,7 @@ public sealed class CloseTests(PostgresFixture postgres)
         Assert.Equal("CLOSED", await StatusAsync(h, LastMonth(h), "INV-MOV"));
     }
 
+    [Trait("Acceptance", "AT-07")]
     [Fact]
     public async Task AT07_a_journal_deleted_by_a_superuser_is_an_evidence_error_and_breaks_the_hash_chain()
     {
@@ -172,6 +219,7 @@ public sealed class CloseTests(PostgresFixture postgres)
         Assert.Equal("CLOSED", await StatusAsync(h, LastMonth(h), "AP-REC"));
     }
 
+    [Trait("Acceptance", "RO-01")]
     [Fact]
     public async Task RO01_reopening_needs_a_second_approver_and_a_reclose_leaves_its_own_snapshot()
     {

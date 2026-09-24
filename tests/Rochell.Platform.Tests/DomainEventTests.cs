@@ -10,6 +10,7 @@ namespace Rochell.Platform.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class DomainEventTests(PostgresFixture postgres)
 {
+    [Trait("Acceptance", "ID-06")]
     [Fact]
     public async Task ID06_several_events_per_version_with_deterministic_order()
     {

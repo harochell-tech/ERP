@@ -67,6 +67,7 @@ public sealed class RoleChangeTests(PostgresFixture postgres)
         Assert.Equal(2L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.role_assignment_request WHERE status = 'REQUESTED'"));
     }
 
+    [Trait("Acceptance", "RL-01")]
     [Fact]
     public async Task RL01_nobody_can_request_a_role_for_themselves()
     {
@@ -79,6 +80,7 @@ public sealed class RoleChangeTests(PostgresFixture postgres)
         Assert.Equal(0L, await h.CountAsync("iam.role_assignment_request"));
     }
 
+    [Trait("Acceptance", "SC-02")]
     [Fact]
     public async Task SC02_segregation_of_duties_blocks_the_approval()
     {
@@ -93,6 +95,22 @@ public sealed class RoleChangeTests(PostgresFixture postgres)
         Assert.Contains("goods_receipt:post", ex.Message, StringComparison.Ordinal);
         Assert.Equal(0L, await ActiveAsync(h, a.Target, "CUENTAS_POR_PAGAR"));
         Assert.Equal("REQUESTED", await h.ScalarAsync<string>("SELECT status FROM iam.role_assignment_request WHERE request_id = @r", ("r", request.ResultRef)));
+    }
+
+    [Trait("Acceptance", "RO-02")]
+    [Fact]
+    public async Task RO02_whoever_may_reopen_a_period_cannot_also_second_approve_it()
+    {
+        var a = await ActorsAsync();
+        await using var h = a.H;
+        await h.GrantAsync(h.CompanyId, a.Target, "CONTROLLER"); // holds period_component:reopen
+        var request = await Request(a, a.Target, "SEGUNDO_APROBADOR_CIERRE", "req-ro02");
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() => Approve(a, a.ApproverSession, request.ResultRef, "app-ro02"));
+
+        Assert.Equal(RoleChangeErrors.SodConflict, ex.Code);
+        Assert.Contains("period_component:reopen", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(0L, await ActiveAsync(h, a.Target, "SEGUNDO_APROBADOR_CIERRE"));
     }
 
     [Fact]

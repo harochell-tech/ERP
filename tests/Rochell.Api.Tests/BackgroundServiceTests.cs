@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Rochell.Api.Http;
+using Rochell.Platform.Time;
 using Rochell.TestInfrastructure;
 using Xunit;
 
@@ -29,6 +30,27 @@ public sealed class BackgroundServiceTests(PostgresFixture postgres) : IDisposab
         }
 
         Assert.Equal("DOMAIN_EVENT:SEALED", await h.ScalarAsync<string>("SELECT string_agg(DISTINCT ledger || ':' || integrity_status, ',') FROM audit.integrity_state"));
+    }
+
+    [Trait("Acceptance", "INT-02")]
+    [Fact]
+    public async Task A_group_altered_before_sealing_raises_a_critical_alert_from_the_hosted_sealer()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await h.CreateStockSetupAsync();
+        await h.RunAsync(new TestReceiveStock(h.CompanyId, h.SessionId, "r", s.LocationA, s.ItemId, 1m, 10.00m, BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow)), new TestReceiveStockHandler());
+        await h.AdminRequireAsync("BEGIN; SET LOCAL session_replication_role = replica; UPDATE fin.gl_entry SET rule_line_code = rule_line_code || 'X'; COMMIT;");
+
+        // The row is altered before the host (and its sealer) starts, so the first sealing pass finds it.
+        using var api = new ApiHost(h, settings: new Dictionary<string, string?> { ["Rochell:Sealer:Enabled"] = "true", ["Rochell:Sealer:Interval"] = "00:00:00.200" });
+        _ = api.CreateClient();
+        for (var i = 0; i < 50 && !api.Logs.Any(l => l.Level == LogLevel.Critical); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Assert.Equal("SEAL_ERROR", await h.ScalarAsync<string>("SELECT integrity_status FROM audit.integrity_state WHERE ledger = 'GL'"));
+        Assert.Contains(api.Logs, l => l.Level == LogLevel.Critical && l.Message.Contains("SEAL_ERROR", StringComparison.Ordinal));
     }
 
     [Fact]

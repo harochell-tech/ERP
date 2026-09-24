@@ -44,6 +44,7 @@ public sealed class ExplainTests(PostgresFixture postgres)
         return si;
     }
 
+    [Trait("Acceptance", "EX-01")]
     [Fact]
     public async Task EX01_a_receipt_line_explains_its_event_document_rule_mapping_and_text()
     {

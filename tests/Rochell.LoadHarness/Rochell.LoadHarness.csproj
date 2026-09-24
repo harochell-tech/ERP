@@ -1,15 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>Rochell.Procurement.Tests</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Rochell.LoadHarness</RootNamespace>
+    <!-- E-PR19-3: PF-01 load harness; a console app so the regular `dotnet test` never runs it. -->
+    <IsTestProject>false</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="Npgsql" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Rochell.Procurement\Rochell.Procurement.csproj" />
+    <ProjectReference Include="..\..\src\Rochell.Audit\Rochell.Audit.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Reconciliation\Rochell.Reconciliation.csproj" />
     <ProjectReference Include="..\Rochell.TestInfrastructure\Rochell.TestInfrastructure.csproj" />
   </ItemGroup>

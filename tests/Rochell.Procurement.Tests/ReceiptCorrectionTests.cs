@@ -81,6 +81,7 @@ public sealed class ReceiptCorrectionTests(PostgresFixture postgres)
         Assert.Equal(1L, await h.ScalarAsync<long>("SELECT count(*) FROM core.document_link WHERE link_type = 'CORRECTS' AND to_line_id = @g", ("g", grLine)));
     }
 
+    [Trait("Acceptance", "RC-03")]
     [Fact]
     public async Task RC03_less_received_splits_into_remaining_stock_and_usage_variance()
     {
@@ -123,6 +124,7 @@ public sealed class ReceiptCorrectionTests(PostgresFixture postgres)
         Assert.Equal("9.000000|13500.0000|13500.0000|-57000.0000|1500.0000|0|27.000000", await Books(h, poB));
     }
 
+    [Trait("Acceptance", "RC-04")]
     [Fact]
     public async Task RC04_an_invoiced_quantity_cannot_be_corrected_away()
     {
@@ -138,6 +140,7 @@ public sealed class ReceiptCorrectionTests(PostgresFixture postgres)
         Assert.Equal(ProcurementErrors.AlreadyInvoiced, ex.Code);
     }
 
+    [Trait("Acceptance", "RC-05")]
     [Fact]
     public async Task RC05_increase_beyond_tolerance_needs_an_approved_over_receipt()
     {

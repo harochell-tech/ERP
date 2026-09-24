@@ -50,6 +50,7 @@ public sealed class PurchaseOrderTests(PostgresFixture postgres)
             ("p", po)));
     }
 
+    [Trait("Acceptance", "SC-01")]
     [Fact]
     public async Task SC01_creator_cannot_approve_even_holding_the_approver_role()
     {

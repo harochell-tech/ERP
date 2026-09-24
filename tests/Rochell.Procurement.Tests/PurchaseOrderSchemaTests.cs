@@ -90,6 +90,7 @@ public sealed class PurchaseOrderSchemaTests(PostgresFixture postgres)
         }
     }
 
+    [Trait("Acceptance", "TEN-02")]
     [Fact]
     public async Task Row_level_security_isolates_purchase_orders()
     {

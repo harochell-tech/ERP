@@ -29,6 +29,7 @@ public sealed class LedgerMaintenanceTests(PostgresFixture postgres)
     private static Task<CommandResult> Repost(TestHarness h, Guid session, Guid sourceEvent, string rule, string key)
         => h.RunAsync(new RepostEvent(h.CompanyId, session, key, sourceEvent, rule, "Mapeo de GRNI equivocado"), new RepostEventHandler());
 
+    [Trait("Acceptance", "AT-06")]
     [Fact]
     public async Task AT06_repost_moves_the_journal_to_the_current_mapping_and_the_receipt_can_still_be_reversed()
     {
@@ -105,6 +106,7 @@ public sealed class LedgerMaintenanceTests(PostgresFixture postgres)
         { "INVENTORY_ADJUSTMENT", "5190" },
     };
 
+    [Trait("Acceptance", "IV-03")]
     [Theory]
     [MemberData(nameof(CounterAccounts))]
     public async Task IV03_an_orphan_value_goes_to_zero_against_the_policy_account(string counterRole, string counterAccount)

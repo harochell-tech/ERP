@@ -22,3 +22,16 @@ dotnet test Rochell.slnx
 cd web && npm ci && npm run lint && npm run typecheck && npm run check:api && npm test && npm run build
 npx playwright install chromium && npx playwright test   # needs the Release build of the solution
 ```
+
+## Load (PF-01)
+
+Workflow `.github/workflows/load.yml`, job `pf-01` (not a required check): manual (`workflow_dispatch`, receipts and workers as
+inputs), weekly, and on changes to `tests/Rochell.LoadHarness`. It runs 10,000 goods receipts with 8 workers and the sealer, then
+the 8 reconciliations; fails when p95 of PostGoodsReceipt ≥ 500 ms or the reconciliations take ≥ 30 s. The report (`pf01.md`,
+`pf01.json`) is the job summary and an artifact. Locally:
+
+```bash
+dotnet run --project tests/Rochell.LoadHarness -c Release -- --receipts 10000 --workers 8 --report load-report
+```
+
+CC-04 (50 workers × 60 s) runs in the regular suite; `ROCHELL_CC04_SECONDS` shortens it for local iterations.

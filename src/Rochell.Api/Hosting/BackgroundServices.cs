@@ -26,7 +26,7 @@ public sealed class SealerService(SealerSettings settings, SealerDatabase databa
                 var failed = passes.Sum(p => p.Failed);
                 if (failed > 0)
                 {
-                    logger.LogError("Sealer marked {Failed} group(s) SEAL_ERROR; run hash verification.", failed);
+                    logger.LogCritical("Sealer marked {Failed} group(s) SEAL_ERROR: a ledger row no longer matches its hash; closing is blocked until it is resolved (INT-02). Run hash verification.", failed);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

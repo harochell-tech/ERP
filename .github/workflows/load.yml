@@ -1,0 +1,60 @@
+name: load
+
+# E-PR19-3: PF-01 on the reference hardware (GitHub ubuntu-24.04 runner) until staging exists (B-03).
+# Not part of the required check: manual, weekly, and on changes to the harness itself.
+on:
+  workflow_dispatch:
+    inputs:
+      receipts:
+        description: Synthetic goods receipts
+        default: "10000"
+      workers:
+        description: Concurrent workers
+        default: "8"
+  schedule:
+    - cron: "0 6 * * 1"
+  pull_request:
+    paths:
+      - tests/Rochell.LoadHarness/**
+      - .github/workflows/load.yml
+
+permissions:
+  contents: read
+
+jobs:
+  pf-01:
+    name: pf-01
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+      DOTNET_ENVIRONMENT: Test
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build tests/Rochell.LoadHarness -c Release
+
+      - name: PF-01 (10,000 receipts, p95 < 500 ms, reconciliations < 30 s)
+        run: >
+          dotnet run --project tests/Rochell.LoadHarness -c Release --no-build --
+          --receipts "${{ github.event.inputs.receipts || '10000' }}"
+          --workers "${{ github.event.inputs.workers || '8' }}"
+          --report load-report
+
+      - name: Summary
+        if: always()
+        run: cat load-report/pf01.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pf01-report
+          path: load-report
+          if-no-files-found: warn
