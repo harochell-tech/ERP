@@ -11,8 +11,8 @@ using Rochell.Platform.Time;
 namespace Rochell.Platform.Commands;
 
 /// <summary>
-/// Transaction template of Frozen Baseline Patch 1 §5.2, platform part (steps 1–3, 8, 14–17):
-/// pre-assign ids → BEGIN → command_log (result NULL; duplicates wait on the unique index) → handler
+/// Transaction template of Frozen Baseline Patch 1 §5.2, platform part (steps 1–3, 6, 8, 14–17):
+/// pre-assign ids → BEGIN → tenant settings (RLS) → authorization → command_log (result NULL; duplicates wait on the unique index) → handler
 /// (events, documents, ledgers) → outbox → single UPDATE of the result → COMMIT → request_log outside the TX.
 /// Retries the whole command on 40001/40P01 with the same idempotency key.
 /// </summary>
@@ -20,13 +20,15 @@ public sealed class CommandPipeline
 {
     private static readonly int[] BackoffMs = [50, 200, 800];
     private readonly DbDataSource _dataSource;
+    private readonly ICommandAuthorizer _authorizer;
     private readonly IRequestLogSink _requestLog;
     private readonly IClock _clock;
     private readonly IIdGenerator _ids;
 
-    public CommandPipeline(DbDataSource dataSource, IRequestLogSink requestLog, IClock? clock = null, IIdGenerator? ids = null)
+    public CommandPipeline(DbDataSource dataSource, ICommandAuthorizer authorizer, IRequestLogSink requestLog, IClock? clock = null, IIdGenerator? ids = null)
     {
         _dataSource = dataSource ?? throw new ArgumentNullException(nameof(dataSource));
+        _authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
         _requestLog = requestLog ?? throw new ArgumentNullException(nameof(requestLog));
         _clock = clock ?? SystemClock.Instance;
         _ids = ids ?? UuidV7Generator.Instance;
@@ -103,14 +105,11 @@ public sealed class CommandPipeline
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
 
-        await Sql.ExecuteAsync(
-            connection,
-            transaction,
-            "SELECT set_config('app.company_id', @company, true), set_config('app.session_id', @session, true), set_config('app.correlation_id', @correlation, true)",
-            cancellationToken,
-            ("company", command.CompanyId.ToString()),
-            ("session", command.SessionId.ToString()),
-            ("correlation", correlationId.ToString())).ConfigureAwait(false);
+        await SetTenantAsync(connection, transaction, command, correlationId, cancellationToken).ConfigureAwait(false);
+
+        // Step 6 (authorization part): session, permission, plant scope and step-up, before any write.
+        var requirement = Requirement(handler);
+        await _authorizer.AuthorizeAsync(connection, transaction, command, requirement, cancellationToken).ConfigureAwait(false);
 
         // Step 3: idempotency row. A concurrent command with the same key blocks here until the first one ends.
         try
@@ -133,7 +132,7 @@ public sealed class CommandPipeline
         catch (DbException ex) when (ex.SqlState == SqlStates.UniqueViolation)
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            return await ReadCommittedResultAsync(connection, command, handler.CommandType, cancellationToken).ConfigureAwait(false);
+            return await ReadCommittedResultAsync(connection, command, handler.CommandType, correlationId, cancellationToken).ConfigureAwait(false);
         }
 
         var context = new CommandContext(connection, transaction, command, commandId, resultRef, correlationId, _clock, _ids);
@@ -167,15 +166,38 @@ public sealed class CommandPipeline
         return new CommandResult(commandId, resultRef, canonicalPayload, Duplicate: false);
     }
 
+    /// <summary>Transaction-local tenant settings read by row-level security policies and triggers.</summary>
+    public static Task SetTenantAsync(DbConnection connection, DbTransaction transaction, ICommand command, Guid correlationId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        return Sql.ExecuteAsync(
+            connection,
+            transaction,
+            "SELECT set_config('app.company_id', @company, true), set_config('app.session_id', @session, true), set_config('app.correlation_id', @correlation, true)",
+            cancellationToken,
+            ("company", command.CompanyId.ToString()),
+            ("session", command.SessionId.ToString()),
+            ("correlation", correlationId.ToString()));
+    }
+
+    private static RequiresPermissionAttribute Requirement(object handler)
+        => handler.GetType().GetCustomAttributes(typeof(RequiresPermissionAttribute), inherit: false) is [RequiresPermissionAttribute requirement]
+            ? requirement
+            : throw new InvalidOperationException($"Command handler {handler.GetType().FullName} does not declare [RequiresPermission].");
+
     private static async Task<CommandResult> ReadCommittedResultAsync(
         DbConnection connection,
         ICommand command,
         string commandType,
+        Guid correlationId,
         CancellationToken cancellationToken)
     {
+        // Row-level security: the read needs the tenant setting, so it runs in its own short transaction.
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await SetTenantAsync(connection, transaction, command, correlationId, cancellationToken).ConfigureAwait(false);
         await using var select = Sql.Command(
             connection,
-            null,
+            transaction,
             """
             SELECT command_id, result_ref, result_payload::text
             FROM core.command_log
@@ -190,7 +212,10 @@ public sealed class CommandPipeline
             throw new InvalidOperationException("Idempotency conflict reported but no committed command_log row was found.");
         }
 
-        return new CommandResult(reader.GetGuid(0), reader.GetGuid(1), JsonCanonicalizer.Canonicalize(reader.GetString(2)), Duplicate: true);
+        var result = new CommandResult(reader.GetGuid(0), reader.GetGuid(1), JsonCanonicalizer.Canonicalize(reader.GetString(2)), Duplicate: true);
+        await reader.CloseAsync().ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return result;
     }
 
     private static string CanonicalResult(string payload)

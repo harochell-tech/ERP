@@ -18,7 +18,7 @@ public sealed class PlatformSchemaTests(PostgresFixture postgres)
     [InlineData("core.document_link")]
     public async Task Append_only_tables_reject_update_and_delete_even_for_the_owner(string table)
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         await SeedAllTablesAsync(h);
 
         Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync($"UPDATE {table} SET company_id = company_id"))?.SqlState);
@@ -37,7 +37,7 @@ public sealed class PlatformSchemaTests(PostgresFixture postgres)
     [InlineData("INSERT INTO md.company VALUES (gen_random_uuid(), '999', 'x')")]
     public async Task Application_role_has_no_privileges_beyond_the_baseline(string sql)
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         await SeedAllTablesAsync(h);
 
         Assert.Equal(InsufficientPrivilege, (await h.AppExecuteAsync(sql))?.SqlState);
@@ -46,9 +46,9 @@ public sealed class PlatformSchemaTests(PostgresFixture postgres)
     [Fact]
     public async Task Cross_company_references_are_rejected_by_the_database()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         var (eventId, _) = await SeedAllTablesAsync(h);
-        var other = await PlatformHarness.CreateCompanyAsync(h.Admin);
+        var other = await h.CreateCompanyAsync();
 
         // Company B pointing at company A's event must fail in every table (composite FKs).
         Assert.Equal(SqlStates.ForeignKeyViolation, (await h.AdminExecuteAsync(
@@ -66,9 +66,9 @@ public sealed class PlatformSchemaTests(PostgresFixture postgres)
     [Fact]
     public async Task Domain_event_must_belong_to_a_command_of_the_same_company()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         var result = await h.Pipeline.ExecuteAsync(h.Ping("fk"), new PingHandler(), Guid.CreateVersion7());
-        var other = await PlatformHarness.CreateCompanyAsync(h.Admin);
+        var other = await h.CreateCompanyAsync();
 
         var ex = await h.AdminExecuteAsync(
             $$"""
@@ -85,7 +85,7 @@ public sealed class PlatformSchemaTests(PostgresFixture postgres)
     [Fact]
     public async Task Document_link_is_unique_treating_null_lines_as_equal()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         var (eventId, _) = await SeedAllTablesAsync(h);
         var from = Guid.CreateVersion7();
         var to = Guid.CreateVersion7();
@@ -95,7 +95,7 @@ public sealed class PlatformSchemaTests(PostgresFixture postgres)
         Assert.Equal(SqlStates.UniqueViolation, (await h.AdminExecuteAsync(insert))?.SqlState);
     }
 
-    private static async Task<(Guid EventId, Guid CommandId)> SeedAllTablesAsync(PlatformHarness h)
+    private static async Task<(Guid EventId, Guid CommandId)> SeedAllTablesAsync(TestHarness h)
     {
         var result = await h.Pipeline.ExecuteAsync(h.Ping("seed-" + Guid.NewGuid().ToString("N")), new PingHandler(), Guid.CreateVersion7());
         await h.RequestLog.FlushAsync();

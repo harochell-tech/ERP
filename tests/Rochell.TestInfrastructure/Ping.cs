@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Rochell.Platform.Commands;
 
-namespace Rochell.Platform.Tests.Infrastructure;
+namespace Rochell.TestInfrastructure;
 
 public enum PingMode
 {
@@ -20,6 +20,10 @@ public sealed record PingCommand(
     int SideEvents = 0,
     DateTime? OccurredAt = null) : ICommand;
 
+/// <summary>Plant-scoped test command.</summary>
+public sealed record PlantPingCommand(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PlantId) : IPlantScopedCommand;
+
+[RequiresPermission("test:ping")]
 public sealed class PingHandler : ICommandHandler<PingCommand>
 {
     private int _executions;
@@ -58,5 +62,28 @@ public sealed class PingHandler : ICommandHandler<PingCommand>
         }
 
         return JsonSerializer.Serialize(new { pingId = context.ResultRef, message = command.Message });
+    }
+}
+
+[RequiresPermission("test:ping_step_up", StepUp = true)]
+public sealed class StepUpPingHandler : ICommandHandler<PingCommand>
+{
+    private readonly PingHandler _inner = new();
+
+    public string CommandType => "Test.StepUpPing";
+
+    public Task<string> HandleAsync(PingCommand command, CommandContext context, CancellationToken cancellationToken)
+        => _inner.HandleAsync(command, context, cancellationToken);
+}
+
+[RequiresPermission("test:ping")]
+public sealed class PlantPingHandler : ICommandHandler<PlantPingCommand>
+{
+    public string CommandType => "Test.PlantPing";
+
+    public async Task<string> HandleAsync(PlantPingCommand command, CommandContext context, CancellationToken cancellationToken)
+    {
+        await context.AppendEventAsync(new EventDraft("PlantPinged", 1, "Ping", context.ResultRef, 1, "{}", Publish: false), cancellationToken);
+        return "{}";
     }
 }

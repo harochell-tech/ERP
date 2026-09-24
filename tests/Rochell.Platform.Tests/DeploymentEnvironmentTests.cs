@@ -14,7 +14,7 @@ public sealed class DeploymentEnvironmentTests(PostgresFixture postgres)
     [Fact]
     public async Task Empty_table_yields_null_environment()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
 
         await using var command = h.App.CreateCommand("SELECT core.current_environment()");
         Assert.Equal(DBNull.Value, await command.ExecuteScalarAsync());
@@ -23,7 +23,7 @@ public sealed class DeploymentEnvironmentTests(PostgresFixture postgres)
     [Fact]
     public async Task Application_role_cannot_write_or_spoof_the_environment()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         Assert.Null(await h.AdminExecuteAsync("INSERT INTO core.deployment_environment (environment, set_by, set_at) VALUES ('PRODUCTION', current_user, now())"));
 
         Assert.Equal(InsufficientPrivilege, (await h.AppExecuteAsync("UPDATE core.deployment_environment SET environment = 'TEST'"))?.SqlState);
@@ -48,7 +48,7 @@ public sealed class DeploymentEnvironmentTests(PostgresFixture postgres)
     [InlineData("TRUNCATE core.deployment_environment")]
     public async Task Even_the_owner_cannot_change_it_without_a_migration(string sql)
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         Assert.Null(await h.AdminExecuteAsync("INSERT INTO core.deployment_environment (environment, set_by, set_at) VALUES ('TEST', current_user, now())"));
 
         Assert.Equal(SqlStates.RaiseException, (await h.AdminExecuteAsync(sql))?.SqlState);
@@ -57,7 +57,7 @@ public sealed class DeploymentEnvironmentTests(PostgresFixture postgres)
     [Fact]
     public async Task Only_one_row_and_only_known_values()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
 
         Assert.Equal(SqlStates.CheckViolation, (await h.AdminExecuteAsync("INSERT INTO core.deployment_environment (environment, set_by, set_at) VALUES ('STAGING', current_user, now())"))?.SqlState);
         Assert.Equal(SqlStates.CheckViolation, (await h.AdminExecuteAsync("INSERT INTO core.deployment_environment (singleton, environment, set_by, set_at) VALUES (false, 'TEST', current_user, now())"))?.SqlState);

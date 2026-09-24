@@ -13,7 +13,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
     [Fact]
     public async Task ID01_duplicate_returns_original_result_and_writes_nothing()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         var handler = new PingHandler();
         var command = h.Ping("id-01");
 
@@ -35,7 +35,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
     [Fact]
     public async Task ID02_CMD03_concurrent_same_key_executes_once_and_second_waits()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         var handler = new PingHandler { HoldTransaction = TimeSpan.FromSeconds(1) };
         var command = h.Ping("id-02");
 
@@ -54,7 +54,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
     [Fact]
     public async Task ID03_domain_rejection_leaves_no_command_log_and_allows_retry()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         var handler = new PingHandler();
 
         var ex = await Assert.ThrowsAsync<DomainException>(
@@ -73,7 +73,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
     [Fact]
     public async Task ID04_technical_failure_rolls_back_everything()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => h.Pipeline.ExecuteAsync(h.Ping("id-04", mode: PingMode.FailAfterEvents, sideEvents: 2), new PingHandler(), Guid.CreateVersion7()));
@@ -85,7 +85,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
     [Fact]
     public async Task ID05_request_log_failure_never_affects_the_command()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         Assert.Null(await h.AdminExecuteAsync("REVOKE INSERT ON obs.request_log FROM rochell_app"));
 
         var result = await h.Pipeline.ExecuteAsync(h.Ping("id-05"), new PingHandler(), Guid.CreateVersion7());
@@ -101,7 +101,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
     [Fact]
     public async Task Result_payload_is_stored_and_committed_at_is_set()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
 
         var result = await h.Pipeline.ExecuteAsync(h.Ping("result", message: "bloque 6"), new PingHandler(), Guid.CreateVersion7());
 
@@ -113,8 +113,9 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
     [Fact]
     public async Task Same_key_in_another_company_is_a_different_command()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
-        var otherCompany = await PlatformHarness.CreateCompanyAsync(h.Admin);
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var otherCompany = await h.CreateCompanyAsync();
+        await h.GrantAsync(otherCompany, h.UserId, "TEST_PINGER");
         var handler = new PingHandler();
 
         var a = await h.Pipeline.ExecuteAsync(h.Ping("shared-key"), handler, Guid.CreateVersion7());

@@ -49,13 +49,45 @@ public sealed class OutboxDispatcher
         _onError = onError;
     }
 
-    /// <summary>Dispatches up to <paramref name="batchSize"/> pending events. Returns how many were marked dispatched.</summary>
+    /// <summary>
+    /// Dispatches up to <paramref name="batchSize"/> pending events per company. Returns how many were marked dispatched.
+    /// Row-level security isolates companies, so each company is claimed in its own transaction with its tenant setting.
+    /// </summary>
     public async Task<int> DispatchPendingAsync(int batchSize = 100, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
 
+        var total = 0;
+        foreach (var companyId in await CompaniesAsync(cancellationToken).ConfigureAwait(false))
+        {
+            total += await DispatchCompanyAsync(companyId, batchSize, cancellationToken).ConfigureAwait(false);
+        }
+
+        return total;
+    }
+
+    private async Task<List<Guid>> CompaniesAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = Sql.Command(connection, null, "SELECT company_id FROM md.company ORDER BY company_id");
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var companies = new List<Guid>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            companies.Add(reader.GetGuid(0));
+        }
+
+        return companies;
+    }
+
+    private static Task SetCompanyAsync(DbConnection connection, DbTransaction transaction, Guid companyId, CancellationToken cancellationToken)
+        => Sql.ExecuteAsync(connection, transaction, "SELECT set_config('app.company_id', @company, true)", cancellationToken, ("company", companyId.ToString()));
+
+    private async Task<int> DispatchCompanyAsync(Guid companyId, int batchSize, CancellationToken cancellationToken)
+    {
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await SetCompanyAsync(connection, transaction, companyId, cancellationToken).ConfigureAwait(false);
 
         var batch = await ClaimAsync(connection, transaction, batchSize, cancellationToken).ConfigureAwait(false);
         var dispatched = 0;
@@ -140,6 +172,7 @@ public sealed class OutboxDispatcher
     {
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await SetCompanyAsync(connection, transaction, item.CompanyId, cancellationToken).ConfigureAwait(false);
 
         var inserted = await Sql.ExecuteAsync(
             connection,

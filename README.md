@@ -23,6 +23,7 @@ Contradictions or ambiguities are reported as a proposed erratum; they are never
 | `tests/Rochell.TestInfrastructure` | Shared PostgreSQL 17 fixture (Testcontainers), app-role login |
 | `tests/Rochell.Migrations.Tests` | Runner + schema tests on PostgreSQL 17 |
 | `tests/Rochell.Platform.Tests` | Platform tests (ID-01…07, CMD-01…03, hashing golden vectors, environment, privileges) |
+| `tests/Rochell.Identity.Tests` | Identity tests (sessions, authorization, step-up, role changes, SoD, RLS) |
 | `tests/Rochell.ArchitectureTests` | Guardrails: no floating point, module boundaries, repository conventions |
 
 ## Environments
@@ -30,4 +31,4 @@ Contradictions or ambiguities are reported as a proposed erratum; they are never
 `Development`, `Test`, `Staging` (`ASPNETCORE_ENVIRONMENT` / `DOTNET_ENVIRONMENT`). Any other value fails at startup.
 Credentials for Test/Staging come only from environment variables. The fiscal production gate does **not** use these settings (Patch 1.1, correction 3).
 
-See `docs/engineering/migrations.md`, `docs/engineering/platform.md` and `docs/engineering/ci.md`.
+See `docs/engineering/` (migrations, platform, identity, ci) and `docs/architecture/errata.md`.
