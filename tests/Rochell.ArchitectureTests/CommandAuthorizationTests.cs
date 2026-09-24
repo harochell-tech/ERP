@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Rochell.Platform.Commands;
+using Rochell.Platform.Queries;
 using Xunit;
 
 namespace Rochell.ArchitectureTests;
@@ -10,7 +11,8 @@ public sealed partial class CommandAuthorizationTests
     private static IEnumerable<Type> ProductionHandlers => Repo.ProductionAssemblies
         .SelectMany(a => a.GetTypes())
         .Where(t => t is { IsClass: true, IsAbstract: false }
-                    && t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICommandHandler<>)));
+                    && t.GetInterfaces().Any(i => i.IsGenericType
+                                                  && (i.GetGenericTypeDefinition() == typeof(ICommandHandler<>) || i.GetGenericTypeDefinition() == typeof(IQueryHandler<>))));
 
     [Fact]
     public void Every_production_command_handler_declares_a_permission()

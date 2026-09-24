@@ -87,3 +87,22 @@ public sealed class PlantPingHandler : ICommandHandler<PlantPingCommand>
         return "{}";
     }
 }
+
+/// <summary>Test-only query that tries to write: the query pipeline must refuse it (read-only transaction, E-PR17-1).</summary>
+public sealed record WritingQuery(Guid CompanyId, Guid SessionId) : Rochell.Platform.Queries.IQuery;
+
+[RequiresPermission("test:ping")]
+public sealed class WritingQueryHandler : Rochell.Platform.Queries.IQueryHandler<WritingQuery>
+{
+    public string QueryType => "Test.WritingQuery";
+
+    public async Task<string> HandleAsync(WritingQuery query, Rochell.Platform.Queries.QueryContext context, CancellationToken cancellationToken)
+    {
+        await Rochell.Platform.Data.Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "INSERT INTO obs.request_log (request_id, outcome, received_at) VALUES (gen_random_uuid(), 'SUCCEEDED', now())",
+            cancellationToken);
+        return "{}";
+    }
+}

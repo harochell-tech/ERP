@@ -27,6 +27,19 @@ public static class PolicySetup
     };
 
     /// <summary>ACTIVE policy version prepared by the deployment identity and approved by the harness user. Returns its id.</summary>
+    /// <summary>Creates an ACTIVE version of the policy only if none is ACTIVE yet (shared by setups that may be combined).</summary>
+    public static async Task EnsureActivePolicyAsync(this TestHarness h, string policyCode, IReadOnlyDictionary<string, string> parameters)
+    {
+        ArgumentNullException.ThrowIfNull(h);
+        if (await h.ScalarAsync<long>(
+                "SELECT count(*) FROM acc.accounting_policy_version WHERE company_id = @c AND policy_code = @p AND status = 'ACTIVE'",
+                ("c", h.CompanyId),
+                ("p", policyCode)) == 0)
+        {
+            await h.CreateActivePolicyAsync(policyCode, parameters);
+        }
+    }
+
     public static async Task<Guid> CreateActivePolicyAsync(this TestHarness h, string policyCode, IReadOnlyDictionary<string, string> parameters, DateOnly? from = null)
     {
         ArgumentNullException.ThrowIfNull(h);

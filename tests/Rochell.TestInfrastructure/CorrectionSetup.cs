@@ -9,7 +9,7 @@ public static class CorrectionSetup
     public static async Task EnableCorrectionsAsync(this TestHarness h, bool approveRules = true)
     {
         ArgumentNullException.ThrowIfNull(h);
-        await h.CreateActivePolicyAsync("INVENTORY", PolicySetup.Inventory);
+        await h.EnsureActivePolicyAsync("INVENTORY", PolicySetup.Inventory);
         await h.EnableReallocationAsync(approveR02B: false);
         await h.CreateActiveMapAsync("MATERIAL_USAGE_VARIANCE", await h.CreateAccountAsync("5110", "Variación de uso de material", isControl: false));
         if (approveRules)

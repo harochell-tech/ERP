@@ -219,7 +219,7 @@ public sealed class SupplierInvoicePostingTests(PostgresFixture postgres)
         await using var h = await TestHarness.CreateAsync(postgres);
         var s = await h.CreateInvoicingSetupAsync();
         await h.EnableInvoicePostingAsync();
-        await h.CreateActivePolicyAsync("INVENTORY", PolicySetup.Inventory);   // corrections without re-creating the PPV account
+        // Corrections without re-creating the PPV account; their INVENTORY policy already comes with invoice posting (E-PR17-4).
         await h.AdminRequireAsync(
             $"UPDATE fin.posting_rule_version SET status = 'ACTIVE', approved_by = '{h.UserId}' WHERE posting_rule_id IN ('{CorrectionSetup.R03A}', '{CorrectionSetup.R03B}') AND version = 1");
         var (si, version) = await MatchedAsync(h, s, 6m, 1500m);
