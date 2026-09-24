@@ -8,7 +8,7 @@ The Controller approves mappings (`ApproveAccountRoleMap`) and rule versions (`A
 
 1. `var plan = await engine.PrepareAsync(context, request)` — before writing anything: active rule version (by business date),
    posting date (period + close component, late entry), account per line (role map by posting date, category-specific first),
-   rounding to 2 decimals, balance. Any gap throws `POSTING_PREREQUISITE_MISSING` / `POSTING_UNBALANCED` → full rollback.
+   rounding to 2 decimals, balance (a difference within the POSTING policy tolerance goes to ROUNDING_DIFFERENCE, line R-08). Any gap throws `POSTING_PREREQUISITE_MISSING` / `POSTING_UNBALANCED` → full rollback.
 2. Append the domain event and write the documents.
 3. `await engine.WriteAsync(context, plan, eventId)` — journal, lines (row hashes) and `gl_period_balance`.
 

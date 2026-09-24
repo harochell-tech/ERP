@@ -96,9 +96,10 @@ public sealed class SchemaTests(PostgresFixture postgres)
             WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'migrations')
             """);
 
-        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*.
+        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*.
         Assert.Equal(
-            "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.outbox,core.state_history,"
+            "acc.accounting_policy,acc.accounting_policy_parameter,acc.accounting_policy_version,acc.policy_parameter_definition,"
+            + "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.outbox,core.state_history,"
             + "fin.account,fin.account_role,fin.account_role_map,fin.close_component_state,fin.gl_entry,fin.gl_journal,fin.gl_period_balance,"
             + "fin.period,fin.posting_rule,fin.posting_rule_version,"
             + "iam.permission,iam.role,iam.role_assignment,iam.role_assignment_request,iam.role_permission,iam.session,iam.sod_rule,iam.user,"

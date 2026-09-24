@@ -83,8 +83,9 @@ public sealed class PostingEngineTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         var ledger = await h.CreateLedgerAsync();
+        await h.CreateActivePolicyAsync("POSTING", PolicySetup.Posting);
 
-        var ex = await Assert.ThrowsAsync<DomainException>(() => Post(h, ledger, "unbalanced", 100m, credit: 99.99m));
+        var ex = await Assert.ThrowsAsync<DomainException>(() => Post(h, ledger, "unbalanced", 100m, credit: 90m));
 
         Assert.Equal(FinanceErrors.PostingUnbalanced, ex.Code);
         Assert.Equal((0L, 0L, 0L), await h.CountsAsync());

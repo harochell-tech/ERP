@@ -15,6 +15,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["ADMIN_SEGURIDAD"] = "role:assign,role:revoke",
         ["ALMACENISTA"] = "goods_receipt:post,item:create,receipt_correction:create",
         ["ANALISTA_FISCAL"] = "fiscal_rule:configure,fiscal_rule_source:register",
+        ["APROBADOR_POLITICAS"] = "accounting_policy:approve", // E-PR06-4
         ["APROBADOR_COMPRAS"] = "purchase_order:approve,purchase_order:approve_over_receipt",
         ["AUDITOR"] = "audit:read,hash:verify,reconciliation:read",
         ["COMPRADOR"] = "purchase_order:cancel,purchase_order:create,purchase_order:submit,supplier:create,supplier:update",

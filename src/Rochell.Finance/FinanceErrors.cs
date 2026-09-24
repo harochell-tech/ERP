@@ -12,4 +12,6 @@ public static class FinanceErrors
     public const string FourEyes = "FOUR_EYES_REQUIRED";
     public const string Overlap = "EFFECTIVE_RANGE_OVERLAP";
     public const string RuleDefinitionInvalid = "RULE_DEFINITION_INVALID";
+    public const string PolicyParametersInvalid = "POLICY_PARAMETERS_INVALID";
+    public const string PolicyUnknown = "POLICY_UNKNOWN";
 }

@@ -28,7 +28,8 @@ public sealed record PostingPlan(
     Guid PeriodId,
     DateOnly PostingDate,
     bool LateEntry,
-    IReadOnlyList<PlannedLine> Lines);
+    IReadOnlyList<PlannedLine> Lines,
+    Guid? RoundingPolicyVersionId = null);
 
 public sealed record PlannedLine(PostingLineInput Input, RuleLine Rule, Guid AccountId, Guid AccountRoleMapId, string? ItemCategory, decimal Debit, decimal Credit);
 
