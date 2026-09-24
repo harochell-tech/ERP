@@ -135,7 +135,10 @@ public sealed class CommandPipeline
             return await ReadCommittedResultAsync(connection, command, handler.CommandType, correlationId, cancellationToken).ConfigureAwait(false);
         }
 
-        var context = new CommandContext(connection, transaction, command, commandId, resultRef, correlationId, _clock, _ids);
+        var context = new CommandContext(connection, transaction, command, commandId, resultRef, correlationId, _clock, _ids)
+        {
+            StepUpCheck = ct => _authorizer.EnsureStepUpAsync(connection, transaction, command, ct),
+        };
         var payload = await handler.HandleAsync(command, context, cancellationToken).ConfigureAwait(false);
         var canonicalPayload = CanonicalResult(payload);
 

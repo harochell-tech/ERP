@@ -8,6 +8,8 @@ public static class PolicySetup
         ["match_qty_tolerance_pct"] = "0.01",
         ["match_price_tolerance_pct"] = "0.01",
         ["match_amount_tolerance_abs"] = "5.00",
+        ["po_approval_limit"] = "100000.00",
+        ["po_approval_step_up_threshold"] = "50000.00",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Inventory = new Dictionary<string, string>

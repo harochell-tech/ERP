@@ -38,6 +38,13 @@ public interface ICommandAuthorizer
         ICommand command,
         RequiresPermissionAttribute requirement,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Conditional step-up requested by a handler (e.g. "re-authenticate above a policy threshold", E-PR08-2).
+    /// Throws <see cref="DomainException"/> with <see cref="AuthorizationErrors.StepUpRequired"/> when the session's
+    /// last re-authentication is too old.
+    /// </summary>
+    Task EnsureStepUpAsync(DbConnection connection, DbTransaction transaction, ICommand command, CancellationToken cancellationToken);
 }
 
 /// <summary>Error codes raised by authorization (request_log outcome REJECTED_DOMAIN).</summary>

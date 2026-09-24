@@ -89,6 +89,17 @@ public sealed class SqlCommandAuthorizer : ICommandAuthorizer
             ("threshold", now - _options.ActivityTouchInterval)).ConfigureAwait(false);
     }
 
+    public async Task EnsureStepUpAsync(DbConnection connection, DbTransaction transaction, ICommand command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        var session = await ReadSessionAsync(connection, transaction, command.SessionId, cancellationToken).ConfigureAwait(false)
+            ?? throw new DomainException(AuthorizationErrors.SessionInvalid, "The session does not exist.");
+        if (session.LastStepUpAt is null || _clock.UtcNow - session.LastStepUpAt.Value > _options.StepUpMaxAge)
+        {
+            throw new DomainException(AuthorizationErrors.StepUpRequired, "This action requires re-authentication.");
+        }
+    }
+
     private static async Task<SessionRow?> ReadSessionAsync(DbConnection connection, DbTransaction transaction, Guid sessionId, CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(

@@ -60,6 +60,14 @@ public sealed class CommandContext
 
     internal IReadOnlyList<Guid> PublishedEventIds => _published;
 
+    internal Func<CancellationToken, Task>? StepUpCheck { get; set; }
+
+    /// <summary>Requires a recent re-authentication of the acting session, decided by the handler (E-PR08-2).</summary>
+    public Task RequireStepUpAsync(CancellationToken cancellationToken)
+        => StepUpCheck is null
+            ? throw new InvalidOperationException("Step-up is not available outside the command pipeline.")
+            : StepUpCheck(cancellationToken);
+
     /// <summary>Inserts a domain event with its canonical row hash. Returns the event id.</summary>
     public async Task<Guid> AppendEventAsync(EventDraft draft, CancellationToken cancellationToken)
     {
