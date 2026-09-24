@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\src\Rochell.Migrations\Rochell.Migrations.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Platform\Rochell.Platform.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Identity\Rochell.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Rochell.Finance\Rochell.Finance.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\db\migrations\*.sql" Link="migrations\main\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
