@@ -359,13 +359,23 @@ public sealed class VoidSupplierInvoiceHandler : ICommandHandler<VoidSupplierInv
         var reason = PurchaseOrderStore.RequireReason(command.Reason);
         var header = await SupplierInvoiceStore.LockAsync(context, command.SupplierInvoiceId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         if (header.Status is not (SupplierInvoiceStatus.Draft or SupplierInvoiceStatus.MatchException or SupplierInvoiceStatus.Matched)
-            || header.AccountingStatus != "NOT_POSTED")
+            || header.AccountingStatus is not ("NOT_POSTED" or "POSTING_BLOCKED"))
         {
             throw new DomainException(ProcurementErrors.InvalidState, $"The invoice is {header.Status}/{header.AccountingStatus}; only unposted invoices can be voided.");
         }
 
+        // E-PR13b-1: a POSTING_BLOCKED invoice never posted anything; voided, its accounting status is NOT_POSTED again.
         var version = await SupplierInvoiceStore.TransitionAsync(
-            context, header, SupplierInvoiceStatus.Voided, CommandType, "SupplierInvoiceVoided", new { siId = header.Id, reason }, publish: true, cancellationToken, reason).ConfigureAwait(false);
+            context,
+            header,
+            SupplierInvoiceStatus.Voided,
+            CommandType,
+            "SupplierInvoiceVoided",
+            new { siId = header.Id, reason, previousAccountingStatus = header.AccountingStatus },
+            publish: true,
+            cancellationToken,
+            reason,
+            ", accounting_status = 'NOT_POSTED'").ConfigureAwait(false);
         return JsonSerializer.Serialize(new { supplierInvoiceId = header.Id, status = SupplierInvoiceStatus.Voided, version });
     }
 }

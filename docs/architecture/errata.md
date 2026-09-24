@@ -84,6 +84,9 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR13-5 | PR-13 | doc_date not in the future; due_date ≥ doc_date and mandatory; tax determination and posting use doc_date (late entry when the component is closed). |
 | E-PR13-6 | PR-13 | R-04 closes with AP-REC; R-05 with INV-MOV (two journals of the same event). |
 | E-PR13-7 | PR-13 | R-05 coverage s = min(area quantity, Q_base) ÷ Q_base, Q_base with the receipt's own factor; s·D to 2 decimals, PPV = D − s·D; new value-only movement PRICE_ADJUSTMENT. |
+| E-PR13b-1 | PR-13b | Voiding a POSTING_BLOCKED invoice returns its accounting status to NOT_POSTED (nothing was ever posted); the event keeps the previous status. |
+| E-PR13b-2 | PR-13b | R-04 dimensions: GRNI plant + supplier; AP_CONTROL supplier + AP subledger (the AP document); WITHHOLDING_PAYABLE supplier; ITBIS_RECOVERABLE plant. |
+| E-PR13b-3 | PR-13b | A supplier invoice reversal is posted on the reversal date; the part of the price difference that cannot return to inventory goes to PPV through R-07B (seeded DRAFT). |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -110,4 +113,7 @@ Implementation rules derived from the above (no architectural change):
 - The application never locks append-only tables with FOR UPDATE (it needs the UPDATE privilege); it serializes with advisory locks instead.
 - A source is registered (and approved) by the fiscal analyst; the specialist's activation reviews the version with its sources.
 - Fiscal gate closed (FISCAL_GATE_CLOSED) when no purchase ITBIS rule is ACTIVE on the date, or when any rule has a version pending activation already in force on the date without an ACTIVE version covering it (SI-07). Only one purchase ITBIS rule may be active at a time.
+- R-04 and R-05 are separate journals of one event and each balances: R-04 credits AP with Q·P + T − W, R-05 credits (or debits) AP with the price difference D; both AP lines reference the same AP document, so the payable is Q·P′ + T − W.
+- Posting re-checks, under lock, that each line bills no more than received − invoiced (CC-03); the database CHECK `qty_invoiced ≤ qty_received` is the last guard.
+- The R-05 price differences (D, Q_base, covered share, value entry) are kept in the SupplierInvoicePosted event payload; the reversal (R-07/R-07B) reads them from there.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
