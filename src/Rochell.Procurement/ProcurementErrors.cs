@@ -31,6 +31,13 @@ public static class ProcurementErrors
     public const string CorrectionNotFound = "RECEIPT_CORRECTION_NOT_FOUND";
     public const string CorrectionNotPending = "RECEIPT_CORRECTION_NOT_PENDING";
     public const string EvidenceRequired = "EVIDENCE_REQUIRED";
+    public const string InvoiceNotFound = "SUPPLIER_INVOICE_NOT_FOUND";
+    public const string LineKindNotSupported = "LINE_KIND_NOT_SUPPORTED";
+    public const string FiscalNumberInvalid = "FISCAL_NUMBER_INVALID";
+    public const string FiscalNumberUsed = "FISCAL_NUMBER_USED";
+    public const string DateInvalid = "DATE_INVALID";
+    public const string PoLineNotInvoiceable = "PO_LINE_NOT_INVOICEABLE";
+    public const string QtyExceptionNotApprovable = "QTY_EXCEPTION_NOT_APPROVABLE";
 }
 
 public static class PurchaseOrderStatus

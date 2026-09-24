@@ -76,6 +76,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR12-5 | PR-12 | Test runs record their environment; READY and ACTIVE need the latest run of the deployment's own environment to pass. |
 | E-PR12-6 | PR-12 | Supplier taxpayer type from its identifier: 9-digit RNC = COMPANY, 11-digit cédula = INDIVIDUAL, none = FOREIGN. |
 | E-PR12-7 | PR-12 | Tax base and amount: 2 decimals half-up per line (`amount = round(base × rate, 2)`, enforced by CHECK). |
+| E-PR13-0 | PR-13 | Split into PR-13a (schema, register, match, exception approval, void) and PR-13b (posting R-04/R-05, AP, reversal R-07, CC-03). |
+| E-PR13-1 | PR-13 | Invoiced quantity above received-not-invoiced is a match exception that is never approvable; it is resolved by a receipt correction and a re-match. Under-invoicing is normal; `match_qty_tolerance_pct` is unused in VS#1. |
+| E-PR13-2 | PR-13 | A line's price is within tolerance when \|P′ − P\| ≤ P × match_price_tolerance_pct OR \|Q × (P′ − P)\| ≤ match_amount_tolerance_abs. |
+| E-PR13-3 | PR-13 | Non-recoverable ITBIS: posting records POSTING_BLOCKED with the determination, without journal, AP or qty_invoiced; other missing prerequisites roll back (P-1); a closed fiscal gate rejects (SI-07). |
+| E-PR13-4 | PR-13 | Supplier fiscal number: format only, B + 10 digits (NCF) or E + 12 digits (e-NCF); unique per supplier among non-voided invoices. |
+| E-PR13-5 | PR-13 | doc_date not in the future; due_date ≥ doc_date and mandatory; tax determination and posting use doc_date (late entry when the component is closed). |
+| E-PR13-6 | PR-13 | R-04 closes with AP-REC; R-05 with INV-MOV (two journals of the same event). |
+| E-PR13-7 | PR-13 | R-05 coverage s = min(area quantity, Q_base) ÷ Q_base, Q_base with the receipt's own factor; s·D to 2 decimals, PPV = D − s·D; new value-only movement PRICE_ADJUSTMENT. |
 
 Implementation rules derived from the above (no architectural change):
 
