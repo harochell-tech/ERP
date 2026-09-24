@@ -28,6 +28,9 @@ public static class ProcurementErrors
     public const string ReceiptNotReversible = "GOODS_RECEIPT_NOT_REVERSIBLE";
     public const string AlreadyInvoiced = "ALREADY_INVOICED";
     public const string UseReceiptCorrection = "USE_RECEIPT_CORRECTION";
+    public const string CorrectionNotFound = "RECEIPT_CORRECTION_NOT_FOUND";
+    public const string CorrectionNotPending = "RECEIPT_CORRECTION_NOT_PENDING";
+    public const string EvidenceRequired = "EVIDENCE_REQUIRED";
 }
 
 public static class PurchaseOrderStatus

@@ -30,3 +30,16 @@ and every lot is untouched since the receipt (otherwise: receipt correction, PR-
   APPROVED / PARTIALLY_RECEIVED; the weigh ticket is free again.
 
 **Setup:** approve R-02B and map PURCHASE_PRICE_VARIANCE before the first reversal that needs a reallocation.
+
+## Corrections (PR-11)
+
+`CreateReceiptCorrection` (Almacenista) proposes Δq on one receipt line with a reason and an evidence reference; under
+materiality it is DRAFT, above it PENDING_APPROVAL. `ApproveReceiptCorrection` (Controller, step-up above materiality) posts it;
+`RejectReceiptCorrection` rejects a pending one. Creator and approver always differ (SoD and a database CHECK).
+
+- **Δq > 0 (R-03A):** +Δq to the receipt's lot; Dr RAW_MATERIAL / Cr GRNI for Δq × P; within tolerance or approved over-receipt.
+- **Δq < 0 (R-03B):** q₁ = min(area stock, |Δq|) leaves stock at the average (receipt lot first, then oldest lots); q₂ = the rest
+  goes to MATERIAL_USAGE_VARIANCE at P; Dr GRNI |Δq| × P; the price difference of q₁ to PURCHASE_PRICE_VARIANCE.
+- The receipt becomes CORRECTED (and can then no longer be reversed); the order's received quantity and status follow.
+
+**Setup:** approve R-03A and R-03B; map PURCHASE_PRICE_VARIANCE and MATERIAL_USAGE_VARIANCE; INVENTORY policy active.

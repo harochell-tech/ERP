@@ -190,7 +190,7 @@ public sealed class ReverseGoodsReceiptHandler : ICommandHandler<ReverseGoodsRec
             ("gr", receipt.GrId),
             ("event", eventId)).ConfigureAwait(false);
 
-        var newStatus = await OrderStatusAfterAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
+        var newStatus = await PurchaseOrderStore.StatusFromReceiptsAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
         if (newStatus != header.Status)
         {
             await PurchaseOrderStore.TransitionAsync(context, header, newStatus, CommandType, "PurchaseOrderReceiptStatusChanged", new { poId = header.Id, status = newStatus, grrId }, publish: true, cancellationToken).ConfigureAwait(false);
@@ -278,22 +278,6 @@ public sealed class ReverseGoodsReceiptHandler : ICommandHandler<ReverseGoodsRec
         return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is Guid journal
             ? journal
             : throw new InvalidOperationException("A POSTED goods receipt without an unreversed journal (K-25 should prevent this).");
-    }
-
-    /// <summary>§11.1: APPROVED when nothing remains received, RECEIVED when every line is complete, otherwise PARTIALLY_RECEIVED.</summary>
-    private static async Task<string> OrderStatusAfterAsync(CommandContext context, Guid poId, CancellationToken cancellationToken)
-    {
-        await using var command = Sql.Command(
-            context.Connection,
-            context.Transaction,
-            """
-            SELECT CASE WHEN bool_and(qty_received = 0) THEN 'APPROVED'
-                        WHEN bool_and(qty_received >= qty_ordered) THEN 'RECEIVED'
-                        ELSE 'PARTIALLY_RECEIVED' END
-            FROM pur.purchase_order_line WHERE po_id = @p
-            """,
-            ("p", poId));
-        return (string)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
     }
 
     private sealed record ReceiptHeader(Guid GrId, string GrNo, Guid PoId, Guid PlantId, string DocumentStatus, string AccountingStatus, Guid PostingEventId);
