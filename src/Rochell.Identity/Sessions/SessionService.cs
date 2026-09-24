@@ -10,6 +10,23 @@ namespace Rochell.Identity.Sessions;
 /// <summary>Claims of an ID token already validated by the OIDC middleware (signature, issuer, audience, expiry).</summary>
 public sealed record OidcClaims(string Subject, string? Email, bool EmailVerified, string? HostedDomain);
 
+/// <summary>A role the session's user holds now in a company, company-wide (<see cref="PlantId"/> null) or for one plant.</summary>
+public sealed record SessionAssignment(string RoleCode, string RoleName, Guid? PlantId);
+
+/// <summary>What the user may do in one company: assignments valid now and the permissions they grant.</summary>
+public sealed record SessionCompany(Guid CompanyId, string LegalName, IReadOnlyList<SessionAssignment> Assignments, IReadOnlyList<string> Permissions);
+
+/// <summary>An open session as the UI needs it: who, until when, whether a step-up is still fresh, and where the user can act.</summary>
+public sealed record SessionDescription(
+    Guid SessionId,
+    Guid UserId,
+    string? Email,
+    DateTime LoginAt,
+    DateTime? LastStepUpAt,
+    DateTime? StepUpValidUntil,
+    DateTime ExpiresAt,
+    IReadOnlyList<SessionCompany> Companies);
+
 /// <summary>
 /// Office sessions (ADR-012, ADR-038). Login and re-authentication accept only verified Google Workspace identities
 /// of the configured domain whose subject belongs to an active human user with an employee (E-PR03-8).
@@ -80,6 +97,79 @@ public sealed class SessionService
         }
     }
 
+    /// <summary>
+    /// Describes a usable session (same rules as authorization, E-PR03-6) without touching its activity. Throws
+    /// <see cref="DomainException"/> with <see cref="AuthorizationErrors.SessionInvalid"/> or <see cref="AuthorizationErrors.SessionExpired"/>.
+    /// Assignments are read company by company because they are protected by row-level security.
+    /// </summary>
+    public async Task<SessionDescription> DescribeAsync(Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        var now = _clock.UtcNow;
+        var session = await Reading.SingleOrDefaultAsync(
+            connection,
+            null,
+            """
+            SELECT s.user_id, u.email, s.login_at, s.last_activity_at, s.last_step_up_at, s.logout_at, u.status, u.kind
+            FROM iam.session s
+            JOIN iam.user u ON u.user_id = s.user_id
+            WHERE s.session_id = @session_id
+            """,
+            r => new SessionRow(r.GetGuid(0), r.NullableString(1), r.Utc(2), r.Utc(3), r.NullableUtc(4), r.NullableUtc(5), r.GetString(6), r.GetString(7)),
+            cancellationToken,
+            ("session_id", sessionId)).ConfigureAwait(false)
+            ?? throw new DomainException(AuthorizationErrors.SessionInvalid, "The session does not exist.");
+        SessionRules.EnsureUsable(_options, now, session.LoginAt, session.LastActivityAt, session.LogoutAt, session.Status, session.Kind);
+
+        var companies = await Reading.ListAsync(
+            connection,
+            null,
+            "SELECT company_id, legal_name FROM md.company ORDER BY legal_name, company_id",
+            r => (Id: r.GetGuid(0), Name: r.GetString(1)),
+            cancellationToken).ConfigureAwait(false);
+
+        var result = new List<SessionCompany>();
+        foreach (var (companyId, legalName) in companies)
+        {
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            await Sql.ExecuteAsync(connection, transaction, "SELECT set_config('app.company_id', @c, true)", cancellationToken, ("c", companyId.ToString())).ConfigureAwait(false);
+            var assignments = await Reading.ListAsync(
+                connection,
+                transaction,
+                """
+                SELECT r.code, r.name, ra.plant_id, array_agg(rp.permission_code ORDER BY rp.permission_code)
+                FROM iam.role_assignment ra
+                JOIN iam.role r ON r.role_id = ra.role_id
+                JOIN iam.role_permission rp ON rp.role_id = ra.role_id
+                WHERE ra.company_id = @c AND ra.user_id = @u AND ra.valid_from <= @now AND (ra.valid_to IS NULL OR ra.valid_to > @now)
+                GROUP BY r.code, r.name, ra.plant_id
+                ORDER BY r.code, ra.plant_id NULLS FIRST
+                """,
+                r => (Assignment: new SessionAssignment(r.GetString(0), r.GetString(1), r.NullableGuid(2)), Permissions: r.GetFieldValue<string[]>(3)),
+                cancellationToken,
+                ("c", companyId),
+                ("u", session.UserId),
+                ("now", now)).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            if (assignments.Count > 0)
+            {
+                var permissions = assignments.SelectMany(a => a.Permissions).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+                result.Add(new SessionCompany(companyId, legalName, assignments.Select(a => a.Assignment).ToList(), permissions));
+            }
+        }
+
+        var stepUpValidUntil = session.LastStepUpAt + _options.StepUpMaxAge;
+        return new SessionDescription(
+            sessionId,
+            session.UserId,
+            session.Email,
+            session.LoginAt,
+            session.LastStepUpAt,
+            stepUpValidUntil > now ? stepUpValidUntil : null,
+            SessionRules.ExpiresAt(_options, session.LoginAt, session.LastActivityAt),
+            result);
+    }
+
     public async Task EndSessionAsync(Guid sessionId, CancellationToken cancellationToken = default)
     {
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -91,6 +181,8 @@ public sealed class SessionService
             ("now", _clock.UtcNow),
             ("session_id", sessionId)).ConfigureAwait(false);
     }
+
+    private sealed record SessionRow(Guid UserId, string? Email, DateTime LoginAt, DateTime LastActivityAt, DateTime? LastStepUpAt, DateTime? LogoutAt, string Status, string Kind);
 
     private void ValidateClaims(OidcClaims claims)
     {
