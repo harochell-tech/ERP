@@ -96,9 +96,10 @@ public sealed class SchemaTests(PostgresFixture postgres)
             WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'migrations')
             """);
 
-        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*. PR-07: inv.*. PR-08: pur.purchase_order*. PR-09: pur.goods_receipt*. PR-10: pur.goods_receipt_reversal. PR-11: pur.receipt_correction. PR-12: tax.*. PR-13a: pur.supplier_invoice*, pur.match_result, fin.ap_document.
+        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*. PR-07: inv.*. PR-08: pur.purchase_order*. PR-09: pur.goods_receipt*. PR-10: pur.goods_receipt_reversal. PR-11: pur.receipt_correction. PR-12: tax.*. PR-13a: pur.supplier_invoice*, pur.match_result, fin.ap_document. PR-15: audit.*.
         Assert.Equal(
             "acc.accounting_policy,acc.accounting_policy_parameter,acc.accounting_policy_version,acc.policy_parameter_definition,"
+            + "audit.integrity_state,audit.ledger_digest,audit.ledger_seal,"
             + "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.outbox,core.state_history,"
             + "fin.account,fin.account_role,fin.account_role_map,fin.ap_document,fin.close_component_state,fin.gl_entry,fin.gl_journal,fin.gl_period_balance,"
             + "fin.period,fin.posting_rule,fin.posting_rule_version,"

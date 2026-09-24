@@ -3,7 +3,9 @@
     <RootNamespace>Rochell.Audit</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Module rule: a module may reference only Rochell.Platform (ArchitectureTests). -->
+    <!-- Module rule (E-PR15-7): Audit may use Platform, and Finance / Inventory only to recompute their row hashes. -->
     <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+    <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
+    <ProjectReference Include="..\Rochell.Inventory\Rochell.Inventory.csproj" />
   </ItemGroup>
 </Project>

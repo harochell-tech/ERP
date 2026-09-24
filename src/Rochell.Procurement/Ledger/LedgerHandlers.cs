@@ -18,6 +18,8 @@ namespace Rochell.Procurement.Ledger;
 /// R-REP. Every inventory line of generation n gets an exact REPOST reversal of its value entry, and generation n + 1 a new REPOST
 /// value entry of the same amount (E-PR14-3): the valuation is unchanged and each GL inventory line keeps its own value entry (P-1).
 /// Each new inventory line records the value entry it replaces, so document reversals still find their inverse (PostingEngine).
+/// Both value entries belong to the JournalReposted event of this transaction: every inventory ledger row has as source an event
+/// committed with it, which is what groups them for sealing (PR-15).
 /// </summary>
 [RequiresPermission("journal:repost", StepUp = true)]
 public sealed class RepostEventHandler : ICommandHandler<RepostEvent>
@@ -149,7 +151,7 @@ public sealed class RepostEventHandler : ICommandHandler<RepostEvent>
                 new MovementSource(repostEventId, "REPOST", context.ResultRef), new MovementDates(occurredAt, businessDate, reversalPlan.PostingDate), cancellationToken).ConfigureAwait(false);
             await _inventory.PostValueAdjustmentAsync(
                 context, MovementTypes.Repost, v.Area, v.Plant, v.Item, v.Amount, v.Replacement, null,
-                new MovementSource(command.SourceEventId, "REPOST", context.ResultRef), new MovementDates(occurredAt, businessDate, newPlan.PostingDate), cancellationToken).ConfigureAwait(false);
+                new MovementSource(repostEventId, "REPOST", context.ResultRef), new MovementDates(occurredAt, businessDate, newPlan.PostingDate), cancellationToken).ConfigureAwait(false);
         }
 
         var reversed = await _engine.WriteReversalAsync(context, reversalPlan, repostEventId, occurredAt, cancellationToken, valueEntries.ToDictionary(v => v.Original, v => v.Reversal)).ConfigureAwait(false);

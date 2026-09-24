@@ -39,4 +39,9 @@ public static class BusinessCalendar
 
     public static DateOnly DefaultBusinessDate(DateTime utc)
         => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(Precision.ToMicroseconds(utc), DominicanRepublic));
+
+    /// <summary>The UTC instants [start, end) of a local calendar day in the Dominican Republic (daily digests, E-PR15-5).</summary>
+    public static (DateTime StartUtc, DateTime EndUtc) DayUtcRange(DateOnly day)
+        => (TimeZoneInfo.ConvertTimeToUtc(day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), DominicanRepublic),
+            TimeZoneInfo.ConvertTimeToUtc(day.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), DominicanRepublic));
 }

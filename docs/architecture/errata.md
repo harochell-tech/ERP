@@ -92,6 +92,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR14-3 | PR-14 | New value-only movement REPOST (any sign): the reversal points to the original value entry, generation n + 1 gets a new entry of the same amount; valuation unchanged, P-1 kept. |
 | E-PR14-4 | PR-14 | R-06 only removes orphan value (quantity 0, value ≠ 0) down to zero; other VAL-RESIDUAL findings are reported (PR-16), not adjusted by R-06 in VS#1. |
 | E-PR14-5 | PR-14 | INVENTORY policy parameter `valuation_residual_account_role` (PURCHASE_PRICE_VARIANCE or INVENTORY_ADJUSTMENT) chooses R-06's counter-account; new value-only movement RESIDUAL_ADJUSTMENT; R-06 seeded DRAFT. |
+| E-PR15-1 | PR-15 | `audit.integrity_state` (Patch 1 P-2) is created in PR-15; PENDING_SEAL rows are written by AFTER INSERT triggers on the ledger tables, in the command's transaction; a SEALED or SEAL_ERROR group cannot receive rows. |
+| E-PR15-2 | PR-15 | VS#1 chains: GL (group = journal: header, entries by line_no), INV_QTY and INV_VALUE (group = source event), DOMAIN_EVENT (group = command, events by command_event_index). |
+| E-PR15-3 | PR-15 | Sealer: background process as DB role `rochell_sealer`, the only writer of seals and sealing states; advisory lock per chain, every 5 s, batches of 1,000; a group whose rows no longer match their stored hashes becomes SEAL_ERROR (CRITICAL alert) and the chain continues; close blocking in PR-16. |
+| E-PR15-4 | PR-15 | WORM behind an interface: write-once file store for CI/development (refused outside TEST), S3 Object Lock at a second provider when B-03 is resolved; digest signed with ECDSA P-256; the e-mail copy is deferred until mail infrastructure exists. |
+| E-PR15-5 | PR-15 | Digest day = local date of sealed_at in America/Santo_Domingo, generated at 00:15 for the previous day; no seals → no digest; each digest links to the last existing one. |
+| E-PR15-6 | PR-15 | Verification is the command VerifyHashChain (`hash:verify`: Auditor, Controller): first invalid ledger_sequence, gaps, Merkle vs WORM, PENDING_SEAL older than 10 min, SEAL_ERROR groups; findings returned, not stored (PR-16). |
+| E-PR15-7 | PR-15 | Module graph amendment: Rochell.Audit → Platform, Finance, Inventory (only to recompute row hashes); nothing depends on Audit. |
+| E-PR15-8 | PR-15 | HS-01 is tested deterministically: 200 concurrent postings with the sealer running end in a valid chain, and a posting commits while a sealing transaction is open mid-batch. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -124,4 +132,5 @@ Implementation rules derived from the above (no architectural change):
 - A value entry may be reversed once by its document and once by a repost (two partial unique indexes, migration 0017).
 - Each inventory line posted by a repost records, in its determination inputs, the value entry it replaces (`reposts_value_entry_id`); document reversals map their original value entries and the Posting Engine follows that chain, so a reposted receipt or invoice still reverses.
 - RepostEvent and the residual adjustment live in Procurement: under the module graph (E-PR08-1) it is the only module that may use Finance and Inventory together.
+- Every inventory ledger row has as source an event committed in the same transaction (a repost's value entries belong to its JournalReposted event); that is what makes a source event a closed group for sealing.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
