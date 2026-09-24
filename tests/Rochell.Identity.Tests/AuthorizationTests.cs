@@ -128,8 +128,8 @@ public sealed class AuthorizationTests(PostgresFixture postgres)
     public async Task Plant_scoped_assignment_authorizes_only_its_plant_and_not_company_wide_commands()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
-        var plantA = Guid.CreateVersion7();
-        var plantB = Guid.CreateVersion7();
+        var plantA = await h.CreatePlantAsync();
+        var plantB = await h.CreatePlantAsync();
         var plantUser = await h.CreateUserAsync();
         await h.GrantAsync(h.CompanyId, plantUser, "TEST_PINGER", plantA);
         var session = await h.CreateSessionAsync(plantUser);
@@ -147,7 +147,7 @@ public sealed class AuthorizationTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        var result = await h.RunAsync(new PlantPingCommand(h.CompanyId, h.SessionId, "any-plant", Guid.CreateVersion7()), new PlantPingHandler());
+        var result = await h.RunAsync(new PlantPingCommand(h.CompanyId, h.SessionId, "any-plant", await h.CreatePlantAsync()), new PlantPingHandler());
 
         Assert.False(result.Duplicate);
     }

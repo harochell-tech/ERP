@@ -6,6 +6,8 @@ using Rochell.Platform.Hosting;
 // Usage: rochell-migrate <migrate|verify|status|init-environment TEST|PRODUCTION>
 //        rochell-migrate create-user <email> <google-oidc-subject> <employee-id>       (E-PR03-5)
 //        rochell-migrate grant-role <email> <ROLE_CODE> <company-rnc> [plant-id]         (bootstrap grants, E-PR03-5)
+//        rochell-migrate create-plant <company-rnc> <PLANT_CODE> <VALUATION_AREA_CODE>    (E-PR04-2)
+//        rochell-migrate create-location <company-rnc> <PLANT_CODE> <LOCATION_CODE>       (E-PR04-2)
 // Environment: DOTNET_ENVIRONMENT = Development | Test | Staging
 // Connection:  ConnectionStrings:Rochell (appsettings.Development.json or env var ConnectionStrings__Rochell).
 //              Must use the deployment role (schema owner), never the application role.
@@ -162,8 +164,78 @@ try
                 return 0;
             }
 
+        case "create-plant":
+            {
+                // E-PR04-2: plants (each with its own valuation area) are created by the deployment role in VS#1.
+                if (args.Length != 4)
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate create-plant <company-rnc> <PLANT_CODE> <VALUATION_AREA_CODE>");
+                    return 1;
+                }
+
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                await using var create = new NpgsqlCommand(
+                    """
+                    WITH company AS (SELECT company_id FROM md.company WHERE rnc = @rnc),
+                         area AS (
+                           INSERT INTO md.valuation_area (company_id, valuation_area_id, code)
+                           SELECT company_id, @area_id, upper(@area_code) FROM company
+                           RETURNING company_id, valuation_area_id)
+                    INSERT INTO md.plant (plant_id, company_id, code, valuation_area_id)
+                    SELECT @plant_id, company_id, upper(@plant_code), valuation_area_id FROM area
+                    """,
+                    connection);
+                var plantId = Guid.CreateVersion7();
+                create.Parameters.AddWithValue("rnc", args[1]);
+                create.Parameters.AddWithValue("area_id", Guid.CreateVersion7());
+                create.Parameters.AddWithValue("area_code", args[3]);
+                create.Parameters.AddWithValue("plant_id", plantId);
+                create.Parameters.AddWithValue("plant_code", args[2]);
+                if (await create.ExecuteNonQueryAsync() != 1)
+                {
+                    await Console.Error.WriteLineAsync("Company not found.");
+                    return 2;
+                }
+
+                Console.WriteLine($"Plant {args[2].ToUpperInvariant()} created: {plantId}.");
+                return 0;
+            }
+
+        case "create-location":
+            {
+                if (args.Length != 4)
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate create-location <company-rnc> <PLANT_CODE> <LOCATION_CODE>");
+                    return 1;
+                }
+
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                await using var create = new NpgsqlCommand(
+                    """
+                    INSERT INTO md.location (location_id, company_id, plant_id, code)
+                    SELECT @id, p.company_id, p.plant_id, upper(@code)
+                    FROM md.plant p JOIN md.company c ON c.company_id = p.company_id
+                    WHERE c.rnc = @rnc AND p.code = upper(@plant)
+                    """,
+                    connection);
+                create.Parameters.AddWithValue("id", Guid.CreateVersion7());
+                create.Parameters.AddWithValue("code", args[3]);
+                create.Parameters.AddWithValue("rnc", args[1]);
+                create.Parameters.AddWithValue("plant", args[2]);
+                if (await create.ExecuteNonQueryAsync() != 1)
+                {
+                    await Console.Error.WriteLineAsync("Company or plant not found.");
+                    return 2;
+                }
+
+                Console.WriteLine($"Location {args[3].ToUpperInvariant()} created in plant {args[2].ToUpperInvariant()}.");
+                return 0;
+            }
+
         default:
-            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment TEST|PRODUCTION|create-user|grant-role>");
+            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-user|grant-role|create-plant|create-location>");
             return 1;
     }
 }

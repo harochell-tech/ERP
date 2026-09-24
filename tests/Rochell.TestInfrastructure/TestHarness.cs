@@ -121,6 +121,49 @@ public sealed class TestHarness : IAsyncDisposable
         }
     }
 
+    /// <summary>Creates a plant with its own valuation area (like `rochell-migrate create-plant`). Returns the plant id.</summary>
+    public async Task<Guid> CreatePlantAsync(Guid? companyId = null, string? code = null)
+    {
+        var plantId = Guid.CreateVersion7();
+        var areaId = Guid.CreateVersion7();
+        var plantCode = code ?? "P" + plantId.ToString("N")[^6..].ToUpperInvariant();
+        await using var command = Admin.CreateCommand(
+            """
+            INSERT INTO md.valuation_area (company_id, valuation_area_id, code) VALUES (@company, @area, @code);
+            INSERT INTO md.plant (plant_id, company_id, code, valuation_area_id) VALUES (@plant, @company, @code, @area);
+            """);
+        command.Parameters.AddWithValue("company", companyId ?? CompanyId);
+        command.Parameters.AddWithValue("area", areaId);
+        command.Parameters.AddWithValue("plant", plantId);
+        command.Parameters.AddWithValue("code", plantCode);
+        await command.ExecuteNonQueryAsync();
+        return plantId;
+    }
+
+    public async Task<Guid> CreateLocationAsync(Guid plantId, string code = "RECEPCION", Guid? companyId = null)
+    {
+        var id = Guid.CreateVersion7();
+        await using var command = Admin.CreateCommand("INSERT INTO md.location (location_id, company_id, plant_id, code) VALUES (@id, @company, @plant, @code)");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("company", companyId ?? CompanyId);
+        command.Parameters.AddWithValue("plant", plantId);
+        command.Parameters.AddWithValue("code", code);
+        await command.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    /// <summary>New user holding <paramref name="roles"/> in the harness company, with an open session. Returns the session id.</summary>
+    public async Task<Guid> SessionWithRolesAsync(params string[] roles)
+    {
+        var user = await CreateUserAsync();
+        foreach (var role in roles)
+        {
+            await GrantAsync(CompanyId, user, role);
+        }
+
+        return await CreateSessionAsync(user);
+    }
+
     public PingCommand Ping(string key, string message = "hola", PingMode mode = PingMode.Normal, int sideEvents = 0, DateTime? occurredAt = null)
         => new(CompanyId, SessionId, key, message, mode, sideEvents, occurredAt);
 

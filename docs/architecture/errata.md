@@ -16,6 +16,15 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR03-6 | PR-03 | Office sessions: absolute lifetime 12 h, inactivity 30 min, both configurable. Requires `iam.session.last_activity_at` (refreshed at most once a minute). |
 | E-PR03-7 | PR-03 | SoD exceptions are out of VS#1: `role_assignment.sod_exception_id` must be NULL. |
 | E-PR03-8 | PR-03 | Login requires `email_verified = true`, `hd` = configured domain and an OIDC subject linked to an ACTIVE HUMAN user with employee. MFA is enforced by Google Workspace, not verified in the token. |
+| E-PR04-1 | PR-04 | `DefineUomConversion` requires `item:activate` (Controller): a conversion changes inventory quantities. |
+| E-PR04-2 | PR-04 | Plants (with their valuation area) and locations are created by the deployment role: `rochell-migrate create-plant` / `create-location`. |
+| E-PR04-3 | PR-04 | VS#1 master lifecycle is DRAFT → ACTIVE; the Controller's activation is the approval. The enum keeps REVIEW/APPROVED/OBSOLETE. |
+| E-PR04-4 | PR-04 | `UpdateSupplier` only in DRAFT; changes to active suppliers (with re-approval) come after VS#1. |
+| E-PR04-5 | PR-04 | RNC validated by format only (9 digits RNC / 11 digits cédula, separators removed) through `IRncRegistry`; `rnc_validated_at` stays NULL until the DGII lookup exists. |
+| E-PR04-6 | PR-04 | The schema allows FOREIGN parties; the VS#1 command creates LOCAL suppliers only. |
+| E-PR04-7 | PR-04 | `item_category` is a closed list: CEMENTO, AGREGADO, ADITIVO, OTRA_MATERIA_PRIMA. |
+| E-PR04-8 | PR-04 | Conversions always point to the item's base UOM; a new one closes the open one and cannot start before today. |
+| E-PR04-9 | PR-04 | UOM seed: kg, t (mass), m3, l (volume), un (count). |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -23,3 +32,5 @@ Implementation rules derived from the above (no architectural change):
   company-wide assignment or one for that plant.
 - Segregation-of-duties checks are per company and serialized per user with an advisory lock.
 - The outbox dispatcher processes companies one at a time so row-level security applies to it as to any command.
+- `md.item.description` (NOT NULL) was added as a trivial field omitted by the frozen schema ("no necesito todavía cada campo trivial").
+- Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
