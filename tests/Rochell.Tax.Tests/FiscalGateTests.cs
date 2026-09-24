@@ -147,6 +147,7 @@ public sealed class FiscalGateTests(PostgresFixture postgres)
     public async Task A_person_with_both_roles_cannot_activate_a_version_they_configured()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
+        await h.InitTestEnvironmentAsync();
         var both = await h.SessionWithRolesAsync("ANALISTA_FISCAL", "ESPECIALISTA_FISCAL");
         var own = new FiscalActors(both, both);
         var version = await h.ConfigureAsync(own, "cfg", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition, From);

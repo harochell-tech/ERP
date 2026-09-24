@@ -21,10 +21,10 @@ public sealed class TestDetermineTaxHandler : ICommandHandler<TestDetermineTax>
         return JsonSerializer.Serialize(new
         {
             determinationId = determination.DeterminationId,
-            recoverable = determination.RecoverableInput,
-            withholding = determination.Withholding,
+            recoverable = determination.RecoverableInput.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), // ADR-015: decimals as strings
+            withholding = determination.Withholding.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
             nonRecoverable = determination.HasNonRecoverableInput,
-            taxes = determination.Taxes.Select(t => $"{t.TaxCode}:{t.Amount:0.00}:{t.Effect}"),
+            taxes = determination.Taxes.Select(t => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{t.TaxCode}:{t.Amount:0.00}:{t.Effect}")),
         });
     }
 }

@@ -35,7 +35,7 @@ public sealed class TaxEngineTests(PostgresFixture postgres)
 
         Assert.Equal("ITBIS:18000.00:RECOVERABLE_INPUT", Taxes(fromCompany));
         Assert.Equal("ITBIS:18000.00:RECOVERABLE_INPUT,RET_ITBIS:5400.00:WITHHOLDING", Taxes(fromIndividual));
-        Assert.Equal(5400m, fromIndividual.GetProperty("withholding").GetDecimal());
+        Assert.Equal("5400.00", fromIndividual.GetProperty("withholding").GetString());
         Assert.Equal(2L, await h.ScalarAsync<long>(
             "SELECT count(*) FROM tax.tax_determination WHERE rule_version_ids @> ARRAY[@a, @b]::uuid[]", ("a", itbis), ("b", withholding)));
         Assert.Equal("INDIVIDUAL", await h.ScalarAsync<string>(
