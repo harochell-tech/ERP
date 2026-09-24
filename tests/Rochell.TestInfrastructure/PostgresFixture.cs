@@ -5,8 +5,11 @@ using Xunit;
 
 namespace Rochell.TestInfrastructure;
 
-/// <summary>A migrated database: admin = deployment role (owner); app = login that is a member of rochell_app.</summary>
-public sealed record TestDatabase(string AdminConnectionString, string AppConnectionString);
+/// <summary>
+/// A migrated database: admin = deployment role (owner); app = login that is a member of rochell_app;
+/// sealer = login that is a member of rochell_sealer (PR-15).
+/// </summary>
+public sealed record TestDatabase(string AdminConnectionString, string AppConnectionString, string SealerConnectionString);
 
 /// <summary>
 /// One PostgreSQL 17 container per test assembly; every test gets its own database.
@@ -17,6 +20,8 @@ public sealed class PostgresFixture : IAsyncLifetime
     public const string Image = "postgres:17.6-alpine";
     public const string AppLogin = "rochell_app_test";
     private const string AppPassword = "rochell_app_test_only";
+    public const string SealerLogin = "rochell_sealer_test";
+    private const string SealerPassword = "rochell_sealer_test_only";
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage(Image)
@@ -57,7 +62,8 @@ public sealed class PostgresFixture : IAsyncLifetime
         await EnsureAppLoginAsync(setup);
 
         var app = new NpgsqlConnectionStringBuilder(admin) { Username = AppLogin, Password = AppPassword }.ConnectionString;
-        return new TestDatabase(admin, app);
+        var sealer = new NpgsqlConnectionStringBuilder(admin) { Username = SealerLogin, Password = SealerPassword }.ConnectionString;
+        return new TestDatabase(admin, app, sealer);
     }
 
     private async Task EnsureAppLoginAsync(string adminConnectionString)
@@ -73,6 +79,9 @@ public sealed class PostgresFixture : IAsyncLifetime
                 BEGIN
                   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{AppLogin}') THEN
                     CREATE ROLE {AppLogin} LOGIN PASSWORD '{AppPassword}' IN ROLE rochell_app;
+                  END IF;
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{SealerLogin}') THEN
+                    CREATE ROLE {SealerLogin} LOGIN PASSWORD '{SealerPassword}' IN ROLE rochell_sealer;
                   END IF;
                 END $$;
                 """,

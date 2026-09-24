@@ -21,6 +21,7 @@ public sealed class TestHarness : IAsyncDisposable
         Database = database;
         App = app;
         Admin = admin;
+        Sealer = NpgsqlDataSource.Create(database.SealerConnectionString);
         Clock = clock;
         Options = new IdentityOptions { HostedDomain = HostedDomain };
         RequestLog = new RequestLogWriter(app, RequestLogErrors.Add);
@@ -33,6 +34,9 @@ public sealed class TestHarness : IAsyncDisposable
     public NpgsqlDataSource App { get; }
 
     public NpgsqlDataSource Admin { get; }
+
+    /// <summary>Connections as rochell_sealer, the only writer of seals and digests (PR-15).</summary>
+    public NpgsqlDataSource Sealer { get; }
 
     public IClock Clock { get; }
 
@@ -254,5 +258,6 @@ public sealed class TestHarness : IAsyncDisposable
     {
         await App.DisposeAsync();
         await Admin.DisposeAsync();
+        await Sealer.DisposeAsync();
     }
 }

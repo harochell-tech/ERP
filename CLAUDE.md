@@ -29,7 +29,7 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | --- | --- |
 | PR-01 … PR-13b | Merged to `main`, CI green |
 | PR-14 | Repost (R-REP) + valuation residual (R-06). Branch `pr-14-repost-residuals`; push, open the PR, watch CI |
-| PR-15 | Hash chain: `audit.ledger_seal`, `audit.ledger_digest`, sealer, daily Merkle digest, WORM write, verifier (HS-01, HS-02). **Depends on B-03** (WORM object storage) — propose how CI simulates WORM before coding |
+| PR-15 | Hash chain (E-PR15-1…8 approved): integrity state, sealer, daily digest, WORM (file store in CI; S3 Object Lock pending B-03), verifier. Branch `pr-15-hash-chain`, on top of PR-14 |
 | PR-16 | Reconciliations (`rec.*`, 8 definitions incl. VAL-RESIDUAL, ACC-EVIDENCE) + CloseComponent / ReopenComponent (T-13): AT-07, PD-02, CC-05, IV-03 (close blocked) |
 | PR-17 | Explain this entry (EX-01): explanation templates of every rule |
 | PR-18 | API (OpenAPI) + minimal web UI; AT-01 and AT-02 end to end through the API |
@@ -79,7 +79,8 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
 5. **`core.deployment_environment` is empty in test databases** (production sets it with `rochell-migrate init-environment`).
    Tests that need it initialize it (`TaxSetup.InitTestEnvironmentAsync`); code must fail loudly when it is missing.
 6. **Connection pools:** each test gets its own database; setup connections use `Pooling=false` (`PostgresFixture`), otherwise a
-   100+ test project exhausts `max_connections` (53300).
+   100+ test project exhausts `max_connections` (53300). Concurrency tests throttle themselves (e.g. `SemaphoreSlim(32)`):
+   the app pool allows 100 connections, and with the sealer and fixture connections that already exceeds the server limit.
 7. SoD pairs in `iam.sod_rule` are ordered (`permission_a < permission_b`). Seed counts are asserted by tests
    (39 permissions, 16 SoD rules; policy parameter counts in `AccountingPolicyTests`) — update them when you seed more.
 8. The table inventory test compares `information_schema` order: check it against a real migrated database.
