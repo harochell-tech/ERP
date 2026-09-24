@@ -1,0 +1,295 @@
+using System.Data.Common;
+using Rochell.Platform.Commands;
+using Rochell.Platform.Data;
+using Rochell.Platform.Time;
+
+namespace Rochell.Inventory;
+
+/// <summary>Source document of a movement (document type, id and optional line).</summary>
+public sealed record MovementSource(Guid EventId, string DocumentType, Guid DocumentId, Guid? LineId = null);
+
+/// <summary>Dates of a movement (ADR-023). PostingDate must be the posting date of the GL journal (checked at COMMIT, P-1).</summary>
+public sealed record MovementDates(DateTime OccurredAt, DateOnly BusinessDate, DateOnly PostingDate);
+
+/// <summary>A receipt into a location and lot. <paramref name="ValueEntryId"/> is pre-assigned so the GL line can reference it.</summary>
+public sealed record ReceiptMovement(Guid LocationId, Guid ItemId, Guid LotId, decimal Quantity, decimal Value, Guid ValueEntryId);
+
+/// <summary>Stock already taken from the balance (conditional UPDATE) and its moving-average value.</summary>
+public sealed record IssueReservation(Guid PlantId, Guid ValuationAreaId, Guid LocationId, Guid ItemId, Guid LotId, decimal Quantity, decimal Value);
+
+/// <summary>
+/// Inventory ledger (ADR-016/017, E-PR07-1…8). Runs inside the command transaction; every value entry must be paired with
+/// exactly one GL line by the caller (Posting Engine) — the database checks it at COMMIT (P-1) together with P-3.
+/// Lock order: stock balance → valuation balance → GL period balance.
+/// </summary>
+public sealed class InventoryLedger
+{
+    /// <summary>Creates the lot of a receipt line (E-PR07-3).</summary>
+    public async Task<Guid> CreateLotAsync(CommandContext context, Guid itemId, Guid? supplierPartyId, string? supplierLotNumber, Guid sourceEventId, DateOnly businessDate, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var lotId = context.Ids.NewId();
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO inv.lot (lot_id, company_id, item_id, lot_code, supplier_party_id, supplier_lot_number, created_event_id)
+            VALUES (@id, @company, @item, @code, @supplier, @supplier_lot, @event)
+            """,
+            cancellationToken,
+            ("id", lotId),
+            ("company", context.CompanyId),
+            ("item", itemId),
+            ("code", $"L{businessDate:yyyyMMdd}-{lotId.ToString("N")[^8..].ToUpperInvariant()}"),
+            ("supplier", supplierPartyId),
+            ("supplier_lot", string.IsNullOrWhiteSpace(supplierLotNumber) ? null : supplierLotNumber.Trim()),
+            ("event", sourceEventId)).ConfigureAwait(false);
+        return lotId;
+    }
+
+    /// <summary>Writes a receipt: quantity entry, value entry and both balances. Returns the quantity entry id.</summary>
+    public async Task<Guid> ReceiveAsync(CommandContext context, ReceiptMovement movement, MovementSource source, MovementDates dates, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(movement);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(dates);
+        if (movement.Quantity <= 0 || decimal.Round(movement.Quantity, 6) != movement.Quantity)
+        {
+            throw new InvalidOperationException("Receipt quantity must be positive with at most 6 decimals (base UOM).");
+        }
+
+        if (movement.Value <= 0 || decimal.Round(movement.Value, 2) != movement.Value)
+        {
+            throw new InvalidOperationException("Receipt value must be positive with 2 decimals (E-PR07-1).");
+        }
+
+        var (plantId, areaId) = await PlantAndAreaAsync(context, movement.LocationId, cancellationToken).ConfigureAwait(false);
+        var recordedAt = context.Clock.UtcNow;
+        var quantityEntry = new QuantityEntryRow(
+            context.Ids.NewId(), context.CompanyId, MovementTypes.Receipt, plantId, movement.LocationId, movement.ItemId, movement.LotId, movement.Quantity,
+            source.EventId, source.DocumentType, source.DocumentId, source.LineId, null, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate);
+        await InsertQuantityAsync(context, quantityEntry, cancellationToken).ConfigureAwait(false);
+        await InsertValueAsync(
+            context,
+            new ValueEntryRow(
+                movement.ValueEntryId, context.CompanyId, MovementTypes.Receipt, areaId, plantId, movement.ItemId, quantityEntry.QuantityEntryId, movement.Value,
+                source.EventId, null, quantityEntry.OccurredAt, recordedAt, dates.BusinessDate, dates.PostingDate),
+            cancellationToken).ConfigureAwait(false);
+
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO inv.inv_stock_balance (company_id, plant_id, location_id, item_id, lot_id, quantity)
+            VALUES (@company, @plant, @location, @item, @lot, @qty)
+            ON CONFLICT (location_id, item_id, lot_id) DO UPDATE SET quantity = inv.inv_stock_balance.quantity + EXCLUDED.quantity
+            """,
+            cancellationToken,
+            ("company", context.CompanyId),
+            ("plant", plantId),
+            ("location", movement.LocationId),
+            ("item", movement.ItemId),
+            ("lot", movement.LotId),
+            ("qty", movement.Quantity)).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO inv.inv_valuation_balance (company_id, valuation_area_id, item_id, quantity, value)
+            VALUES (@company, @area, @item, @qty, @value)
+            ON CONFLICT (valuation_area_id, item_id) DO UPDATE
+              SET quantity = inv.inv_valuation_balance.quantity + EXCLUDED.quantity, value = inv.inv_valuation_balance.value + EXCLUDED.value
+            """,
+            cancellationToken,
+            ("company", context.CompanyId),
+            ("area", areaId),
+            ("item", movement.ItemId),
+            ("qty", movement.Quantity),
+            ("value", movement.Value)).ConfigureAwait(false);
+        return quantityEntry.QuantityEntryId;
+    }
+
+    /// <summary>
+    /// CON-03: takes <paramref name="quantity"/> from the stock balance with a conditional UPDATE (never negative) and
+    /// computes its moving-average value under the valuation lock (E-PR07-1: 2 decimals half-up; the last unit takes the
+    /// remaining value). Nothing is written to the ledgers yet; the whole transaction rolls back on any later failure.
+    /// </summary>
+    public async Task<IssueReservation> ReserveIssueAsync(CommandContext context, Guid locationId, Guid itemId, Guid lotId, decimal quantity, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (quantity <= 0 || decimal.Round(quantity, 6) != quantity)
+        {
+            throw new InvalidOperationException("Issue quantity must be positive with at most 6 decimals (base UOM).");
+        }
+
+        var (plantId, areaId) = await PlantAndAreaAsync(context, locationId, cancellationToken).ConfigureAwait(false);
+        var taken = await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE inv.inv_stock_balance SET quantity = quantity - @qty WHERE location_id = @location AND item_id = @item AND lot_id = @lot AND quantity >= @qty",
+            cancellationToken,
+            ("qty", quantity),
+            ("location", locationId),
+            ("item", itemId),
+            ("lot", lotId)).ConfigureAwait(false);
+        if (taken != 1)
+        {
+            throw new DomainException(InventoryErrors.InsufficientStock, $"Not enough stock of the lot in the location to issue {quantity}.");
+        }
+
+        decimal areaQuantity;
+        decimal areaValue;
+        await using (var valuation = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT quantity, value FROM inv.inv_valuation_balance WHERE valuation_area_id = @area AND item_id = @item FOR UPDATE",
+            ("area", areaId),
+            ("item", itemId)))
+        await using (var reader = await valuation.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("Stock exists without a valuation balance.");
+            }
+
+            areaQuantity = reader.GetDecimal(0);
+            areaValue = reader.GetDecimal(1);
+        }
+
+        var value = quantity == areaQuantity
+            ? areaValue
+            : decimal.Round(areaValue * quantity / areaQuantity, 2, MidpointRounding.AwayFromZero);
+        return new IssueReservation(plantId, areaId, locationId, itemId, lotId, quantity, value);
+    }
+
+    /// <summary>Writes a reserved issue: negative quantity entry, negative value entry (if the value is not zero) and the valuation balance.</summary>
+    public async Task<Guid> WriteIssueAsync(CommandContext context, IssueReservation reservation, Guid? valueEntryId, MovementSource source, MovementDates dates, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(reservation);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(dates);
+        if ((reservation.Value != 0) != (valueEntryId is not null))
+        {
+            throw new InvalidOperationException("A value entry id is required exactly when the issue has a value.");
+        }
+
+        var recordedAt = context.Clock.UtcNow;
+        var quantityEntry = new QuantityEntryRow(
+            context.Ids.NewId(), context.CompanyId, MovementTypes.Issue, reservation.PlantId, reservation.LocationId, reservation.ItemId, reservation.LotId, -reservation.Quantity,
+            source.EventId, source.DocumentType, source.DocumentId, source.LineId, null, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate);
+        await InsertQuantityAsync(context, quantityEntry, cancellationToken).ConfigureAwait(false);
+        if (valueEntryId is not null)
+        {
+            await InsertValueAsync(
+                context,
+                new ValueEntryRow(
+                    valueEntryId.Value, context.CompanyId, MovementTypes.Issue, reservation.ValuationAreaId, reservation.PlantId, reservation.ItemId, quantityEntry.QuantityEntryId,
+                    -reservation.Value, source.EventId, null, quantityEntry.OccurredAt, recordedAt, dates.BusinessDate, dates.PostingDate),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE inv.inv_valuation_balance SET quantity = quantity - @qty, value = value - @value WHERE valuation_area_id = @area AND item_id = @item",
+            cancellationToken,
+            ("qty", reservation.Quantity),
+            ("value", reservation.Value),
+            ("area", reservation.ValuationAreaId),
+            ("item", reservation.ItemId)).ConfigureAwait(false);
+        return quantityEntry.QuantityEntryId;
+    }
+
+    private static async Task<(Guid PlantId, Guid AreaId)> PlantAndAreaAsync(CommandContext context, Guid locationId, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT p.plant_id, p.valuation_area_id FROM md.location l JOIN md.plant p ON p.plant_id = l.plant_id WHERE l.company_id = @company AND l.location_id = @location",
+            ("company", context.CompanyId),
+            ("location", locationId));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ? (reader.GetGuid(0), reader.GetGuid(1))
+            : throw new DomainException(InventoryErrors.LocationNotFound, "The location does not exist in this company.");
+    }
+
+    private static Task InsertQuantityAsync(CommandContext context, QuantityEntryRow e, CancellationToken cancellationToken)
+        => Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO inv.inv_quantity_entry (quantity_entry_id, company_id, movement_type, plant_id, location_id, item_id, lot_id, quantity,
+              source_event_id, source_document_type, source_document_id, source_line_id, reverses_quantity_entry_id,
+              occurred_at, recorded_at, business_date, posting_date, row_hash)
+            VALUES (@id, @company, CAST(@type AS inv.movement_type), @plant, @location, @item, @lot, @qty,
+              @event, @doc_type, @doc_id, @line_id, @reverses, @occurred, @recorded, @business, @posting, @hash)
+            """,
+            cancellationToken,
+            ("id", e.QuantityEntryId),
+            ("company", e.CompanyId),
+            ("type", e.MovementType),
+            ("plant", e.PlantId),
+            ("location", e.LocationId),
+            ("item", e.ItemId),
+            ("lot", e.LotId),
+            ("qty", e.Quantity),
+            ("event", e.SourceEventId),
+            ("doc_type", e.SourceDocumentType),
+            ("doc_id", e.SourceDocumentId),
+            ("line_id", e.SourceLineId),
+            ("reverses", e.ReversesQuantityEntryId),
+            ("occurred", e.OccurredAt),
+            ("recorded", e.RecordedAt),
+            ("business", e.BusinessDate),
+            ("posting", e.PostingDate),
+            ("hash", e.ComputeRowHash()));
+
+    private static Task InsertValueAsync(CommandContext context, ValueEntryRow e, CancellationToken cancellationToken)
+        => Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO inv.inv_value_entry (value_entry_id, company_id, movement_type, valuation_area_id, plant_id, item_id, quantity_entry_id, amount,
+              source_event_id, reverses_value_entry_id, occurred_at, recorded_at, business_date, posting_date, row_hash)
+            VALUES (@id, @company, CAST(@type AS inv.movement_type), @area, @plant, @item, @qty_entry, @amount,
+              @event, @reverses, @occurred, @recorded, @business, @posting, @hash)
+            """,
+            cancellationToken,
+            ("id", e.ValueEntryId),
+            ("company", e.CompanyId),
+            ("type", e.MovementType),
+            ("area", e.ValuationAreaId),
+            ("plant", e.PlantId),
+            ("item", e.ItemId),
+            ("qty_entry", e.QuantityEntryId),
+            ("amount", e.Amount),
+            ("event", e.SourceEventId),
+            ("reverses", e.ReversesValueEntryId),
+            ("occurred", e.OccurredAt),
+            ("recorded", e.RecordedAt),
+            ("business", e.BusinessDate),
+            ("posting", e.PostingDate),
+            ("hash", e.ComputeRowHash()));
+
+    /// <summary>Reads inv_quantity_entry columns in declared order (tests recompute row hashes with it).</summary>
+    public static QuantityEntryRow ReadQuantityEntry(DbDataReader r)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        return new QuantityEntryRow(
+            r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetGuid(4), r.GetGuid(5), r.GetGuid(6), r.GetDecimal(7), r.GetGuid(8), r.GetString(9),
+            r.GetGuid(10), r.IsDBNull(11) ? null : r.GetGuid(11), r.IsDBNull(12) ? null : r.GetGuid(12), r.GetFieldValue<DateTime>(13), r.GetFieldValue<DateTime>(14),
+            r.GetFieldValue<DateOnly>(15), r.GetFieldValue<DateOnly>(16));
+    }
+
+    /// <summary>Reads inv_value_entry columns in declared order.</summary>
+    public static ValueEntryRow ReadValueEntry(DbDataReader r)
+    {
+        ArgumentNullException.ThrowIfNull(r);
+        return new ValueEntryRow(
+            r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetGuid(4), r.GetGuid(5), r.IsDBNull(6) ? null : r.GetGuid(6), r.GetDecimal(7), r.GetGuid(8),
+            r.IsDBNull(9) ? null : r.GetGuid(9), r.GetFieldValue<DateTime>(10), r.GetFieldValue<DateTime>(11), r.GetFieldValue<DateOnly>(12), r.GetFieldValue<DateOnly>(13));
+    }
+}

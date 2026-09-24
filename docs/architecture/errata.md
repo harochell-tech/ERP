@@ -40,6 +40,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR06-5 | PR-06 | Parameter values are JSON strings (decimals as `"0.02"`). |
 | E-PR06-6 | PR-06 | Architecture test: no decimal literals in `src/` other than 0m, 1m, 100m, except column type limits marked `// type-limit`. |
 | E-PR06-7 | PR-06 | A missing ACTIVE policy is a missing posting prerequisite (full rollback); initial values are set by the Controller (A-01). |
+| E-PR07-1 | PR-07 | Inventory value entries have 2 decimals (half-up), equal to their GL line; the moving average is not rounded; issuing the last unit takes the remaining value. |
+| E-PR07-2 | PR-07 | Quantities always in the item's base UOM, `numeric(18,6)`; conversion happens in the document. |
+| E-PR07-3 | PR-07 | Lot mandatory for raw-material movements; one lot per receipt line (PR-09), supplier lot number optional. |
+| E-PR07-4 | PR-07 | Every GL line with subledger INV carries plant, item and its value entry (CHECK); the GL ↔ value-entry link is 1:1 both ways. |
+| E-PR07-5 | PR-07 | Movement type ISSUE exists in the schema but in VS#1 only the R-T1 test fixture uses it (TST-01, architecture test). |
+| E-PR07-6 | PR-07 | Row hash of inventory ledgers covers all columns except `row_hash`. |
+| E-PR07-7 | PR-07 | Stock balance by location × item × lot; valuation balance by valuation area (plant) × item. |
+| E-PR07-8 | PR-07 | At COMMIT, for touched positions: valuation = Σ value entries = Σ GL (RAW_MATERIAL, plants of the area, item); quantities agree across ledger, stock and valuation. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -51,4 +59,6 @@ Implementation rules derived from the above (no architectural change):
 - Account-role mappings are loaded as DRAFT by the deployment role (`import-account-map`) and approved by the Controller; `prepared_by` was added to enforce preparer ≠ approver.
 - Since PR-06 a rounding difference within `rounding_difference_tolerance` is booked on rule line R-08 (ROUNDING_DIFFERENCE, policy version in `determination_inputs`); only postings that need rounding depend on the POSTING policy.
 - The posting rule version is chosen by the business date; the account mapping by the posting date.
+- Value entry ids are pre-assigned (Errata E-4) so the Posting Engine line and the value entry reference each other in the same transaction.
+- `RAW_MATERIAL` lines always use subledger INV and `AP_CONTROL` lines subledger AP (CHECK on `fin.gl_entry`).
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
