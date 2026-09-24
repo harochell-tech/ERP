@@ -285,21 +285,43 @@ public sealed class InventoryLedger
                 cancellationToken).ConfigureAwait(false);
         }
 
-        await Sql.ExecuteAsync(
-            context.Connection,
-            context.Transaction,
-            """
-            INSERT INTO inv.inv_valuation_balance (company_id, valuation_area_id, item_id, quantity, value)
-            VALUES (@company, @area, @item, @qty, @value)
-            ON CONFLICT (valuation_area_id, item_id) DO UPDATE
-              SET quantity = inv.inv_valuation_balance.quantity + EXCLUDED.quantity, value = inv.inv_valuation_balance.value + EXCLUDED.value
-            """,
-            cancellationToken,
-            ("company", context.CompanyId),
-            ("area", areaId),
-            ("item", itemId),
-            ("qty", quantity),
-            ("value", value)).ConfigureAwait(false);
+        // An upsert checks CHECK constraints on the proposed INSERT row before detecting the conflict, so a negative delta
+        // would fail quantity >= 0 even when the final balance is valid: removals update the existing balance directly.
+        if (quantity < 0)
+        {
+            var updated = await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "UPDATE inv.inv_valuation_balance SET quantity = quantity + @qty, value = value + @value WHERE valuation_area_id = @area AND item_id = @item",
+                cancellationToken,
+                ("qty", quantity),
+                ("value", value),
+                ("area", areaId),
+                ("item", itemId)).ConfigureAwait(false);
+            if (updated != 1)
+            {
+                throw new InvalidOperationException("Removing stock from an item without a valuation balance.");
+            }
+        }
+        else
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                INSERT INTO inv.inv_valuation_balance (company_id, valuation_area_id, item_id, quantity, value)
+                VALUES (@company, @area, @item, @qty, @value)
+                ON CONFLICT (valuation_area_id, item_id) DO UPDATE
+                  SET quantity = inv.inv_valuation_balance.quantity + EXCLUDED.quantity, value = inv.inv_valuation_balance.value + EXCLUDED.value
+                """,
+                cancellationToken,
+                ("company", context.CompanyId),
+                ("area", areaId),
+                ("item", itemId),
+                ("qty", quantity),
+                ("value", value)).ConfigureAwait(false);
+        }
+
         return quantityEntry.QuantityEntryId;
     }
 
