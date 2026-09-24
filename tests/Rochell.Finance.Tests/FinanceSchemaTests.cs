@@ -52,7 +52,6 @@ public sealed class FinanceSchemaTests(PostgresFixture postgres)
     [InlineData("DELETE FROM fin.gl_journal")]
     [InlineData("INSERT INTO fin.account (account_id, company_id, code, name, is_control) VALUES (gen_random_uuid(), '{0}', '9999', 'x', false)")]
     [InlineData("UPDATE fin.account_role_map SET account_id = account_id")]
-    [InlineData("UPDATE fin.close_component_state SET status = 'CLOSED'")]
     [InlineData("INSERT INTO fin.period (period_id, company_id, starts_on, ends_on) VALUES (gen_random_uuid(), '{0}', '2040-01-01', '2040-01-31')")]
     public async Task Application_role_cannot_bypass_the_posting_engine(string sqlTemplate)
     {
@@ -62,6 +61,20 @@ public sealed class FinanceSchemaTests(PostgresFixture postgres)
             var ex = await h.AppExecuteAsync(string.Format(System.Globalization.CultureInfo.InvariantCulture, sqlTemplate, h.CompanyId));
 
             Assert.Equal(InsufficientPrivilege, ex?.SqlState);
+        }
+    }
+
+    [Fact]
+    public async Task A_component_cannot_be_closed_without_CloseComponent()
+    {
+        // PR-16: the application may write the state columns (CloseComponent does), but the guard only accepts a close that
+        // carries its closer and snapshot hash, with the version advanced.
+        var (h, _, _) = await PostedAsync(postgres);
+        await using (h)
+        {
+            var ex = await h.AppExecuteAsync($"UPDATE fin.close_component_state SET status = 'CLOSED' WHERE company_id = '{h.CompanyId}'", h.CompanyId);
+
+            Assert.Contains("is not allowed", ex?.MessageText, StringComparison.Ordinal);
         }
     }
 

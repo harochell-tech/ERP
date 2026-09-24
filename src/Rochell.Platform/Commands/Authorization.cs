@@ -55,3 +55,12 @@ public static class AuthorizationErrors
     public const string NotAuthorized = "NOT_AUTHORIZED";
     public const string StepUpRequired = "STEP_UP_REQUIRED";
 }
+
+/// <summary>
+/// The command runs in a SERIALIZABLE transaction instead of READ COMMITTED (T-13, CloseComponent). Serialization failures
+/// are retried by the pipeline like any other retryable conflict.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+public sealed class SerializableTransactionAttribute : Attribute
+{
+}

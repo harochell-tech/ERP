@@ -100,6 +100,15 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR15-6 | PR-15 | Verification is the command VerifyHashChain (`hash:verify`: Auditor, Controller): first invalid ledger_sequence, gaps, Merkle vs WORM, PENDING_SEAL older than 10 min, SEAL_ERROR groups; findings returned, not stored (PR-16). |
 | E-PR15-7 | PR-15 | Module graph amendment: Rochell.Audit → Platform, Finance, Inventory (only to recompute row hashes); nothing depends on Audit. |
 | E-PR15-8 | PR-15 | HS-01 is tested deterministically: 200 concurrent postings with the sealer running end in a valid chain, and a posting commits while a sealing transaction is open mid-batch. |
+| E-PR16-1 | PR-16 | Reconciliations evaluate the whole ledger as of the run (global invariants), with zero tolerance; statuses MATCHED / EXCEPTIONS / FAILED (MATCHED_WITH_TOLERANCE unused in VS#1). |
+| E-PR16-2 | PR-16 | Blocking per component: INV-MOV ← INV-QTY-BALANCE, INV-VALUE-BALANCE, INV-VALUE-GL, VALUE-GL-LINK, VAL-RESIDUAL, ACC-EVIDENCE (inventory documents); AP-REC ← AP-GL, ACC-EVIDENCE (invoices); GRNI-AGING is a warning and blocks nothing. |
+| E-PR16-3 | PR-16 | VAL-RESIDUAL: orphan value (quantity 0, value ≠ 0) = ERROR, fixed by R-06; quantity > 0 with value ≤ 0 = WARNING; the unit-cost range criterion is deferred. |
+| E-PR16-4 | PR-16 | ACC-EVIDENCE: a document POSTED needs a live journal of its posting event; REVERSED needs journals and no live AUTO journal; NOT_POSTED / POSTING_BLOCKED have no live journal. Journals of document-less events (repost, residual adjustment) are validated through their event. |
+| E-PR16-5 | PR-16 | A period component closes only after the period's end date (local); no order between periods in VS#1. |
+| E-PR16-6 | PR-16 | Append-only fin.close_snapshot with the component's reconciliation totals and balances; its SHA-256 is close_component_state.snapshot_hash; each close and re-close has its own snapshot. |
+| E-PR16-7 | PR-16 | fin.reopen_request with RequestReopen (Controller), ApproveReopen / RejectReopen (second approver ≠ requester), all with step-up; replaces the baseline's ReopenComponent. |
+| E-PR16-8 | PR-16 | Patch 1.1 date-coherence CHECK and business-date index on audit.integrity_state added with PR-16. |
+| E-PR16-9 | PR-16 | Every run stored in rec.recon_run with its findings in rec.recon_exception (status OPEN); no resolution workflow in VS#1: a finding disappears when a later run no longer finds it. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -133,4 +142,7 @@ Implementation rules derived from the above (no architectural change):
 - Each inventory line posted by a repost records, in its determination inputs, the value entry it replaces (`reposts_value_entry_id`); document reversals map their original value entries and the Posting Engine follows that chain, so a reposted receipt or invoice still reverses.
 - RepostEvent and the residual adjustment live in Procurement: under the module graph (E-PR08-1) it is the only module that may use Finance and Inventory together.
 - Every inventory ledger row has as source an event committed in the same transaction (a repost's value entries belong to its JournalReposted event); that is what makes a source event a closed group for sealing.
+- Blocking is a table (rec.recon_blocking) instead of the baseline's single blocks_component column, because ACC-EVIDENCE blocks both components; each finding carries the component it blocks.
+- A component state changes only through its guard: OPEN/REOPENED → CLOSED with closer and snapshot hash, CLOSED → REOPENED, version + 1. Test fixtures that close directly must supply a closer and a snapshot hash (FinanceSetup.SetComponentAsync).
+- A handler marked [SerializableTransaction] runs SERIALIZABLE (CloseComponent, T-13); serialization failures are retried by the pipeline.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.

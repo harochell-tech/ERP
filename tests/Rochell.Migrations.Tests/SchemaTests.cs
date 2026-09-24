@@ -96,17 +96,18 @@ public sealed class SchemaTests(PostgresFixture postgres)
             WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'migrations')
             """);
 
-        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*. PR-07: inv.*. PR-08: pur.purchase_order*. PR-09: pur.goods_receipt*. PR-10: pur.goods_receipt_reversal. PR-11: pur.receipt_correction. PR-12: tax.*. PR-13a: pur.supplier_invoice*, pur.match_result, fin.ap_document. PR-15: audit.*.
+        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*. PR-07: inv.*. PR-08: pur.purchase_order*. PR-09: pur.goods_receipt*. PR-10: pur.goods_receipt_reversal. PR-11: pur.receipt_correction. PR-12: tax.*. PR-13a: pur.supplier_invoice*, pur.match_result, fin.ap_document. PR-15: audit.*. PR-16: rec.*, fin.close_snapshot, fin.reopen_request.
         Assert.Equal(
             "acc.accounting_policy,acc.accounting_policy_parameter,acc.accounting_policy_version,acc.policy_parameter_definition,"
             + "audit.integrity_state,audit.ledger_digest,audit.ledger_seal,"
             + "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.outbox,core.state_history,"
-            + "fin.account,fin.account_role,fin.account_role_map,fin.ap_document,fin.close_component_state,fin.gl_entry,fin.gl_journal,fin.gl_period_balance,"
-            + "fin.period,fin.posting_rule,fin.posting_rule_version,"
+            + "fin.account,fin.account_role,fin.account_role_map,fin.ap_document,fin.close_component_state,fin.close_snapshot,fin.gl_entry,fin.gl_journal,fin.gl_period_balance,"
+            + "fin.period,fin.posting_rule,fin.posting_rule_version,fin.reopen_request,"
             + "iam.permission,iam.role,iam.role_assignment,iam.role_assignment_request,iam.role_permission,iam.session,iam.sod_rule,iam.user,"
             + "inv.inv_quantity_entry,inv.inv_stock_balance,inv.inv_valuation_balance,inv.inv_value_entry,inv.lot,"
             + "md.company,md.item,md.location,md.party,md.plant,md.uom,md.uom_conversion,md.valuation_area,obs.request_log,"
             + "pur.goods_receipt,pur.goods_receipt_line,pur.goods_receipt_reversal,pur.match_result,pur.purchase_order,pur.purchase_order_line,pur.receipt_correction,pur.supplier_invoice,pur.supplier_invoice_line,"
+            + "rec.recon_blocking,rec.recon_definition,rec.recon_exception,rec.recon_run,"
             + "tax.fiscal_rule,tax.fiscal_rule_source,tax.fiscal_rule_test_run,tax.fiscal_rule_version,tax.fiscal_rule_version_source,tax.tax_determination,tax.tax_determination_line",
             tables);
     }

@@ -131,7 +131,7 @@ public sealed class PostingEngineTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         var ledger = await h.CreateLedgerAsync();
-        await h.AdminRequireAsync($"UPDATE fin.close_component_state SET status = 'CLOSED', version = version + 1 WHERE company_id = '{h.CompanyId}' AND component = 'INV-MOV'");
+        await h.AdminRequireAsync($"UPDATE fin.close_component_state SET status = 'CLOSED', version = version + 1, closed_by = '{h.UserId}', closed_at = now(), snapshot_hash = sha256('fixture') WHERE company_id = '{h.CompanyId}' AND component = 'INV-MOV'");
 
         var ex = await Assert.ThrowsAsync<DomainException>(() => Post(h, ledger, "all-closed", 50m));
 

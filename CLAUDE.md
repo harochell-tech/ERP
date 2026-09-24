@@ -28,9 +28,8 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR | State |
 | --- | --- |
 | PR-01 … PR-13b | Merged to `main`, CI green |
-| PR-14 | Repost (R-REP) + valuation residual (R-06). Branch `pr-14-repost-residuals`; push, open the PR, watch CI |
-| PR-15 | Hash chain (E-PR15-1…8 approved): integrity state, sealer, daily digest, WORM (file store in CI; S3 Object Lock pending B-03), verifier. Branch `pr-15-hash-chain`, on top of PR-14 |
-| PR-16 | Reconciliations (`rec.*`, 8 definitions incl. VAL-RESIDUAL, ACC-EVIDENCE) + CloseComponent / ReopenComponent (T-13): AT-07, PD-02, CC-05, IV-03 (close blocked) |
+| PR-14, PR-15 | Merged: repost + valuation residual; hash chain (S3 Object Lock still pending B-03) |
+| PR-16 | Reconciliations + CloseComponent + reopen with second approver (E-PR16-1…9 approved). Branch `pr-16-reconciliation-close` |
 | PR-17 | Explain this entry (EX-01): explanation templates of every rule |
 | PR-18 | API (OpenAPI) + minimal web UI; AT-01 and AT-02 end to end through the API |
 | PR-19 | Concurrency and load suite: CC-04, PF-01, full regression → slice acceptance |
@@ -89,7 +88,9 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
    posting event; **ADR-027** every status change has its `core.state_history` row in the same transaction.
 10. Every command must write its result (`command_log.result_payload`) before COMMIT — the pipeline does it; hand-written SQL
     simulations must too.
-11. Before each commit, re-derive expected test values by hand (the R-02B, R-03B, R-05, R-07B tests have worked examples).
+11. `bool || text` in PostgreSQL gives `true` / `false` (psql only *displays* `t` / `f`): assertions on concatenated SQL use the
+    full words.
+12. Before each commit, re-derive expected test values by hand (the R-02B, R-03B, R-05, R-07B tests have worked examples).
 
 ## 6. Handy SQL
 
