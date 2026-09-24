@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\src\Rochell.Finance\Rochell.Finance.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Inventory\Rochell.Inventory.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Procurement\Rochell.Procurement.csproj" />
+    <ProjectReference Include="..\..\src\Rochell.Tax\Rochell.Tax.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\db\migrations\*.sql" Link="migrations\main\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

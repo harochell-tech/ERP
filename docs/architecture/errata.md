@@ -69,6 +69,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR11-3 | PR-11 | Δq < 0 takes the receipt's lot first, then the item's other lots in the area from oldest to newest (UUIDv7 order), then by location. |
 | E-PR11-4 | PR-11 | Under materiality (|Δq| × P ≤ `inventory_adjustment_materiality`) a correction is DRAFT and the Controller approves without step-up; above it starts PENDING_APPROVAL and approval needs step-up. Reject uses `receipt_correction:approve`. |
 | E-PR11-5 | PR-11 | R-03A and R-03B seeded DRAFT from 2026-01-01; R-03B has both PPV side variants; MATERIAL_USAGE_VARIANCE carries plant and item. |
+| E-PR12-1 | PR-12 | Fiscal sources, rules, versions, test runs and determinations carry `company_id` with RLS. |
+| E-PR12-2 | PR-12 | A source stores a text reference and the SHA-256 of the consulted document (supplied by the analyst) until WORM storage exists (B-03). |
+| E-PR12-3 | PR-12 | Declarative definitions: PURCHASE_ITBIS {tax_code, rate, effect RECOVERABLE_INPUT or NON_RECOVERABLE_INPUT, exempt_item_categories?}; PURCHASE_WITHHOLDING {tax_code, rate, base NET or ITBIS, party_types}. Rates are strings, 0 < rate ≤ 1, ≤ 6 decimals. |
+| E-PR12-4 | PR-12 | Versions start BLOCKED_PENDING_SOURCE; source + latest passing run → READY; activation → ACTIVE; a successor closes its open predecessor at its start date, or retires it when it starts on or before it. Definitions are immutable. |
+| E-PR12-5 | PR-12 | Test runs record their environment; READY and ACTIVE need the latest run of the deployment's own environment to pass. |
+| E-PR12-6 | PR-12 | Supplier taxpayer type from its identifier: 9-digit RNC = COMPANY, 11-digit cédula = INDIVIDUAL, none = FOREIGN. |
+| E-PR12-7 | PR-12 | Tax base and amount: 2 decimals half-up per line (`amount = round(base × rate, 2)`, enforced by CHECK). |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -90,4 +97,7 @@ Implementation rules derived from the above (no architectural change):
 - Exact reversals point the inventory line's `subledger_ref` to the new inverse value entry (required by `gl_entry_inv_link`).
 - Receipt reversal guard "nothing invoiced": `qty_invoiced ≤ qty_received − reversed quantity` on each PO line of the receipt.
 - R-03B amounts: GRNI = |Δq| × P; stock value = q₁ × avg (the whole area value when q₁ empties it), split by lot with the remainder on the last; q₁ at P = GRNI × q₁ ÷ |Δq|; MUV = GRNI − q₁ at P; PPV = q₁ at P − stock value. Base quantities use the receipt's own conversion.
+- SoD `fiscal_rule:activate` ⟂ `fiscal_rule:configure` (§14) seeded in PR-12 (missing from the PR-03 seed).
+- A source is registered (and approved) by the fiscal analyst; the specialist's activation reviews the version with its sources.
+- Fiscal gate closed (FISCAL_GATE_CLOSED) when no purchase ITBIS rule is ACTIVE on the date, or when any rule has a version pending activation already in force on the date without an ACTIVE version covering it (SI-07). Only one purchase ITBIS rule may be active at a time.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.

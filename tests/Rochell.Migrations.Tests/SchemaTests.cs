@@ -96,7 +96,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
             WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'migrations')
             """);
 
-        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*. PR-07: inv.*. PR-08: pur.purchase_order*. PR-09: pur.goods_receipt*. PR-10: pur.goods_receipt_reversal. PR-11: pur.receipt_correction.
+        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*. PR-07: inv.*. PR-08: pur.purchase_order*. PR-09: pur.goods_receipt*. PR-10: pur.goods_receipt_reversal. PR-11: pur.receipt_correction. PR-12: tax.*.
         Assert.Equal(
             "acc.accounting_policy,acc.accounting_policy_parameter,acc.accounting_policy_version,acc.policy_parameter_definition,"
             + "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.outbox,core.state_history,"
@@ -105,7 +105,8 @@ public sealed class SchemaTests(PostgresFixture postgres)
             + "iam.permission,iam.role,iam.role_assignment,iam.role_assignment_request,iam.role_permission,iam.session,iam.sod_rule,iam.user,"
             + "inv.inv_quantity_entry,inv.inv_stock_balance,inv.inv_valuation_balance,inv.inv_value_entry,inv.lot,"
             + "md.company,md.item,md.location,md.party,md.plant,md.uom,md.uom_conversion,md.valuation_area,obs.request_log,"
-            + "pur.goods_receipt,pur.goods_receipt_line,pur.goods_receipt_reversal,pur.purchase_order,pur.purchase_order_line,pur.receipt_correction",
+            + "pur.goods_receipt,pur.goods_receipt_line,pur.goods_receipt_reversal,pur.purchase_order,pur.purchase_order_line,pur.receipt_correction,"
+            + "tax.fiscal_rule,tax.fiscal_rule_source,tax.fiscal_rule_test_run,tax.fiscal_rule_version,tax.fiscal_rule_version_source,tax.tax_determination,tax.tax_determination_line",
             tables);
     }
 }
