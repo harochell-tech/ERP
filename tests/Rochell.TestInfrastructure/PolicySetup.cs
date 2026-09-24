@@ -17,6 +17,7 @@ public static class PolicySetup
         ["inventory_adjustment_materiality"] = "10000.00",
         ["grni_aging_alert_days"] = "60",
         ["invoice_price_variance_allocation_method"] = "STOCK_COVERAGE",
+        ["valuation_residual_account_role"] = "PURCHASE_PRICE_VARIANCE",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Posting = new Dictionary<string, string>

@@ -40,6 +40,9 @@ public static class ProcurementErrors
     public const string QtyExceptionNotApprovable = "QTY_EXCEPTION_NOT_APPROVABLE";
     public const string QtyExceedsAvailable = "QTY_EXCEEDS_AVAILABLE";
     public const string ApNotOpen = "AP_NOT_OPEN";
+    public const string NothingToRepost = "NOTHING_TO_REPOST";
+    public const string RepostRuleIncompatible = "REPOST_RULE_INCOMPATIBLE";
+    public const string NotOrphanResidual = "NOT_AN_ORPHAN_RESIDUAL";
 }
 
 public static class PurchaseOrderStatus

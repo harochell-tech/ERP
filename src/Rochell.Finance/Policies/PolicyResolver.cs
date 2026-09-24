@@ -24,6 +24,7 @@ public static class PolicyParameters
     public const string LateEntryHours = "late_entry_hours";
     public const string PoApprovalLimit = "po_approval_limit";
     public const string PoApprovalStepUpThreshold = "po_approval_step_up_threshold";
+    public const string ValuationResidualAccountRole = "valuation_residual_account_role";
 }
 
 /// <summary>The ACTIVE policy version for a date and its parameters (values are strings, E-PR06-5).</summary>
