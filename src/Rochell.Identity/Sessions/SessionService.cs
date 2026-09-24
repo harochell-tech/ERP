@@ -10,8 +10,11 @@ namespace Rochell.Identity.Sessions;
 /// <summary>Claims of an ID token already validated by the OIDC middleware (signature, issuer, audience, expiry).</summary>
 public sealed record OidcClaims(string Subject, string? Email, bool EmailVerified, string? HostedDomain);
 
-/// <summary>A role the session's user holds now in a company, company-wide (<see cref="PlantId"/> null) or for one plant.</summary>
-public sealed record SessionAssignment(string RoleCode, string RoleName, Guid? PlantId);
+/// <summary>
+/// A role the session's user holds now in a company, company-wide (<see cref="PlantId"/> null) or for one plant, with the
+/// permissions it grants (the UI derives each permission's plant scope from it, E-PR18b-8).
+/// </summary>
+public sealed record SessionAssignment(string RoleCode, string RoleName, Guid? PlantId, IReadOnlyList<string> Permissions);
 
 /// <summary>What the user may do in one company: assignments valid now and the permissions they grant.</summary>
 public sealed record SessionCompany(Guid CompanyId, string LegalName, IReadOnlyList<SessionAssignment> Assignments, IReadOnlyList<string> Permissions);
@@ -145,7 +148,7 @@ public sealed class SessionService
                 GROUP BY r.code, r.name, ra.plant_id
                 ORDER BY r.code, ra.plant_id NULLS FIRST
                 """,
-                r => (Assignment: new SessionAssignment(r.GetString(0), r.GetString(1), r.NullableGuid(2)), Permissions: r.GetFieldValue<string[]>(3)),
+                r => new SessionAssignment(r.GetString(0), r.GetString(1), r.NullableGuid(2), r.GetFieldValue<string[]>(3)),
                 cancellationToken,
                 ("c", companyId),
                 ("u", session.UserId),
@@ -154,7 +157,7 @@ public sealed class SessionService
             if (assignments.Count > 0)
             {
                 var permissions = assignments.SelectMany(a => a.Permissions).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
-                result.Add(new SessionCompany(companyId, legalName, assignments.Select(a => a.Assignment).ToList(), permissions));
+                result.Add(new SessionCompany(companyId, legalName, assignments, permissions));
             }
         }
 

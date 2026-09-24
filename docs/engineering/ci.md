@@ -1,6 +1,6 @@
 # CI and merge policy
 
-Workflow: `.github/workflows/ci.yml`, job `build-test`: restore → `dotnet format whitespace --verify-no-changes` → build Release (warnings are errors) → tests (unit, architecture, PostgreSQL 17 via Testcontainers) → TRX artifacts.
+Workflow: `.github/workflows/ci.yml`, job `build-test`: restore → `dotnet format whitespace --verify-no-changes` → build Release (warnings are errors) → tests (unit, architecture, PostgreSQL 17 via Testcontainers) → web (E-PR18b-10): `npm ci`, lint, typecheck, generated API types in sync with `openapi.json`, Vitest, `next build`, and the Playwright journey against the real API (`tests/Rochell.DevStack`) → TRX artifacts (and the Playwright report on failure).
 
 ## Blocking merges (manual, one-time, repository admin)
 
@@ -15,8 +15,10 @@ Without this rule the workflow reports failures but cannot block a merge by itse
 
 ## Local run
 
-Requires .NET SDK 10 and Docker (Testcontainers pulls `postgres:17.6-alpine`).
+Requires .NET SDK 10, Docker (Testcontainers pulls `postgres:17.6-alpine`) and, for `web/`, Node 24 (`web/.nvmrc`).
 
 ```bash
 dotnet test Rochell.slnx
+cd web && npm ci && npm run lint && npm run typecheck && npm run check:api && npm test && npm run build
+npx playwright install chromium && npx playwright test   # needs the Release build of the solution
 ```

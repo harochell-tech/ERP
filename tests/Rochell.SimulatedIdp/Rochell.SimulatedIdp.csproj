@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Rochell.Testing.Oidc</RootNamespace>
+    <!-- E-PR18-2 / E-PR18b-9: test and development only; never referenced from src/. -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Rochell.Identity\Rochell.Identity.csproj" />
+  </ItemGroup>
+</Project>

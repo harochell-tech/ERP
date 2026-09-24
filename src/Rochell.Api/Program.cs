@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 using Rochell.Api.Auth;
 using Rochell.Api.Endpoints;
@@ -77,10 +78,26 @@ services.ConfigureHttpJsonOptions(options => ApiJson.Configure(options.Serialize
 services.AddRochellOidc(settings.Oidc, hostedDomain);
 services.AddRochellOpenApi();
 
+if (builder.Environment.IsDevelopment())
+{
+    // `next dev` forwards /api and the sign-in pages from its own origin (E-PR18b-2): honour X-Forwarded-* from loopback only.
+    services.Configure<ForwardedHeadersOptions>(options => options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost);
+}
+
 var app = builder.Build();
+if (app.Environment.IsDevelopment())
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseCorrelation();
+if (!string.IsNullOrWhiteSpace(settings.WebRoot))
+{
+    app.UseWebAssets(settings.WebRoot);
+}
+
 app.UseCsrfHeader();
 app.UseAuthentication();
 

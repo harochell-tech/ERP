@@ -2,18 +2,21 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Rochell.Identity.Sessions;
 
-namespace Rochell.Api.Tests;
+namespace Rochell.Testing.Oidc;
 
 /// <summary>
-/// E-PR18-2 / A-03: a simulated Google Workspace for CI. It exists only under tests/. The API's real OpenID Connect handler
-/// talks to it: discovery, JWKS and the token endpoint are answered through <see cref="Backchannel"/>; the browser leg
-/// (the authorization endpoint) is <see cref="Authorize"/>, which a test calls with the redirect the API produced.
+/// E-PR18-2 / A-03 / E-PR18b-9: a simulated Google Workspace for CI and local development. It exists only under tests/. The
+/// API's real OpenID Connect handler talks to it: discovery, JWKS and the token endpoint are answered through
+/// <see cref="Backchannel"/>; the browser leg (the authorization endpoint) is <see cref="Authorize"/>, called by a test with the
+/// redirect the API produced, or by the user-picker page (<see cref="MapBrowserEndpoints"/>) in a real browser.
 /// ID tokens are RS256-signed with a key generated per instance and carry sub, email, email_verified, hd and the nonce.
 /// </summary>
 public sealed class SimulatedIdp : IDisposable
@@ -21,16 +24,21 @@ public sealed class SimulatedIdp : IDisposable
     public const string Issuer = "https://idp.test";
     public const string ClientId = "rochell-api-test";
     public const string ClientSecret = "simulated-client-secret";
+    public const string BrowserPath = "/dev-idp/authorize";
     private const string KeyId = "simulated-key-1";
 
     private readonly RSA _rsa = RSA.Create(2048);
-    private readonly ConcurrentDictionary<string, OidcClaims> _accounts = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, (OidcClaims Claims, string Label)> _accounts = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, PendingCode> _codes = new(StringComparer.Ordinal);
 
-    public SimulatedIdp()
+    /// <param name="authorizationEndpoint">Where browsers are sent to sign in; the default is only reachable by tests calling <see cref="Authorize"/>.</param>
+    public SimulatedIdp(string authorizationEndpoint = Issuer + "/authorize")
     {
+        AuthorizationEndpoint = authorizationEndpoint;
         Backchannel = new BackchannelHandler(this);
     }
+
+    public string AuthorizationEndpoint { get; }
 
     /// <summary>The OIDC handler's backchannel (metadata, keys, code redemption).</summary>
     public HttpMessageHandler Backchannel { get; }
@@ -38,10 +46,10 @@ public sealed class SimulatedIdp : IDisposable
     /// <summary>Query parameters of the last authorization request (e.g. prompt=login on a step-up).</summary>
     public IReadOnlyDictionary<string, string> LastAuthorizeRequest { get; private set; } = new Dictionary<string, string>();
 
-    public void AddAccount(OidcClaims account)
+    public void AddAccount(OidcClaims account, string? label = null)
     {
         ArgumentNullException.ThrowIfNull(account);
-        _accounts[account.Subject] = account;
+        _accounts[account.Subject] = (account, label ?? account.Email ?? account.Subject);
     }
 
     /// <summary>
@@ -51,9 +59,63 @@ public sealed class SimulatedIdp : IDisposable
     public Uri Authorize(Uri authorizeRequest, string subject)
     {
         ArgumentNullException.ThrowIfNull(authorizeRequest);
+        var query = Validate(authorizeRequest);
+        if (!_accounts.TryGetValue(subject, out var account))
+        {
+            throw new InvalidOperationException($"No simulated account {subject}.");
+        }
+
+        var code = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));
+        _codes[code] = new PendingCode(account.Claims, query["nonce"], query["redirect_uri"], query["code_challenge"]);
+        return new Uri(QueryHelpers.AddQueryString(query["redirect_uri"], new Dictionary<string, string?> { ["code"] = code, ["state"] = query["state"] }));
+    }
+
+    /// <summary>
+    /// Development and browser tests: <c>GET /dev-idp/authorize</c> lists the accounts; choosing one completes the sign-in.
+    /// Mounted into the API host only by the dev stack (tests/Rochell.DevStack), never by the production host.
+    /// </summary>
+    public Task HandleBrowserAsync(HttpContext http)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        var request = new Uri(AuthorizationEndpoint + http.Request.QueryString.Value);
+        var subject = http.Request.Query["subject"].ToString();
+        if (subject.Length > 0)
+        {
+            return Results.Redirect(Authorize(RemoveSubject(request), subject).ToString()).ExecuteAsync(http);
+        }
+
+        Validate(request);
+        var encoder = HtmlEncoder.Default;
+        var items = new StringBuilder();
+        foreach (var (sub, account) in _accounts.OrderBy(a => a.Value.Label, StringComparer.Ordinal))
+        {
+            var link = QueryHelpers.AddQueryString(BrowserPath + http.Request.QueryString.Value, "subject", sub);
+            items.Append("<li><a href=\"").Append(encoder.Encode(link)).Append("\">").Append(encoder.Encode(account.Label)).Append("</a></li>");
+        }
+
+        return Results.Content(
+            "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>IdP simulado</title></head><body>"
+            + "<h1>IdP simulado (solo desarrollo y pruebas)</h1><p>Elija el usuario con el que desea entrar:</p><ul>" + items + "</ul></body></html>",
+            "text/html; charset=utf-8").ExecuteAsync(http);
+    }
+
+    public void Dispose()
+    {
+        _rsa.Dispose();
+        Backchannel.Dispose();
+    }
+
+    private static Uri RemoveSubject(Uri request)
+    {
+        var query = QueryHelpers.ParseQuery(request.Query).Where(p => p.Key != "subject").ToDictionary(p => p.Key, p => (string?)p.Value.ToString(), StringComparer.Ordinal);
+        return new Uri(QueryHelpers.AddQueryString(request.GetLeftPart(UriPartial.Path), query));
+    }
+
+    private Dictionary<string, string> Validate(Uri authorizeRequest)
+    {
         var query = QueryHelpers.ParseQuery(authorizeRequest.Query).ToDictionary(p => p.Key, p => p.Value.ToString(), StringComparer.Ordinal);
         LastAuthorizeRequest = query;
-        if (authorizeRequest.GetLeftPart(UriPartial.Path) != Issuer + "/authorize"
+        if (authorizeRequest.GetLeftPart(UriPartial.Path) != AuthorizationEndpoint
             || query.GetValueOrDefault("client_id") != ClientId
             || query.GetValueOrDefault("response_type") != "code"
             || query.GetValueOrDefault("code_challenge_method") != "S256"
@@ -62,20 +124,7 @@ public sealed class SimulatedIdp : IDisposable
             throw new InvalidOperationException("Unexpected authorization request: " + authorizeRequest);
         }
 
-        if (!_accounts.TryGetValue(subject, out var account))
-        {
-            throw new InvalidOperationException($"No simulated account {subject}.");
-        }
-
-        var code = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));
-        _codes[code] = new PendingCode(account, query["nonce"], query["redirect_uri"], query["code_challenge"]);
-        return new Uri(QueryHelpers.AddQueryString(query["redirect_uri"], new Dictionary<string, string?> { ["code"] = code, ["state"] = query["state"] }));
-    }
-
-    public void Dispose()
-    {
-        _rsa.Dispose();
-        Backchannel.Dispose();
+        return query;
     }
 
     private string IdToken(PendingCode pending)
@@ -125,10 +174,10 @@ public sealed class SimulatedIdp : IDisposable
         return Json(HttpStatusCode.OK, new { access_token = "simulated-access-token", token_type = "Bearer", expires_in = 300, id_token = IdToken(pending) });
     }
 
-    private object Discovery() => new Dictionary<string, object>
+    private Dictionary<string, object> Discovery() => new()
     {
         ["issuer"] = Issuer,
-        ["authorization_endpoint"] = Issuer + "/authorize",
+        ["authorization_endpoint"] = AuthorizationEndpoint,
         ["token_endpoint"] = Issuer + "/token",
         ["jwks_uri"] = Issuer + "/jwks",
         ["response_types_supported"] = new[] { "code" },

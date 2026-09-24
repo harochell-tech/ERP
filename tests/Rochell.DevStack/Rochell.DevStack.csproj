@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Rochell.DevStack</RootNamespace>
+    <!-- E-PR18b-9: local development and the Playwright journey only; never deployed. -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Rochell.Api\Rochell.Api.csproj" />
+    <ProjectReference Include="..\Rochell.TestInfrastructure\Rochell.TestInfrastructure.csproj" />
+    <ProjectReference Include="..\Rochell.SimulatedIdp\Rochell.SimulatedIdp.csproj" />
+  </ItemGroup>
+</Project>

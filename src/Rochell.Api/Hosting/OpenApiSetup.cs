@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using Rochell.Api.Auth;
@@ -94,7 +95,16 @@ public static class OpenApiSetup
                     schema.Type = type == typeof(DateTime) ? JsonSchemaType.String : JsonSchemaType.String | JsonSchemaType.Null;
                     schema.Format = "date-time";
                 }
-                else if (context.JsonPropertyInfo is null && typeof(ICommand).IsAssignableFrom(type) && schema.Properties is not null)
+                else if (context.JsonPropertyInfo is null && context.JsonTypeInfo.Kind == JsonTypeInfoKind.Object && schema.Required is { Count: > 0 } required)
+                {
+                    // Constructor parameters with a default value are optional in the body (RespectRequiredConstructorParameters).
+                    foreach (var property in context.JsonTypeInfo.Properties.Where(p => p.AssociatedParameter is { HasDefaultValue: true }))
+                    {
+                        required.Remove(property.Name);
+                    }
+                }
+
+                if (context.JsonPropertyInfo is null && typeof(ICommand).IsAssignableFrom(type) && schema.Properties is not null)
                 {
                     foreach (var field in CommandRunner.ServerFields)
                     {

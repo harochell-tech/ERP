@@ -31,8 +31,8 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-14, PR-15 | Merged: repost + valuation residual; hash chain (S3 Object Lock still pending B-03) |
 | PR-16 | Merged: reconciliations, CloseComponent, reopen with second approver |
 | PR-17 | Merged: Explain this entry, read-only query pipeline, POL-01 inputs on R-05/R-07B |
-| PR-18a | API (OIDC, 44 command endpoints, read queries, OpenAPI, hosted sealer/digest), AT-01/AT-02 over HTTP. E-PR18-1…7 approved — see §7 |
-| PR-18b | `web/` (Next.js, Spanish UI, types generated from `src/Rochell.Api/openapi.json`) — next |
+| PR-18a | Merged (#19): API (OIDC, 44 command endpoints, read queries, OpenAPI, hosted sealer/digest), AT-01/AT-02 over HTTP |
+| PR-18b | `web/` (Next.js static export served by the API, Spanish UI, typed from `openapi.json`), dev stack, Playwright journey. E-PR18b-1…11 approved |
 | PR-19 | Concurrency and load suite: CC-04, PF-01, full regression → slice acceptance |
 
 Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** staging PostgreSQL 17 + WORM storage;
@@ -104,14 +104,14 @@ SELECT r.code, v.version, v.status, v.close_component FROM fin.posting_rule r JO
 SELECT posting_generation, journal_type, reverses_journal_id FROM fin.gl_journal WHERE source_event_id = '<event>';
 ```
 
-## 7. PR-18 — approved decisions (E-PR18-1…7, in `errata.md`)
+## 7. PR-18 — approved decisions (E-PR18-1…7, E-PR18b-1…11, in `errata.md`)
 
-PR-18a (API) is described in `docs/engineering/api.md`. For PR-18b (`web/`, E-PR18-6):
-- Generate the TypeScript types from `src/Rochell.Api/openapi.json`; after any API change regenerate the document with
-  `ROCHELL_UPDATE_OPENAPI=1 dotnet test tests/Rochell.Api.Tests --filter OpenApiDocumentTests` and commit it.
-- Only the slice flows (PO create/submit/approve; receipt, correction, reversal; supplier invoice register/match/exception/
-  post/reverse; reconciliations; close and reopen; Explain). Master data through the API only. UI in Spanish, no polish.
-- Every POST sends `X-Rochell-Csrf: 1` and an `Idempotency-Key` created when the form opens; on 403 `STEP_UP_REQUIRED` send
-  the user to `/api/v1/auth/step-up?returnUrl=…` and retry with the same key. Decimals are strings.
-- The simulated IdP lives in `tests/Rochell.Api.Tests`; a standalone dev runner for it is part of PR-18b.
+API: `docs/engineering/api.md`. Web: `docs/engineering/web.md`.
+- After any API change regenerate `src/Rochell.Api/openapi.json`
+  (`ROCHELL_UPDATE_OPENAPI=1 dotnet test tests/Rochell.Api.Tests --filter OpenApiDocumentTests`) **and** the web types
+  (`cd web && npm run gen:api`); CI fails if either is stale.
+- The UI never does money or quantity arithmetic; decimals are strings. Every POST: `X-Rochell-Csrf: 1` + an `Idempotency-Key`
+  created when the form opens; `STEP_UP_REQUIRED` → `/api/v1/auth/step-up`, the user presses again with the same key.
+- Local stack: `dotnet run --project tests/Rochell.DevStack -c Release -- --web-root web/out` (Docker; Chrome/Firefox).
 - The API host keeps `RochellEnvironments.EnsureSupported` (Development / Test / Staging in VS#1).
+- Next: PR-19 (CC-04, PF-01, full regression → slice acceptance).
