@@ -24,6 +24,7 @@
     <Project Path="tests/Rochell.Procurement.Tests/Rochell.Procurement.Tests.csproj" />
     <Project Path="tests/Rochell.Tax.Tests/Rochell.Tax.Tests.csproj" />
     <Project Path="tests/Rochell.Audit.Tests/Rochell.Audit.Tests.csproj" />
+    <Project Path="tests/Rochell.Reconciliation.Tests/Rochell.Reconciliation.Tests.csproj" />
     <Project Path="tests/Rochell.ArchitectureTests/Rochell.ArchitectureTests.csproj" />
   </Folder>
 </Solution>

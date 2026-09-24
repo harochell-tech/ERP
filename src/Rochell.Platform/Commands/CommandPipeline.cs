@@ -103,7 +103,8 @@ public sealed class CommandPipeline
         var resultRef = _ids.NewId();
 
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
+        var isolation = handler.GetType().IsDefined(typeof(SerializableTransactionAttribute), inherit: false) ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted;
+        await using var transaction = await connection.BeginTransactionAsync(isolation, cancellationToken).ConfigureAwait(false);
 
         await SetTenantAsync(connection, transaction, command, correlationId, cancellationToken).ConfigureAwait(false);
 
