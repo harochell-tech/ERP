@@ -25,6 +25,10 @@ public sealed class PostingEngine
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(request);
+        if (request.JournalType is not ("AUTO" or "VALUATION_REALLOCATION"))
+        {
+            throw new InvalidOperationException("Planned journals are AUTO or VALUATION_REALLOCATION; reversals use ReverseAsync.");
+        }
 
         var rule = await ActiveRuleAsync(context, request.RuleCode, request.BusinessDate, cancellationToken).ConfigureAwait(false);
         var (periodId, postingDate, lateEntry) = await ResolvePostingDateAsync(context, rule.CloseComponent, request.BusinessDate, cancellationToken).ConfigureAwait(false);
@@ -84,7 +88,7 @@ public sealed class PostingEngine
 
         var journal = new GlJournalRow(
             context.Ids.NewId(), context.CompanyId, plan.PostingDate, plan.PeriodId, sourceEventId, plan.PostingRuleId, plan.PostingRuleVersion,
-            plan.Request.Generation, "AUTO", null, plan.LateEntry, Platform.Time.Precision.ToMicroseconds(plan.Request.OccurredAt));
+            plan.Request.Generation, plan.Request.JournalType, null, plan.LateEntry, Platform.Time.Precision.ToMicroseconds(plan.Request.OccurredAt));
         await InsertJournalAsync(context, journal, cancellationToken).ConfigureAwait(false);
 
         var entries = new List<GlEntryRow>();
@@ -131,6 +135,13 @@ public sealed class PostingEngine
         CancellationToken cancellationToken,
         IReadOnlyDictionary<Guid, Guid>? valueEntryMap = null)
     {
+        var plan = await PrepareReversalAsync(context, originalJournalId, businessDate, cancellationToken).ConfigureAwait(false);
+        return await WriteReversalAsync(context, plan, sourceEventId, occurredAt, cancellationToken, valueEntryMap).ConfigureAwait(false);
+    }
+
+    /// <summary>Validates an exact reversal before any write (journal exists, not yet reversed, open period) and resolves its posting date.</summary>
+    public async Task<ReversalPlan> PrepareReversalAsync(CommandContext context, Guid originalJournalId, DateOnly businessDate, CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(context);
         var original = await ReadJournalHeaderAsync(context, originalJournalId, cancellationToken).ConfigureAwait(false)
             ?? throw new DomainException(FinanceErrors.JournalNotFound, "The journal to reverse does not exist.");
@@ -146,13 +157,26 @@ public sealed class PostingEngine
             ("r", original.RuleId),
             ("v", original.RuleVersion));
         var (periodId, postingDate, lateEntry) = await ResolvePostingDateAsync(context, component!, businessDate, cancellationToken).ConfigureAwait(false);
+        return new ReversalPlan(originalJournalId, original.RuleId, original.RuleVersion, periodId, postingDate, lateEntry, businessDate);
+    }
 
+    /// <summary>Writes a prepared exact reversal.</summary>
+    public async Task<PostedJournal> WriteReversalAsync(
+        CommandContext context,
+        ReversalPlan plan,
+        Guid sourceEventId,
+        DateTime occurredAt,
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<Guid, Guid>? valueEntryMap = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(plan);
         var journal = new GlJournalRow(
-            context.Ids.NewId(), context.CompanyId, postingDate, periodId, sourceEventId, original.RuleId, original.RuleVersion,
-            1, "REVERSAL", originalJournalId, lateEntry, Platform.Time.Precision.ToMicroseconds(occurredAt));
+            context.Ids.NewId(), context.CompanyId, plan.PostingDate, plan.PeriodId, sourceEventId, plan.PostingRuleId, plan.PostingRuleVersion,
+            1, "REVERSAL", plan.OriginalJournalId, plan.LateEntry, Platform.Time.Precision.ToMicroseconds(occurredAt));
         await InsertJournalAsync(context, journal, cancellationToken).ConfigureAwait(false);
 
-        var originalEntries = await ReadEntriesAsync(context, originalJournalId, cancellationToken).ConfigureAwait(false);
+        var originalEntries = await ReadEntriesAsync(context, plan.OriginalJournalId, cancellationToken).ConfigureAwait(false);
         var entries = originalEntries.Select(e =>
         {
             Guid? valueEntry = null;
@@ -167,17 +191,18 @@ public sealed class PostingEngine
             {
                 GlEntryId = context.Ids.NewId(),
                 JournalId = journal.JournalId,
-                PostingDate = postingDate,
+                PostingDate = plan.PostingDate,
                 Debit = e.Credit,
                 Credit = e.Debit,
+                SubledgerRef = valueEntry ?? e.SubledgerRef,
                 InvValueEntryId = valueEntry,
                 SourceEventId = sourceEventId,
-                DeterminationInputs = JsonCanonicalizer.Canonicalize(JsonSerializer.Serialize(new { reverses_entry_id = e.GlEntryId, reverses_journal_id = originalJournalId, late_entry = lateEntry })),
+                DeterminationInputs = JsonCanonicalizer.Canonicalize(JsonSerializer.Serialize(new { reverses_entry_id = e.GlEntryId, reverses_journal_id = plan.OriginalJournalId, late_entry = plan.LateEntry })),
             };
         }).ToList();
 
-        await WriteEntriesAsync(context, periodId, entries, cancellationToken).ConfigureAwait(false);
-        return new PostedJournal(journal.JournalId, postingDate, lateEntry, entries.Select(e => e.GlEntryId).ToList());
+        await WriteEntriesAsync(context, plan.PeriodId, entries, cancellationToken).ConfigureAwait(false);
+        return new PostedJournal(journal.JournalId, plan.PostingDate, plan.LateEntry, entries.Select(e => e.GlEntryId).ToList());
     }
 
     private static void ValidateShape(RuleLine rule, PostingLineInput input)

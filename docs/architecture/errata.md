@@ -60,6 +60,10 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR09-4 | PR-09 | Line value = quantity (PO line UOM) × PO price, 2 decimals half-up; inventory receives the quantity converted to the base UOM with the conversion effective on the receipt date, 6 decimals. |
 | E-PR09-5 | PR-09 | Weigh ticket optional in VS#1; when present it cannot repeat on another non-reversed receipt. |
 | E-PR09-6 | PR-09 | `late_entry_hours` does not affect posting in VS#1 (late entry = closed component, E-PR05-4); it is reserved for reporting and reconciliations. |
+| E-PR10-1 | PR-10 | R-02B `avg₀` = the area's average (value ÷ quantity) immediately before the reversal; the remaining stock keeps its unit cost. |
+| E-PR10-2 | PR-10 | PURCHASE_PRICE_VARIANCE lines carry plant and item dimensions. |
+| E-PR10-3 | PR-10 | `inv.movement_type` gains VALUATION_REALLOCATION (value only); the exact reversal uses RECEIPT_REVERSAL with `reverses_*_entry_id`. |
+| E-PR10-4 | PR-10 | R-02B seeded DRAFT from 2026-01-01 with both side variants; R-02 (A) is the exact reversal of the R-01 journal (no new rule). |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -78,4 +82,6 @@ Implementation rules derived from the above (no architectural change):
 - ADR-027 is enforced for purchase orders: a status (on insert or change) without its `core.state_history` row fails at COMMIT.
 - Rejecting a purchase order uses `purchase_order:approve` (§14 lists no reject permission; whoever may approve may reject).
 - Goods receipt and purchase order status changes require their `core.state_history` row in the same transaction (ADR-027, enforced by deferred triggers); a POSTED receipt requires its AUTO journal (K-25).
+- Exact reversals point the inventory line's `subledger_ref` to the new inverse value entry (required by `gl_entry_inv_link`).
+- Receipt reversal guard "nothing invoiced": `qty_invoiced ≤ qty_received − reversed quantity` on each PO line of the receipt.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.

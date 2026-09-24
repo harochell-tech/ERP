@@ -17,3 +17,16 @@ At COMMIT the database checks: journal balanced, value entry ↔ GL line (P-1), 
 status changes have their history rows (ADR-027).
 
 **Setup:** approve R-01 (`ApprovePostingRuleVersion R-01 v1`) and map RAW_MATERIAL and GRNI accounts before the first receipt.
+
+## Reversal (PR-10)
+
+`ReverseGoodsReceipt` (goods_receipt:reverse, Controller, step-up) reverses a whole POSTED receipt when nothing was invoiced
+and every lot is untouched since the receipt (otherwise: receipt correction, PR-11).
+
+- **R-02 (A):** exact inverse of the R-01 journal and of each receipt value entry (never recalculated).
+- **R-02B:** only if, after A, an area × item has quantity 0 and value ≠ 0, or quantity > 0 and value ≤ 0 — reallocated to
+  0 or quantity × avg₀ (average just before the reversal) against PURCHASE_PRICE_VARIANCE (journal VALUATION_REALLOCATION).
+- The receipt becomes REVERSED with its `goods_receipt_reversal` document (both checked at COMMIT); the order goes back to
+  APPROVED / PARTIALLY_RECEIVED; the weigh ticket is free again.
+
+**Setup:** approve R-02B and map PURCHASE_PRICE_VARIANCE before the first reversal that needs a reallocation.

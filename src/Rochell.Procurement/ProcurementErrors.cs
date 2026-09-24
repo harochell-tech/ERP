@@ -24,6 +24,10 @@ public static class ProcurementErrors
     public const string WeighTicketUsed = "WEIGH_TICKET_USED";
     public const string OccurredInFuture = "OCCURRED_IN_FUTURE";
     public const string ValueTooSmall = "VALUE_TOO_SMALL";
+    public const string ReceiptNotFound = "GOODS_RECEIPT_NOT_FOUND";
+    public const string ReceiptNotReversible = "GOODS_RECEIPT_NOT_REVERSIBLE";
+    public const string AlreadyInvoiced = "ALREADY_INVOICED";
+    public const string UseReceiptCorrection = "USE_RECEIPT_CORRECTION";
 }
 
 public static class PurchaseOrderStatus
