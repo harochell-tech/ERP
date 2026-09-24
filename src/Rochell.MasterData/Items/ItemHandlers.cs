@@ -94,7 +94,7 @@ public sealed class CreateRawMaterialHandler : ICommandHandler<CreateRawMaterial
 [RequiresPermission("item:activate")]
 public sealed class DefineUomConversionHandler : ICommandHandler<DefineUomConversion>
 {
-    private const decimal MaxFactor = 9_999_999_999.99999999m; // numeric(18,8)
+    private const decimal MaxFactor = 9_999_999_999.99999999m; // type-limit: numeric(18,8)
 
     public string CommandType => "MasterData.DefineUomConversion";
 

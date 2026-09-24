@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.Text.Json;
+using Rochell.Finance.Policies;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Hashing;
@@ -11,11 +12,14 @@ namespace Rochell.Finance.Posting;
 /// <see cref="PrepareAsync"/> validates every prerequisite without writing (step 7 of the template);
 /// <see cref="WriteAsync"/> writes the journal, its lines and the balance projection (step 11).
 /// Any missing prerequisite throws <see cref="DomainException"/> with <see cref="FinanceErrors.PostingPrerequisiteMissing"/>,
-/// so the whole command rolls back. Rounding tolerance is zero until accounting policies exist (PR-06).
+/// so the whole command rolls back. A rounding difference within the POSTING policy tolerance is booked to
+/// ROUNDING_DIFFERENCE (rule line R-08); anything larger is rejected (E-PR05-7, PR-06).
 /// </summary>
 public sealed class PostingEngine
 {
     public const string Currency = "DOP";
+    public const string RoundingLineCode = "R-08";
+    public const string RoundingRole = "ROUNDING_DIFFERENCE";
 
     public async Task<PostingPlan> PrepareAsync(CommandContext context, PostingRequest request, CancellationToken cancellationToken)
     {
@@ -43,12 +47,33 @@ public sealed class PostingEngine
 
         var debit = lines.Sum(l => l.Debit);
         var credit = lines.Sum(l => l.Credit);
+        Guid? roundingPolicy = null;
+        if (lines.Count >= 2 && debit != credit)
+        {
+            // Only a posting that actually needs rounding depends on the POSTING policy (E-PR06-7).
+            var policy = await PolicyResolver.ResolveAsync(context, PolicyCodes.Posting, request.BusinessDate, cancellationToken).ConfigureAwait(false);
+            var difference = debit - credit;
+            if (Math.Abs(difference) > policy.Decimal(PolicyParameters.RoundingDifferenceTolerance))
+            {
+                throw new DomainException(FinanceErrors.PostingUnbalanced, $"Posting {request.RuleCode} differs by {difference} (debit {debit}, credit {credit}), above the rounding tolerance.");
+            }
+
+            var side = difference > 0 ? RuleDefinition.Credit : RuleDefinition.Debit;
+            var roundingRule = new RuleLine(RoundingLineCode, side, RoundingRole, RoundingLineCode, [], null);
+            var (accountId, mapId) = await ResolveAccountAsync(context, RoundingRole, null, postingDate, cancellationToken).ConfigureAwait(false);
+            var amount = Math.Abs(difference);
+            lines.Add(new PlannedLine(new PostingLineInput(RoundingLineCode, RoundingLineCode, amount), roundingRule, accountId, mapId, null, side == RuleDefinition.Debit ? amount : 0, side == RuleDefinition.Credit ? amount : 0));
+            roundingPolicy = policy.PolicyVersionId;
+            debit = lines.Sum(l => l.Debit);
+            credit = lines.Sum(l => l.Credit);
+        }
+
         if (lines.Count < 2 || debit != credit)
         {
             throw new DomainException(FinanceErrors.PostingUnbalanced, $"Posting {request.RuleCode} does not balance after rounding (debit {debit}, credit {credit}).");
         }
 
-        return new PostingPlan(request, rule.RuleId, rule.Version, rule.EventType, rule.CloseComponent, periodId, postingDate, lateEntry, lines);
+        return new PostingPlan(request, rule.RuleId, rule.Version, rule.EventType, rule.CloseComponent, periodId, postingDate, lateEntry, lines, roundingPolicy);
     }
 
     public async Task<PostedJournal> WriteAsync(CommandContext context, PostingPlan plan, Guid sourceEventId, CancellationToken cancellationToken)
@@ -76,6 +101,11 @@ public sealed class PostingEngine
                 ["business_date"] = plan.Request.BusinessDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
                 ["inputs"] = line.Input.Inputs ?? new Dictionary<string, string>(),
             };
+            if (line.Rule.Code == RoundingLineCode)
+            {
+                inputs["policy_version_id"] = plan.RoundingPolicyVersionId;
+            }
+
             entries.Add(new GlEntryRow(
                 context.Ids.NewId(), journal.JournalId, ++lineNo, context.CompanyId, plan.PostingDate, line.AccountId, line.Rule.AccountRole,
                 line.Debit, line.Credit, Currency, line.Input.PlantId, line.Input.ItemId, line.Input.PartyId, line.Rule.Subledger,

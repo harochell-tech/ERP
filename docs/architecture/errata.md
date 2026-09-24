@@ -33,6 +33,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR05-6 | PR-05 | DOP only in VS#1 (CHECK). |
 | E-PR05-7 | PR-05 | GL lines rounded half-up to 2 decimals (CHECK); rounding differences go to ROUNDING_DIFFERENCE within the policy tolerance. |
 | E-PR05-8 | PR-05 | Row hash of `gl_journal`/`gl_entry` covers all columns except `row_hash`; `gl_entry.inv_value_entry_id` gets its FK in PR-07. |
+| E-PR06-1 | PR-06 | Three policies: PURCHASING (receipt and match tolerances), INVENTORY (adjustment materiality, GRNI aging, price-variance allocation = STOCK_COVERAGE), POSTING (rounding tolerance, late-entry hours). |
+| E-PR06-2 | PR-06 | Policy versions go DRAFT → ACTIVE on approval; the effective range decides when they apply. |
+| E-PR06-3 | PR-06 | `acc.policy_parameter_definition` (type, min, max, allowed values) validates versions; every parameter of the policy is required. |
+| E-PR06-4 | PR-06 | Role APROBADOR_POLITICAS seeded with only `accounting_policy:approve`. |
+| E-PR06-5 | PR-06 | Parameter values are JSON strings (decimals as `"0.02"`). |
+| E-PR06-6 | PR-06 | Architecture test: no decimal literals in `src/` other than 0m, 1m, 100m, except column type limits marked `// type-limit`. |
+| E-PR06-7 | PR-06 | A missing ACTIVE policy is a missing posting prerequisite (full rollback); initial values are set by the Controller (A-01). |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -42,6 +49,6 @@ Implementation rules derived from the above (no architectural change):
 - The outbox dispatcher processes companies one at a time so row-level security applies to it as to any command.
 - `md.item.description` (NOT NULL) was added as a trivial field omitted by the frozen schema ("no necesito todavía cada campo trivial").
 - Account-role mappings are loaded as DRAFT by the deployment role (`import-account-map`) and approved by the Controller; `prepared_by` was added to enforce preparer ≠ approver.
-- Until accounting policies exist (PR-06) the rounding tolerance is zero: an unbalanced posting is rejected, no rounding line is generated.
+- Since PR-06 a rounding difference within `rounding_difference_tolerance` is booked on rule line R-08 (ROUNDING_DIFFERENCE, policy version in `determination_inputs`); only postings that need rounding depend on the POSTING policy.
 - The posting rule version is chosen by the business date; the account mapping by the posting date.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
