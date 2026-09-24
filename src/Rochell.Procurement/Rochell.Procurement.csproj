@@ -9,5 +9,6 @@
   <ItemGroup>
     <!-- E-PR08-1: Procurement may depend on Finance, Inventory, MasterData and Tax (verified by ArchitectureTests). -->
     <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
+    <ProjectReference Include="..\Rochell.Inventory\Rochell.Inventory.csproj" />
   </ItemGroup>
 </Project>
