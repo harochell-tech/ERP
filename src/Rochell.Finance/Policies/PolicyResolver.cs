@@ -22,6 +22,8 @@ public static class PolicyParameters
     public const string InvoicePriceVarianceAllocationMethod = "invoice_price_variance_allocation_method";
     public const string RoundingDifferenceTolerance = "rounding_difference_tolerance";
     public const string LateEntryHours = "late_entry_hours";
+    public const string PoApprovalLimit = "po_approval_limit";
+    public const string PoApprovalStepUpThreshold = "po_approval_step_up_threshold";
 }
 
 /// <summary>The ACTIVE policy version for a date and its parameters (values are strings, E-PR06-5).</summary>

@@ -3,7 +3,11 @@
     <RootNamespace>Rochell.Procurement</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Module rule: a module may reference only Rochell.Platform (ArchitectureTests). -->
+    <!-- Module dependencies are an explicit allow-list verified by ArchitectureTests (E-PR08-1). -->
     <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- E-PR08-1: Procurement may depend on Finance, Inventory, MasterData and Tax (verified by ArchitectureTests). -->
+    <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
   </ItemGroup>
 </Project>

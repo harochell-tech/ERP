@@ -48,6 +48,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR07-6 | PR-07 | Row hash of inventory ledgers covers all columns except `row_hash`. |
 | E-PR07-7 | PR-07 | Stock balance by location × item × lot; valuation balance by valuation area (plant) × item. |
 | E-PR07-8 | PR-07 | At COMMIT, for touched positions: valuation = Σ value entries = Σ GL (RAW_MATERIAL, plants of the area, item); quantities agree across ledger, stock and valuation. |
+| E-PR08-1 | PR-08 | Module dependencies are an explicit, acyclic allow-list verified by ArchitectureTests: Procurement → Finance, Inventory, MasterData, Tax; every module → Platform. No separate contracts projects. |
+| E-PR08-2 | PR-08 | PURCHASING policy gains `po_approval_limit` (purchasing approver; the Controller has no limit) and `po_approval_step_up_threshold` (re-authentication when the order total exceeds it). |
+| E-PR08-3 | PR-08 | `po_no` is readable but not sequential: `OC-<year>-<8 hex of the UUIDv7>` (ADR-029). |
+| E-PR08-4 | PR-08 | Order quantities and prices are in the line UOM, which must be the base UOM or have a conversion valid on the order date; the goods receipt converts to base with the conversion valid at receipt. |
+| E-PR08-5 | PR-08 | `UpdatePurchaseOrderDraft` replaces the lines of a DRAFT order (permission `purchase_order:create`). |
+| E-PR08-6 | PR-08 | `ClosePurchaseOrder` is implemented in PR-13 with the supplier invoice. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -61,4 +67,7 @@ Implementation rules derived from the above (no architectural change):
 - The posting rule version is chosen by the business date; the account mapping by the posting date.
 - Value entry ids are pre-assigned (Errata E-4) so the Posting Engine line and the value entry reference each other in the same transaction.
 - `RAW_MATERIAL` lines always use subledger INV and `AP_CONTROL` lines subledger AP (CHECK on `fin.gl_entry`).
+- Conditional step-up: handlers call `context.RequireStepUpAsync` (evaluated by the identity authorizer) when the need depends on the data (E-PR08-2).
+- Purchase-order commands are plant-scoped (the command carries the plant and the handler checks it matches the order); the order date is a trivial column added to validate UOM conversions.
+- ADR-027 is enforced for purchase orders: a status (on insert or change) without its `core.state_history` row fails at COMMIT.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
