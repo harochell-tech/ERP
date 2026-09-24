@@ -30,8 +30,9 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-01 … PR-13b | Merged to `main`, CI green |
 | PR-14, PR-15 | Merged: repost + valuation residual; hash chain (S3 Object Lock still pending B-03) |
 | PR-16 | Merged: reconciliations, CloseComponent, reopen with second approver |
-| PR-17 | Explain this entry + read-only query pipeline + POL-01 inputs on R-05/R-07B (E-PR17-1…6 approved). Branch `pr-17-explain` |
-| PR-18 | API (OpenAPI) + minimal web UI; AT-01 and AT-02 end to end through the API |
+| PR-17 | Merged: Explain this entry, read-only query pipeline, POL-01 inputs on R-05/R-07B |
+| PR-18a | API (OIDC, 44 command endpoints, read queries, OpenAPI, hosted sealer/digest), AT-01/AT-02 over HTTP. E-PR18-1…7 approved — see §7 |
+| PR-18b | `web/` (Next.js, Spanish UI, types generated from `src/Rochell.Api/openapi.json`) — next |
 | PR-19 | Concurrency and load suite: CC-04, PF-01, full regression → slice acceptance |
 
 Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** staging PostgreSQL 17 + WORM storage;
@@ -81,7 +82,7 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
    100+ test project exhausts `max_connections` (53300). Concurrency tests throttle themselves (e.g. `SemaphoreSlim(32)`):
    the app pool allows 100 connections, and with the sealer and fixture connections that already exceeds the server limit.
 7. SoD pairs in `iam.sod_rule` are ordered (`permission_a < permission_b`). Seed counts are asserted by tests
-   (39 permissions, 16 SoD rules; policy parameter counts in `AccountingPolicyTests`) — update them when you seed more.
+   (44 permissions, 16 SoD rules; policy parameter counts in `AccountingPolicyTests`) — update them when you seed more.
 8. The table inventory test compares `information_schema` order: check it against a real migrated database.
 9. Deferred guarantees checked at COMMIT: journal balance; **P-1** every inventory GL line ↔ exactly one value entry;
    **P-3** valuation = Σ value entries = GL inventory; **K-25** `accounting_status = POSTED` ⇔ an unreversed AUTO journal of the
@@ -102,3 +103,15 @@ SELECT r.code, v.version, v.status, v.close_component FROM fin.posting_rule r JO
 -- Journals of an event
 SELECT posting_generation, journal_type, reverses_journal_id FROM fin.gl_journal WHERE source_event_id = '<event>';
 ```
+
+## 7. PR-18 — approved decisions (E-PR18-1…7, in `errata.md`)
+
+PR-18a (API) is described in `docs/engineering/api.md`. For PR-18b (`web/`, E-PR18-6):
+- Generate the TypeScript types from `src/Rochell.Api/openapi.json`; after any API change regenerate the document with
+  `ROCHELL_UPDATE_OPENAPI=1 dotnet test tests/Rochell.Api.Tests --filter OpenApiDocumentTests` and commit it.
+- Only the slice flows (PO create/submit/approve; receipt, correction, reversal; supplier invoice register/match/exception/
+  post/reverse; reconciliations; close and reopen; Explain). Master data through the API only. UI in Spanish, no polish.
+- Every POST sends `X-Rochell-Csrf: 1` and an `Idempotency-Key` created when the form opens; on 403 `STEP_UP_REQUIRED` send
+  the user to `/api/v1/auth/step-up?returnUrl=…` and retry with the same key. Decimals are strings.
+- The simulated IdP lives in `tests/Rochell.Api.Tests`; a standalone dev runner for it is part of PR-18b.
+- The API host keeps `RochellEnvironments.EnsureSupported` (Development / Test / Staging in VS#1).

@@ -13,19 +13,20 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     private static readonly Dictionary<string, string> ExpectedRoles = new()
     {
         ["ADMIN_SEGURIDAD"] = "role:assign,role:revoke",
-        ["ALMACENISTA"] = "goods_receipt:post,item:create,receipt_correction:create",
+        ["ALMACENISTA"] = "goods_receipt:post,goods_receipt:read,item:create,master_data:read,purchase_order:read,receipt_correction:create",
         ["ANALISTA_FISCAL"] = "fiscal_rule:configure,fiscal_rule_source:register",
         ["APROBADOR_POLITICAS"] = "accounting_policy:approve", // E-PR06-4
-        ["APROBADOR_COMPRAS"] = "purchase_order:approve,purchase_order:approve_over_receipt",
-        ["AUDITOR"] = "audit:read,hash:verify,reconciliation:read",
-        ["COMPRADOR"] = "purchase_order:cancel,purchase_order:create,purchase_order:submit,supplier:create,supplier:update",
-        ["CONTROLLER"] = "account_role_map:approve,accounting_policy:approve,accounting_policy:prepare,audit:read,goods_receipt:reverse,hash:verify,"
-            + "item:activate,journal:repost,match_exception:approve,period_component:close,period_component:reopen,posting_rule:approve,"
-            + "purchase_order:approve,receipt_correction:approve,reconciliation:read,reconciliation:run,supplier:activate,supplier_invoice:reverse,"
-            + "valuation_residual:approve",
-        ["CUENTAS_POR_PAGAR"] = "supplier_invoice:match,supplier_invoice:post,supplier_invoice:register,supplier_invoice:void",
+        ["APROBADOR_COMPRAS"] = "master_data:read,purchase_order:approve,purchase_order:approve_over_receipt,purchase_order:read",
+        ["AUDITOR"] = "audit:read,goods_receipt:read,hash:verify,master_data:read,period:read,purchase_order:read,reconciliation:read,supplier_invoice:read",
+        ["COMPRADOR"] = "master_data:read,purchase_order:cancel,purchase_order:create,purchase_order:read,purchase_order:submit,supplier:create,supplier:update",
+        ["CONTROLLER"] = "account_role_map:approve,accounting_policy:approve,accounting_policy:prepare,audit:read,goods_receipt:read,goods_receipt:reverse,"
+            + "hash:verify,item:activate,journal:repost,master_data:read,match_exception:approve,period:read,period_component:close,period_component:reopen,"
+            + "posting_rule:approve,purchase_order:approve,purchase_order:read,receipt_correction:approve,reconciliation:read,reconciliation:run,"
+            + "supplier:activate,supplier_invoice:read,supplier_invoice:reverse,valuation_residual:approve",
+        ["CUENTAS_POR_PAGAR"] = "goods_receipt:read,master_data:read,purchase_order:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
+            + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "fiscal_rule:activate",
-        ["SEGUNDO_APROBADOR_CIERRE"] = "period_component:second_approve",
+        ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "role:second_approve",
     };
 
@@ -34,7 +35,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(39L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
+        Assert.Equal(44L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
         Assert.Equal(16L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
         foreach (var (role, permissions) in ExpectedRoles)
         {

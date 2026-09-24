@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Rochell.Identity.Sessions;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Time;
@@ -35,15 +36,7 @@ public sealed class SqlCommandAuthorizer : ICommandAuthorizer
         var session = await ReadSessionAsync(connection, transaction, command.SessionId, cancellationToken).ConfigureAwait(false)
             ?? throw new DomainException(AuthorizationErrors.SessionInvalid, "The session does not exist.");
 
-        if (session.LogoutAt is not null || session.Status != "ACTIVE" || session.Kind != "HUMAN")
-        {
-            throw new DomainException(AuthorizationErrors.SessionInvalid, "The session is closed or its user is not active.");
-        }
-
-        if (now - session.LoginAt >= _options.SessionAbsoluteLifetime || now - session.LastActivityAt >= _options.SessionIdleTimeout)
-        {
-            throw new DomainException(AuthorizationErrors.SessionExpired, "The session has expired; sign in again.");
-        }
+        SessionRules.EnsureUsable(_options, now, session.LoginAt, session.LastActivityAt, session.LogoutAt, session.Status, session.Kind);
 
         Guid? plantId = command is IPlantScopedCommand scoped ? scoped.PlantId : null;
         await using (var permission = Sql.Command(

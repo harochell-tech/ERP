@@ -3,6 +3,20 @@
     <RootNamespace>Rochell.Api</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The host composes every module: it adds transport (HTTP, cookies, OpenAPI), never business rules. -->
     <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+    <ProjectReference Include="..\Rochell.Identity\Rochell.Identity.csproj" />
+    <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
+    <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
+    <ProjectReference Include="..\Rochell.Inventory\Rochell.Inventory.csproj" />
+    <ProjectReference Include="..\Rochell.Procurement\Rochell.Procurement.csproj" />
+    <ProjectReference Include="..\Rochell.Tax\Rochell.Tax.csproj" />
+    <ProjectReference Include="..\Rochell.Audit\Rochell.Audit.csproj" />
+    <ProjectReference Include="..\Rochell.Reconciliation\Rochell.Reconciliation.csproj" />
   </ItemGroup>
 </Project>

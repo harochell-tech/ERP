@@ -15,6 +15,37 @@ public interface IQuery
     Guid SessionId { get; }
 }
 
+/// <summary>
+/// A query that may be restricted to one plant. With a plant, the reader needs an assignment for that plant or for the whole
+/// company (like plant-scoped commands) and the handler returns only that plant's documents; without one, a company-wide
+/// assignment is required.
+/// </summary>
+public interface IPlantScopedQuery : IQuery
+{
+    Guid? PlantId { get; }
+}
+
+/// <summary>Error codes of the read side.</summary>
+public static class QueryErrors
+{
+    /// <summary>The requested document does not exist in this company (or in the requested plant).</summary>
+    public const string NotFound = "NOT_FOUND";
+
+    /// <summary>A filter or paging parameter is out of range.</summary>
+    public const string InvalidParameter = "INVALID_PARAMETER";
+
+    public const int MaxLimit = 200;
+
+    /// <summary>Checks list paging: 1 ≤ limit ≤ <see cref="MaxLimit"/>, offset ≥ 0.</summary>
+    public static void EnsurePaging(int limit, int offset)
+    {
+        if (limit is < 1 or > MaxLimit || offset < 0)
+        {
+            throw new DomainException(InvalidParameter, $"limit must be between 1 and {MaxLimit} and offset must not be negative.");
+        }
+    }
+}
+
 public interface IQueryHandler<in TQuery>
     where TQuery : IQuery
 {
@@ -57,7 +88,9 @@ public sealed class QueryPipeline(DbDataSource dataSource, ICommandAuthorizer au
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
-        var principal = new QueryPrincipal(query.CompanyId, query.SessionId);
+        ICommand principal = query is IPlantScopedQuery { PlantId: { } plantId }
+            ? new PlantQueryPrincipal(query.CompanyId, query.SessionId, plantId)
+            : new QueryPrincipal(query.CompanyId, query.SessionId);
         await CommandPipeline.SetTenantAsync(connection, transaction, principal, UuidV7Generator.Instance.NewId(), cancellationToken).ConfigureAwait(false);
         await authorizer.AuthorizeAsync(connection, transaction, principal, requirement, cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(connection, transaction, "SET TRANSACTION READ ONLY", cancellationToken).ConfigureAwait(false);
@@ -69,6 +102,12 @@ public sealed class QueryPipeline(DbDataSource dataSource, ICommandAuthorizer au
 
     /// <summary>The authorizer's view of a query: who and where, with no idempotency key.</summary>
     private sealed record QueryPrincipal(Guid CompanyId, Guid SessionId) : ICommand
+    {
+        public string IdempotencyKey => "query";
+    }
+
+    /// <summary>A query restricted to one plant: authorized like a plant-scoped command.</summary>
+    private sealed record PlantQueryPrincipal(Guid CompanyId, Guid SessionId, Guid PlantId) : IPlantScopedCommand
     {
         public string IdempotencyKey => "query";
     }

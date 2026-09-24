@@ -25,4 +25,5 @@ The first invalid `ledger_sequence` per chain (an altered row breaks its group a
 - Keys: the signing key lives only with the sealing service (secret store); verifiers need the public key.
 - WORM: `FileSystemWormStore` only in TEST environments. Production needs S3 Object Lock in compliance mode at a second
   provider (**B-03**). The e-mail copy of each digest is deferred until mail infrastructure exists.
-- Hosting of the sealer loop (`LedgerSealer.RunAsync`) and the 00:15 digest job arrives with the API host (PR-18).
+- Hosting (PR-18a, E-PR18-5): the sealer and the 00:15 digest run as background services of the API host, switched by
+  configuration; the digest does not start without WORM storage (see [api.md](api.md#background-services-e-pr18-5)).
