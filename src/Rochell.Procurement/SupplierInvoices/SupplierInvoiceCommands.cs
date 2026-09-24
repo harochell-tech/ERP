@@ -41,3 +41,12 @@ public static class SupplierInvoiceStatus
     public const string Voided = "VOIDED";
     public const string Reversed = "REVERSED";
 }
+
+/// <summary>
+/// T-09 (C-14): posts a MATCHED invoice — fiscal determination at the invoice date, R-04 (AP-REC) and R-05 (INV-MOV), the AP
+/// document, invoiced quantities and BILLS links, in one transaction. Non-recoverable ITBIS records POSTING_BLOCKED (E-PR13-3).
+/// </summary>
+public sealed record PostSupplierInvoice(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SupplierInvoiceId, long ExpectedVersion) : ICommand;
+
+/// <summary>T-10 (R-07): reverses a posted invoice whose AP document is fully open (Controller, step-up), on the reversal date (E-PR13b-3).</summary>
+public sealed record ReverseSupplierInvoice(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SupplierInvoiceId, long ExpectedVersion, string Reason) : ICommand;

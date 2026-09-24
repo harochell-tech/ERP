@@ -38,6 +38,8 @@ public static class ProcurementErrors
     public const string DateInvalid = "DATE_INVALID";
     public const string PoLineNotInvoiceable = "PO_LINE_NOT_INVOICEABLE";
     public const string QtyExceptionNotApprovable = "QTY_EXCEPTION_NOT_APPROVABLE";
+    public const string QtyExceedsAvailable = "QTY_EXCEEDS_AVAILABLE";
+    public const string ApNotOpen = "AP_NOT_OPEN";
 }
 
 public static class PurchaseOrderStatus

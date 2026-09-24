@@ -469,22 +469,41 @@ public sealed class InventoryLedger
     }
 
     /// <summary>Patch 1 P-4 (R-02B): a value-only reallocation of <paramref name="amount"/> (signed, 2 decimals) in an area × item.</summary>
-    public async Task ReallocateValueAsync(CommandContext context, Guid valuationAreaId, Guid plantId, Guid itemId, decimal amount, Guid valueEntryId, MovementSource source, MovementDates dates, CancellationToken cancellationToken)
+    public Task ReallocateValueAsync(CommandContext context, Guid valuationAreaId, Guid plantId, Guid itemId, decimal amount, Guid valueEntryId, MovementSource source, MovementDates dates, CancellationToken cancellationToken)
+        => PostValueAdjustmentAsync(context, MovementTypes.ValuationReallocation, valuationAreaId, plantId, itemId, amount, valueEntryId, null, source, dates, cancellationToken);
+
+    /// <summary>
+    /// A value-only movement (no quantity) of <paramref name="amount"/> (signed, 2 decimals) in an area × item: valuation
+    /// reallocations (R-02B, R-07B) and price adjustments (R-05), optionally the exact reversal of another value entry (R-07).
+    /// Callers hold the valuation lock and pre-assign <paramref name="valueEntryId"/> (P-1).
+    /// </summary>
+    public async Task PostValueAdjustmentAsync(
+        CommandContext context,
+        string movementType,
+        Guid valuationAreaId,
+        Guid plantId,
+        Guid itemId,
+        decimal amount,
+        Guid valueEntryId,
+        Guid? reversesValueEntryId,
+        MovementSource source,
+        MovementDates dates,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(dates);
         if (amount == 0 || decimal.Round(amount, 2) != amount)
         {
-            throw new InvalidOperationException("A reallocation needs a non-zero amount with 2 decimals.");
+            throw new InvalidOperationException("A value adjustment needs a non-zero amount with 2 decimals.");
         }
 
         var recordedAt = context.Clock.UtcNow;
         await InsertValueAsync(
             context,
             new ValueEntryRow(
-                valueEntryId, context.CompanyId, MovementTypes.ValuationReallocation, valuationAreaId, plantId, itemId, null, amount,
-                source.EventId, null, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate),
+                valueEntryId, context.CompanyId, movementType, valuationAreaId, plantId, itemId, null, amount,
+                source.EventId, reversesValueEntryId, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate),
             cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(
             context.Connection,
