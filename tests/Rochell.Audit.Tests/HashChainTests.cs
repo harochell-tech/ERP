@@ -92,7 +92,20 @@ public sealed class HashChainTests(PostgresFixture postgres) : IDisposable
             }
         });
 
-        await Task.WhenAll(Enumerable.Range(0, 200).Select(i => Receive(h, s, $"hs01-{i}")));
+        // 200 postings race the sealer; at most 32 hold a connection at once, below PostgreSQL's max_connections (53300).
+        using var slots = new SemaphoreSlim(32);
+        await Task.WhenAll(Enumerable.Range(0, 200).Select(async i =>
+        {
+            await slots.WaitAsync();
+            try
+            {
+                await Receive(h, s, $"hs01-{i}");
+            }
+            finally
+            {
+                slots.Release();
+            }
+        }));
         await stop.CancelAsync();
         await sealing;
         await sealer.SealAllAsync(CancellationToken.None);

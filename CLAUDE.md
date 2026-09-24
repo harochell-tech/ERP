@@ -79,7 +79,8 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
 5. **`core.deployment_environment` is empty in test databases** (production sets it with `rochell-migrate init-environment`).
    Tests that need it initialize it (`TaxSetup.InitTestEnvironmentAsync`); code must fail loudly when it is missing.
 6. **Connection pools:** each test gets its own database; setup connections use `Pooling=false` (`PostgresFixture`), otherwise a
-   100+ test project exhausts `max_connections` (53300).
+   100+ test project exhausts `max_connections` (53300). Concurrency tests throttle themselves (e.g. `SemaphoreSlim(32)`):
+   the app pool allows 100 connections, and with the sealer and fixture connections that already exceeds the server limit.
 7. SoD pairs in `iam.sod_rule` are ordered (`permission_a < permission_b`). Seed counts are asserted by tests
    (39 permissions, 16 SoD rules; policy parameter counts in `AccountingPolicyTests`) — update them when you seed more.
 8. The table inventory test compares `information_schema` order: check it against a real migrated database.
