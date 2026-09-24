@@ -54,6 +54,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR08-4 | PR-08 | Order quantities and prices are in the line UOM, which must be the base UOM or have a conversion valid on the order date; the goods receipt converts to base with the conversion valid at receipt. |
 | E-PR08-5 | PR-08 | `UpdatePurchaseOrderDraft` replaces the lines of a DRAFT order (permission `purchase_order:create`). |
 | E-PR08-6 | PR-08 | `ClosePurchaseOrder` is implemented in PR-13 with the supplier invoice. |
+| E-PR09-1 | PR-09 | R-01's GRNI line carries plant and supplier (party) dimensions, for GRNI aging by supplier. |
+| E-PR09-2 | PR-09 | R-01 v1 is seeded DRAFT with `effective_from = 2026-01-01`; the Controller approves it in the application. |
+| E-PR09-3 | PR-09 | Goods receipt number `RM-yyyy-XXXXXXXX`, readable and not sequential. |
+| E-PR09-4 | PR-09 | Line value = quantity (PO line UOM) × PO price, 2 decimals half-up; inventory receives the quantity converted to the base UOM with the conversion effective on the receipt date, 6 decimals. |
+| E-PR09-5 | PR-09 | Weigh ticket optional in VS#1; when present it cannot repeat on another non-reversed receipt. |
+| E-PR09-6 | PR-09 | `late_entry_hours` does not affect posting in VS#1 (late entry = closed component, E-PR05-4); it is reserved for reporting and reconciliations. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -70,4 +76,6 @@ Implementation rules derived from the above (no architectural change):
 - Conditional step-up: handlers call `context.RequireStepUpAsync` (evaluated by the identity authorizer) when the need depends on the data (E-PR08-2).
 - Purchase-order commands are plant-scoped (the command carries the plant and the handler checks it matches the order); the order date is a trivial column added to validate UOM conversions.
 - ADR-027 is enforced for purchase orders: a status (on insert or change) without its `core.state_history` row fails at COMMIT.
+- Rejecting a purchase order uses `purchase_order:approve` (§14 lists no reject permission; whoever may approve may reject).
+- Goods receipt and purchase order status changes require their `core.state_history` row in the same transaction (ADR-027, enforced by deferred triggers); a POSTED receipt requires its AUTO journal (K-25).
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.

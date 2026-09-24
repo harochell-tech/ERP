@@ -17,6 +17,13 @@ public static class ProcurementErrors
     public const string AlreadyReceived = "ALREADY_RECEIVED";
     public const string ReasonRequired = "REASON_REQUIRED";
     public const string LineNotFound = "LINE_NOT_FOUND";
+    public const string NotReceivable = "PURCHASE_ORDER_NOT_RECEIVABLE";
+    public const string LocationNotInPlant = "LOCATION_NOT_IN_PLANT";
+    public const string ReceiptToleranceExceeded = "RECEIPT_TOLERANCE_EXCEEDED";
+    public const string DuplicateLine = "DUPLICATE_LINE";
+    public const string WeighTicketUsed = "WEIGH_TICKET_USED";
+    public const string OccurredInFuture = "OCCURRED_IN_FUTURE";
+    public const string ValueTooSmall = "VALUE_TOO_SMALL";
 }
 
 public static class PurchaseOrderStatus
