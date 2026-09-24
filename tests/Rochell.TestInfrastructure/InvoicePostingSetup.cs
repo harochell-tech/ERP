@@ -15,9 +15,15 @@ public static class InvoicePostingSetup
     /// Everything posting needs: fiscal rules through the gate (TEST sources), ITBIS / AP / withholding / PPV accounts and maps,
     /// and R-04, R-05, R-07B approved (unless <paramref name="approveRules"/> is false).
     /// </summary>
-    public static async Task EnableInvoicePostingAsync(this TestHarness h, string itbisDefinition = FullItbis, string? withholdingDefinition = null, bool approveRules = true)
+    /// <param name="inventoryPolicy">R-05 / R-07B allocate price differences with the INVENTORY policy (POL-01, E-PR17-4).</param>
+    public static async Task EnableInvoicePostingAsync(this TestHarness h, string itbisDefinition = FullItbis, string? withholdingDefinition = null, bool approveRules = true, bool inventoryPolicy = true)
     {
         ArgumentNullException.ThrowIfNull(h);
+        if (inventoryPolicy)
+        {
+            await h.EnsureActivePolicyAsync("INVENTORY", PolicySetup.Inventory);
+        }
+
         var actors = await h.FiscalActorsAsync();
         await h.ActivateRuleAsync(actors, "itbis", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, itbisDefinition, new DateOnly(2026, 1, 1));
         if (withholdingDefinition is not null)

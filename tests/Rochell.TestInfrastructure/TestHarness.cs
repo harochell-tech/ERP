@@ -4,6 +4,7 @@ using Rochell.Identity.Authorization;
 using Rochell.Identity.Sessions;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Observability;
+using Rochell.Platform.Queries;
 using Rochell.Platform.Time;
 
 namespace Rochell.TestInfrastructure;
@@ -26,6 +27,7 @@ public sealed class TestHarness : IAsyncDisposable
         Options = new IdentityOptions { HostedDomain = HostedDomain };
         RequestLog = new RequestLogWriter(app, RequestLogErrors.Add);
         Pipeline = new CommandPipeline(app, new SqlCommandAuthorizer(Options, clock), RequestLog, clock);
+        Queries = new QueryPipeline(app, new SqlCommandAuthorizer(Options, clock), clock);
         Sessions = new SessionService(app, Options, clock);
     }
 
@@ -53,6 +55,9 @@ public sealed class TestHarness : IAsyncDisposable
     public RequestLogWriter RequestLog { get; }
 
     public CommandPipeline Pipeline { get; }
+
+    /// <summary>Read-only queries (E-PR17-1).</summary>
+    public QueryPipeline Queries { get; }
 
     public SessionService Sessions { get; }
 
@@ -170,6 +175,10 @@ public sealed class TestHarness : IAsyncDisposable
 
     public PingCommand Ping(string key, string message = "hola", PingMode mode = PingMode.Normal, int sideEvents = 0, DateTime? occurredAt = null)
         => new(CompanyId, SessionId, key, message, mode, sideEvents, occurredAt);
+
+    public Task<string> QueryAsync<TQuery>(TQuery query, IQueryHandler<TQuery> handler)
+        where TQuery : IQuery
+        => Queries.ExecuteAsync(query, handler);
 
     public Task<CommandResult> RunAsync<TCommand>(TCommand command, ICommandHandler<TCommand> handler)
         where TCommand : ICommand

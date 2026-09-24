@@ -109,6 +109,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR16-7 | PR-16 | fin.reopen_request with RequestReopen (Controller), ApproveReopen / RejectReopen (second approver ≠ requester), all with step-up; replaces the baseline's ReopenComponent. |
 | E-PR16-8 | PR-16 | Patch 1.1 date-coherence CHECK and business-date index on audit.integrity_state added with PR-16. |
 | E-PR16-9 | PR-16 | Every run stored in rec.recon_run with its findings in rec.recon_exception (status OPEN); no resolution workflow in VS#1: a finding disappears when a later run no longer finds it. |
+| E-PR17-1 | PR-17 | Read-only query pipeline in Platform: session, permission and RLS like commands, then SET TRANSACTION READ ONLY; no command_log, events or request_log. Explain requires `audit:read` (Controller, Auditor). |
+| E-PR17-2 | PR-17 | Explain returns, per GL line: event (dates, command, user), document, rule and version, mapping used (validity, approver), policy versions, fiscal determination, late-entry dates, seal state and the rendered text. |
+| E-PR17-3 | PR-17 | Generic wording in code for journals without their own template: exact reversals (R-02, R-07, repost reversals), repost generation n + 1, rounding (R-08) and a late-entry suffix. |
+| E-PR17-4 | PR-17 | POL-01: R-05 and R-07B resolve the INVENTORY policy (method must be STOCK_COVERAGE) and record method, policy version, area quantity, Q, s and D per line (R-07B: s original and s now). Posting a price difference needs an ACTIVE INVENTORY policy; earlier journals are not rewritten (their values stay in the event payload). |
+| E-PR17-5 | PR-17 | Placeholders come from the source document (gr_no, po_no, grr_id, rc_id, ncf) and the line's inputs; one without a value stays visible and complete = false. |
+| E-PR17-6 | PR-17 | The HTTP endpoint and the screen arrive with PR-18; PR-17 delivers the query and its tests. |
 
 Implementation rules derived from the above (no architectural change):
 

@@ -29,8 +29,8 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | --- | --- |
 | PR-01 … PR-13b | Merged to `main`, CI green |
 | PR-14, PR-15 | Merged: repost + valuation residual; hash chain (S3 Object Lock still pending B-03) |
-| PR-16 | Reconciliations + CloseComponent + reopen with second approver (E-PR16-1…9 approved). Branch `pr-16-reconciliation-close` |
-| PR-17 | Explain this entry (EX-01): explanation templates of every rule |
+| PR-16 | Merged: reconciliations, CloseComponent, reopen with second approver |
+| PR-17 | Explain this entry + read-only query pipeline + POL-01 inputs on R-05/R-07B (E-PR17-1…6 approved). Branch `pr-17-explain` |
 | PR-18 | API (OpenAPI) + minimal web UI; AT-01 and AT-02 end to end through the API |
 | PR-19 | Concurrency and load suite: CC-04, PF-01, full regression → slice acceptance |
 
@@ -86,11 +86,13 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
 9. Deferred guarantees checked at COMMIT: journal balance; **P-1** every inventory GL line ↔ exactly one value entry;
    **P-3** valuation = Σ value entries = GL inventory; **K-25** `accounting_status = POSTED` ⇔ an unreversed AUTO journal of the
    posting event; **ADR-027** every status change has its `core.state_history` row in the same transaction.
-10. Every command must write its result (`command_log.result_payload`) before COMMIT — the pipeline does it; hand-written SQL
+10. Queries (`IQuery` / `IQueryHandler`, `QueryPipeline`) run READ ONLY after authorization; they also need a seeded
+    `[RequiresPermission]` (ArchitectureTests covers both handler kinds).
+11. Every command must write its result (`command_log.result_payload`) before COMMIT — the pipeline does it; hand-written SQL
     simulations must too.
-11. `bool || text` in PostgreSQL gives `true` / `false` (psql only *displays* `t` / `f`): assertions on concatenated SQL use the
+12. `bool || text` in PostgreSQL gives `true` / `false` (psql only *displays* `t` / `f`): assertions on concatenated SQL use the
     full words.
-12. Before each commit, re-derive expected test values by hand (the R-02B, R-03B, R-05, R-07B tests have worked examples).
+13. Before each commit, re-derive expected test values by hand (the R-02B, R-03B, R-05, R-07B tests have worked examples).
 
 ## 6. Handy SQL
 

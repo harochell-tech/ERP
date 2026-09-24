@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
+using Rochell.Finance;
+using Rochell.Finance.Policies;
 using Rochell.Finance.Posting;
 using Rochell.Inventory;
 using Rochell.Platform.Commands;
@@ -101,11 +103,37 @@ internal static class InvoicePostingStore
     public static decimal Money(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
 
     public static string Text(decimal value) => value.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Share s of a price difference allocated to stock, as recorded for Explain (six decimals).</summary>
+    public static string Coverage(decimal allocated, decimal difference)
+        => (difference == 0 ? 0 : decimal.Round(allocated / difference, 6, MidpointRounding.AwayFromZero)).ToString(CultureInfo.InvariantCulture);
 }
 
 [RequiresPermission("supplier_invoice:post")]
 public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInvoice>
 {
+    /// <summary>The INVENTORY policy that allocates price differences; STOCK_COVERAGE is the only method in VS#1 (Patch 1.1).</summary>
+    internal static async Task<ResolvedPolicy> AllocationPolicyAsync(CommandContext context, DateOnly date, CancellationToken cancellationToken)
+    {
+        var policy = await PolicyResolver.ResolveAsync(context, PolicyCodes.Inventory, date, cancellationToken).ConfigureAwait(false);
+        var method = policy.Text(PolicyParameters.InvoicePriceVarianceAllocationMethod);
+        return method == "STOCK_COVERAGE"
+            ? policy
+            : throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"Price-difference allocation method {method} is not implemented; VS#1 supports STOCK_COVERAGE.");
+    }
+
+    /// <summary>POL-01: what R-05 used for one line — method, policy version, area quantity, Q, s and D.</summary>
+    private static Dictionary<string, string> AllocationInputs(ResolvedPolicy policy, decimal areaQuantity, decimal baseQuantity, decimal difference)
+        => new()
+        {
+            [PolicyParameters.InvoicePriceVarianceAllocationMethod] = policy.Text(PolicyParameters.InvoicePriceVarianceAllocationMethod),
+            ["policy_version_id"] = policy.PolicyVersionId.ToString(),
+            ["area_quantity"] = areaQuantity.ToString(CultureInfo.InvariantCulture),
+            ["base_quantity"] = baseQuantity.ToString(CultureInfo.InvariantCulture),
+            ["coverage"] = decimal.Round(Math.Min(areaQuantity, baseQuantity) / baseQuantity, 6, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture),
+            ["difference"] = InvoicePostingStore.Text(difference),
+        };
+
     private readonly PostingEngine _engine = new();
     private readonly InventoryLedger _inventory = new();
     private readonly TaxEngine _tax = new();
@@ -191,6 +219,13 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
             differences.Add(new PriceDifference(line.Id, b.PlantId, b.ValuationAreaId, b.ItemId, d, baseQuantity, covered, covered == 0 ? null : context.Ids.NewId()));
         }
 
+        // POL-01 (Patch 1.1, E-PR17-4): a price difference is allocated by the INVENTORY policy's method, recorded per line.
+        ResolvedPolicy? allocationPolicy = null;
+        if (differences.Count > 0)
+        {
+            allocationPolicy = await AllocationPolicyAsync(context, header.DocDate, cancellationToken).ConfigureAwait(false);
+        }
+
         // P-1: every posting prerequisite before any write.
         var r04Lines = new List<PostingLineInput>();
         r04Lines.AddRange(lines.Select(l => new PostingLineInput("R04-DR-GRNI", "received_value", grni[l.Id], PlantId: po[l.PurchaseOrderLineId].PlantId, PartyId: header.PartyId)));
@@ -209,16 +244,28 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
             {
                 var uncovered = pd.Difference - pd.Covered;
                 var up = pd.Difference > 0;
+                var inputs = AllocationInputs(allocationPolicy!, areaQuantities[(pd.ValuationAreaId, pd.ItemId)], pd.BaseQuantity, pd.Difference);
                 if (pd.Covered != 0)
                 {
-                    r05Lines.Add(new PostingLineInput(up ? "R05-DR-INV" : "R05-CR-INV", "covered_difference", Math.Abs(pd.Covered), PlantId: pd.PlantId, ItemId: pd.ItemId, SubledgerRef: pd.ValueEntryId, InvValueEntryId: pd.ValueEntryId));
+                    r05Lines.Add(new PostingLineInput(up ? "R05-DR-INV" : "R05-CR-INV", "covered_difference", Math.Abs(pd.Covered), PlantId: pd.PlantId, ItemId: pd.ItemId, SubledgerRef: pd.ValueEntryId, InvValueEntryId: pd.ValueEntryId, Inputs: inputs));
                 }
 
-                r05Lines.Add(new PostingLineInput(up ? "R05-DR-PPV" : "R05-CR-PPV", "uncovered_difference", Math.Abs(uncovered), PlantId: pd.PlantId, ItemId: pd.ItemId));
+                r05Lines.Add(new PostingLineInput(up ? "R05-DR-PPV" : "R05-CR-PPV", "uncovered_difference", Math.Abs(uncovered), PlantId: pd.PlantId, ItemId: pd.ItemId, Inputs: inputs));
             }
 
             var totalDifference = differences.Sum(pd => pd.Difference);
-            r05Lines.Add(new PostingLineInput(totalDifference >= 0 ? "R05-CR-AP" : "R05-DR-AP", "price_difference", Math.Abs(totalDifference), PartyId: header.PartyId, SubledgerRef: apDocId));
+            r05Lines.Add(new PostingLineInput(
+                totalDifference >= 0 ? "R05-CR-AP" : "R05-DR-AP",
+                "price_difference",
+                Math.Abs(totalDifference),
+                PartyId: header.PartyId,
+                SubledgerRef: apDocId,
+                Inputs: new Dictionary<string, string>
+                {
+                    [PolicyParameters.InvoicePriceVarianceAllocationMethod] = allocationPolicy!.Text(PolicyParameters.InvoicePriceVarianceAllocationMethod),
+                    ["policy_version_id"] = allocationPolicy.PolicyVersionId.ToString(),
+                    ["difference"] = InvoicePostingStore.Text(totalDifference),
+                }));
             r05 = await _engine.PrepareAsync(context, new PostingRequest(InvoicePostingStore.R05, header.DocDate, occurredAt, r05Lines), cancellationToken).ConfigureAwait(false);
         }
 
@@ -391,6 +438,7 @@ public sealed class ReverseSupplierInvoiceHandler : ICommandHandler<ReverseSuppl
         var businessDate = BusinessCalendar.DefaultBusinessDate(occurredAt);
         var reversals = new List<(Guid Original, Guid Reversal, decimal Amount, Guid Area, Guid Plant, Guid Item)>();
         var reallocations = new List<(decimal Amount, Guid Area, Guid Plant, Guid Item, Guid ValueEntryId)>();
+        var reallocationInputs = new List<Dictionary<string, string>>();
         foreach (var pd in posting.GetProperty("priceDifferences").EnumerateArray()
                      .OrderBy(p => p.GetProperty("valuationAreaId").GetGuid()).ThenBy(p => p.GetProperty("itemId").GetGuid()))
         {
@@ -411,8 +459,20 @@ public sealed class ReverseSupplierInvoiceHandler : ICommandHandler<ReverseSuppl
             if (reallocation != 0)
             {
                 reallocations.Add((reallocation, area, plant, item, context.Ids.NewId()));
+                reallocationInputs.Add(new Dictionary<string, string>
+                {
+                    ["difference"] = InvoicePostingStore.Text(difference),
+                    ["base_quantity"] = baseQuantity.ToString(CultureInfo.InvariantCulture),
+                    ["area_quantity"] = areaQuantity.ToString(CultureInfo.InvariantCulture),
+                    ["coverage_original"] = InvoicePostingStore.Coverage(covered, difference),
+                    ["coverage_now"] = InvoicePostingStore.Coverage(coveredNow, difference),
+                });
             }
         }
+
+        ResolvedPolicy? allocationPolicy = reallocations.Count > 0
+            ? await PostSupplierInvoiceHandler.AllocationPolicyAsync(context, businessDate, cancellationToken).ConfigureAwait(false)
+            : null;
 
         // P-1: every prerequisite before any write.
         var r04Journal = await InvoicePostingStore.AutoJournalAsync(context, postingEventId, InvoicePostingStore.R04, cancellationToken).ConfigureAwait(false)
@@ -429,17 +489,25 @@ public sealed class ReverseSupplierInvoiceHandler : ICommandHandler<ReverseSuppl
                     InvoicePostingStore.R07B,
                     businessDate,
                     occurredAt,
-                    reallocations.SelectMany(r => r.Amount > 0
-                        ? new[]
+                    reallocations.SelectMany((r, i) =>
+                    {
+                        var inputs = new Dictionary<string, string>(reallocationInputs[i])
                         {
-                            new PostingLineInput("R07B-DR-INV", "reallocation", r.Amount, PlantId: r.Plant, ItemId: r.Item, SubledgerRef: r.ValueEntryId, InvValueEntryId: r.ValueEntryId),
-                            new PostingLineInput("R07B-CR-PPV", "reallocation", r.Amount, PlantId: r.Plant, ItemId: r.Item),
-                        }
-                        : new[]
-                        {
-                            new PostingLineInput("R07B-CR-INV", "reallocation", -r.Amount, PlantId: r.Plant, ItemId: r.Item, SubledgerRef: r.ValueEntryId, InvValueEntryId: r.ValueEntryId),
-                            new PostingLineInput("R07B-DR-PPV", "reallocation", -r.Amount, PlantId: r.Plant, ItemId: r.Item),
-                        }).ToList(),
+                            [PolicyParameters.InvoicePriceVarianceAllocationMethod] = allocationPolicy!.Text(PolicyParameters.InvoicePriceVarianceAllocationMethod),
+                            ["policy_version_id"] = allocationPolicy.PolicyVersionId.ToString(),
+                        };
+                        return r.Amount > 0
+                            ? new[]
+                            {
+                                new PostingLineInput("R07B-DR-INV", "reallocation", r.Amount, PlantId: r.Plant, ItemId: r.Item, SubledgerRef: r.ValueEntryId, InvValueEntryId: r.ValueEntryId, Inputs: inputs),
+                                new PostingLineInput("R07B-CR-PPV", "reallocation", r.Amount, PlantId: r.Plant, ItemId: r.Item, Inputs: inputs),
+                            }
+                            : new[]
+                            {
+                                new PostingLineInput("R07B-CR-INV", "reallocation", -r.Amount, PlantId: r.Plant, ItemId: r.Item, SubledgerRef: r.ValueEntryId, InvValueEntryId: r.ValueEntryId, Inputs: inputs),
+                                new PostingLineInput("R07B-DR-PPV", "reallocation", -r.Amount, PlantId: r.Plant, ItemId: r.Item, Inputs: inputs),
+                            };
+                    }).ToList(),
                     JournalType: "VALUATION_REALLOCATION"),
                 cancellationToken).ConfigureAwait(false);
         }

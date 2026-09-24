@@ -52,8 +52,7 @@ public sealed class CloseTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         var s = await h.CreateInvoicingSetupAsync();
-        await h.EnableInvoicePostingAsync();
-        await h.CreateActivePolicyAsync("INVENTORY", PolicySetup.Inventory);
+        await h.EnableInvoicePostingAsync();   // includes the INVENTORY policy that GRNI-AGING reads
         var si = (await h.RunAsync(
             new RegisterSupplierInvoice(h.CompanyId, s.Clerk, "r", s.Purchasing.SupplierId, "B0100000001", Today(h), Today(h).AddDays(30), [new(s.PoLineId, 6m, 1500m)]),
             new RegisterSupplierInvoiceHandler())).ResultRef;
