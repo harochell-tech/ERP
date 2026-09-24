@@ -179,8 +179,17 @@ public sealed class ConfigureFiscalRuleVersionHandler : ICommandHandler<Configur
             ("c", context.CompanyId),
             ("code", code),
             ("kind", definition.Kind)).ConfigureAwait(false);
+        // Versions of one rule are numbered one at a time. The application may not lock fiscal_rule rows (FOR UPDATE needs the
+        // UPDATE privilege it deliberately lacks on this append-only table), so the rule code is serialized with an advisory lock.
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT pg_advisory_xact_lock(hashtextextended('fiscal_rule:' || @c::text || ':' || @code, 0))",
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("code", code)).ConfigureAwait(false);
         Guid ruleId;
-        await using (var rule = Sql.Command(context.Connection, context.Transaction, "SELECT rule_id, rule_kind FROM tax.fiscal_rule WHERE company_id = @c AND code = @code FOR UPDATE", ("c", context.CompanyId), ("code", code)))
+        await using (var rule = Sql.Command(context.Connection, context.Transaction, "SELECT rule_id, rule_kind FROM tax.fiscal_rule WHERE company_id = @c AND code = @code", ("c", context.CompanyId), ("code", code)))
         await using (var reader = await rule.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
             await reader.ReadAsync(cancellationToken).ConfigureAwait(false);

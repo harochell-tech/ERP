@@ -127,12 +127,25 @@ public sealed class FiscalGateTests(PostgresFixture postgres)
         Assert.Equal(TaxErrors.AnotherItbisRuleActive, ex.Code);
     }
 
+    /// <summary>E-PR03-4 (a): one person may hold both roles, but never activates a version they configured.</summary>
     [Fact]
-    public async Task Configuring_and_activating_cannot_be_held_by_one_person()
+    public async Task A_person_with_both_roles_cannot_activate_a_version_they_configured()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
+        var both = await h.SessionWithRolesAsync("ANALISTA_FISCAL", "ESPECIALISTA_FISCAL");
+        var own = new FiscalActors(both, both);
+        var version = await h.ConfigureAsync(own, "cfg", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition, From);
+        var source = await h.RegisterTestSourceAsync(own, "src");
+        await h.RunAsync(new LinkFiscalSource(h.CompanyId, both, "lnk", version, source), new LinkFiscalSourceHandler());
+        await h.RunAsync(new RunFiscalRuleTests(h.CompanyId, both, "tst", version, [TaxSetup.PassingCase(FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition)]), new RunFiscalRuleTestsHandler());
 
-        await Assert.ThrowsAsync<Npgsql.PostgresException>(() => h.SessionWithRolesAsync("ANALISTA_FISCAL", "ESPECIALISTA_FISCAL"));
+        var ex = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new ActivateFiscalRuleVersion(h.CompanyId, both, "act", version), new ActivateFiscalRuleVersionHandler()));
+        var forced = await h.AdminExecuteAsync(
+            $"UPDATE tax.fiscal_rule_version SET status = 'ACTIVE', activated_by = configured_by, activated_at = now(), row_version = row_version + 1 WHERE rule_version_id = '{version}'");
+
+        Assert.Equal(TaxErrors.ActivatorIsConfigurer, ex.Code);
+        Assert.Equal(SqlStates.CheckViolation, forced?.SqlState);
+        Assert.Equal("READY", await Status(h, version));
     }
 
     [Theory]

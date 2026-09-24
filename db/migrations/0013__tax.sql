@@ -6,8 +6,7 @@ CREATE SCHEMA tax;
 REVOKE ALL ON SCHEMA tax FROM PUBLIC;
 GRANT USAGE ON SCHEMA tax TO rochell_app;
 
--- §14: configuring a fiscal rule and activating it are incompatible (gap in the PR-03 seed).
-INSERT INTO iam.sod_rule (permission_a, permission_b) VALUES ('fiscal_rule:activate', 'fiscal_rule:configure');
+-- Configure ⟂ activate is a document-level rule (E-PR03-4 a): enforced per version by fiscal_rule_version_activator, not by SoD.
 
 -- ---------------------------------------------------------------------------------------------
 -- Official sources (E-PR12-1 company scoped; E-PR12-2 text reference + SHA-256 of the document until WORM storage).
