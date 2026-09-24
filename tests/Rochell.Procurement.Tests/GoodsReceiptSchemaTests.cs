@@ -99,6 +99,34 @@ public sealed class GoodsReceiptSchemaTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_receipt_cannot_be_marked_reversed_without_its_reversal_document()
+    {
+        var (h, _, _, gr) = await ReceivedAsync(postgres);
+        await using (h)
+        {
+            await using var connection = await h.Admin.OpenConnectionAsync();
+            await using var tx = await connection.BeginTransactionAsync();
+#pragma warning disable CA2100 // Test SQL.
+            await using (var update = new Npgsql.NpgsqlCommand(
+                $"""
+                INSERT INTO core.state_history (state_history_id, company_id, aggregate_type, aggregate_id, status_kind, from_state, to_state, command, event_id)
+                SELECT gen_random_uuid(), company_id, 'GoodsReceipt', gr_id, 'DOCUMENT', 'POSTED', 'REVERSED', 'x', posting_event_id FROM pur.goods_receipt WHERE gr_id = '{gr}';
+                UPDATE pur.goods_receipt SET document_status = 'REVERSED', accounting_status = 'REVERSED', version = version + 1 WHERE gr_id = '{gr}';
+                """,
+                connection,
+                tx))
+#pragma warning restore CA2100
+            {
+                await update.ExecuteNonQueryAsync();
+            }
+
+            var ex = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => tx.CommitAsync());
+
+            Assert.Contains("REVERSED without a goods_receipt_reversal", ex.MessageText, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task Row_level_security_isolates_receipts()
     {
         var (h, _, _, _) = await ReceivedAsync(postgres);

@@ -14,4 +14,5 @@ public static class MovementTypes
     public const string ReceiptCorrection = "RECEIPT_CORRECTION";
     public const string Issue = "ISSUE";
     public const string ValuationAdjustment = "VALUATION_ADJUSTMENT";
+    public const string ValuationReallocation = "VALUATION_REALLOCATION";
 }

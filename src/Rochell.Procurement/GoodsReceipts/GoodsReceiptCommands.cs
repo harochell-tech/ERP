@@ -19,3 +19,6 @@ public sealed record PostGoodsReceipt(
     DateTime OccurredAt,
     IReadOnlyList<GoodsReceiptLineInput> Lines,
     string? WeighTicketRef = null) : IPlantScopedCommand;
+
+/// <summary>T-03 ReverseGoodsReceipt (E-8 §5.2, Patch 1 P-4): reverses a whole POSTED receipt whose lots are untouched.</summary>
+public sealed record ReverseGoodsReceipt(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid GoodsReceiptId, string Reason) : ICommand;

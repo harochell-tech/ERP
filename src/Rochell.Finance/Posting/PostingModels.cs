@@ -16,7 +16,7 @@ public sealed record PostingLineInput(
     IReadOnlyDictionary<string, string>? Inputs = null);
 
 /// <summary>A posting to prepare (validate) before any write, and to write afterwards with the source event id (Patch 1 §5.2 steps 7 and 11).</summary>
-public sealed record PostingRequest(string RuleCode, DateOnly BusinessDate, DateTime OccurredAt, IReadOnlyList<PostingLineInput> Lines, int Generation = 1);
+public sealed record PostingRequest(string RuleCode, DateOnly BusinessDate, DateTime OccurredAt, IReadOnlyList<PostingLineInput> Lines, int Generation = 1, string JournalType = "AUTO");
 
 /// <summary>Result of the preflight: everything resolved, nothing written.</summary>
 public sealed record PostingPlan(
@@ -34,3 +34,6 @@ public sealed record PostingPlan(
 public sealed record PlannedLine(PostingLineInput Input, RuleLine Rule, Guid AccountId, Guid AccountRoleMapId, string? ItemCategory, decimal Debit, decimal Credit);
 
 public sealed record PostedJournal(Guid JournalId, DateOnly PostingDate, bool LateEntry, IReadOnlyList<Guid> EntryIds);
+
+/// <summary>A validated exact reversal (Patch 1 P-4): the journal to reverse and where the reversal will be posted.</summary>
+public sealed record ReversalPlan(Guid OriginalJournalId, Guid PostingRuleId, int PostingRuleVersion, Guid PeriodId, DateOnly PostingDate, bool LateEntry, DateOnly BusinessDate);

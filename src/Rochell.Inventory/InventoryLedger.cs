@@ -14,6 +14,9 @@ public sealed record MovementDates(DateTime OccurredAt, DateOnly BusinessDate, D
 /// <summary>A receipt into a location and lot. <paramref name="ValueEntryId"/> is pre-assigned so the GL line can reference it.</summary>
 public sealed record ReceiptMovement(Guid LocationId, Guid ItemId, Guid LotId, decimal Quantity, decimal Value, Guid ValueEntryId);
 
+/// <summary>The receipt movements of one source line.</summary>
+public sealed record ReceiptEntries(Guid QuantityEntryId, Guid PlantId, Guid LocationId, Guid ItemId, Guid LotId, decimal Quantity, Guid ValueEntryId, Guid ValuationAreaId, decimal Value);
+
 /// <summary>Stock already taken from the balance (conditional UPDATE) and its moving-average value.</summary>
 public sealed record IssueReservation(Guid PlantId, Guid ValuationAreaId, Guid LocationId, Guid ItemId, Guid LotId, decimal Quantity, decimal Value);
 
@@ -200,6 +203,147 @@ public sealed class InventoryLedger
             ("area", reservation.ValuationAreaId),
             ("item", reservation.ItemId)).ConfigureAwait(false);
         return quantityEntry.QuantityEntryId;
+    }
+
+    /// <summary>Locks one stock balance row (lock level N6) and returns its quantity (0 when absent).</summary>
+    public async Task<decimal> LockStockAsync(CommandContext context, Guid locationId, Guid itemId, Guid lotId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT quantity FROM inv.inv_stock_balance WHERE location_id = @location AND item_id = @item AND lot_id = @lot FOR UPDATE",
+            ("location", locationId),
+            ("item", itemId),
+            ("lot", lotId));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is decimal quantity ? quantity : 0;
+    }
+
+    /// <summary>Locks the valuation balance of an area × item (lock level N7) and returns its quantity and value.</summary>
+    public async Task<(decimal Quantity, decimal Value)> LockValuationAsync(CommandContext context, Guid valuationAreaId, Guid itemId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT quantity, value FROM inv.inv_valuation_balance WHERE valuation_area_id = @area AND item_id = @item FOR UPDATE",
+            ("area", valuationAreaId),
+            ("item", itemId));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ? (reader.GetDecimal(0), reader.GetDecimal(1))
+            : (0, 0);
+    }
+
+    /// <summary>The receipt movements of a source line (e.g. a goods receipt line): its quantity entry and value entry.</summary>
+    public async Task<ReceiptEntries> ReceiptEntriesAsync(CommandContext context, Guid sourceLineId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT q.quantity_entry_id, q.plant_id, q.location_id, q.item_id, q.lot_id, q.quantity, v.value_entry_id, v.valuation_area_id, v.amount
+            FROM inv.inv_quantity_entry q
+            JOIN inv.inv_value_entry v ON v.quantity_entry_id = q.quantity_entry_id AND v.movement_type = 'RECEIPT'
+            WHERE q.company_id = @c AND q.source_line_id = @line AND q.movement_type = 'RECEIPT'
+            """,
+            ("c", context.CompanyId),
+            ("line", sourceLineId));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ? new ReceiptEntries(reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2), reader.GetGuid(3), reader.GetGuid(4), reader.GetDecimal(5), reader.GetGuid(6), reader.GetGuid(7), reader.GetDecimal(8))
+            : throw new InvalidOperationException($"No receipt movements for source line {sourceLineId}.");
+    }
+
+    /// <summary>
+    /// True when the lot has any ledger movement other than its receipt (E-8 §5.2: then the receipt cannot be reversed;
+    /// use a receipt correction).
+    /// </summary>
+    public async Task<bool> LotHasLaterMovementsAsync(CommandContext context, Guid lotId, Guid receiptQuantityEntryId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT EXISTS (SELECT 1 FROM inv.inv_quantity_entry WHERE lot_id = @lot AND quantity_entry_id <> @receipt)",
+            ("lot", lotId),
+            ("receipt", receiptQuantityEntryId));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true;
+    }
+
+    /// <summary>
+    /// Patch 1 P-4 (R-02 A): the exact inverse of a receipt — −quantity from its lot and location, −value (the original amount,
+    /// never recalculated) with pre-assigned <paramref name="reversalValueEntryId"/>, and both balances.
+    /// </summary>
+    public async Task ReverseReceiptAsync(CommandContext context, ReceiptEntries receipt, Guid reversalValueEntryId, MovementSource source, MovementDates dates, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(receipt);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(dates);
+        var taken = await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE inv.inv_stock_balance SET quantity = quantity - @qty WHERE location_id = @location AND item_id = @item AND lot_id = @lot AND quantity >= @qty",
+            cancellationToken,
+            ("qty", receipt.Quantity),
+            ("location", receipt.LocationId),
+            ("item", receipt.ItemId),
+            ("lot", receipt.LotId)).ConfigureAwait(false);
+        if (taken != 1)
+        {
+            throw new DomainException(InventoryErrors.InsufficientStock, "The received lot no longer holds the received quantity.");
+        }
+
+        var recordedAt = context.Clock.UtcNow;
+        var quantityEntry = new QuantityEntryRow(
+            context.Ids.NewId(), context.CompanyId, MovementTypes.ReceiptReversal, receipt.PlantId, receipt.LocationId, receipt.ItemId, receipt.LotId, -receipt.Quantity,
+            source.EventId, source.DocumentType, source.DocumentId, source.LineId, receipt.QuantityEntryId, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate);
+        await InsertQuantityAsync(context, quantityEntry, cancellationToken).ConfigureAwait(false);
+        await InsertValueAsync(
+            context,
+            new ValueEntryRow(
+                reversalValueEntryId, context.CompanyId, MovementTypes.ReceiptReversal, receipt.ValuationAreaId, receipt.PlantId, receipt.ItemId, quantityEntry.QuantityEntryId,
+                -receipt.Value, source.EventId, receipt.ValueEntryId, quantityEntry.OccurredAt, recordedAt, dates.BusinessDate, dates.PostingDate),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE inv.inv_valuation_balance SET quantity = quantity - @qty, value = value - @value WHERE valuation_area_id = @area AND item_id = @item",
+            cancellationToken,
+            ("qty", receipt.Quantity),
+            ("value", receipt.Value),
+            ("area", receipt.ValuationAreaId),
+            ("item", receipt.ItemId)).ConfigureAwait(false);
+    }
+
+    /// <summary>Patch 1 P-4 (R-02B): a value-only reallocation of <paramref name="amount"/> (signed, 2 decimals) in an area × item.</summary>
+    public async Task ReallocateValueAsync(CommandContext context, Guid valuationAreaId, Guid plantId, Guid itemId, decimal amount, Guid valueEntryId, MovementSource source, MovementDates dates, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(dates);
+        if (amount == 0 || decimal.Round(amount, 2) != amount)
+        {
+            throw new InvalidOperationException("A reallocation needs a non-zero amount with 2 decimals.");
+        }
+
+        var recordedAt = context.Clock.UtcNow;
+        await InsertValueAsync(
+            context,
+            new ValueEntryRow(
+                valueEntryId, context.CompanyId, MovementTypes.ValuationReallocation, valuationAreaId, plantId, itemId, null, amount,
+                source.EventId, null, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE inv.inv_valuation_balance SET value = value + @value WHERE valuation_area_id = @area AND item_id = @item",
+            cancellationToken,
+            ("value", amount),
+            ("area", valuationAreaId),
+            ("item", itemId)).ConfigureAwait(false);
     }
 
     private static async Task<(Guid PlantId, Guid AreaId)> PlantAndAreaAsync(CommandContext context, Guid locationId, CancellationToken cancellationToken)
