@@ -13,7 +13,7 @@ public sealed class DomainEventTests(PostgresFixture postgres)
     [Fact]
     public async Task ID06_several_events_per_version_with_deterministic_order()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
 
         var result = await h.Pipeline.ExecuteAsync(h.Ping("id-06", sideEvents: 1), new PingHandler(), Guid.CreateVersion7());
 
@@ -33,7 +33,7 @@ public sealed class DomainEventTests(PostgresFixture postgres)
     [Fact]
     public async Task Row_hash_recomputed_from_stored_row_matches()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         await h.Pipeline.ExecuteAsync(h.Ping("hash", message: "Bloque 6\" – ñ", sideEvents: 2), new PingHandler(), Guid.CreateVersion7());
 
         await using var command = h.Admin.CreateCommand(
@@ -63,7 +63,7 @@ public sealed class DomainEventTests(PostgresFixture postgres)
     [Fact]
     public async Task Business_date_defaults_to_dominican_calendar_date()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         var occurredAt = new DateTime(2026, 9, 23, 3, 30, 0, DateTimeKind.Utc); // 23:30 on 2026-09-22 in Santo Domingo
 
         var result = await h.Pipeline.ExecuteAsync(h.Ping("bdate", occurredAt: occurredAt), new PingHandler(), Guid.CreateVersion7());
@@ -75,7 +75,7 @@ public sealed class DomainEventTests(PostgresFixture postgres)
     [Fact]
     public async Task Decimal_json_numbers_in_payload_are_rejected()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
 
         await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => h.Pipeline.ExecuteAsync(
             h.Ping("decimal"), new DecimalPayloadHandler(), Guid.CreateVersion7()));
@@ -83,6 +83,7 @@ public sealed class DomainEventTests(PostgresFixture postgres)
         Assert.Equal(0L, await h.CountAsync("core.domain_event"));
     }
 
+    [Rochell.Platform.Commands.RequiresPermission("test:ping")]
     private sealed class DecimalPayloadHandler : Rochell.Platform.Commands.ICommandHandler<PingCommand>
     {
         public string CommandType => "Test.DecimalPayload";

@@ -129,4 +129,35 @@ public sealed class CommandContext
 
         return row.EventId;
     }
+
+    /// <summary>Records a state transition in core.state_history (ADR-027), linked to the event that caused it.</summary>
+    public Task AppendStateAsync(
+        string aggregateType,
+        Guid aggregateId,
+        string statusKind,
+        string? fromState,
+        string toState,
+        string command,
+        Guid eventId,
+        CancellationToken cancellationToken,
+        string? reason = null)
+        => Sql.ExecuteAsync(
+            Connection,
+            Transaction,
+            """
+            INSERT INTO core.state_history
+              (state_history_id, company_id, aggregate_type, aggregate_id, status_kind, from_state, to_state, command, event_id, reason)
+            VALUES (@id, @company_id, @aggregate_type, @aggregate_id, @status_kind, @from_state, @to_state, @command, @event_id, @reason)
+            """,
+            cancellationToken,
+            ("id", _ids.NewId()),
+            ("company_id", CompanyId),
+            ("aggregate_type", aggregateType),
+            ("aggregate_id", aggregateId),
+            ("status_kind", statusKind),
+            ("from_state", fromState),
+            ("to_state", toState),
+            ("command", command),
+            ("event_id", eventId),
+            ("reason", reason));
 }

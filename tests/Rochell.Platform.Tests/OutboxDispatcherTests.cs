@@ -13,7 +13,7 @@ public sealed class OutboxDispatcherTests(PostgresFixture postgres)
     [Fact]
     public async Task ID07_redelivered_event_is_applied_once()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         await h.Pipeline.ExecuteAsync(h.Ping("id-07"), new PingHandler(), Guid.CreateVersion7());
         var consumer = new RecordingConsumer("test.recorder");
         var dispatcher = new OutboxDispatcher(h.App, [consumer]);
@@ -33,7 +33,7 @@ public sealed class OutboxDispatcherTests(PostgresFixture postgres)
     [Fact]
     public async Task Events_are_delivered_in_outbox_order_and_unpublished_events_are_not_delivered()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         await h.Pipeline.ExecuteAsync(h.Ping("order-1"), new PingHandler(), Guid.CreateVersion7());
         await h.Pipeline.ExecuteAsync(h.Ping("order-2", sideEvents: 1), new PingHandler(), Guid.CreateVersion7());
         var consumer = new RecordingConsumer("test.order");
@@ -48,7 +48,7 @@ public sealed class OutboxDispatcherTests(PostgresFixture postgres)
     [Fact]
     public async Task Failing_consumer_leaves_event_pending_with_backoff()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         await h.Pipeline.ExecuteAsync(h.Ping("fail"), new PingHandler(), Guid.CreateVersion7());
         var errors = new List<Exception>();
 
@@ -64,7 +64,7 @@ public sealed class OutboxDispatcherTests(PostgresFixture postgres)
     [Fact]
     public async Task Concurrent_dispatchers_never_deliver_the_same_row_twice()
     {
-        await using var h = await PlatformHarness.CreateAsync(postgres);
+        await using var h = await TestHarness.CreateAsync(postgres);
         for (var i = 0; i < 20; i++)
         {
             await h.Pipeline.ExecuteAsync(h.Ping($"concurrent-{i}"), new PingHandler(), Guid.CreateVersion7());

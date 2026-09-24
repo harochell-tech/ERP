@@ -112,7 +112,7 @@ public sealed class MigrationRunnerTests(PostgresFixture postgres)
         await runner.MigrateAsync(TestPaths.MainSource);
         await runner.MigrateAsync(TestPaths.TestSource);
 
-        Assert.Equal(0L, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration WHERE source = 'test'"));
+        Assert.Equal((long)TestPaths.TestMigrationFiles.Count, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration WHERE source = 'test'"));
         Assert.Equal((long)MainCount, await Db.ScalarAsync<long>(cs, "SELECT count(*) FROM migrations.applied_migration WHERE source = 'main'"));
     }
 

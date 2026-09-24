@@ -20,6 +20,9 @@ public static class TestPaths
         }
     }
 
+    public static IReadOnlyList<string> TestMigrationFiles
+        => Directory.EnumerateFiles(TestSource.DirectoryPath, "*.sql").Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal).ToList();
+
     public static IReadOnlyList<string> MainMigrationFiles
         => Directory.EnumerateFiles(MainMigrations, "*.sql").Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal).ToList();
 }

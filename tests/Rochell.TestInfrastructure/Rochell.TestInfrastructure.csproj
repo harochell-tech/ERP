@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>Rochell.TestInfrastructure</RootNamespace>
-    <!-- Shared fixtures; contains no tests. -->
+    <!-- Shared fixtures and test-only commands; contains no tests. -->
     <IsTestProject>false</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
@@ -11,6 +11,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Rochell.Migrations\Rochell.Migrations.csproj" />
+    <ProjectReference Include="..\..\src\Rochell.Platform\Rochell.Platform.csproj" />
+    <ProjectReference Include="..\..\src\Rochell.Identity\Rochell.Identity.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\db\migrations\*.sql" Link="migrations\main\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
