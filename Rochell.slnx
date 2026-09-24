@@ -18,6 +18,7 @@
     <Project Path="tests/Rochell.Migrations.Tests/Rochell.Migrations.Tests.csproj" />
     <Project Path="tests/Rochell.Platform.Tests/Rochell.Platform.Tests.csproj" />
     <Project Path="tests/Rochell.Identity.Tests/Rochell.Identity.Tests.csproj" />
+    <Project Path="tests/Rochell.MasterData.Tests/Rochell.MasterData.Tests.csproj" />
     <Project Path="tests/Rochell.ArchitectureTests/Rochell.ArchitectureTests.csproj" />
   </Folder>
 </Solution>
