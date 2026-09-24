@@ -331,15 +331,26 @@ public sealed class RunFiscalRuleTestsHandler : ICommandHandler<RunFiscalRuleTes
 
         var passed = failures.Count == 0;
         var resultHash = SHA256.HashData(Encoding.UTF8.GetBytes(JsonCanonicalizer.Canonicalize(JsonSerializer.Serialize(results))));
+
+        // E-PR12-5: the run belongs to this deployment's environment; an uninitialized deployment is a configuration error,
+        // never a run silently left unrecorded.
+        string environment;
+        await using (var env = Sql.Command(context.Connection, context.Transaction, "SELECT environment FROM core.deployment_environment"))
+        {
+            environment = await env.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
+                ?? throw new InvalidOperationException("The deployment environment is not initialized; run `rochell-migrate init-environment TEST|PRODUCTION` first.");
+        }
+
         await Sql.ExecuteAsync(
             context.Connection,
             context.Transaction,
             """
             INSERT INTO tax.fiscal_rule_test_run (test_run_id, company_id, rule_version_id, environment, passed, cases, result_hash, executed_by, executed_at)
-            SELECT @id, @c, @v, environment, @passed, @cases, @hash, @by, @at FROM core.deployment_environment
+            VALUES (@id, @c, @v, @env, @passed, @cases, @hash, @by, @at)
             """,
             cancellationToken,
             ("id", context.ResultRef),
+            ("env", environment),
             ("c", context.CompanyId),
             ("v", version.Id),
             ("passed", passed),

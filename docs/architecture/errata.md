@@ -98,6 +98,7 @@ Implementation rules derived from the above (no architectural change):
 - Receipt reversal guard "nothing invoiced": `qty_invoiced ≤ qty_received − reversed quantity` on each PO line of the receipt.
 - R-03B amounts: GRNI = |Δq| × P; stock value = q₁ × avg (the whole area value when q₁ empties it), split by lot with the remainder on the last; q₁ at P = GRNI × q₁ ÷ |Δq|; MUV = GRNI − q₁ at P; PPV = q₁ at P − stock value. Base quantities use the receipt's own conversion.
 - Configure ⟂ activate for fiscal rules stays document-level (E-PR03-4 a): the same person may hold both roles but never activates a version they configured (CHECK `activated_by <> configured_by`).
+- A fiscal test run requires an initialized deployment environment; without it the command fails (FAILED_TECHNICAL) instead of silently recording nothing.
 - The application never locks append-only tables with FOR UPDATE (it needs the UPDATE privilege); it serializes with advisory locks instead.
 - A source is registered (and approved) by the fiscal analyst; the specialist's activation reviews the version with its sources.
 - Fiscal gate closed (FISCAL_GATE_CLOSED) when no purchase ITBIS rule is ACTIVE on the date, or when any rule has a version pending activation already in force on the date without an ACTIVE version covering it (SI-07). Only one purchase ITBIS rule may be active at a time.

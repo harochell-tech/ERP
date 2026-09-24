@@ -53,6 +53,21 @@ public sealed class FiscalGateTests(PostgresFixture postgres)
         Assert.Equal(2L, await h.ScalarAsync<long>("SELECT count(*) FROM tax.fiscal_rule_test_run WHERE rule_version_id = @v AND environment = 'TEST'", ("v", version)));
     }
 
+    [Fact]
+    public async Task A_test_run_without_an_initialized_environment_fails_loudly_and_records_nothing()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var actors = await h.FiscalActorsAsync(initEnvironment: false);
+        var version = await h.ConfigureAsync(actors, "cfg", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition, From);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => h.RunAsync(
+            new RunFiscalRuleTests(h.CompanyId, actors.Analyst, "tst", version, [TaxSetup.PassingCase(FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition)]),
+            new RunFiscalRuleTestsHandler()));
+
+        Assert.Contains("init-environment", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(0L, await h.CountAsync("tax.fiscal_rule_test_run"));
+    }
+
     public static TheoryData<string, string> InvalidDefinitions() => new()
     {
         { FiscalRuleKinds.PurchaseItbis, """{"tax_code":"ITBIS","rate":"0.18","effect":"RECOVERABLE_INPUT","extra":1}""" },

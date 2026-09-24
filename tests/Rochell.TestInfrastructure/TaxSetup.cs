@@ -37,9 +37,21 @@ public static class TaxSetup
     public const string ItbisDefinition = """{"tax_code":"ITBIS","rate":"0.18","effect":"RECOVERABLE_INPUT","exempt_item_categories":["AGREGADO"]}""";
     public const string WithholdingDefinition = """{"tax_code":"RET_ITBIS","rate":"0.30","base":"ITBIS","party_types":["INDIVIDUAL"]}""";
 
-    public static async Task<FiscalActors> FiscalActorsAsync(this TestHarness h)
+    /// <summary>Initializes the deployment environment as TEST (what `rochell-migrate init-environment TEST` does), unless set.</summary>
+    public static Task InitTestEnvironmentAsync(this TestHarness h)
     {
         ArgumentNullException.ThrowIfNull(h);
+        return h.AdminRequireAsync("INSERT INTO core.deployment_environment (environment, set_by, set_at) VALUES ('TEST', current_user, now()) ON CONFLICT DO NOTHING");
+    }
+
+    public static async Task<FiscalActors> FiscalActorsAsync(this TestHarness h, bool initEnvironment = true)
+    {
+        ArgumentNullException.ThrowIfNull(h);
+        if (initEnvironment)
+        {
+            await h.InitTestEnvironmentAsync();
+        }
+
         return new FiscalActors(await h.SessionWithRolesAsync("ANALISTA_FISCAL"), await h.SessionWithRolesAsync("ESPECIALISTA_FISCAL"));
     }
 
