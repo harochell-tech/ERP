@@ -31,7 +31,7 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-14, PR-15 | Merged: repost + valuation residual; hash chain (S3 Object Lock still pending B-03) |
 | PR-16 | Merged: reconciliations, CloseComponent, reopen with second approver |
 | PR-17 | Merged: Explain this entry, read-only query pipeline, POL-01 inputs on R-05/R-07B |
-| PR-18a | API (OIDC, 44 command endpoints, read queries, OpenAPI, hosted sealer/digest), AT-01/AT-02 over HTTP. E-PR18-1…7 approved — see §7 |
+| PR-18a | Merged (#19): API (OIDC, 44 command endpoints, read queries, OpenAPI, hosted sealer/digest), AT-01/AT-02 over HTTP |
 | PR-18b | `web/` (Next.js, Spanish UI, types generated from `src/Rochell.Api/openapi.json`) — next |
 | PR-19 | Concurrency and load suite: CC-04, PF-01, full regression → slice acceptance |
 
