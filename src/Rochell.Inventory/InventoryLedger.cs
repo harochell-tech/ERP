@@ -14,6 +14,9 @@ public sealed record MovementDates(DateTime OccurredAt, DateOnly BusinessDate, D
 /// <summary>A receipt into a location and lot. <paramref name="ValueEntryId"/> is pre-assigned so the GL line can reference it.</summary>
 public sealed record ReceiptMovement(Guid LocationId, Guid ItemId, Guid LotId, decimal Quantity, decimal Value, Guid ValueEntryId);
 
+/// <summary>A stock balance row (location, lot, quantity).</summary>
+public sealed record StockRow(Guid LocationId, Guid LotId, decimal Quantity);
+
 /// <summary>The receipt movements of one source line.</summary>
 public sealed record ReceiptEntries(Guid QuantityEntryId, Guid PlantId, Guid LocationId, Guid ItemId, Guid LotId, decimal Quantity, Guid ValueEntryId, Guid ValuationAreaId, decimal Value);
 
@@ -203,6 +206,153 @@ public sealed class InventoryLedger
             ("area", reservation.ValuationAreaId),
             ("item", reservation.ItemId)).ConfigureAwait(false);
         return quantityEntry.QuantityEntryId;
+    }
+
+    /// <summary>
+    /// A movement with explicit quantity and value (both signed), e.g. receipt corrections (E-8 §5.4). Negative quantities use
+    /// the conditional UPDATE (never below zero); the value entry exists only when <paramref name="value"/> is not zero and
+    /// then needs its pre-assigned <paramref name="valueEntryId"/> (P-1). Callers hold the stock and valuation locks.
+    /// </summary>
+    public async Task<Guid> PostMovementAsync(
+        CommandContext context,
+        string movementType,
+        Guid locationId,
+        Guid itemId,
+        Guid lotId,
+        decimal quantity,
+        decimal value,
+        Guid? valueEntryId,
+        MovementSource source,
+        MovementDates dates,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(dates);
+        if (quantity == 0 || decimal.Round(quantity, 6) != quantity || decimal.Round(value, 2) != value || (value != 0) != (valueEntryId is not null))
+        {
+            throw new InvalidOperationException("A movement needs a non-zero quantity (6 decimals), a 2-decimal value and a value entry id exactly when the value is not zero.");
+        }
+
+        var (plantId, areaId) = await PlantAndAreaAsync(context, locationId, cancellationToken).ConfigureAwait(false);
+        if (quantity < 0)
+        {
+            var taken = await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "UPDATE inv.inv_stock_balance SET quantity = quantity + @qty WHERE location_id = @location AND item_id = @item AND lot_id = @lot AND quantity >= -@qty",
+                cancellationToken,
+                ("qty", quantity),
+                ("location", locationId),
+                ("item", itemId),
+                ("lot", lotId)).ConfigureAwait(false);
+            if (taken != 1)
+            {
+                throw new DomainException(InventoryErrors.InsufficientStock, $"Not enough stock of the lot in the location to remove {-quantity}.");
+            }
+        }
+        else
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                INSERT INTO inv.inv_stock_balance (company_id, plant_id, location_id, item_id, lot_id, quantity)
+                VALUES (@company, @plant, @location, @item, @lot, @qty)
+                ON CONFLICT (location_id, item_id, lot_id) DO UPDATE SET quantity = inv.inv_stock_balance.quantity + EXCLUDED.quantity
+                """,
+                cancellationToken,
+                ("company", context.CompanyId),
+                ("plant", plantId),
+                ("location", locationId),
+                ("item", itemId),
+                ("lot", lotId),
+                ("qty", quantity)).ConfigureAwait(false);
+        }
+
+        var recordedAt = context.Clock.UtcNow;
+        var quantityEntry = new QuantityEntryRow(
+            context.Ids.NewId(), context.CompanyId, movementType, plantId, locationId, itemId, lotId, quantity,
+            source.EventId, source.DocumentType, source.DocumentId, source.LineId, null, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate);
+        await InsertQuantityAsync(context, quantityEntry, cancellationToken).ConfigureAwait(false);
+        if (valueEntryId is not null)
+        {
+            await InsertValueAsync(
+                context,
+                new ValueEntryRow(
+                    valueEntryId.Value, context.CompanyId, movementType, areaId, plantId, itemId, quantityEntry.QuantityEntryId, value,
+                    source.EventId, null, quantityEntry.OccurredAt, recordedAt, dates.BusinessDate, dates.PostingDate),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        // An upsert checks CHECK constraints on the proposed INSERT row before detecting the conflict, so a negative delta
+        // would fail quantity >= 0 even when the final balance is valid: removals update the existing balance directly.
+        if (quantity < 0)
+        {
+            var updated = await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "UPDATE inv.inv_valuation_balance SET quantity = quantity + @qty, value = value + @value WHERE valuation_area_id = @area AND item_id = @item",
+                cancellationToken,
+                ("qty", quantity),
+                ("value", value),
+                ("area", areaId),
+                ("item", itemId)).ConfigureAwait(false);
+            if (updated != 1)
+            {
+                throw new InvalidOperationException("Removing stock from an item without a valuation balance.");
+            }
+        }
+        else
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                INSERT INTO inv.inv_valuation_balance (company_id, valuation_area_id, item_id, quantity, value)
+                VALUES (@company, @area, @item, @qty, @value)
+                ON CONFLICT (valuation_area_id, item_id) DO UPDATE
+                  SET quantity = inv.inv_valuation_balance.quantity + EXCLUDED.quantity, value = inv.inv_valuation_balance.value + EXCLUDED.value
+                """,
+                cancellationToken,
+                ("company", context.CompanyId),
+                ("area", areaId),
+                ("item", itemId),
+                ("qty", quantity),
+                ("value", value)).ConfigureAwait(false);
+        }
+
+        return quantityEntry.QuantityEntryId;
+    }
+
+    /// <summary>
+    /// Stock rows of an item in a plant with quantity &gt; 0, locked (N6) in the issue order of E-PR11-3: the preferred lot first,
+    /// then the other lots from oldest to newest (UUIDv7 order), then by location.
+    /// </summary>
+    public async Task<IReadOnlyList<StockRow>> LockStockOfItemAsync(CommandContext context, Guid plantId, Guid itemId, Guid preferredLotId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT location_id, lot_id, quantity FROM inv.inv_stock_balance
+            WHERE company_id = @c AND plant_id = @plant AND item_id = @item AND quantity > 0
+            ORDER BY (lot_id = @preferred) DESC, lot_id, location_id
+            FOR UPDATE
+            """,
+            ("c", context.CompanyId),
+            ("plant", plantId),
+            ("item", itemId),
+            ("preferred", preferredLotId));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var rows = new List<StockRow>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            rows.Add(new StockRow(reader.GetGuid(0), reader.GetGuid(1), reader.GetDecimal(2)));
+        }
+
+        return rows;
     }
 
     /// <summary>Locks one stock balance row (lock level N6) and returns its quantity (0 when absent).</summary>

@@ -148,6 +148,22 @@ internal static class PurchaseOrderStore
         }
     }
 
+    /// <summary>§11.1 receipt-driven status: APPROVED when nothing remains received, RECEIVED when every line is complete, otherwise PARTIALLY_RECEIVED.</summary>
+    public static async Task<string> StatusFromReceiptsAsync(CommandContext context, Guid poId, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT CASE WHEN bool_and(qty_received = 0) THEN 'APPROVED'
+                        WHEN bool_and(qty_received >= qty_ordered) THEN 'RECEIVED'
+                        ELSE 'PARTIALLY_RECEIVED' END
+            FROM pur.purchase_order_line WHERE po_id = @p
+            """,
+            ("p", poId));
+        return (string)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
+    }
+
     /// <summary>Changes status with its event and state_history row (ADR-027). Extra SET fragments are constant SQL.</summary>
     public static async Task TransitionAsync(
         CommandContext context,

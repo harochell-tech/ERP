@@ -64,6 +64,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR10-2 | PR-10 | PURCHASE_PRICE_VARIANCE lines carry plant and item dimensions. |
 | E-PR10-3 | PR-10 | `inv.movement_type` gains VALUATION_REALLOCATION (value only); the exact reversal uses RECEIPT_REVERSAL with `reverses_*_entry_id`. |
 | E-PR10-4 | PR-10 | R-02B seeded DRAFT from 2026-01-01 with both side variants; R-02 (A) is the exact reversal of the R-01 journal (no new rule). |
+| E-PR11-1 | PR-11 | `evidence_object_key` is a mandatory text reference (corrected ticket, photo, record) until WORM object storage exists (B-03). |
+| E-PR11-2 | PR-11 | Δq > 0 always goes to the receipt's original lot and location, even with zero stock; no correction lots. |
+| E-PR11-3 | PR-11 | Δq < 0 takes the receipt's lot first, then the item's other lots in the area from oldest to newest (UUIDv7 order), then by location. |
+| E-PR11-4 | PR-11 | Under materiality (|Δq| × P ≤ `inventory_adjustment_materiality`) a correction is DRAFT and the Controller approves without step-up; above it starts PENDING_APPROVAL and approval needs step-up. Reject uses `receipt_correction:approve`. |
+| E-PR11-5 | PR-11 | R-03A and R-03B seeded DRAFT from 2026-01-01; R-03B has both PPV side variants; MATERIAL_USAGE_VARIANCE carries plant and item. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -84,4 +89,5 @@ Implementation rules derived from the above (no architectural change):
 - Goods receipt and purchase order status changes require their `core.state_history` row in the same transaction (ADR-027, enforced by deferred triggers); a POSTED receipt requires its AUTO journal (K-25).
 - Exact reversals point the inventory line's `subledger_ref` to the new inverse value entry (required by `gl_entry_inv_link`).
 - Receipt reversal guard "nothing invoiced": `qty_invoiced ≤ qty_received − reversed quantity` on each PO line of the receipt.
+- R-03B amounts: GRNI = |Δq| × P; stock value = q₁ × avg (the whole area value when q₁ empties it), split by lot with the remainder on the last; q₁ at P = GRNI × q₁ ÷ |Δq|; MUV = GRNI − q₁ at P; PPV = q₁ at P − stock value. Base quantities use the receipt's own conversion.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
