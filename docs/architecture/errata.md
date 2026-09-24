@@ -25,6 +25,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR04-7 | PR-04 | `item_category` is a closed list: CEMENTO, AGREGADO, ADITIVO, OTRA_MATERIA_PRIMA. |
 | E-PR04-8 | PR-04 | Conversions always point to the item's base UOM; a new one closes the open one and cannot start before today. |
 | E-PR04-9 | PR-04 | UOM seed: kg, t (mass), m3, l (volume), un (count). |
+| E-PR05-1 | PR-05 | The chart of accounts is loaded by the deployment role (`rochell-migrate import-accounts`, CSV approved by the Controller); no account creation from the application in VS#1. |
+| E-PR05-2 | PR-05 | Posting rule definition is declarative JSON (lines: code, side, account role, amount name, dimensions, subledger); code only computes the named amounts; versions go DRAFT → ACTIVE on Controller approval. |
+| E-PR05-3 | PR-05 | Monthly calendar periods created with `rochell-migrate open-periods <rnc> <year>`, both components OPEN; posting to a date without period is rejected. |
+| E-PR05-4 | PR-05 | Each rule version declares its close component (INV-MOV or AP-REC); if closed for the business date's month the journal goes to the first day of the next open period with `late_entry = true`; none open → rejected. |
+| E-PR05-5 | PR-05 | `fin.account_role` seeded with the slice roles; control roles (AP_CONTROL, RAW_MATERIAL) map only to control accounts and vice versa. |
+| E-PR05-6 | PR-05 | DOP only in VS#1 (CHECK). |
+| E-PR05-7 | PR-05 | GL lines rounded half-up to 2 decimals (CHECK); rounding differences go to ROUNDING_DIFFERENCE within the policy tolerance. |
+| E-PR05-8 | PR-05 | Row hash of `gl_journal`/`gl_entry` covers all columns except `row_hash`; `gl_entry.inv_value_entry_id` gets its FK in PR-07. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -33,4 +41,7 @@ Implementation rules derived from the above (no architectural change):
 - Segregation-of-duties checks are per company and serialized per user with an advisory lock.
 - The outbox dispatcher processes companies one at a time so row-level security applies to it as to any command.
 - `md.item.description` (NOT NULL) was added as a trivial field omitted by the frozen schema ("no necesito todavía cada campo trivial").
+- Account-role mappings are loaded as DRAFT by the deployment role (`import-account-map`) and approved by the Controller; `prepared_by` was added to enforce preparer ≠ approver.
+- Until accounting policies exist (PR-06) the rounding tolerance is zero: an unbalanced posting is rejected, no rounding line is generated.
+- The posting rule version is chosen by the business date; the account mapping by the posting date.
 - Master rows use optimistic concurrency: every change increments `version` by exactly 1 (database guard) and commands carry `expected_version`.
