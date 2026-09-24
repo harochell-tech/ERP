@@ -49,7 +49,7 @@ public sealed class PurchaseOrderSchemaTests(PostgresFixture postgres)
 
     [Theory]
     [InlineData("DELETE FROM pur.purchase_order")]
-    [InlineData("UPDATE pur.purchase_order SET party_id = party_id, version = version + 1")]
+    [InlineData("UPDATE pur.purchase_order SET party_id = gen_random_uuid(), version = version + 1")]
     [InlineData("UPDATE pur.purchase_order_line SET unit_price = 1, version = version + 1")]
     [InlineData("UPDATE pur.purchase_order SET version = version")]
     public async Task Identity_and_history_are_protected_even_for_the_owner(string sql)
