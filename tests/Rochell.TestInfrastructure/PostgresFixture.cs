@@ -47,10 +47,14 @@ public sealed class PostgresFixture : IAsyncLifetime
     public async Task<TestDatabase> CreateMigratedDatabaseAsync()
     {
         var admin = await CreateEmptyDatabaseAsync();
-        var runner = new MigrationRunner(() => new NpgsqlConnection(admin));
+
+        // One-off setup connections to a brand-new database must not stay in Npgsql's global pool: every test creates its own
+        // database, so each would leave an idle pooled connection for minutes and a large suite exhausts max_connections (53300).
+        var setup = new NpgsqlConnectionStringBuilder(admin) { Pooling = false }.ConnectionString;
+        var runner = new MigrationRunner(() => new NpgsqlConnection(setup));
         await runner.MigrateAsync(TestPaths.MainSource);
         await runner.MigrateAsync(TestPaths.TestSource);
-        await EnsureAppLoginAsync(admin);
+        await EnsureAppLoginAsync(setup);
 
         var app = new NpgsqlConnectionStringBuilder(admin) { Username = AppLogin, Password = AppPassword }.ConnectionString;
         return new TestDatabase(admin, app);
