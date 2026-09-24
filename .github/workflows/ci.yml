@@ -45,6 +45,45 @@ jobs:
           --results-directory TestResults
           --blame-hang-timeout 5m
 
+      # E-PR18b-10: the web UI in the same required job.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Web install
+        working-directory: web
+        run: npm ci
+
+      - name: Web lint, typecheck, API types in sync, unit tests
+        working-directory: web
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run check:api
+          npm test
+
+      - name: Web build (static export)
+        working-directory: web
+        run: npm run build
+
+      - name: Web browser journey (Playwright, real API and simulated IdP)
+        working-directory: web
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          if-no-files-found: ignore
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7

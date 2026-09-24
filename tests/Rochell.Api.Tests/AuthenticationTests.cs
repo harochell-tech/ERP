@@ -42,7 +42,10 @@ public sealed class AuthenticationTests(PostgresFixture postgres)
         Assert.Equal($"{user:N}@{TestHarness.HostedDomain}", session.GetProperty("email").GetString());
         var company = Assert.Single(session.GetProperty("companies").EnumerateArray());
         Assert.Equal(h.CompanyId, company.GetProperty("companyId").GetGuid());
-        Assert.Equal("COMPRADOR", Assert.Single(company.GetProperty("assignments").EnumerateArray()).GetProperty("roleCode").GetString());
+        var assignment = Assert.Single(company.GetProperty("assignments").EnumerateArray());
+        Assert.Equal("COMPRADOR", assignment.GetProperty("roleCode").GetString());
+        Assert.Equal(JsonValueKind.Null, assignment.GetProperty("plantId").ValueKind);
+        Assert.Contains("purchase_order:create", assignment.GetProperty("permissions").EnumerateArray().Select(p => p.GetString())); // E-PR18b-8
         Assert.Contains("purchase_order:read", company.GetProperty("permissions").EnumerateArray().Select(p => p.GetString()));
         Assert.Equal(JsonValueKind.String, session.GetProperty("stepUpValidUntil").ValueKind); // a fresh login counts as re-authentication
     }

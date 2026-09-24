@@ -14,6 +14,7 @@ using Rochell.Api.Http;
 using Rochell.Platform.Json;
 using Rochell.Platform.Time;
 using Rochell.TestInfrastructure;
+using Rochell.Testing.Oidc;
 using Xunit;
 
 namespace Rochell.Api.Tests;

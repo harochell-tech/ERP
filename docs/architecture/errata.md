@@ -122,6 +122,17 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR18-5 | PR-18 | The sealer (every 5 s) and the 00:15 digest run as background services of the API host, switchable by configuration, connecting as `rochell_sealer`. Outside TEST the digest does not start without real WORM storage (B-03); sealing works without it. |
 | E-PR18-6 | PR-18 | UI coverage (PR-18b): only the slice flows (PO create/submit/approve; receipt, correction, reversal; supplier invoice register/match/exception/post/reverse; reconciliations; close and reopen; Explain). Master data through the API only in VS#1. UI in Spanish, no visual polish. |
 | E-PR18-7 | PR-18 | `openapi.json` is committed; a test fails when the generated document differs; the `web/` types are generated from it. |
+| E-PR18b-1 | PR-18b | `web/`: Node 24 LTS (`.nvmrc`, `engines`), Next.js 16 (App Router), React 19, strict TypeScript, npm with `package-lock.json`; plain CSS, no component or style library. |
+| E-PR18b-2 | PR-18b | Static export (`output: 'export'`), client-side only, no Node server in production; the API host serves it from the same origin (no CORS, no proxy; the session cookie works as is). In development `next dev` forwards `/api/*` to the API. |
+| E-PR18b-3 | PR-18b | `openapi-typescript` generates `web/src/api/schema.d.ts` from `src/Rochell.Api/openapi.json`; a small typed client; CI fails when the generated types differ. |
+| E-PR18b-4 | PR-18b | The UI never does money or quantity arithmetic: decimals stay strings, forms validate their format, amounts shown come from the API (no computed totals on screen). |
+| E-PR18b-5 | PR-18b | `accounting_status` is shown to everyone; the link to Explain appears only when the session has `audit:read` (no new permission). |
+| E-PR18b-6 | PR-18b | On `STEP_UP_REQUIRED` the form data and its `Idempotency-Key` are kept in `sessionStorage`, the user re-authenticates and returns to the filled form; the user presses the button again (no automatic resubmission), with the same key. |
+| E-PR18b-7 | PR-18b | The purchase order screen also offers Reject (approver) and Cancel (buyer), over existing commands. |
+| E-PR18b-8 | PR-18b | A plant-scoped user works in its assigned plant (sent as `plantId`); a company-wide user picks the plant from a list; navigation follows the permissions returned by `/api/v1/session`. |
+| E-PR18b-9 | PR-18b | Local development without Google: an executable dev stack under `tests/` (simulated IdP with a user picker, test-only) and a development seed under `tests/` (never in `db/migrations`). Safari does not keep Secure cookies on `http://localhost`: use Chrome or Firefox. |
+| E-PR18b-10 | PR-18b | In the required `ci / build-test` job: `npm ci`, lint, typecheck, generated-types check, Vitest unit tests, `next build`, and one Playwright journey (buyer creates and submits a PO, approver approves, storekeeper receives) against the real API with the simulated IdP. |
+| E-PR18b-11 | PR-18b | All UI text in Spanish, written directly (no i18n library); errors shown by `code` from a Spanish dictionary, falling back to the API message with the `correlationId`. |
 
 Implementation rules derived from the above (no architectural change):
 
@@ -165,3 +176,8 @@ Implementation rules derived from the above (no architectural change):
 - Plant scope applies to queries as to commands: purchase-order, goods-receipt and master-data queries accept a plant; with it an assignment for that plant or the whole company is required and only that plant's documents are returned; without it a company-wide assignment is required.
 - E-PR18-4 grants: `purchase_order:read` to Comprador, Aprobador de compras, Almacenista, Cuentas por pagar, Controller, Auditor; `goods_receipt:read` to Almacenista, Cuentas por pagar, Controller, Auditor; `supplier_invoice:read` to Cuentas por pagar, Controller, Auditor; `period:read` to Controller, Segundo aprobador de cierre, Auditor; `master_data:read` to Comprador, Aprobador de compras, Almacenista, Cuentas por pagar, Controller, Auditor.
 - The host flushes `obs.request_log` every second; the outbox dispatcher is not hosted because VS#1 has no event consumers.
+- PR-18b: `/api/v1/session` lists each assignment's permissions, so the UI derives each permission's plant scope (E-PR18b-8); the API stays the authority.
+- The static export needs `'unsafe-inline'` for scripts in the pages' Content-Security-Policy (Next.js bootstraps inline); everything else is limited to `'self'` and pages cannot be framed.
+- Detail pages take the document id as a query parameter (a static export has no dynamic routes).
+- OpenAPI: constructor parameters with a default value are optional in request bodies, and the web types are generated with `--default-non-nullable false`, so optional members stay optional in TypeScript.
+- The API honours `X-Forwarded-*` from loopback only in Development (for `next dev`); Staging needs its own proxy configuration when it is deployed.

@@ -12,5 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Rochell.Api\Rochell.Api.csproj" />
     <ProjectReference Include="..\Rochell.TestInfrastructure\Rochell.TestInfrastructure.csproj" />
+    <ProjectReference Include="..\Rochell.SimulatedIdp\Rochell.SimulatedIdp.csproj" />
   </ItemGroup>
 </Project>

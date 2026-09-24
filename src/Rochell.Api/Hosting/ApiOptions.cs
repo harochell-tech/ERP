@@ -20,6 +20,9 @@ public sealed class ApiOptions
     /// </summary>
     public string? DataProtectionKeysPath { get; set; }
 
+    /// <summary>E-PR18b-2: directory of the web UI's static export (web/out), served from the API's own origin. Unset: no UI.</summary>
+    public string? WebRoot { get; set; }
+
     public IdentitySettings Identity { get; set; } = new();
 
     public OidcSettings Oidc { get; set; } = new();

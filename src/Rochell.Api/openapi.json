@@ -9163,7 +9163,8 @@
         "required": [
           "roleCode",
           "roleName",
-          "plantId"
+          "plantId",
+          "permissions"
         ],
         "type": "object",
         "properties": {
@@ -9179,6 +9180,12 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

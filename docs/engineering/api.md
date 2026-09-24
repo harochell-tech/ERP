@@ -14,13 +14,13 @@ generated from the committed `src/Rochell.Api/openapi.json`.
 | Callback page | A small HTML page that navigates to `returnUrl` (local paths only). A plain redirect would not work: the callback is a cross-site navigation, and the browser would not send the new Strict cookie on it |
 | `GET /api/v1/auth/step-up?returnUrl=…` | New authorization with `prompt=login` and `max_age=0`. The id of the session to re-authenticate travels in the protected OIDC state, because the Strict cookie is not sent on the callback; `RecordStepUpAsync` checks that the same Google identity owns the session |
 | `POST /api/v1/auth/logout` | Sets `logout_at` and deletes the cookie |
-| `GET /api/v1/session` | User, expiry, step-up freshness, and per company the assignments (company-wide or per plant) and permissions valid now. Does not refresh activity |
+| `GET /api/v1/session` | User, expiry, step-up freshness, and per company the assignments (company-wide or per plant, each with the permissions it grants, E-PR18b-8) and permissions valid now. Does not refresh activity |
 
 Expiry, idle timeout, step-up age and user status stay in the database and are checked on every request (E-PR03-2, E-PR03-6).
 Every non-GET request under `/api` must send `X-Rochell-Csrf: 1` (anti-CSRF; no CORS is granted). No ASP.NET identity cookie
 exists; the OIDC handler's transient sign-in scheme is never used.
 
-CI uses a simulated IdP (`tests/Rochell.Api.Tests/SimulatedIdp.cs`): discovery, JWKS and the token endpoint answer the real
+CI uses a simulated IdP (`tests/Rochell.SimulatedIdp`, also used by the dev stack, see [web.md](web.md)): discovery, JWKS and the token endpoint answer the real
 OIDC handler's backchannel, and tests play the browser leg. It exists only under `tests/`. Staging needs the Google Workspace
 client (A-03).
 
@@ -90,7 +90,8 @@ The outbox dispatcher is not hosted: VS#1 has no event consumers.
 Section `Rochell` (environment variables `Rochell__…`): `AppConnectionString` (a `rochell_app` login),
 `SealerConnectionString` (a `rochell_sealer` login, only with the sealer or digest on), `Identity:HostedDomain`,
 `Oidc:Authority` (default Google), `Oidc:ClientId`, `Oidc:ClientSecret`, `DataProtectionKeysPath` (persist keys; losing them
-only signs users out), `Audit:DigestPublicKeyPem`. The host refuses to start without the required values and only in
+only signs users out), `Audit:DigestPublicKeyPem`, `WebRoot` (the `web/out` export to serve from the same origin, E-PR18b-2; the
+host refuses to start if it does not exist). In Development only, `X-Forwarded-*` from loopback is honoured (for `next dev`). The host refuses to start without the required values and only in
 Development, Test or Staging. `/openapi/v1.json` is served in Development and Test.
 
 ## OpenAPI (E-PR18-7)

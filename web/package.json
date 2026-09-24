@@ -1,0 +1,39 @@
+{
+  "name": "rochell-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rochell Core, UI mínima de VS#1 (PR-18b). Exportación estática servida por Rochell.Api.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "gen:api": "openapi-typescript ../src/Rochell.Api/openapi.json --default-non-nullable false --output src/api/schema.d.ts",
+    "check:api": "node scripts/check-api-types.mjs",
+    "test": "vitest run",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "16.3.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^24",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.6",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3",
+    "vitest": "5.0.1"
+  },
+  "allowScripts": {
+    "unrs-resolver": false,
+    "fsevents": false
+  }
+}
