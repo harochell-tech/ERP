@@ -1,0 +1,12 @@
+# Build context of the staging/production image (E-B03-5): sources only.
+.git
+**/bin
+**/obj
+**/TestResults
+web/node_modules
+web/.next
+web/out
+web/test-results
+web/playwright-report
+deploy
+docs

@@ -94,7 +94,9 @@ The outbox dispatcher is not hosted: VS#1 has no event consumers.
 Section `Rochell` (environment variables `Rochell__…`): `AppConnectionString` (a `rochell_app` login),
 `SealerConnectionString` (a `rochell_sealer` login, only with the sealer or digest on), `Identity:HostedDomain`,
 `Oidc:Authority` (default Google), `Oidc:ClientId`, `Oidc:ClientSecret`, `DataProtectionKeysPath` (persist keys; losing them
-only signs users out), `Audit:DigestPublicKeyPem`, `WebRoot` (the `web/out` export to serve from the same origin, E-PR18b-2; the
+only signs users out), `Audit:DigestPublicKeyPem` (or `Audit:DigestPublicKeyPemFile`; likewise `Digest:SigningKeyPemFile`, E-B03-6 —
+a configured file that does not exist stops the host), `ReverseProxy:TrustedNetworks` (CIDR list of the reverse proxy; only
+requests from there may set `X-Forwarded-For/Proto`, E-B03-2 — see [staging.md](staging.md)), `WebRoot` (the `web/out` export to serve from the same origin, E-PR18b-2; the
 host refuses to start if it does not exist). In Development only, `X-Forwarded-*` from loopback is honoured (for `next dev`). The host refuses to start without the required values and only in
 Development, Test or Staging. `/openapi/v1.json` is served in Development and Test.
 

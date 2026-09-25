@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -28,6 +29,12 @@ public sealed class ApiHost(TestHarness harness, IClock? clock = null, IReadOnly
     public SimulatedIdp Idp { get; } = new();
 
     public TestHarness Harness { get; } = harness;
+
+    /// <summary>
+    /// The client address every request appears to come from. TestServer leaves it unset, and the forwarded-headers middleware skips
+    /// its known-proxy check for an unknown address (Kestrel always has one); reverse-proxy tests set it.
+    /// </summary>
+    public IPAddress? RemoteIp { get; init; }
 
     /// <summary>Everything the host logged at Warning or above.</summary>
     public ConcurrentQueue<(LogLevel Level, string Message)> Logs { get; } = new();
@@ -59,6 +66,10 @@ public sealed class ApiHost(TestHarness harness, IClock? clock = null, IReadOnly
         {
             services.Configure<OpenIdConnectOptions>(OidcAuthentication.Scheme, o => o.BackchannelHttpHandler = Idp.Backchannel);
             services.AddSingleton<ILoggerProvider>(new CollectingLoggerProvider(Logs));
+            if (RemoteIp is { } remoteIp)
+            {
+                services.AddSingleton<IStartupFilter>(new RemoteIpStartupFilter(remoteIp));
+            }
             if (clock is not null)
             {
                 services.AddSingleton(clock);
@@ -178,4 +189,19 @@ public static class ApiCalls
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
         return (response.StatusCode, problem.TryGetProperty("code", out var code) ? code.GetString() : null);
     }
+}
+
+/// <summary>Sets the connection's remote address before the host's own middleware runs.</summary>
+internal sealed class RemoteIpStartupFilter(IPAddress remoteIp) : IStartupFilter
+{
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
+        => app =>
+        {
+            app.Use((context, nextMiddleware) =>
+            {
+                context.Connection.RemoteIpAddress = remoteIp;
+                return nextMiddleware(context);
+            });
+            next(app);
+        };
 }

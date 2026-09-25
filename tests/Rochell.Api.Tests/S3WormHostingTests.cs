@@ -42,6 +42,49 @@ public sealed class S3WormHostingTests(PostgresFixture postgres, S3WormFixture s
     }
 
     [Fact]
+    public async Task Digest_keys_can_come_from_files()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var directory = Directory.CreateTempSubdirectory("rochell-keys-");
+        try
+        {
+            var signing = Path.Combine(directory.FullName, "digest-signing.pem");
+            var verifying = Path.Combine(directory.FullName, "digest-public.pem");
+            await File.WriteAllTextAsync(signing, _key.ExportPkcs8PrivateKeyPem());
+            await File.WriteAllTextAsync(verifying, _key.ExportSubjectPublicKeyInfoPem());
+            var settings = Settings(await s3.CreateBucketAsync());
+            settings.Remove("Rochell:Digest:SigningKeyPem");
+            settings.Remove("Rochell:Audit:DigestPublicKeyPem");
+            settings["Rochell:Digest:SigningKeyPemFile"] = signing;
+            settings["Rochell:Audit:DigestPublicKeyPemFile"] = verifying;
+            using var api = new ApiHost(h, settings: settings);
+            var controller = await api.SignInAsSessionUserAsync(await h.SessionWithRolesAsync("CONTROLLER"));
+
+            var verify = await controller.OkAsync(h.CompanyId, "audit", "verify-hash-chain", new { });
+
+            Assert.True(verify.GetProperty("result").GetProperty("valid").GetBoolean());
+            Assert.DoesNotContain(api.Logs, l => l.Level == LogLevel.Critical);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task A_missing_key_file_stops_the_host()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var settings = Settings(await s3.CreateBucketAsync());
+        settings.Remove("Rochell:Digest:SigningKeyPem");
+        settings["Rochell:Digest:SigningKeyPemFile"] = "/nonexistent/digest-signing.pem";
+        using var api = new ApiHost(h, settings: settings);
+
+        var ex = Assert.ThrowsAny<Exception>(() => api.CreateClient());
+        Assert.Contains("SigningKeyPemFile", ex.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_bucket_without_object_lock_leaves_verification_unavailable()
     {
         await using var h = await TestHarness.CreateAsync(postgres);

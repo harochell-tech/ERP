@@ -32,6 +32,18 @@ public sealed class ApiOptions
     public DigestSettings Digest { get; set; } = new();
 
     public AuditSettings Audit { get; set; } = new();
+
+    public ReverseProxySettings ReverseProxy { get; set; } = new();
+}
+
+/// <summary>
+/// E-B03-2: the reverse proxy (Caddy) in front of a staging or production host. Only requests arriving from these networks may set
+/// the client address and scheme through X-Forwarded-For / X-Forwarded-Proto (one hop). Empty: forwarded headers are ignored.
+/// </summary>
+public sealed class ReverseProxySettings
+{
+    /// <summary>CIDR networks of the proxy, e.g. the compose network "172.30.0.0/24".</summary>
+    public List<string> TrustedNetworks { get; set; } = [];
 }
 
 public sealed class IdentitySettings
@@ -73,6 +85,9 @@ public sealed class DigestSettings
 
     /// <summary>PKCS#8 PEM of the ECDSA P-256 signing key (secret store only).</summary>
     public string? SigningKeyPem { get; set; }
+
+    /// <summary>E-B03-6: file holding <see cref="SigningKeyPem"/> (generated on the server, readable only by the host).</summary>
+    public string? SigningKeyPemFile { get; set; }
 }
 
 /// <summary>What verification (hash:verify) and the digest need to reach the WORM copies.</summary>
@@ -83,6 +98,9 @@ public sealed class AuditSettings
 
     /// <summary>SubjectPublicKeyInfo PEM of the digest signing key, used by VerifyHashChain.</summary>
     public string? DigestPublicKeyPem { get; set; }
+
+    /// <summary>File holding <see cref="DigestPublicKeyPem"/>.</summary>
+    public string? DigestPublicKeyPemFile { get; set; }
 
     /// <summary>S3 Object Lock WORM store (B-03, E-B03-3/4); any environment. Exclusive with <see cref="FileSystemWormRoot"/>.</summary>
     public S3WormSettings S3 { get; set; } = new();

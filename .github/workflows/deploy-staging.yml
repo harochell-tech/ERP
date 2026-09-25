@@ -1,0 +1,86 @@
+name: deploy-staging
+
+# E-B03-5: manual, from main only, and only for a commit whose "ci / build-test" check passed.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  checks: read
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/rochell-core:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Require a green CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?check_name=build-test" --jq '.check_runs | map(.conclusion) | first')
+          echo "ci / build-test: ${conclusion}"
+          test "${conclusion}" = "success"
+
+      - name: Build and push the image
+        run: |
+          IMAGE="${IMAGE,,}"
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build --pull -t "${IMAGE}" .
+          docker push "${IMAGE}"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+
+      - name: SSH setup
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.STAGING_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Upload deployment files and environment
+        env:
+          TARGET: ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}
+          STAGING_HOST: ${{ vars.STAGING_HOST }}
+          WORKSPACE_DOMAIN: ${{ vars.WORKSPACE_DOMAIN }}
+          DEPLOY_DB_PASSWORD: ${{ secrets.DEPLOY_DB_PASSWORD }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          SEALER_DB_PASSWORD: ${{ secrets.SEALER_DB_PASSWORD }}
+          OIDC_CLIENT_ID: ${{ vars.OIDC_CLIENT_ID }}
+          OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
+          WORM_BUCKET: ${{ vars.WORM_BUCKET }}
+          WORM_REGION: ${{ vars.WORM_REGION }}
+          WORM_ACCESS_KEY_ID: ${{ secrets.WORM_ACCESS_KEY_ID }}
+          WORM_SECRET_ACCESS_KEY: ${{ secrets.WORM_SECRET_ACCESS_KEY }}
+          BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+          BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_ACCESS_KEY_ID }}
+          BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_SECRET_ACCESS_KEY }}
+        run: |
+          scp deploy/staging/compose.yaml deploy/staging/Caddyfile deploy/staging/init-roles.sql \
+              deploy/staging/deploy.sh deploy/staging/backup.sh "${TARGET}:/opt/rochell-staging/"
+          # Values travel as environment variables (never interpolated into the script); the file is mode 600 on the server.
+          vars="ROCHELL_IMAGE STAGING_HOST WORKSPACE_DOMAIN DEPLOY_DB_PASSWORD APP_DB_PASSWORD SEALER_DB_PASSWORD OIDC_CLIENT_ID
+                OIDC_CLIENT_SECRET WORM_BUCKET WORM_REGION WORM_ACCESS_KEY_ID WORM_SECRET_ACCESS_KEY BACKUP_BUCKET
+                BACKUP_ACCESS_KEY_ID BACKUP_SECRET_ACCESS_KEY"
+          ROCHELL_IMAGE="${IMAGE}"
+          for name in ${vars}; do
+            value="${!name}"
+            test -n "${value}" || { echo "Missing ${name} in the staging environment" >&2; exit 1; }
+            printf '%s=%s\n' "${name}" "${value}"
+          done | ssh "${TARGET}" 'umask 077; cat > /opt/rochell-staging/.env'
+
+      - name: Deploy
+        env:
+          TARGET: ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}
+        run: |
+          # The VPS pulls with this job's short-lived token, then forgets it.
+          echo "${{ github.token }}" | ssh "${TARGET}" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+          ssh "${TARGET}" "/opt/rochell-staging/deploy.sh '${IMAGE}'; status=\$?; docker logout ghcr.io; exit \$status"
