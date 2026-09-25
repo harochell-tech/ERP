@@ -28,6 +28,9 @@ internal static class CloseSql
         }
     }
 
+    /// <summary>The text of the period × component lock key (hashed with <c>hashtextextended(key, 0)</c>).</summary>
+    public static string PeriodLockKey(Guid companyId, Guid periodId, string component) => $"period:{companyId}:{periodId}:{component}";
+
     /// <summary>The same key the Posting Engine locks in shared mode for every posting into the period (K-20).</summary>
     public static Task LockPeriodExclusiveAsync(CommandContext context, Guid periodId, string component, CancellationToken cancellationToken)
         => Sql.ExecuteAsync(
@@ -96,9 +99,19 @@ public sealed class RunReconciliationHandler : ICommandHandler<RunReconciliation
 /// </summary>
 [RequiresPermission("period_component:close", StepUp = true)]
 [SerializableTransaction]
-public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>
+public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPreTransactionLocks<CloseComponent>
 {
     public string CommandType => "Finance.CloseComponent";
+
+    /// <summary>
+    /// E-VS1-7 (#25): the period × component lock is held before the SERIALIZABLE snapshot exists; otherwise a posting that
+    /// committed while the close waited would be invisible to its checks. Same key as <see cref="CloseSql.LockPeriodExclusiveAsync"/>.
+    /// </summary>
+    public IReadOnlyList<string> ExclusiveLocksBeforeTransaction(CloseComponent command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        return [CloseSql.PeriodLockKey(command.CompanyId, command.PeriodId, command.Component)];
+    }
 
     public async Task<string> HandleAsync(CloseComponent command, CommandContext context, CancellationToken cancellationToken)
     {

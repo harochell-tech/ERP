@@ -133,7 +133,9 @@ public sealed class PostingEngineTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         var ledger = await h.CreateLedgerAsync();
-        await h.AdminRequireAsync($"UPDATE fin.close_component_state SET status = 'CLOSED', version = version + 1, closed_by = '{h.UserId}', closed_at = now(), snapshot_hash = sha256('fixture') WHERE company_id = '{h.CompanyId}' AND component = 'INV-MOV'");
+        // Fixture state without snapshots: written with triggers off (the E-VS1-8 evidence check would refuse it).
+        await h.AdminRequireAsync(
+            $"BEGIN; SET LOCAL session_replication_role = replica; UPDATE fin.close_component_state SET status = 'CLOSED', version = version + 1, closed_by = '{h.UserId}', closed_at = now(), snapshot_hash = sha256('fixture') WHERE company_id = '{h.CompanyId}' AND component = 'INV-MOV'; COMMIT;");
 
         var ex = await Assert.ThrowsAsync<DomainException>(() => Post(h, ledger, "all-closed", 50m));
 

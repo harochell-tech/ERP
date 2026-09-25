@@ -16,7 +16,7 @@ namespace Rochell.Procurement.SupplierInvoices;
 internal sealed record BilledPoLine(Guid PoLineId, Guid PoId, Guid PlantId, Guid ValuationAreaId, Guid ItemId, decimal UnitPrice, decimal QtyReceived, decimal QtyInvoiced);
 
 /// <summary>The price-difference evidence of one invoice line, kept in the posting event for its reversal (R-07).</summary>
-internal sealed record PriceDifference(Guid SiLineId, Guid PlantId, Guid ValuationAreaId, Guid ItemId, decimal Difference, decimal BaseQuantity, decimal Covered, Guid? ValueEntryId);
+internal sealed record PriceDifference(Guid SiLineId, Guid PlantId, Guid ValuationAreaId, Guid ItemId, decimal Difference, decimal BaseQuantity, decimal ItemQuantity, decimal Covered, Guid? ValueEntryId);
 
 internal static class InvoicePostingStore
 {
@@ -122,15 +122,19 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
             : throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"Price-difference allocation method {method} is not implemented; VS#1 supports STOCK_COVERAGE.");
     }
 
-    /// <summary>POL-01: what R-05 used for one line — method, policy version, area quantity, Q, s and D.</summary>
-    private static Dictionary<string, string> AllocationInputs(ResolvedPolicy policy, decimal areaQuantity, decimal baseQuantity, decimal difference)
+    /// <summary>
+    /// POL-01: what R-05 used for one line — method, policy version, area quantity, the line's Q, the invoice's Q of the item
+    /// (E-VS1-11), s and D.
+    /// </summary>
+    private static Dictionary<string, string> AllocationInputs(ResolvedPolicy policy, decimal areaQuantity, decimal baseQuantity, decimal itemQuantity, decimal difference)
         => new()
         {
             [PolicyParameters.InvoicePriceVarianceAllocationMethod] = policy.Text(PolicyParameters.InvoicePriceVarianceAllocationMethod),
             ["policy_version_id"] = policy.PolicyVersionId.ToString(),
             ["area_quantity"] = areaQuantity.ToString(CultureInfo.InvariantCulture),
             ["base_quantity"] = baseQuantity.ToString(CultureInfo.InvariantCulture),
-            ["coverage"] = decimal.Round(Math.Min(areaQuantity, baseQuantity) / baseQuantity, 6, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture),
+            ["invoice_item_quantity"] = itemQuantity.ToString(CultureInfo.InvariantCulture),
+            ["coverage"] = decimal.Round(Math.Min(areaQuantity, itemQuantity) / itemQuantity, 6, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture),
             ["difference"] = InvoicePostingStore.Text(difference),
         };
 
@@ -196,7 +200,19 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
         var totalItbis = recoverable.Sum(t => t.Amount);
         var payableAtPoPrice = totalGrni + totalItbis - withholding;
 
-        // R-05 (E-PR13-7): coverage s = min(area quantity, Q_base) ÷ Q_base per line; valuation locked (N7) by area, item.
+        // R-05 (E-PR13-7, E-VS1-11): coverage s = min(area quantity, Q) ÷ Q, where Q is the invoice's total base quantity of the
+        // item in the area (all its lines), so one invoice never capitalizes more price difference than the stock covers.
+        // Valuation locked (N7) by area, item.
+        var baseQuantities = new Dictionary<Guid, decimal>();
+        foreach (var line in lines)
+        {
+            var factor = await InvoicePostingStore.ReceiptFactorAsync(context, po[line.PurchaseOrderLineId].PoLineId, cancellationToken).ConfigureAwait(false);
+            baseQuantities[line.Id] = decimal.Round(line.Quantity * factor, 6, MidpointRounding.AwayFromZero);
+        }
+
+        var itemQuantities = lines
+            .GroupBy(l => (po[l.PurchaseOrderLineId].ValuationAreaId, po[l.PurchaseOrderLineId].ItemId))
+            .ToDictionary(g => g.Key, g => g.Sum(l => baseQuantities[l.Id]));
         var differences = new List<PriceDifference>();
         var areaQuantities = new Dictionary<(Guid Area, Guid Item), decimal>();
         foreach (var line in lines.OrderBy(l => po[l.PurchaseOrderLineId].ValuationAreaId).ThenBy(l => po[l.PurchaseOrderLineId].ItemId))
@@ -214,9 +230,9 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
                 areaQuantities[(b.ValuationAreaId, b.ItemId)] = areaQuantity;
             }
 
-            var baseQuantity = decimal.Round(line.Quantity * await InvoicePostingStore.ReceiptFactorAsync(context, b.PoLineId, cancellationToken).ConfigureAwait(false), 6, MidpointRounding.AwayFromZero);
-            var covered = InvoicePostingStore.Money(d * Math.Min(areaQuantity, baseQuantity) / baseQuantity);
-            differences.Add(new PriceDifference(line.Id, b.PlantId, b.ValuationAreaId, b.ItemId, d, baseQuantity, covered, covered == 0 ? null : context.Ids.NewId()));
+            var itemQuantity = itemQuantities[(b.ValuationAreaId, b.ItemId)];
+            var covered = InvoicePostingStore.Money(d * Math.Min(areaQuantity, itemQuantity) / itemQuantity);
+            differences.Add(new PriceDifference(line.Id, b.PlantId, b.ValuationAreaId, b.ItemId, d, baseQuantities[line.Id], itemQuantity, covered, covered == 0 ? null : context.Ids.NewId()));
         }
 
         // POL-01 (Patch 1.1, E-PR17-4): a price difference is allocated by the INVENTORY policy's method, recorded per line.
@@ -244,7 +260,7 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
             {
                 var uncovered = pd.Difference - pd.Covered;
                 var up = pd.Difference > 0;
-                var inputs = AllocationInputs(allocationPolicy!, areaQuantities[(pd.ValuationAreaId, pd.ItemId)], pd.BaseQuantity, pd.Difference);
+                var inputs = AllocationInputs(allocationPolicy!, areaQuantities[(pd.ValuationAreaId, pd.ItemId)], pd.BaseQuantity, pd.ItemQuantity, pd.Difference);
                 if (pd.Covered != 0)
                 {
                     r05Lines.Add(new PostingLineInput(up ? "R05-DR-INV" : "R05-CR-INV", "covered_difference", Math.Abs(pd.Covered), PlantId: pd.PlantId, ItemId: pd.ItemId, SubledgerRef: pd.ValueEntryId, InvValueEntryId: pd.ValueEntryId, Inputs: inputs));
@@ -295,6 +311,7 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
                         itemId = pd.ItemId,
                         difference = InvoicePostingStore.Text(pd.Difference),
                         baseQuantity = InvoicePostingStore.Text(pd.BaseQuantity),
+                        itemQuantity = InvoicePostingStore.Text(pd.ItemQuantity),
                         covered = InvoicePostingStore.Text(pd.Covered),
                         valueEntryId = pd.ValueEntryId,
                     }),
@@ -448,8 +465,17 @@ public sealed class ReverseSupplierInvoiceHandler : ICommandHandler<ReverseSuppl
             var difference = decimal.Parse(pd.GetProperty("difference").GetString()!, CultureInfo.InvariantCulture);
             var baseQuantity = decimal.Parse(pd.GetProperty("baseQuantity").GetString()!, CultureInfo.InvariantCulture);
             var covered = decimal.Parse(pd.GetProperty("covered").GetString()!, CultureInfo.InvariantCulture);
+
+            // E-VS1-11: the Q the posting used (invoices posted before it recorded only the line's quantity).
+            var itemQuantity = pd.TryGetProperty("itemQuantity", out var q) ? decimal.Parse(q.GetString()!, CultureInfo.InvariantCulture) : baseQuantity;
             var areaQuantity = (await _inventory.LockValuationAsync(context, area, item, cancellationToken).ConfigureAwait(false)).Quantity;
-            var coveredNow = InvoicePostingStore.Money(difference * Math.Min(areaQuantity, baseQuantity) / baseQuantity);
+
+            // E-VS1-6 (#24): s′ = min(s, min(area quantity, Q) ÷ Q) — never move back more than R-05 capitalized.
+            var coveredNow = InvoicePostingStore.Money(difference * Math.Min(areaQuantity, itemQuantity) / itemQuantity);
+            if (Math.Abs(coveredNow) > Math.Abs(covered))
+            {
+                coveredNow = covered;
+            }
             if (pd.GetProperty("valueEntryId").ValueKind == JsonValueKind.String)
             {
                 reversals.Add((pd.GetProperty("valueEntryId").GetGuid(), context.Ids.NewId(), -covered, area, plant, item));
@@ -463,6 +489,7 @@ public sealed class ReverseSupplierInvoiceHandler : ICommandHandler<ReverseSuppl
                 {
                     ["difference"] = InvoicePostingStore.Text(difference),
                     ["base_quantity"] = baseQuantity.ToString(CultureInfo.InvariantCulture),
+                    ["invoice_item_quantity"] = itemQuantity.ToString(CultureInfo.InvariantCulture),
                     ["area_quantity"] = areaQuantity.ToString(CultureInfo.InvariantCulture),
                     ["coverage_original"] = InvoicePostingStore.Coverage(covered, difference),
                     ["coverage_now"] = InvoicePostingStore.Coverage(coveredNow, difference),

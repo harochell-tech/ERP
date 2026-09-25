@@ -103,6 +103,48 @@ public sealed class CommandPipeline
         var resultRef = _ids.NewId();
 
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        // E-VS1-7: locks some handlers need before their transaction (and its snapshot) exists; released when the command ends.
+        var held = new List<string>();
+        try
+        {
+            if (handler is IPreTransactionLocks<TCommand> locking)
+            {
+                foreach (var key in locking.ExclusiveLocksBeforeTransaction(command))
+                {
+                    await Sql.ExecuteAsync(connection, null, "SELECT pg_advisory_lock(hashtextextended(@key, 0))", cancellationToken, ("key", key)).ConfigureAwait(false);
+                    held.Add(key);
+                }
+            }
+
+            return await ExecuteInTransactionAsync(connection, command, handler, correlationId, commandId, resultRef, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            foreach (var key in held)
+            {
+                try
+                {
+                    await Sql.ExecuteAsync(connection, null, "SELECT pg_advisory_unlock(hashtextextended(@key, 0))", CancellationToken.None, ("key", key)).ConfigureAwait(false);
+                }
+                catch (DbException)
+                {
+                    // A broken connection is discarded by the pool and PostgreSQL releases its session locks.
+                }
+            }
+        }
+    }
+
+    private async Task<CommandResult> ExecuteInTransactionAsync<TCommand>(
+        DbConnection connection,
+        TCommand command,
+        ICommandHandler<TCommand> handler,
+        Guid correlationId,
+        Guid commandId,
+        Guid resultRef,
+        CancellationToken cancellationToken)
+        where TCommand : ICommand
+    {
         var isolation = handler.GetType().IsDefined(typeof(SerializableTransactionAttribute), inherit: false) ? IsolationLevel.Serializable : IsolationLevel.ReadCommitted;
         await using var transaction = await connection.BeginTransactionAsync(isolation, cancellationToken).ConfigureAwait(false);
 

@@ -64,3 +64,14 @@ public static class AuthorizationErrors
 public sealed class SerializableTransactionAttribute : Attribute
 {
 }
+
+/// <summary>
+/// E-VS1-7: exclusive advisory locks (by key text, hashed like the SQL <c>hashtextextended(key, 0)</c> the ledgers use) the
+/// pipeline takes on the command's connection BEFORE its transaction begins, so a SERIALIZABLE snapshot is taken only after
+/// every holder of those locks has committed. Released when the command ends, including on failure.
+/// </summary>
+public interface IPreTransactionLocks<in TCommand>
+    where TCommand : ICommand
+{
+    IReadOnlyList<string> ExclusiveLocksBeforeTransaction(TCommand command);
+}
