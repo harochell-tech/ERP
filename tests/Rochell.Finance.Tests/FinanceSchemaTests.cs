@@ -139,6 +139,7 @@ public sealed class FinanceSchemaTests(PostgresFixture postgres)
         }
     }
 
+    [Trait("Acceptance", "TMP-01")]
     [Fact]
     public async Task TMP01_active_mappings_and_rule_versions_cannot_overlap()
     {

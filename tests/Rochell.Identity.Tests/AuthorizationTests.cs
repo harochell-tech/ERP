@@ -108,6 +108,7 @@ public sealed class AuthorizationTests(PostgresFixture postgres)
         Assert.Equal(AuthorizationErrors.SessionExpired, ex.Code);
     }
 
+    [Trait("Acceptance", "SC-03")]
     [Fact]
     public async Task Step_up_is_required_after_five_minutes_and_restored_by_re_authentication()
     {

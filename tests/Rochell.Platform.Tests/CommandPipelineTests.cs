@@ -10,6 +10,7 @@ namespace Rochell.Platform.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class CommandPipelineTests(PostgresFixture postgres)
 {
+    [Trait("Acceptance", "ID-01")]
     [Fact]
     public async Task ID01_duplicate_returns_original_result_and_writes_nothing()
     {
@@ -32,6 +33,8 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
         Assert.Equal([RequestOutcome.DuplicateReturned, RequestOutcome.Succeeded], (await h.OutcomesAsync()).Order(StringComparer.Ordinal));
     }
 
+    [Trait("Acceptance", "CMD-03")]
+    [Trait("Acceptance", "ID-02")]
     [Fact]
     public async Task ID02_CMD03_concurrent_same_key_executes_once_and_second_waits()
     {
@@ -51,6 +54,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
         Assert.Equal(1L, await h.CountAsync("core.command_log"));
     }
 
+    [Trait("Acceptance", "ID-03")]
     [Fact]
     public async Task ID03_domain_rejection_leaves_no_command_log_and_allows_retry()
     {
@@ -70,6 +74,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
         Assert.Equal((1L, 2L, 1L), await h.CountsAsync());
     }
 
+    [Trait("Acceptance", "ID-04")]
     [Fact]
     public async Task ID04_technical_failure_rolls_back_everything()
     {
@@ -82,6 +87,7 @@ public sealed class CommandPipelineTests(PostgresFixture postgres)
         Assert.Equal([RequestOutcome.FailedTechnical], await h.OutcomesAsync());
     }
 
+    [Trait("Acceptance", "ID-05")]
     [Fact]
     public async Task ID05_request_log_failure_never_affects_the_command()
     {

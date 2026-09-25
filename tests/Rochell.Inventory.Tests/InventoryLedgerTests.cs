@@ -34,6 +34,8 @@ public sealed class InventoryLedgerTests(PostgresFixture postgres)
             """,
             ("i", item));
 
+    [Trait("Acceptance", "AT-01")]
+    [Trait("Acceptance", "AT-02")]
     [Fact]
     public async Task AT01_AT02_receipts_keep_ledgers_balances_and_GL_in_agreement()
     {
@@ -56,6 +58,7 @@ public sealed class InventoryLedgerTests(PostgresFixture postgres)
             "SELECT count(*) FROM inv.inv_value_entry v WHERE NOT EXISTS (SELECT 1 FROM fin.gl_entry g WHERE g.inv_value_entry_id = v.value_entry_id AND g.debit - g.credit = v.amount)"));
     }
 
+    [Trait("Acceptance", "IV-02")]
     [Fact]
     public async Task Moving_average_issue_and_the_last_unit_takes_the_remaining_value()
     {

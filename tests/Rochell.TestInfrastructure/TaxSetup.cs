@@ -55,14 +55,15 @@ public static class TaxSetup
         return new FiscalActors(await h.SessionWithRolesAsync("ANALISTA_FISCAL"), await h.SessionWithRolesAsync("ESPECIALISTA_FISCAL"));
     }
 
-    public static async Task<Guid> RegisterTestSourceAsync(this TestHarness h, FiscalActors actors, string key, DateOnly? effectiveFrom = null)
+    /// <summary>Registers a source marked TEST (P-7), or PRODUCTION when <paramref name="environment"/> says so.</summary>
+    public static async Task<Guid> RegisterTestSourceAsync(this TestHarness h, FiscalActors actors, string key, DateOnly? effectiveFrom = null, string environment = FiscalSourceEnvironments.Test)
     {
         ArgumentNullException.ThrowIfNull(h);
         ArgumentNullException.ThrowIfNull(actors);
         var result = await h.RunAsync(
             new RegisterFiscalSource(
                 h.CompanyId, actors.Analyst, key, "TEST — fuente de prueba", "Norma de prueba", "v1", new DateOnly(2025, 12, 1), h.Clock.UtcNow.AddDays(-1),
-                effectiveFrom ?? new DateOnly(2025, 12, 1), null, "https://example.test/norma", "test/norma-v1.pdf", new string('a', 64)),
+                effectiveFrom ?? new DateOnly(2025, 12, 1), null, "https://example.test/norma", "test/norma-v1.pdf", new string('a', 64), environment),
             new RegisterFiscalSourceHandler());
         return result.ResultRef;
     }

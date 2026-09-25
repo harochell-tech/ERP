@@ -8797,7 +8797,8 @@
           "effectiveTo",
           "urlOrReference",
           "fileReference",
-          "fileSha256"
+          "fileSha256",
+          "environment"
         ],
         "type": "object",
         "properties": {
@@ -8836,6 +8837,9 @@
             "type": "string"
           },
           "fileSha256": {
+            "type": "string"
+          },
+          "environment": {
             "type": "string"
           }
         },

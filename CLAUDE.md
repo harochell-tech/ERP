@@ -32,8 +32,8 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-16 | Merged: reconciliations, CloseComponent, reopen with second approver |
 | PR-17 | Merged: Explain this entry, read-only query pipeline, POL-01 inputs on R-05/R-07B |
 | PR-18a | Merged (#19): API (OIDC, 44 command endpoints, read queries, OpenAPI, hosted sealer/digest), AT-01/AT-02 over HTTP |
-| PR-18b | `web/` (Next.js static export served by the API, Spanish UI, typed from `openapi.json`), dev stack, Playwright journey. E-PR18b-1…11 approved |
-| PR-19 | Concurrency and load suite: CC-04, PF-01, full regression → slice acceptance |
+| PR-18b | Merged (#20): `web/` (Next.js static export served by the API), dev stack, Playwright journey |
+| PR-19 | CC-04, PF-01 (`tests/Rochell.LoadHarness`, workflow `load`), traceability of all 70 acceptance tests, P-7 conformance (migration 0021). E-PR19-1…15 approved. Acceptance: `docs/acceptance/vs1.md` (pending B-02) |
 
 Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** staging PostgreSQL 17 + WORM storage;
 **A-01** Controller approves policy values and account maps; **A-02** official DGII sources for ITBIS / withholding;
@@ -114,4 +114,7 @@ API: `docs/engineering/api.md`. Web: `docs/engineering/web.md`.
   created when the form opens; `STEP_UP_REQUIRED` → `/api/v1/auth/step-up`, the user presses again with the same key.
 - Local stack: `dotnet run --project tests/Rochell.DevStack -c Release -- --web-root web/out` (Docker; Chrome/Firefox).
 - The API host keeps `RochellEnvironments.EnsureSupported` (Development / Test / Staging in VS#1).
-- Next: PR-19 (CC-04, PF-01, full regression → slice acceptance).
+- Every acceptance test carries `[Trait("Acceptance", "<ID>")]`; `AcceptanceTraceabilityTests` fails if a baseline ID has no test
+  or is missing from `docs/acceptance/vs1.md`.
+- A second unique index on a table written by `INSERT … ON CONFLICT (pk) DO UPDATE` breaks concurrent upserts (23505): PF-01
+  caught it (E-PR19-14).

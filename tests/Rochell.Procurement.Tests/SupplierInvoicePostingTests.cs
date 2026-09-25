@@ -53,6 +53,7 @@ public sealed class SupplierInvoicePostingTests(PostgresFixture postgres)
                    coalesce((SELECT original_amount || '/' || open_amount FROM fin.ap_document), '-')
             """);
 
+    [Trait("Acceptance", "AT-02")]
     [Fact]
     public async Task AT02_invoice_at_the_PO_price_clears_GRNI_and_creates_the_payable()
     {
@@ -72,6 +73,7 @@ public sealed class SupplierInvoicePostingTests(PostgresFixture postgres)
         Assert.Equal("AP", await h.ScalarAsync<string>("SELECT subledger_type FROM fin.gl_entry WHERE account_role = 'AP_CONTROL'"));
     }
 
+    [Trait("Acceptance", "AT-03")]
     [Fact]
     public async Task AT03_price_difference_fully_covered_by_stock_goes_to_inventory()
     {
@@ -87,6 +89,7 @@ public sealed class SupplierInvoicePostingTests(PostgresFixture postgres)
         Assert.Equal("PRICE_ADJUSTMENT:600.0000", await h.ScalarAsync<string>("SELECT movement_type::text || ':' || amount FROM inv.inv_value_entry WHERE movement_type::text = 'PRICE_ADJUSTMENT'"));
     }
 
+    [Trait("Acceptance", "AT-03")]
     [Fact]
     public async Task AT03_only_the_share_still_in_stock_goes_to_inventory_the_rest_to_PPV()
     {
@@ -117,6 +120,7 @@ public sealed class SupplierInvoicePostingTests(PostgresFixture postgres)
         Assert.Equal("0.0000|-10134.0000|1620.0000|-486.0000|9000.0000|0|6.000000/9000.0000|6.000000|10134.0000/10134.0000", await Books(h));
     }
 
+    [Trait("Acceptance", "SI-08")]
     [Fact]
     public async Task SI08_non_recoverable_ITBIS_blocks_posting_and_the_invoice_can_then_be_voided()
     {
@@ -136,6 +140,7 @@ public sealed class SupplierInvoicePostingTests(PostgresFixture postgres)
         Assert.Equal("VOIDED|NOT_POSTED", await h.ScalarAsync<string>("SELECT document_status::text || '|' || accounting_status::text FROM pur.supplier_invoice"));
     }
 
+    [Trait("Acceptance", "SI-07")]
     [Fact]
     public async Task SI07_a_withholding_rule_pending_its_source_closes_the_gate_and_nothing_is_written()
     {
@@ -213,6 +218,7 @@ public sealed class SupplierInvoicePostingTests(PostgresFixture postgres)
         Assert.Equal(0L, await h.CountAsync("fin.ap_document"));
     }
 
+    [Trait("Acceptance", "CC-03")]
     [Fact]
     public async Task CC03_posting_and_a_negative_receipt_correction_never_leave_more_invoiced_than_received()
     {

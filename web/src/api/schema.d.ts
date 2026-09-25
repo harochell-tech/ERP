@@ -1628,6 +1628,7 @@ export interface components {
             urlOrReference: string;
             fileReference: string;
             fileSha256: string;
+            environment: string;
         };
         RegisterSupplierInvoice: {
             /** Format: uuid */

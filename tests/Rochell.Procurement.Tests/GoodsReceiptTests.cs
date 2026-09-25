@@ -49,6 +49,7 @@ public sealed class GoodsReceiptTests(PostgresFixture postgres)
             """,
             ("p", po));
 
+    [Trait("Acceptance", "AT-01")]
     [Fact]
     public async Task AT01_receipt_moves_order_inventory_and_ledger_together()
     {
@@ -119,6 +120,7 @@ public sealed class GoodsReceiptTests(PostgresFixture postgres)
 
     public static TheoryData<string> MissingPrerequisites() => new() { "rule", "mapping" };
 
+    [Trait("Acceptance", "AT-05")]
     [Theory]
     [MemberData(nameof(MissingPrerequisites))]
     public async Task AT05_missing_posting_prerequisite_writes_nothing(string missing)
@@ -178,6 +180,7 @@ public sealed class GoodsReceiptTests(PostgresFixture postgres)
         Assert.Equal(1L, await h.CountAsync("pur.goods_receipt"));
     }
 
+    [Trait("Acceptance", "PD-01")]
     [Fact]
     public async Task PD01_receipt_of_a_closed_month_is_posted_late_in_the_next_open_period()
     {
@@ -199,6 +202,7 @@ public sealed class GoodsReceiptTests(PostgresFixture postgres)
             "SELECT posting_date::text || '|' || business_date::text FROM inv.inv_value_entry"));
     }
 
+    [Trait("Acceptance", "CC-01")]
     [Fact]
     public async Task CC01_concurrent_receipts_never_exceed_the_tolerance()
     {

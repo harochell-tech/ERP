@@ -17,6 +17,8 @@ public sealed class AcceptanceTests(PostgresFixture postgres)
 
     private static string Role(string role) => $"(SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE account_role = '{role}')";
 
+    [Trait("Acceptance", "INT-01")]
+    [Trait("Acceptance", "AT-01")]
     [Fact]
     public async Task AT01_two_receipts_of_20_t_against_an_approved_order_of_40_t_at_1000()
     {
@@ -60,6 +62,7 @@ public sealed class AcceptanceTests(PostgresFixture postgres)
         Assert.Equal(0L, await h.ScalarAsync<long>("SELECT count(*) FROM audit.integrity_state WHERE integrity_status <> 'PENDING_SEAL'"));
     }
 
+    [Trait("Acceptance", "AT-02")]
     [Fact]
     public async Task AT02_invoice_of_40_t_at_1000_with_ITBIS_and_withholding_clears_GRNI_and_AP_GL_matches()
     {

@@ -2,7 +2,11 @@ using Rochell.Platform.Commands;
 
 namespace Rochell.Tax;
 
-/// <summary>E-PR12-2: an official source, referenced by text and by the SHA-256 (64 hex characters) of the document consulted.</summary>
+/// <summary>
+/// E-PR12-2: an official source, referenced by text and by the SHA-256 (64 hex characters) of the document consulted.
+/// <paramref name="Environment"/> (P-7, E-PR19-9) states whether it is a TEST source or a PRODUCTION (official) one; in production
+/// a version is activated only with at least one PRODUCTION source.
+/// </summary>
 public sealed record RegisterFiscalSource(
     Guid CompanyId,
     Guid SessionId,
@@ -16,7 +20,15 @@ public sealed record RegisterFiscalSource(
     DateOnly? EffectiveTo,
     string UrlOrReference,
     string FileReference,
-    string FileSha256) : ICommand;
+    string FileSha256,
+    string Environment) : ICommand;
+
+/// <summary>P-7: what a fiscal source is for.</summary>
+public static class FiscalSourceEnvironments
+{
+    public const string Test = "TEST";
+    public const string Production = "PRODUCTION";
+}
 
 /// <summary>Configures a new version of a rule (creating the rule on its first version). It starts BLOCKED_PENDING_SOURCE.</summary>
 public sealed record ConfigureFiscalRuleVersion(

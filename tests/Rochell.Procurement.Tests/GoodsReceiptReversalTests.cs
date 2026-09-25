@@ -48,6 +48,7 @@ public sealed class GoodsReceiptReversalTests(PostgresFixture postgres)
                    (SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE account_role = 'PURCHASE_PRICE_VARIANCE')
             """);
 
+    [Trait("Acceptance", "RC-01")]
     [Fact]
     public async Task RC01_clean_reversal_restores_everything_and_keeps_the_original_journal()
     {
@@ -91,6 +92,7 @@ public sealed class GoodsReceiptReversalTests(PostgresFixture postgres)
         Assert.Equal("4.000000|6000.0000|6000.0000|0", await Area(h));
     }
 
+    [Trait("Acceptance", "RC-02")]
     [Fact]
     public async Task RC02_a_lot_that_moved_after_the_receipt_requires_a_correction()
     {

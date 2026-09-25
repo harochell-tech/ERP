@@ -10,6 +10,7 @@ namespace Rochell.Platform.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class OutboxDispatcherTests(PostgresFixture postgres)
 {
+    [Trait("Acceptance", "ID-07")]
     [Fact]
     public async Task ID07_redelivered_event_is_applied_once()
     {

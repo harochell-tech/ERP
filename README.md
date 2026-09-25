@@ -27,6 +27,7 @@ Contradictions or ambiguities are reported as a proposed erratum; they are never
 | `tests/Rochell.Identity.Tests` | Identity tests (sessions, authorization, step-up, role changes, SoD, RLS) |
 | `tests/Rochell.Api.Tests` | End-to-end API tests (AT-01/AT-02 over HTTP) |
 | `tests/Rochell.SimulatedIdp`, `tests/Rochell.DevStack` | Simulated Google sign-in and the local development stack (test/dev only) |
+| `tests/Rochell.LoadHarness` | PF-01 load harness (workflow `load`) |
 | `tests/Rochell.ArchitectureTests` | Guardrails: no floating point, module boundaries, repository conventions |
 
 ## Environments
@@ -41,4 +42,4 @@ dotnet build Rochell.slnx -c Release && (cd web && npm ci && npm run build)
 dotnet run --project tests/Rochell.DevStack -c Release -- --web-root web/out    # http://localhost:5080 (Chrome/Firefox)
 ```
 
-See `docs/engineering/web.md` for `next dev`. See `docs/engineering/` (migrations, platform, identity, api, web, ci) and `docs/architecture/errata.md`.
+See `docs/engineering/web.md` for `next dev`. Slice acceptance: `docs/acceptance/vs1.md`. See `docs/engineering/` (migrations, platform, identity, api, web, ci) and `docs/architecture/errata.md`.

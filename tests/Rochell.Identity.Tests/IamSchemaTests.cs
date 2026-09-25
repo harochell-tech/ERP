@@ -60,6 +60,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             """));
     }
 
+    [Trait("Acceptance", "RO-02")]
     [Theory]
     [InlineData("ALMACENISTA", "CUENTAS_POR_PAGAR")]      // SC-02: goods_receipt:post / supplier_invoice:post
     [InlineData("ALMACENISTA", "APROBADOR_COMPRAS")]      // goods_receipt:post / purchase_order:approve_over_receipt
@@ -108,6 +109,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         Assert.Equal(2L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.role_assignment WHERE user_id = @u", ("u", user)));
     }
 
+    [Trait("Acceptance", "SC-04")]
     [Theory]
     [InlineData("INSERT INTO iam.user (user_id, kind, employee_id, email, oidc_subject, status) VALUES (gen_random_uuid(), 'HUMAN', NULL, 'x@rochell.com.do', 'sub-x', 'ACTIVE')")]
     [InlineData("INSERT INTO iam.user (user_id, kind, employee_id, email, oidc_subject, status) VALUES (gen_random_uuid(), 'HUMAN', gen_random_uuid(), 'x@rochell.com.do', NULL, 'ACTIVE')")]
@@ -158,6 +160,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         Assert.Equal(InsufficientPrivilege, (await h.AppExecuteAsync(sql))?.SqlState);
     }
 
+    [Trait("Acceptance", "TEN-02")]
     [Fact]
     public async Task Row_level_security_isolates_companies_for_the_application_role()
     {

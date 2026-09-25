@@ -10,6 +10,7 @@ namespace Rochell.Platform.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class CommandLogGuardTests(PostgresFixture postgres)
 {
+    [Trait("Acceptance", "CMD-01")]
     [Fact]
     public async Task CMD01_result_cannot_be_updated_after_commit()
     {
@@ -23,6 +24,7 @@ public sealed class CommandLogGuardTests(PostgresFixture postgres)
         Assert.Contains("immutable once written", ex!.MessageText, StringComparison.Ordinal);
     }
 
+    [Trait("Acceptance", "CMD-01")]
     [Fact]
     public async Task CMD01_only_result_columns_may_be_written_even_inside_the_inserting_transaction()
     {
@@ -45,6 +47,7 @@ public sealed class CommandLogGuardTests(PostgresFixture postgres)
         }
     }
 
+    [Trait("Acceptance", "CMD-02")]
     [Fact]
     public async Task CMD02_commit_without_result_is_rejected()
     {

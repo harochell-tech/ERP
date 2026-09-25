@@ -10,6 +10,7 @@ public sealed class MasterDataSchemaTests(PostgresFixture postgres)
 {
     private const string InsufficientPrivilege = "42501";
 
+    [Trait("Acceptance", "TEN-01")]
     [Fact]
     public async Task TEN01_masters_cannot_reference_rows_of_another_company()
     {

@@ -77,6 +77,7 @@ public sealed class HashChainTests(PostgresFixture postgres) : IDisposable
         Assert.True(report.GetProperty("valid").GetBoolean(), report.GetRawText());
     }
 
+    [Trait("Acceptance", "HS-01")]
     [Fact]
     public async Task HS01_two_hundred_concurrent_postings_seal_into_a_valid_chain()
     {
@@ -115,6 +116,7 @@ public sealed class HashChainTests(PostgresFixture postgres) : IDisposable
         Assert.True((await VerifyAsync(h, "verify")).GetProperty("valid").GetBoolean());
     }
 
+    [Trait("Acceptance", "HS-01")]
     [Fact]
     public async Task HS01_a_command_commits_while_a_sealing_transaction_is_open()
     {
@@ -132,6 +134,7 @@ public sealed class HashChainTests(PostgresFixture postgres) : IDisposable
         Assert.Equal(2L, await h.ScalarAsync<long>("SELECT count(*) FROM audit.ledger_seal WHERE ledger = 'GL'"));
     }
 
+    [Trait("Acceptance", "HS-02")]
     [Fact]
     public async Task HS02_an_amount_altered_by_a_superuser_is_reported_at_its_sequence()
     {

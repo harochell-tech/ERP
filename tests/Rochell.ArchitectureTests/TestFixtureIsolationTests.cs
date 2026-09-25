@@ -5,6 +5,7 @@ namespace Rochell.ArchitectureTests;
 /// <summary>TST-01 / E-PR07-5: test fixtures (R-T1 stock issue, TEST.* rules, test permissions) never reach production migrations.</summary>
 public sealed class TestFixtureIsolationTests
 {
+    [Trait("Acceptance", "TST-01")]
     [Theory]
     [InlineData("TEST.")]
     [InlineData("TestStock")]

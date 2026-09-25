@@ -82,6 +82,8 @@ public sealed class SupplierInvoiceTests(PostgresFixture postgres)
         Assert.True(await h.ScalarAsync<bool>("SELECT exception_approved_by IS NOT NULL AND exception_approved_by <> created_by FROM pur.supplier_invoice"));
     }
 
+    [Trait("Acceptance", "SI-02")]
+    [Trait("Acceptance", "SI-03")]
     [Fact]
     public async Task SI02_SI03_billing_more_than_received_is_not_approvable_until_the_receipt_is_corrected()
     {
@@ -105,6 +107,8 @@ public sealed class SupplierInvoiceTests(PostgresFixture postgres)
         Assert.Equal("MATCHED|NOT_POSTED|3", await State(h, si));
     }
 
+    [Trait("Acceptance", "SI-04")]
+    [Trait("Acceptance", "SI-05")]
     [Fact]
     public async Task SI04_SI05_a_voided_invoice_frees_its_fiscal_number_and_an_active_one_does_not()
     {
@@ -139,6 +143,7 @@ public sealed class SupplierInvoiceTests(PostgresFixture postgres)
         { "line:unknown", ProcurementErrors.LineNotFound },
     };
 
+    [Trait("Acceptance", "SI-01")]
     [Theory]
     [MemberData(nameof(InvalidRegistrations))]
     public async Task SI01_and_other_invalid_registrations_are_rejected(string variant, string expectedCode)

@@ -30,6 +30,7 @@ public sealed class ReceiptCorrectionSchemaTests(PostgresFixture postgres)
         return (h, rc.ResultRef);
     }
 
+    [Trait("Acceptance", "RC-06")]
     [Fact]
     public async Task RC06_the_creator_can_never_be_the_approver()
     {

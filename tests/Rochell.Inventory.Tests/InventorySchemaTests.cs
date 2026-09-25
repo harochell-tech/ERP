@@ -72,6 +72,7 @@ public sealed class InventorySchemaTests(PostgresFixture postgres)
               VALUES (gen_random_uuid(), '{{journal}}', {{lineNo}}, '{{h.CompanyId}}', (SELECT posting_date FROM fin.gl_journal WHERE journal_id = '{{journal}}'), '{{s.RawMaterialAccount}}', 'RAW_MATERIAL', {{Inv(debit)}}, {{Inv(credit)}}, '{{s.PlantId}}', '{{s.ItemId}}', 'INV', '{{valueEntry}}', '{{valueEntry}}', '{{eventId}}', 'x', '{}', sha256('e'));
               """;
 
+    [Trait("Acceptance", "VAL-02")]
     [Fact]
     public async Task P1_value_entry_without_its_GL_line_fails_at_commit()
     {
@@ -80,7 +81,9 @@ public sealed class InventorySchemaTests(PostgresFixture postgres)
         {
             var ex = await OwnerTransactionAsync(h, ValueAndBalances(h, s, eventId, Guid.CreateVersion7(), 5m));
 
-            Assert.NotNull(ex);
+            // The deferred P-1 trigger raises at COMMIT and nothing of the transaction remains.
+            Assert.Equal(SqlStates.RaiseException, ex?.SqlState);
+            Assert.Contains("needs exactly one GL line", ex?.MessageText, StringComparison.Ordinal);
             Assert.Equal(1L, await h.CountAsync("inv.inv_value_entry"));
         }
     }
