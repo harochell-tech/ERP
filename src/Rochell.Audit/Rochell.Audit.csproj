@@ -8,4 +8,7 @@
     <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
     <ProjectReference Include="..\Rochell.Inventory\Rochell.Inventory.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" />
+  </ItemGroup>
 </Project>

@@ -83,4 +83,27 @@ public sealed class AuditSettings
 
     /// <summary>SubjectPublicKeyInfo PEM of the digest signing key, used by VerifyHashChain.</summary>
     public string? DigestPublicKeyPem { get; set; }
+
+    /// <summary>S3 Object Lock WORM store (B-03, E-B03-3/4); any environment. Exclusive with <see cref="FileSystemWormRoot"/>.</summary>
+    public S3WormSettings S3 { get; set; } = new();
+}
+
+/// <summary>
+/// Bucket created with Object Lock enabled. Credentials: <see cref="AccessKeyId"/> / <see cref="SecretAccessKey"/> when both are
+/// set, otherwise the AWS default chain (AWS_ACCESS_KEY_ID, …). <see cref="ServiceUrl"/> only for S3-compatible endpoints.
+/// </summary>
+public sealed class S3WormSettings
+{
+    public string? Bucket { get; set; }
+
+    public string? Region { get; set; }
+
+    public string? ServiceUrl { get; set; }
+
+    /// <summary>COMPLIANCE retention of each digest, in days (staging: 7, E-B03-3).</summary>
+    public int RetentionDays { get; set; }
+
+    public string? AccessKeyId { get; set; }
+
+    public string? SecretAccessKey { get; set; }
 }

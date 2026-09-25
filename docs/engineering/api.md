@@ -81,8 +81,12 @@ grants them to the roles that work each document plus the Controller and the Aud
 | Daily digest | `Rochell:Digest:Enabled`, `RunAt` (00:15 local), `SigningKeyPem` | Digests the previous day (also on start, if due). **Does not start** without WORM storage or the signing key; logs Critical and sealing continues |
 | request_log | always | Flushes `obs.request_log` every second and at shutdown |
 
-WORM: only `FileSystemWormStore` (`Rochell:Audit:FileSystemWormRoot`), accepted only when `core.deployment_environment` is
-TEST. Outside TEST there is no store until S3 Object Lock (B-03): the digest stays off and `audit/verify-hash-chain` answers 503.
+WORM (exactly one of the two; both, or an unusable one, logs Critical and leaves the digest off and `audit/verify-hash-chain`
+answering 503):
+- `Rochell:Audit:S3` — S3 Object Lock, COMPLIANCE mode (B-03, E-B03-3/4), any environment: `Bucket` (created with Object Lock),
+  `Region`, `RetentionDays` (staging 7), optional `ServiceUrl` (S3-compatible endpoints) and `AccessKeyId` / `SecretAccessKey`
+  (otherwise the AWS default chain). The host checks the bucket's Object Lock configuration before using it.
+- `Rochell:Audit:FileSystemWormRoot` — `FileSystemWormStore`, accepted only when `core.deployment_environment` is TEST.
 The outbox dispatcher is not hosted: VS#1 has no event consumers.
 
 ## Configuration

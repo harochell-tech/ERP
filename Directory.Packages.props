@@ -12,6 +12,8 @@
     <!-- API host (PR-18a): Google Workspace OIDC (E-PR18-2) and the OpenAPI document (E-PR18-7). -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <!-- WORM digests in S3 Object Lock, compliance mode (B-03, E-B03-3/4). -->
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.103.4" />
     <!-- Analyzers -->
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" />
     <!-- Tests -->

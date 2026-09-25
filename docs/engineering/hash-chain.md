@@ -23,7 +23,11 @@ The first invalid `ledger_sequence` per chain (an altered row breaks its group a
 ## Operations
 
 - Keys: the signing key lives only with the sealing service (secret store); verifiers need the public key.
-- WORM: `FileSystemWormStore` only in TEST environments. Production needs S3 Object Lock in compliance mode at a second
-  provider (**B-03**). The e-mail copy of each digest is deferred until mail infrastructure exists.
+- WORM: `FileSystemWormStore` only in TEST environments. Staging and production use `S3WormStore`: S3 Object Lock in
+  COMPLIANCE mode at a second provider (**B-03**, E-B03-3/4). Each digest is written once (`If-None-Match: *`) with a retention
+  nobody can shorten; reads take the key's oldest version and require COMPLIANCE retention, so a later version or delete marker
+  never replaces the anchor. The sealer's IAM user needs `s3:PutObject`, `s3:PutObjectRetention`, `s3:GetObject`,
+  `s3:GetObjectVersion`, `s3:GetObjectRetention`, `s3:ListBucketVersions` and `s3:GetBucketObjectLockConfiguration` — no delete.
+  Tests use RustFS (`S3WormFixture`). The e-mail copy of each digest is deferred until mail infrastructure exists.
 - Hosting (PR-18a, E-PR18-5): the sealer and the 00:15 digest run as background services of the API host, switched by
   configuration; the digest does not start without WORM storage (see [api.md](api.md#background-services-e-pr18-5)).
