@@ -95,10 +95,13 @@ Ranked by risk:
    path escapes the triggers; `SECURITY DEFINER` functions set `search_path` and cannot be called by the application
    (`REVOKE … FROM PUBLIC`); the application cannot write the control columns (column-level INSERT/UPDATE grants); the check is
    equivalent to the full sums the reconciliations compute (INV-QTY-BALANCE, INV-VALUE-BALANCE, INV-VALUE-GL).
-2. **Lock order.** The delta triggers lock the valuation row when the RAW_MATERIAL GL line is inserted, earlier in the
-   transaction than before. In CC-04 (50 workers, 60 s, about 8,700 successful commands) PostgreSQL detected **13 deadlocks**,
-   all resolved by the pipeline's retry (the test prints the count). Decide whether a documented lock order (e.g. valuation row
-   before stock rows) should be imposed in `InventoryLedger` / `PostingEngine` to remove them.
+2. **Lock order.** Before this review, CC-04 (50 workers, 60 s) showed 10–13 deadlocks per run, all resolved by the pipeline's
+   retry. The PostgreSQL log traced every one to `InventoryLedger.LockStockOfItemAsync` (negative receipt corrections): it
+   locked stock rows *in consumption order*, preferred lot first, so two corrections preferring different lots locked the same
+   rows in opposite orders. It now locks in one canonical order (lot, location) and moves the preferred lot first afterwards,
+   with the same consumption order as E-PR11-3; CC-04 then shows 0 deadlocks and about 25 % more completed commands. Check
+   that every other multi-row `FOR UPDATE` (`LockPoLinesAsync`, `LockReceiptLinesAsync`, `LockStockAsync` callers) also locks in
+   a canonical order; the test prints the deadlock count on every run.
 3. **Price-difference allocation (R-05, R-07B, STOCK_COVERAGE, POL-01).** `SupplierInvoicePosting.cs`: the share `s` still in
    stock, the covered part to RAW_MATERIAL and the rest to PPV, and the reversal's journal B with `s′`. Worked figures: AT-03,
    SI-06 (s = 0.25, D = 2,000 → B = Dr RAW 500 / Cr PPV 500), SI-06b.
