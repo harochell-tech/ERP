@@ -114,6 +114,14 @@ Ranked by risk:
 8. **Grants and RLS.** A quick independent pass: connect as `rochell_app` and try to write ledgers, balances, command_log,
    integrity data (schema tests do this per module).
 
+### Fixes from the interim review (E-VS1-6…11, PR #31) — review them too
+
+An automated adversarial review (E-VS1-3) found five defects before this review; their fixes are new ledger code:
+R-07B caps s′ at s and STOCK_COVERAGE uses the invoice's total quantity of the item (`SupplierInvoicePosting.cs`);
+`CloseComponent` takes its period lock before its transaction begins (`IPreTransactionLocks` in `CommandPipeline.cs`);
+migration `0022__interim_review_guards.sql` guards component transitions, rejects journals into a CLOSED component and checks
+balance rows at COMMIT. Regression tests: `InterimReviewCloseTests`, `InterimReviewInvoiceTests`; issues #24–#29.
+
 ## 6. Approved deviations to be aware of
 
 Read `docs/architecture/errata.md` in full; these are the ones that change ledger behaviour or guarantees:
@@ -129,6 +137,7 @@ Read `docs/architecture/errata.md` in full; these are the ones that change ledge
 | E-PR19-12, E-PR19-5, E-PR19-6 | No ownership, availability or lot-issue-policy dimensions in VS#1 |
 | E-PR19-14 | `UNIQUE (company_id, pk)` not on upserted tables (it breaks concurrent `ON CONFLICT`) |
 | E-PR19-15 | `committed_at` from the platform clock |
+| E-VS1-6 … E-VS1-11 | Fixes of the interim review (section 5, last subsection) |
 
 ## 7. How to report
 
