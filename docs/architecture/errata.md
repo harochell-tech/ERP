@@ -153,6 +153,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS1-3 | VS#1 | Interim independent verification (not a substitute for B-02): an adversarial automated review of the ledger code in a separate session without the author's context, guided by invariants L1–L15, with findings filed as GitHub issues; plus property tests that run random command sequences and check the invariants after every step. |
 | E-VS1-4 | VS#1 | Compensating control for real use before B-02: a parallel run of the same period in Rochell Core and the current accounting system, reconciling inventory, accounts payable and GRNI at period end; zero difference is required to rely on Rochell's figures. |
 | E-VS1-5 | VS#1 | Overrides §17's "no other module before the slice closure": the next module may start in parallel; fixes from the B-02 review take priority over new work. |
+| E-VS1-6 | VS#1 (#24) | Invoice reversal (R-07B): s′ = min(s, min(area qty, Q)/Q) — a reversal never moves back more price difference than R-05 capitalized ("lo que sigue en stock"). |
+| E-VS1-7 | VS#1 (#25) | CloseComponent takes the exclusive period × component lock **before** its transaction (and snapshot) begins; the transaction stays SERIALIZABLE (T-13); the lock is released when the command ends. |
+| E-VS1-8 | VS#1 (#26) | The database guards component transitions: CLOSED → REOPENED only with a reopen request approved in the same transaction; → CLOSED only with the close snapshot of the same hash written in the same transaction. |
+| E-VS1-9 | VS#1 (#27) | The database rejects any journal whose period × close component (from its rule version) is CLOSED. |
+| E-VS1-10 | VS#1 (#28) | Deferred checks also on INSERT/UPDATE of the balance tables: a valuation row must equal its control totals and a stock row must equal the sum of its lot's quantity entries at COMMIT. |
+| E-VS1-11 | VS#1 (#29) | STOCK_COVERAGE within one invoice: s (and s′) is computed per item over the invoice's total quantity of that item, so one invoice never capitalizes more price difference than the stock covers; across separate invoices the per-invoice formula stays (documented approximation). |
 
 Implementation rules derived from the above (no architectural change):
 

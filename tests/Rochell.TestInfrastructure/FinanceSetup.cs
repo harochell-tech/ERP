@@ -104,7 +104,8 @@ public static class FinanceSetup
 
     /// <summary>
     /// Sets the status of a close component for the month containing <paramref name="date"/> without running CloseComponent.
-    /// A CLOSED state carries a fixture closer and snapshot hash, as the state guard requires (PR-16).
+    /// A CLOSED state carries a fixture closer and snapshot hash, as the state guard requires (PR-16). A fixture state has no
+    /// snapshot, reopen request or history, so it is written with triggers off (the E-VS1-8 evidence check would refuse it).
     /// </summary>
     public static Task SetComponentAsync(this TestHarness h, DateOnly date, string component, string status)
     {
@@ -112,9 +113,12 @@ public static class FinanceSetup
         var closing = status == "CLOSED" ? $", closed_by = '{h.UserId}', closed_at = now(), snapshot_hash = sha256('fixture')" : string.Empty;
         return h.AdminRequireAsync(
             $"""
+            BEGIN;
+            SET LOCAL session_replication_role = replica;
             UPDATE fin.close_component_state s SET status = '{status}', version = version + 1{closing}
             FROM fin.period p WHERE p.period_id = s.period_id AND p.company_id = '{h.CompanyId}'
-              AND DATE '{date:yyyy-MM-dd}' BETWEEN p.starts_on AND p.ends_on AND s.component = '{component}'
+              AND DATE '{date:yyyy-MM-dd}' BETWEEN p.starts_on AND p.ends_on AND s.component = '{component}';
+            COMMIT;
             """);
     }
 

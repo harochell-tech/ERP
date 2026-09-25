@@ -153,8 +153,9 @@ public sealed class CloseTests(PostgresFixture postgres)
         await using (var closeCommand = closing.CreateCommand())
         {
             closeCommand.Transaction = tx;
+            // A simulated close (no snapshot): triggers off for this fixture statement (the E-VS1-8 evidence check would refuse it).
             closeCommand.CommandText =
-                $"UPDATE fin.close_component_state SET status = 'CLOSED', version = version + 1, closed_by = '{h.UserId}', closed_at = now(), snapshot_hash = sha256('fixture') WHERE period_id = '{period}' AND component = 'INV-MOV'";
+                $"SET LOCAL session_replication_role = replica; UPDATE fin.close_component_state SET status = 'CLOSED', version = version + 1, closed_by = '{h.UserId}', closed_at = now(), snapshot_hash = sha256('fixture') WHERE period_id = '{period}' AND component = 'INV-MOV'";
             await closeCommand.ExecuteNonQueryAsync();
         }
 
