@@ -167,6 +167,8 @@ public sealed class ConcurrencySoakTests(PostgresFixture postgres, ITestOutputHe
 
         await Task.WhenAll(Enumerable.Range(1, Workers).Select(seed => Task.Run(() => Worker(seed))));
 
+        // Deadlocks PostgreSQL detected (and the pipeline retried) during the run: information for the ledger review (B-02).
+        output.WriteLine($"deadlocks detected and retried: {await h.ScalarAsync<long>("SELECT deadlocks FROM pg_stat_database WHERE datname = current_database()")}");
         foreach (var (outcome, count) in outcomes.OrderBy(o => o.Key, StringComparer.Ordinal))
         {
             output.WriteLine($"{outcome} {count}");

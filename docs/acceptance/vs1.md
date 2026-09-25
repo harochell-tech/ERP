@@ -11,7 +11,7 @@ is green **and** the ledger code has been reviewed by a second person (§15.7, �
 | Full regression green in CI (`ci / build-test`) | See the PR-19 CI run |
 | CC-04 (50 workers × 60 s of mixed commands) | Green in the regular CI (E-PR19-2) |
 | PF-01 on the reference hardware (GitHub `ubuntu-24.04`) | **Pass** — p95 226 ms, reconciliations 0.1 s (E-PR19-3); results below |
-| Second-person review of the ledger modules (B-02) | **Pending** — the slice is not accepted until it is done (E-PR19-8) |
+| Second-person review of the ledger modules (B-02) | **Pending** — guide and sign-off table: [`b02-ledger-review.md`](b02-ledger-review.md); the slice is not accepted until it is done (E-PR19-8) |
 
 ## PF-01
 
