@@ -36,6 +36,7 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-19 | CC-04, PF-01 (`tests/Rochell.LoadHarness`, workflow `load`), traceability of all 70 acceptance tests, P-7 conformance (migration 0021). Merged (#21). Acceptance: `docs/acceptance/vs1.md`; B-02 review guide: `docs/acceptance/b02-ledger-review.md` (pending) |
 
 | VS#2 | Supplier payments and banks — Frozen Baseline `docs/architecture/vs2/frozen-baseline-vs2.md` approved (E-VS2-1…10). VS2-01 (schema, E-VS2-01-1…14): `docs/engineering/banks-and-payments.md`; next: VS2-02 |
+| B-03 | Staging decisions E-B03-1…9. B03-1: `S3WormStore` (S3 Object Lock, COMPLIANCE; tests on RustFS). Next: B03-2 Dockerfile + `deploy-staging` (needs VPS, domain, AWS, OIDC from Alexander) |
 
 Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** staging PostgreSQL 17 + WORM storage;
 **A-01** Controller approves policy values and account maps; **A-02** official DGII sources for ITBIS / withholding;

@@ -183,6 +183,15 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS2-01-12 | VS2-01 | IDM-04 for lines without a bank reference: column `occurrence` (1, 2, 3… among identical lines of one file) and `UNIQUE NULLS NOT DISTINCT (company, bank account, direction, bank reference, amount, value date, occurrence)`. |
 | E-VS2-01-13 | VS2-01 | Dimension BA lives only on the BANK line (subledger_ref = bank account, checked by trigger against its gl_account_id); AP lines keep party and ap_doc_id. No new gl_entry column (row hash unchanged). |
 | E-VS2-01-14 | VS2-01 | `fin.payment.method = 'TRANSFER'`; party_bank_account_id is required and a composite FK ties it to the payment's supplier; a trigger requires each applied AP document to belong to that supplier too. |
+| E-B03-1 | B-03 | Staging runs on the existing Hostinger VPS (ADR-026) with Docker Compose: PostgreSQL 17 (btree_gist) and the API, which also serves the web; at least 2 vCPU, 4 GB RAM, Ubuntu 22.04/24.04. |
+| E-B03-2 | B-03 | Domain `staging.<domain>` behind Caddy (automatic Let's Encrypt); only ports 443 and 22 are exposed; PostgreSQL is not. |
+| E-B03-3 | B-03 | WORM: AWS S3 Object Lock in COMPLIANCE mode, a bucket exclusive to staging; the sealer's IAM user may write and read, never delete; staging retention 7 days (production retention decided separately). |
+| E-B03-4 | B-03 | `S3WormStore` (compliance retention, `If-None-Match: *`, reads the oldest version and requires COMPLIANCE retention), configured under `Rochell:Audit:S3`. Tested against an S3-compatible server with Object Lock in Testcontainers: RustFS pinned (`rustfs/rustfs:1.0.0`), because MinIO no longer publishes public images. |
+| E-B03-5 | B-03 | Deployment: Dockerfile and a manual `deploy-staging` workflow, only from `main` with CI green: image to GHCR, SSH, `rochell-migrate` (migrate, `init-environment TEST` — Patch 1.1 allows only TEST or PRODUCTION, and staging is not production), restart of the API. |
+| E-B03-6 | B-03 | Secrets in the GitHub Environment `staging` (SSH key, role passwords, the sealer's AWS keys, OIDC secret); the digest signing key (ECDSA P-256) is generated on the server, read only by the sealer and never leaves it. |
+| E-B03-7 | B-03 | Staging holds synthetic data only (E-VS1-2, E-VS2-10): a test company loaded with the CLI and users of the Workspace domain. |
+| E-B03-8 | B-03 | Staging backup: daily encrypted `pg_dump` to the second provider, kept 7 days; PITR and the monthly restore test are for production. |
+| E-B03-9 | B-03 | B-03 closes when, on staging, the 00:15 digest is written to WORM, `verify-hash-chain` is valid against WORM, and PF-01 is repeated with its result in `docs/acceptance/vs1.md`. |
 
 Implementation rules derived from the above (no architectural change):
 
