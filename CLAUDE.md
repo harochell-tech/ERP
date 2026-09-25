@@ -35,7 +35,7 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-18b | Merged (#20): `web/` (Next.js static export served by the API), dev stack, Playwright journey |
 | PR-19 | CC-04, PF-01 (`tests/Rochell.LoadHarness`, workflow `load`), traceability of all 70 acceptance tests, P-7 conformance (migration 0021). Merged (#21). Acceptance: `docs/acceptance/vs1.md`; B-02 review guide: `docs/acceptance/b02-ledger-review.md` (pending) |
 
-| VS#2 | Supplier payments and banks — Frozen Baseline `docs/architecture/vs2/frozen-baseline-vs2.md` approved (E-VS2-1…10); next: VS2-01 |
+| VS#2 | Supplier payments and banks — Frozen Baseline `docs/architecture/vs2/frozen-baseline-vs2.md` approved (E-VS2-1…10). VS2-01 (schema, E-VS2-01-1…14): `docs/engineering/banks-and-payments.md`; next: VS2-02 |
 
 Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** staging PostgreSQL 17 + WORM storage;
 **A-01** Controller approves policy values and account maps; **A-02** official DGII sources for ITBIS / withholding;
@@ -84,7 +84,7 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
    100+ test project exhausts `max_connections` (53300). Concurrency tests throttle themselves (e.g. `SemaphoreSlim(32)`):
    the app pool allows 100 connections, and with the sealer and fixture connections that already exceeds the server limit.
 7. SoD pairs in `iam.sod_rule` are ordered (`permission_a < permission_b`). Seed counts are asserted by tests
-   (44 permissions, 16 SoD rules; policy parameter counts in `AccountingPolicyTests`) — update them when you seed more.
+   (57 permissions, 24 SoD rules; policy parameter counts in `AccountingPolicyTests`) — update them when you seed more.
 8. The table inventory test compares `information_schema` order: check it against a real migrated database.
 9. Deferred guarantees checked at COMMIT: journal balance; **P-1** every inventory GL line ↔ exactly one value entry;
    **P-3** valuation = Σ value entries = GL inventory; **K-25** `accounting_status = POSTED` ⇔ an unreversed AUTO journal of the

@@ -96,19 +96,43 @@ public sealed class SchemaTests(PostgresFixture postgres)
             WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'migrations')
             """);
 
-        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*. PR-07: inv.*. PR-08: pur.purchase_order*. PR-09: pur.goods_receipt*. PR-10: pur.goods_receipt_reversal. PR-11: pur.receipt_correction. PR-12: tax.*. PR-13a: pur.supplier_invoice*, pur.match_result, fin.ap_document. PR-15: audit.*. PR-16: rec.*, fin.close_snapshot, fin.reopen_request.
+        // PR-01: md.company. PR-02: core.*, obs.request_log. PR-03: iam.*. PR-04: md masters. PR-05: fin.*. PR-06: acc.*. PR-07: inv.*. PR-08: pur.purchase_order*. PR-09: pur.goods_receipt*. PR-10: pur.goods_receipt_reversal. PR-11: pur.receipt_correction. PR-12: tax.*. PR-13a: pur.supplier_invoice*, pur.match_result, fin.ap_document. PR-15: audit.*. PR-16: rec.*, fin.close_snapshot, fin.reopen_request. VS2-01: fin.bank_account, md.party_bank_account, fin.payment, fin.ap_application, fin.bank_statement*.
         Assert.Equal(
             "acc.accounting_policy,acc.accounting_policy_parameter,acc.accounting_policy_version,acc.policy_parameter_definition,"
             + "audit.integrity_state,audit.ledger_digest,audit.ledger_seal,"
             + "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.outbox,core.state_history,"
-            + "fin.account,fin.account_role,fin.account_role_map,fin.ap_document,fin.close_component_state,fin.close_snapshot,fin.gl_entry,fin.gl_journal,fin.gl_period_balance,"
-            + "fin.period,fin.posting_rule,fin.posting_rule_version,fin.reopen_request,"
+            + "fin.account,fin.account_role,fin.account_role_map,fin.ap_application,fin.ap_document,fin.bank_account,fin.bank_statement,fin.bank_statement_line,fin.close_component_state,fin.close_snapshot,fin.gl_entry,fin.gl_journal,fin.gl_period_balance,"
+            + "fin.payment,fin.period,fin.posting_rule,fin.posting_rule_version,fin.reopen_request,"
             + "iam.permission,iam.role,iam.role_assignment,iam.role_assignment_request,iam.role_permission,iam.session,iam.sod_rule,iam.user,"
             + "inv.inv_quantity_entry,inv.inv_stock_balance,inv.inv_valuation_balance,inv.inv_value_entry,inv.lot,"
-            + "md.company,md.item,md.location,md.party,md.plant,md.uom,md.uom_conversion,md.valuation_area,obs.request_log,"
+            + "md.company,md.item,md.location,md.party,md.party_bank_account,md.plant,md.uom,md.uom_conversion,md.valuation_area,obs.request_log,"
             + "pur.goods_receipt,pur.goods_receipt_line,pur.goods_receipt_reversal,pur.match_result,pur.purchase_order,pur.purchase_order_line,pur.receipt_correction,pur.supplier_invoice,pur.supplier_invoice_line,"
             + "rec.recon_blocking,rec.recon_definition,rec.recon_exception,rec.recon_run,"
             + "tax.fiscal_rule,tax.fiscal_rule_source,tax.fiscal_rule_test_run,tax.fiscal_rule_version,tax.fiscal_rule_version_source,tax.tax_determination,tax.tax_determination_line",
             tables);
+    }
+
+    /// <summary>E-VS2-01-6: migration 0023 opens BANK-REC in every period that already exists.</summary>
+    [Fact]
+    public async Task Bank_reconciliation_component_is_opened_in_existing_periods()
+    {
+        var cs = await postgres.CreateEmptyDatabaseAsync();
+        using var scratch = new ScratchMigrations();
+        const string Banks = "0023__payments_and_banks.sql";
+        scratch.Delete(Banks);
+        await Db.Runner(cs).MigrateAsync(scratch.Source);
+        await Db.ExecuteAsync(cs, """
+            INSERT INTO md.company (company_id, rnc, legal_name) VALUES ('00000000-0000-7000-8000-00000000c001', '101000001', 'Empresa');
+            INSERT INTO fin.period (period_id, company_id, starts_on, ends_on)
+            VALUES ('00000000-0000-7000-8000-00000000c002', '00000000-0000-7000-8000-00000000c001', '2026-01-01', '2026-01-31');
+            INSERT INTO fin.close_component_state (company_id, period_id, component, status, version)
+            SELECT '00000000-0000-7000-8000-00000000c001', '00000000-0000-7000-8000-00000000c002', c, 'OPEN', 1 FROM (VALUES ('INV-MOV'), ('AP-REC')) AS v (c);
+            """);
+
+        File.Copy(Path.Combine(TestPaths.MainMigrations, Banks), Path.Combine(scratch.DirectoryPath, Banks));
+        await Db.Runner(cs).MigrateAsync(scratch.Source);
+
+        Assert.Equal("AP-REC:OPEN,BANK-REC:OPEN,INV-MOV:OPEN", await Db.ScalarAsync<string>(cs,
+            "SELECT string_agg(component || ':' || status, ',' ORDER BY component) FROM fin.close_component_state"));
     }
 }

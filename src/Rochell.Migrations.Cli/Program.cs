@@ -328,7 +328,7 @@ try
 
         case "open-periods":
             {
-                // E-PR05-3: twelve calendar-month periods with INV-MOV and AP-REC open. Existing periods are left untouched.
+                // E-PR05-3: twelve calendar-month periods with INV-MOV, AP-REC and BANK-REC (E-VS2-01-6) open. Existing periods are left untouched.
                 if (args.Length != 3 || !int.TryParse(args[2], out var year) || year is < 2000 or > 2100)
                 {
                     await Console.Error.WriteLineAsync("Usage: rochell-migrate open-periods <company-rnc> <year>");
@@ -349,13 +349,13 @@ try
                            RETURNING company_id, period_id)
                     INSERT INTO fin.close_component_state (company_id, period_id, component, status, version)
                     SELECT i.company_id, i.period_id, comp, 'OPEN', 1
-                    FROM inserted i CROSS JOIN (VALUES ('INV-MOV'), ('AP-REC')) AS v (comp)
+                    FROM inserted i CROSS JOIN (VALUES ('INV-MOV'), ('AP-REC'), ('BANK-REC')) AS v (comp)
                     """,
                     connection);
                 open.Parameters.AddWithValue("rnc", args[1]);
                 open.Parameters.AddWithValue("year", year);
                 var components = await open.ExecuteNonQueryAsync();
-                Console.WriteLine($"{components / 2} period(s) opened for {year}.");
+                Console.WriteLine($"{components / 3} period(s) opened for {year}.");
                 return 0;
             }
 

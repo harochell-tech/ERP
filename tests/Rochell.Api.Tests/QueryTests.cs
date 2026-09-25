@@ -107,7 +107,7 @@ public sealed class QueryTests(PostgresFixture postgres)
         Assert.Equal(12, items.Count);
         Assert.Equal("2026-01-01", items[0].GetProperty("startsOn").GetString());
         Assert.Equal(
-            "AP-REC:OPEN,INV-MOV:CLOSED",
+            "AP-REC:OPEN,BANK-REC:OPEN,INV-MOV:CLOSED", // BANK-REC since VS2-01 (E-VS2-01-6)
             string.Join(',', items[0].GetProperty("components").EnumerateArray().Select(c => c.GetProperty("component").GetString() + ":" + c.GetProperty("status").GetString())));
     }
 }
