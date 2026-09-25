@@ -1,7 +1,7 @@
 # Vertical Slice #2 — Pagos a proveedores y bancos (Procure-to-Pay completo)
 
-**Estado: BORRADOR para aprobación de Alexander Rochell.** No es especificación vigente hasta que se apruebe junto con las
-decisiones abiertas de la sección 11 (que pasarán a `errata.md` como E-VS2-n). Ningún código de VS#2 se escribe antes.
+**Estado: CONGELADO — aprobado por Alexander Rochell el 2026-09-25**, con las decisiones D-01…D-10 de la sección 11 tal como
+se recomiendan (errata E-VS2-1…10). Es la especificación de VS#2; cualquier cambio sigue la regla de congelamiento.
 
 Fuentes: Architecture v2 §18 (MVP P0: "AP, bancos, conciliación bancaria semiautomática"), v2 §4 (control contra cambio de
 cuenta bancaria), v2.1 §12 (`fin.ap_document`, `fin.payment`), §17 (reglas P-06, P-07, P-28), §18 (máquina de Payment), §20
@@ -210,14 +210,14 @@ Objetivo de v2 §20 (A6): banco libro − extracto, neto de partidas identificad
 
 Cada PR sigue CLAUDE.md §3 (migración forward-only, pruebas, documentación, CI verde, tu aprobación).
 
-## 11. Decisiones abiertas (necesito tu aprobación antes de congelar)
+## 11. Decisiones (aprobadas como E-VS2-1…10)
 
-| # | Decisión | Recomendación |
+| # | Decisión | Aprobado |
 | --- | --- | --- |
 | D-01 | ¿Quién registra las cuentas bancarias **propias**? | Comando del Controller con reautenticación (no la CLI de despliegue), porque cambian en el tiempo |
 | D-02 | Métodos de pago en VS#2 | Solo **transferencia** (la retención de 72 h aplica). Cheques y su numeración en un slice posterior |
 | D-03 | ¿Incluir el pago de retenciones a la DGII (R-11)? | **No** en VS#2: sin IR-17 ni fuentes oficiales (A-02) el monto no está respaldado; queda para el slice fiscal |
-| D-04 | Formato de extractos | CSV genérico con mapeo por banco (fecha, referencia, monto, débito/crédito, descripción). Necesito saber **con qué bancos opera la empresa** para el primer mapeo |
+| D-04 | Formato de extractos | CSV genérico con mapeo por banco (fecha, referencia, monto, débito/crédito, descripción). Los bancos con que opera la empresa se definen antes de VS2-05 |
 | D-05 | ¿Quién libera pagos? v2.1 dice "Controller / Director", y no existe el rol Director | Controller en VS#2; límites por monto y rol Director cuando la política de aprobación de pagos exista (A-01) |
 | D-06 | ¿Preparar un pago reserva el saldo de las facturas? | No; la liberación re-valida bajo bloqueo (PAY-05). Evita saldos "retenidos" por pagos que nunca se liberan |
 | D-07 | Período del pago | Fecha de negocio = fecha valor; BANK-REC y AP-REC deben estar abiertos o aplica el registro tardío de VS#1 |

@@ -159,6 +159,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS1-9 | VS#1 (#27) | The database rejects any journal whose period × close component (from its rule version) is CLOSED. |
 | E-VS1-10 | VS#1 (#28) | Deferred checks also on INSERT/UPDATE of the balance tables: a valuation row must equal its control totals and a stock row must equal the sum of its lot's quantity entries at COMMIT. |
 | E-VS1-11 | VS#1 (#29) | STOCK_COVERAGE within one invoice: s (and s′) is computed per item over the invoice's total quantity of that item, so one invoice never capitalizes more price difference than the stock covers; across separate invoices the per-invoice formula stays (documented approximation). |
+| E-VS2-1 | VS#2 | The company's own bank accounts are registered by the Controller (command with step-up), not by the deployment CLI. |
+| E-VS2-2 | VS#2 | VS#2 pays by transfer only (the 72 h hold applies); cheques and their numbering come in a later slice. |
+| E-VS2-3 | VS#2 | Withholding remittance to the DGII (R-11) is out of VS#2; it belongs to the fiscal slice (A-02, IR-17). |
+| E-VS2-4 | VS#2 | Bank statements are imported as generic CSV with a mapping per bank (date, reference, amount, debit/credit, description); the banks are defined before VS2-05. |
+| E-VS2-5 | VS#2 | The Controller releases payments; amount limits and a Director role come with the payment approval policy (A-01). |
+| E-VS2-6 | VS#2 | Preparing a payment does not reserve invoice balances; release re-validates under lock. |
+| E-VS2-7 | VS#2 | A payment's business date is its value date; BANK-REC and AP-REC must be open or VS#1's late-entry rule applies. |
+| E-VS2-8 | VS#2 | The 72 h hold is calendar hours from the verification. |
+| E-VS2-9 | VS#2 | A payment belongs to one supplier and may apply to several of its invoices, fully or partially. |
+| E-VS2-10 | VS#2 | No real bank or accounting data until B-02 or a zero-difference parallel run (as E-VS1-2). |
 
 Implementation rules derived from the above (no architectural change):
 
