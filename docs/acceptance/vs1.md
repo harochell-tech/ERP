@@ -10,7 +10,7 @@ is green **and** the ledger code has been reviewed by a second person (§15.7, �
 | 70 acceptance tests of §15 / Patch 1 / Patch 1.1, each with a tagged test | Done — enforced by `AcceptanceTraceabilityTests` (E-PR19-1) |
 | Full regression green in CI (`ci / build-test`) | See the PR-19 CI run |
 | CC-04 (50 workers × 60 s of mixed commands) | Green in the regular CI (E-PR19-2) |
-| PF-01 on the reference hardware (GitHub `ubuntu-24.04`) | Workflow `load` (E-PR19-3); results below |
+| PF-01 on the reference hardware (GitHub `ubuntu-24.04`) | **Pass** — p95 226 ms, reconciliations 0.1 s (E-PR19-3); results below |
 | Second-person review of the ledger modules (B-02) | **Pending** — the slice is not accepted until it is done (E-PR19-8) |
 
 ## PF-01
@@ -23,7 +23,7 @@ security, posting engine, ledgers, deferred checks), 8 workers, sealer running; 
 | Full-position check — local, 12 CPU (macOS, Docker Desktop) | 10,000 / 10,000 | 75 / 287 / 475 / 1003 | < 0.1 s, all MATCHED | pass |
 | Full-position check — GitHub `ubuntu-24.04`, 4 CPU | 10,000 / 10,000 | 176 / **502** / 835 / 1599 | 0.1 s, all MATCHED | **fail** |
 | Delta form (0021) — local, 12 CPU | 10,000 / 10,000 | 29 / 60 / 78 / 269 | 0.2 s, all MATCHED | pass |
-| Delta form (0021) — GitHub `ubuntu-24.04`, 4 CPU | see the latest `load` run of the PR-19 branch | | | |
+| Delta form (0021) — GitHub `ubuntu-24.04`, 4 CPU ([run 36075519769](https://github.com/harochell-tech/ERP/actions/runs/36075519769)) | 10,000 / 10,000 | 113 / **226** / 309 / 715 | 0.1 s, all MATCHED | **PASS** |
 
 E-PR19-10: the full-position check re-summed the history of a position at every COMMIT; its cost grew with that history (median
 32 ms at 1,000 receipts, 75 ms at 10,000) and it missed the limit on the reference runner. The delta form of Patch 1 precision 1
