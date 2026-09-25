@@ -326,8 +326,10 @@ public sealed class InventoryLedger
     }
 
     /// <summary>
-    /// Stock rows of an item in a plant with quantity &gt; 0, locked (N6) in the issue order of E-PR11-3: the preferred lot first,
-    /// then the other lots from oldest to newest (UUIDv7 order), then by location.
+    /// Stock rows of an item in a plant with quantity &gt; 0, locked (N6), returned in the issue order of E-PR11-3: the preferred
+    /// lot first, then the other lots from oldest to newest (UUIDv7 order), then by location. The rows are locked in one canonical
+    /// order (lot, location) whatever the preferred lot is, so two transactions preferring different lots never lock the same rows
+    /// in opposite orders (that deadlocked concurrent corrections, B-02 review); the preferred lot is moved first afterwards.
     /// </summary>
     public async Task<IReadOnlyList<StockRow>> LockStockOfItemAsync(CommandContext context, Guid plantId, Guid itemId, Guid preferredLotId, CancellationToken cancellationToken)
     {
@@ -338,13 +340,12 @@ public sealed class InventoryLedger
             """
             SELECT location_id, lot_id, quantity FROM inv.inv_stock_balance
             WHERE company_id = @c AND plant_id = @plant AND item_id = @item AND quantity > 0
-            ORDER BY (lot_id = @preferred) DESC, lot_id, location_id
+            ORDER BY lot_id, location_id
             FOR UPDATE
             """,
             ("c", context.CompanyId),
             ("plant", plantId),
-            ("item", itemId),
-            ("preferred", preferredLotId));
+            ("item", itemId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var rows = new List<StockRow>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -352,7 +353,8 @@ public sealed class InventoryLedger
             rows.Add(new StockRow(reader.GetGuid(0), reader.GetGuid(1), reader.GetDecimal(2)));
         }
 
-        return rows;
+        // Stable: PostgreSQL's uuid order is kept for the other lots (it differs from Guid.CompareTo).
+        return [.. rows.Where(r => r.LotId == preferredLotId), .. rows.Where(r => r.LotId != preferredLotId)];
     }
 
     /// <summary>Locks one stock balance row (lock level N6) and returns its quantity (0 when absent).</summary>
