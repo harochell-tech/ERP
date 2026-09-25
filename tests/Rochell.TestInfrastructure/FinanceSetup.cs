@@ -95,7 +95,7 @@ public static class FinanceSetup
                    ON CONFLICT (company_id, starts_on) DO NOTHING
                    RETURNING company_id, period_id)
             INSERT INTO fin.close_component_state (company_id, period_id, component, status, version)
-            SELECT i.company_id, i.period_id, comp, 'OPEN', 1 FROM inserted i CROSS JOIN (VALUES ('INV-MOV'), ('AP-REC')) AS v (comp)
+            SELECT i.company_id, i.period_id, comp, 'OPEN', 1 FROM inserted i CROSS JOIN (VALUES ('INV-MOV'), ('AP-REC'), ('BANK-REC')) AS v (comp)
             """);
         command.Parameters.AddWithValue("year", year);
         command.Parameters.AddWithValue("c", h.CompanyId);

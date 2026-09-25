@@ -169,6 +169,20 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS2-8 | VS#2 | The 72 h hold is calendar hours from the verification. |
 | E-VS2-9 | VS#2 | A payment belongs to one supplier and may apply to several of its invoices, fully or partially. |
 | E-VS2-10 | VS#2 | No real bank or accounting data until B-02 or a zero-difference parallel run (as E-VS1-2). |
+| E-VS2-01-1 | VS2-01 | The GL account of a BANK line comes from the payment's bank account (`fin.bank_account.gl_account_id`), recorded in the determination inputs; that account is a control account and belongs to one bank account only. |
+| E-VS2-01-2 | VS2-01 | New GL subledger `BANK` (reference = bank account); a line has role BANK if and only if its subledger is BANK (CHECK), like INV in VS#1. |
+| E-VS2-01-3 | VS2-01 | Bank code: normalized text (upper case, 2–20 characters), no catalog in VS#2. Account number: digits only after removing spaces and hyphens, 5–30. |
+| E-VS2-01-4 | VS2-01 | A supplier account's holder is not matched automatically against the legal name; the Controller's verification evidence is mandatory (at least 20 characters: who was called, at which number, when). |
+| E-VS2-01-5 | VS2-01 | Role TESORERO and 13 new permissions (57 in total) with the SoD pairs of the VS#2 baseline §7; payment:read and bank:read are READ (Tesorero, Cuentas por pagar, Controller, Auditor). |
+| E-VS2-01-6 | VS2-01 | Close component BANK-REC accepted by the CHECKs, created OPEN for existing periods by the migration and for new periods by the deployment CLI. |
+| E-VS2-01-7 | VS2-01 | VS2-01 is schema, seeds, RLS and grants only; commands start in VS2-02. |
+| E-VS2-01-8 | VS2-01 | A supplier bank account's verification data (verified_by, verified_at, evidence of at least 20 characters, payable_from = verified_at + 72 h) is required and kept in VERIFIED **and** SUPERSEDED; it is empty in REVIEW and REJECTED (the baseline CHECK would erase it on supersession). |
+| E-VS2-01-9 | VS2-01 | At most one REVIEW and one VERIFIED account per supplier (partial unique indexes); a new request needs the pending one verified or rejected first. SUPERSEDED comes only from VERIFIED. |
+| E-VS2-01-10 | VS2-01 | A rejection records rejected_by, rejected_at and a mandatory rejection_reason; rejected_by ≠ requested_by (as fin.reopen_request). |
+| E-VS2-01-11 | VS2-01 | Unmatching the statement line of a CLEARED payment returns the payment to RELEASED — the only backward transition, recorded in state_history. |
+| E-VS2-01-12 | VS2-01 | IDM-04 for lines without a bank reference: column `occurrence` (1, 2, 3… among identical lines of one file) and `UNIQUE NULLS NOT DISTINCT (company, bank account, direction, bank reference, amount, value date, occurrence)`. |
+| E-VS2-01-13 | VS2-01 | Dimension BA lives only on the BANK line (subledger_ref = bank account, checked by trigger against its gl_account_id); AP lines keep party and ap_doc_id. No new gl_entry column (row hash unchanged). |
+| E-VS2-01-14 | VS2-01 | `fin.payment.method = 'TRANSFER'`; party_bank_account_id is required and a composite FK ties it to the payment's supplier; a trigger requires each applied AP document to belong to that supplier too. |
 
 Implementation rules derived from the above (no architectural change):
 

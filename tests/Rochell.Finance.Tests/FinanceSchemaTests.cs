@@ -28,7 +28,7 @@ public sealed class FinanceSchemaTests(PostgresFixture postgres)
         await using var h = await TestHarness.CreateAsync(postgres);
 
         Assert.Equal(
-            "AP_CONTROL:t,GRNI:f,INVENTORY_ADJUSTMENT:f,ITBIS_RECOVERABLE:f,MATERIAL_USAGE_VARIANCE:f,PURCHASE_PRICE_VARIANCE:f,RAW_MATERIAL:t,ROUNDING_DIFFERENCE:f,WITHHOLDING_PAYABLE:f",
+            "AP_CONTROL:t,BANK:t,BANK_CHARGES:f,GRNI:f,INVENTORY_ADJUSTMENT:f,ITBIS_RECOVERABLE:f,MATERIAL_USAGE_VARIANCE:f,PURCHASE_PRICE_VARIANCE:f,RAW_MATERIAL:t,ROUNDING_DIFFERENCE:f,WITHHOLDING_PAYABLE:f",
             await h.ScalarAsync<string>("SELECT string_agg(role_code || ':' || CASE WHEN is_control THEN 't' ELSE 'f' END, ',' ORDER BY role_code) FROM fin.account_role WHERE role_code NOT LIKE 'TEST%'"));
     }
 

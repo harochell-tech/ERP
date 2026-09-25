@@ -33,6 +33,7 @@ export function statusLabel(status: string | null | undefined): string {
 export const COMPONENTS: Readonly<Record<string, string>> = {
   "INV-MOV": "Movimientos de inventario",
   "AP-REC": "Cuentas por pagar",
+  "BANK-REC": "Bancos",
 };
 
 export function formatDate(value: string | null | undefined): string {
