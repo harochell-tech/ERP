@@ -7,7 +7,8 @@ editable originals; these Markdown copies are what the code is built against. If
 
 | # | Document | Role |
 | --- | --- | --- |
-| 1 | [`errata.md`](errata.md) | Implementation errata E-PR02-1 … E-PR18-7, each approved by Alexander, plus the derived implementation rules. Overrides everything below for the point it covers. |
+| 1 | [`errata.md`](errata.md) | Implementation errata E-PR02-1 … E-VS2-10, each approved by Alexander, plus the derived implementation rules. Overrides everything below for the point it covers. |
+| 1b | [`vs2/frozen-baseline-vs2.md`](vs2/frozen-baseline-vs2.md) | **Frozen Baseline of Vertical Slice #2** (supplier payments and banks), approved 2026-09-25 with E-VS2-1…10. Builds on VS#1; errata override it where they apply. |
 | 2 | [`baseline/06-frozen-baseline-patch-1.1.md`](baseline/06-frozen-baseline-patch-1.1.md) | Patch 1.1: prices > 0, STOCK_COVERAGE naming, deployment environment. |
 | 3 | [`baseline/05-frozen-baseline-patch-1.md`](baseline/05-frozen-baseline-patch-1.md) | Patch 1 (P-1 … P-8): posting prerequisites roll back, exact reversals (R-02/R-07 A/B), schema and tests replaced. |
 | 4 | [`baseline/04-architecture-v2.1.1-frozen-baseline.md`](baseline/04-architecture-v2.1.1-frozen-baseline.md) | **Frozen Baseline of Vertical Slice #1** (§8 schema … §17 PR plan) and errata E-1 … E-12. |
