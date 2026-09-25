@@ -1,7 +1,11 @@
 # Vertical Slice #1 — acceptance (PR-19)
 
-Frozen Baseline v2.1.1 §15–§17 with Patch 1 and Patch 1.1 (errata E-PR19-1…15). The slice is accepted when every acceptance test
-is green **and** the ledger code has been reviewed by a second person (§15.7, §17 PR-19, B-02).
+Frozen Baseline v2.1.1 §15–§17 with Patch 1 and Patch 1.1 (errata E-PR19-1…15, E-VS1-1…5).
+
+**Status: ACCEPTED CONDITIONALLY on 2026-09-25 (E-VS1-1).** Every acceptance test is green. The second-person ledger review
+(B-02), which §15.7 requires for acceptance, is a post-acceptance condition due **2026-11-24**. Until it is signed off the
+system holds **no real accounting data** (E-VS1-2): staging and tests only, unless the parallel run of E-VS1-4 reconciles to
+zero. Interim verification: E-VS1-3.
 
 ## Status
 
@@ -11,7 +15,9 @@ is green **and** the ledger code has been reviewed by a second person (§15.7, �
 | Full regression green in CI (`ci / build-test`) | See the PR-19 CI run |
 | CC-04 (50 workers × 60 s of mixed commands) | Green in the regular CI (E-PR19-2) |
 | PF-01 on the reference hardware (GitHub `ubuntu-24.04`) | **Pass** — p95 226 ms, reconciliations 0.1 s (E-PR19-3); results below |
-| Second-person review of the ledger modules (B-02) | **Pending** — guide and sign-off table: [`b02-ledger-review.md`](b02-ledger-review.md); the slice is not accepted until it is done (E-PR19-8) |
+| Second-person review of the ledger modules (B-02) | **Open, due 2026-11-24** (E-VS1-1) — guide and sign-off table: [`b02-ledger-review.md`](b02-ledger-review.md) |
+| Interim independent verification (E-VS1-3) | Property tests (`LedgerPropertyTests`: random command sequences, invariants re-summed after every step) green; 30 seeds × 200 steps locally. Adversarial automated review (2026-09-25): **5 reproduced findings open** — [#24](https://github.com/harochell-tech/ERP/issues/24) Blocker (R-07B reversal), [#25](https://github.com/harochell-tech/ERP/issues/25)–[#27](https://github.com/harochell-tech/ERP/issues/27) Major (close under concurrency, direct reopen, journal into a closed component), [#28](https://github.com/harochell-tech/ERP/issues/28) Minor; [#29](https://github.com/harochell-tech/ERP/issues/29) policy decision |
+| Real accounting data | **Not allowed** until B-02 is signed off or a parallel run reconciles to zero (E-VS1-2, E-VS1-4) |
 
 ## PF-01
 
@@ -37,7 +43,8 @@ concurrent first inserts fail (23505); E-PR19-14 excludes those tables.
 
 | # | Condition | Owner |
 | --- | --- | --- |
-| B-02 | Second-person review of the ledger code (Posting Engine, inventory ledger, receipts, corrections, invoices, repost, close) | Alexander |
+| B-02 | Second-person review of the ledger code (Posting Engine, inventory ledger, receipts, corrections, invoices, repost, close) — **due 2026-11-24** | Alexander |
+| E-VS1-4 | Parallel run with the current accounting system (inventory, AP, GRNI reconciled to zero at period end) before any real use without B-02 | Controller |
 | B-03 | Staging PostgreSQL 17 and object-lock (WORM) storage; then the daily digest, hash verification over WORM, and PF-01 repeated on staging | Tech lead |
 | A-01 | Controller approves the account maps and policy values | Management + Controller |
 | A-02 | Official DGII sources (PRODUCTION) for purchase ITBIS and withholding; until then production activation is blocked by design (P-7, E-PR19-9) | Fiscal specialist |

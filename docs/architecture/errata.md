@@ -148,6 +148,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PR19-13 | PR-19 | `inv.inv_stock_balance` gains composite FKs `(company_id, item_id)` → `md.item` and `(company_id, lot_id)` → `inv.lot`. |
 | E-PR19-14 | PR-19 | `UNIQUE (company_id, <pk>)` is added to the company-scoped tables that lacked it (tax_determination_line, fiscal_rule_test_run, reopen_request, close_snapshot, uom_conversion). Not to the three tables written by `INSERT … ON CONFLICT (pk) DO UPDATE` (inv_stock_balance, inv_valuation_balance, match_result): a second unique index makes concurrent upserts fail with 23505 (found by PF-01), and no composite FK references them. |
 | E-PR19-15 | PR-19 | `command_log.committed_at` comes from the platform clock (microsecond precision, controllable in tests) instead of `clock_timestamp()` (P-3). |
+| E-VS1-1 | VS#1 | The slice is **accepted conditionally** (2026-09-25): all acceptance tests green; the second-person ledger review (B-02) becomes a post-acceptance condition due **2026-11-24** (60 days). `docs/acceptance/vs1.md` records the conditional status and every open condition. |
+| E-VS1-2 | VS#1 | Until B-02 is signed off, Rochell Core holds **no real accounting data**: staging and tests only. Any real use first requires either the B-02 sign-off or the parallel run of E-VS1-4. |
+| E-VS1-3 | VS#1 | Interim independent verification (not a substitute for B-02): an adversarial automated review of the ledger code in a separate session without the author's context, guided by invariants L1–L15, with findings filed as GitHub issues; plus property tests that run random command sequences and check the invariants after every step. |
+| E-VS1-4 | VS#1 | Compensating control for real use before B-02: a parallel run of the same period in Rochell Core and the current accounting system, reconciling inventory, accounts payable and GRNI at period end; zero difference is required to rely on Rochell's figures. |
+| E-VS1-5 | VS#1 | Overrides §17's "no other module before the slice closure": the next module may start in parallel; fixes from the B-02 review take priority over new work. |
 
 Implementation rules derived from the above (no architectural change):
 
