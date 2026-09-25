@@ -20,13 +20,15 @@ security, posting engine, ledgers, deferred checks), 8 workers, sealer running; 
 
 | Run | Receipts | p50 / p95 / p99 / max (ms) | 8 reconciliations | Result |
 | --- | --- | --- | --- | --- |
-| Local, 12 CPU (macOS, Docker Desktop) | 10,000 / 10,000 | 75 / 287 / 475 / 1003 | < 0.1 s, all MATCHED | PASS |
-| GitHub `ubuntu-24.04` (workflow `load`) | see the run of the PR-19 branch | | | |
+| Full-position check — local, 12 CPU (macOS, Docker Desktop) | 10,000 / 10,000 | 75 / 287 / 475 / 1003 | < 0.1 s, all MATCHED | pass |
+| Full-position check — GitHub `ubuntu-24.04`, 4 CPU | 10,000 / 10,000 | 176 / **502** / 835 / 1599 | 0.1 s, all MATCHED | **fail** |
+| Delta form (0021) — local, 12 CPU | 10,000 / 10,000 | 29 / 60 / 78 / 269 | 0.2 s, all MATCHED | pass |
+| Delta form (0021) — GitHub `ubuntu-24.04`, 4 CPU | see the latest `load` run of the PR-19 branch | | | |
 
-E-PR19-10: with p95 below 500 ms the full position check (valuation = Σ value entries = Σ GL at every COMMIT) stays instead
-of the delta form of Patch 1 precision 1. **Watch item:** its cost grows with the history of a position (the median went from
-32 ms at 1,000 receipts to 75 ms at 10,000); PF-01 runs weekly, and the delta form is the planned change before volumes
-approach the limit.
+E-PR19-10: the full-position check re-summed the history of a position at every COMMIT; its cost grew with that history (median
+32 ms at 1,000 receipts, 75 ms at 10,000) and it missed the limit on the reference runner. The delta form of Patch 1 precision 1
+replaced it: each ledger insert adds its delta to control totals kept on the valuation row by SECURITY DEFINER triggers, and the
+deferred check compares that one row. The median no longer grows with history.
 
 PF-01 also caught a defect before it shipped: a second unique index on a table written by `INSERT … ON CONFLICT (pk)` makes
 concurrent first inserts fail (23505); E-PR19-14 excludes those tables.

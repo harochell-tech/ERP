@@ -91,6 +91,27 @@ public sealed class InventoryConformanceTests(PostgresFixture postgres)
         Assert.Equal(results[0], results[1]);
     }
 
+    /// <summary>E-PR19-10: the control totals behind the O(1) position check are written only by the ledger triggers.</summary>
+    [Fact]
+    public async Task Position_control_totals_follow_the_ledgers_and_the_application_cannot_write_them()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await h.CreateStockSetupAsync();
+        var lot = await Receive(h, s, 10m, 1000m, "r-1");
+        await Receive(h, s, 5m, 600m, "r-2");
+        await Issue(h, s, lot, 4m, "i");
+
+        var update = await h.AppExecuteAsync("UPDATE inv.inv_valuation_balance SET ledger_value = ledger_value + 1");
+        var insert = await h.AppExecuteAsync(
+            $"INSERT INTO inv.inv_valuation_balance (company_id, valuation_area_id, item_id, quantity, value, ledger_value) SELECT company_id, valuation_area_id, '{s.ItemId}', 0, 0, 5 FROM md.plant WHERE plant_id = '{s.PlantId}' ON CONFLICT DO NOTHING");
+
+        // 15 t / 1 600 → average 106.666…; 4 t issued at 426.67 → 11 t / 1 173.33.
+        Assert.Equal("11.000000/1173.3300|11.000000/1173.3300/1173.3300", await h.ScalarAsync<string>(
+            "SELECT quantity || '/' || value || '|' || ledger_quantity || '/' || ledger_value || '/' || gl_value FROM inv.inv_valuation_balance"));
+        Assert.Equal("42501", update?.SqlState);
+        Assert.Equal("42501", insert?.SqlState);
+    }
+
     [Fact]
     public async Task A_stock_balance_row_belongs_to_the_company_of_its_item_and_lot()
     {
