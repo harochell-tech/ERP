@@ -1,0 +1,91 @@
+# Staging (B-03): E-B03-1 (VPS + Docker Compose), E-B03-2 (Caddy, only 443 exposed), E-B03-3/6 (S3 WORM, secrets).
+# Values come from /opt/rochell-staging/.env, written by the deploy-staging workflow from the GitHub Environment "staging".
+name: rochell-staging
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rochell
+      POSTGRES_USER: rochell_deploy
+      POSTGRES_PASSWORD: ${DEPLOY_DB_PASSWORD:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rochell_deploy -d rochell"]
+      interval: 5s
+      retries: 20
+
+  # Deployment CLI (schema owner): `docker compose run --rm migrate <command>`.
+  migrate:
+    image: ${ROCHELL_IMAGE:?}
+    profiles: [tools]
+    entrypoint: ["dotnet", "/app/migrate/rochell-migrate.dll"]
+    environment:
+      DOTNET_ENVIRONMENT: Staging
+      ConnectionStrings__Rochell: Host=postgres;Database=rochell;Username=rochell_deploy;Password=${DEPLOY_DB_PASSWORD:?}
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [internal]
+
+  api:
+    image: ${ROCHELL_IMAGE:?}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Staging
+      Rochell__AppConnectionString: Host=postgres;Database=rochell;Username=rochell_app_login;Password=${APP_DB_PASSWORD:?}
+      Rochell__SealerConnectionString: Host=postgres;Database=rochell;Username=rochell_sealer_login;Password=${SEALER_DB_PASSWORD:?}
+      Rochell__Identity__HostedDomain: ${WORKSPACE_DOMAIN:?}
+      Rochell__Oidc__Authority: https://accounts.google.com
+      Rochell__Oidc__ClientId: ${OIDC_CLIENT_ID:?}
+      Rochell__Oidc__ClientSecret: ${OIDC_CLIENT_SECRET:?}
+      Rochell__Sealer__Enabled: "true"
+      Rochell__Digest__Enabled: "true"
+      Rochell__Digest__SigningKeyPemFile: /run/secrets/digest-signing.pem
+      Rochell__Audit__DigestPublicKeyPemFile: /run/secrets/digest-public.pem
+      Rochell__Audit__S3__Bucket: ${WORM_BUCKET:?}
+      Rochell__Audit__S3__Region: ${WORM_REGION:?}
+      Rochell__Audit__S3__RetentionDays: "7"
+      AWS_ACCESS_KEY_ID: ${WORM_ACCESS_KEY_ID:?}
+      AWS_SECRET_ACCESS_KEY: ${WORM_SECRET_ACCESS_KEY:?}
+      Rochell__ReverseProxy__TrustedNetworks__0: 172.30.0.0/24
+    volumes:
+      - dpkeys:/var/lib/rochell/keys
+      - ./secrets/digest-signing.pem:/run/secrets/digest-signing.pem:ro
+      - ./secrets/digest-public.pem:/run/secrets/digest-public.pem:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [internal, edge]
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      STAGING_HOST: ${STAGING_HOST:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    networks: [edge]
+
+networks:
+  # PostgreSQL has no route outside the host.
+  internal:
+    internal: true
+  # Caddy ↔ API, and the API's way out (Google OIDC, S3). The API trusts X-Forwarded-* only from this subnet.
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  pgdata:
+  dpkeys:
+  caddy_data:
+  caddy_config:
