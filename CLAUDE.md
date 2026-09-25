@@ -33,7 +33,7 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-17 | Merged: Explain this entry, read-only query pipeline, POL-01 inputs on R-05/R-07B |
 | PR-18a | Merged (#19): API (OIDC, 44 command endpoints, read queries, OpenAPI, hosted sealer/digest), AT-01/AT-02 over HTTP |
 | PR-18b | Merged (#20): `web/` (Next.js static export served by the API), dev stack, Playwright journey |
-| PR-19 | CC-04, PF-01 (`tests/Rochell.LoadHarness`, workflow `load`), traceability of all 70 acceptance tests, P-7 conformance (migration 0021). E-PR19-1…15 approved. Acceptance: `docs/acceptance/vs1.md` (pending B-02) |
+| PR-19 | CC-04, PF-01 (`tests/Rochell.LoadHarness`, workflow `load`), traceability of all 70 acceptance tests, P-7 conformance (migration 0021). Merged (#21). Acceptance: `docs/acceptance/vs1.md`; B-02 review guide: `docs/acceptance/b02-ledger-review.md` (pending) |
 
 Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** staging PostgreSQL 17 + WORM storage;
 **A-01** Controller approves policy values and account maps; **A-02** official DGII sources for ITBIS / withholding;
