@@ -20,6 +20,8 @@ var builder = WebApplication.CreateBuilder(args);
 RochellEnvironments.EnsureSupported(builder.Environment.EnvironmentName);
 
 var settings = builder.Configuration.GetSection(ApiOptions.Section).Get<ApiOptions>() ?? new ApiOptions();
+settings.Digest.SigningKeyPem ??= FromFile(settings.Digest.SigningKeyPemFile, "Digest:SigningKeyPemFile");
+settings.Audit.DigestPublicKeyPem ??= FromFile(settings.Audit.DigestPublicKeyPemFile, "Audit:DigestPublicKeyPemFile");
 var appConnection = Required(settings.AppConnectionString, "AppConnectionString");
 var hostedDomain = Required(settings.Identity.HostedDomain, "Identity:HostedDomain");
 Required(settings.Oidc.Authority, "Oidc:Authority");
@@ -78,14 +80,31 @@ services.ConfigureHttpJsonOptions(options => ApiJson.Configure(options.Serialize
 services.AddRochellOidc(settings.Oidc, hostedDomain);
 services.AddRochellOpenApi();
 
-if (builder.Environment.IsDevelopment())
+var behindProxy = settings.ReverseProxy.TrustedNetworks.Count > 0;
+if (behindProxy)
+{
+    // E-B03-2: behind Caddy the scheme (https, for the OIDC redirect and Secure cookies) and client address come from the proxy,
+    // trusted only from its own networks.
+    services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 1;
+        options.KnownProxies.Clear();
+        options.KnownIPNetworks.Clear();
+        foreach (var network in settings.ReverseProxy.TrustedNetworks)
+        {
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+        }
+    });
+}
+else if (builder.Environment.IsDevelopment())
 {
     // `next dev` forwards /api and the sign-in pages from its own origin (E-PR18b-2): honour X-Forwarded-* from loopback only.
     services.Configure<ForwardedHeadersOptions>(options => options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost);
 }
 
 var app = builder.Build();
-if (app.Environment.IsDevelopment())
+if (behindProxy || app.Environment.IsDevelopment())
 {
     app.UseForwardedHeaders();
 }
@@ -117,6 +136,14 @@ static string Required(string? value, string key)
     => string.IsNullOrWhiteSpace(value)
         ? throw new InvalidOperationException($"Configuration {ApiOptions.Section}:{key} is required (environment variable {ApiOptions.Section}__{key.Replace(":", "__", StringComparison.Ordinal)}).")
         : value;
+
+// E-B03-6: keys kept in files on the server. A configured file that cannot be read stops the host.
+static string? FromFile(string? path, string key)
+    => string.IsNullOrWhiteSpace(path)
+        ? null
+        : File.Exists(path)
+            ? File.ReadAllText(path)
+            : throw new InvalidOperationException($"Configuration {ApiOptions.Section}:{key} points to {path}, which does not exist.");
 
 /// <summary>Entry point, visible to the end-to-end tests (WebApplicationFactory).</summary>
 public partial class Program;

@@ -31,5 +31,8 @@ dotnet run --project src/Rochell.Migrations.Cli -- init-environment PRODUCTION  
 ```
 
 The value can never be changed afterwards (the command refuses a different value; the table rejects UPDATE/DELETE).
+Staging databases are TEST (E-B03-5).
+
+A new deployment's company: `create-company <rnc> <legal-name>` (E-B03-7; staging uses a fictitious RNC and synthetic data).
 
 Exit codes: `0` OK, `1` usage/configuration error, `2` migration error (modified, deleted, out-of-order or failing script).

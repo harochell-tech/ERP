@@ -4,6 +4,7 @@ using Rochell.Migrations;
 using Rochell.Platform.Hosting;
 
 // Usage: rochell-migrate <migrate|verify|status|init-environment TEST|PRODUCTION>
+//        rochell-migrate create-company <rnc> <legal-name>                                 (E-B03-7; staging: synthetic data only)
 //        rochell-migrate create-user <email> <google-oidc-subject> <employee-id>       (E-PR03-5)
 //        rochell-migrate grant-role <email> <ROLE_CODE> <company-rnc> [plant-id]         (bootstrap grants, E-PR03-5)
 //        rochell-migrate create-plant <company-rnc> <PLANT_CODE> <VALUATION_AREA_CODE>    (E-PR04-2)
@@ -90,6 +91,34 @@ try
                 }
 
                 Console.WriteLine($"Deployment environment: {current}.");
+                return 0;
+            }
+
+        case "create-company":
+            {
+                // E-B03-7: the company of a new deployment. Staging holds a synthetic company only (E-VS1-2, E-VS2-10).
+                if (args.Length != 3 || !System.Text.RegularExpressions.Regex.IsMatch(args[1], "^([0-9]{9}|[0-9]{11})$") || string.IsNullOrWhiteSpace(args[2]))
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate create-company <rnc (9 or 11 digits)> <legal-name>");
+                    return 1;
+                }
+
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                await using var insert = new NpgsqlCommand(
+                    "INSERT INTO md.company (company_id, rnc, legal_name) VALUES (@id, @rnc, @name) ON CONFLICT (rnc) DO NOTHING",
+                    connection);
+                var companyId = Guid.CreateVersion7();
+                insert.Parameters.AddWithValue("id", companyId);
+                insert.Parameters.AddWithValue("rnc", args[1]);
+                insert.Parameters.AddWithValue("name", args[2].Trim());
+                if (await insert.ExecuteNonQueryAsync() == 0)
+                {
+                    await Console.Error.WriteLineAsync($"Company {args[1]} already exists.");
+                    return 2;
+                }
+
+                Console.WriteLine($"Company {args[1]} created: {companyId}.");
                 return 0;
             }
 
@@ -360,7 +389,7 @@ try
             }
 
         default:
-            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods>");
+            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods>");
             return 1;
     }
 }

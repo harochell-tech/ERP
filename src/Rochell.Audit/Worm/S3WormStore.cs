@@ -68,7 +68,9 @@ public sealed class S3WormStore : IWormStore
                     InputStream = body,
                     ContentType = "application/json",
                     IfNoneMatch = "*",
-                    ChecksumAlgorithm = ChecksumAlgorithm.SHA256,
+                    // Object Lock writes need an integrity header; Content-MD5 is the one every S3-compatible provider accepts
+                    // (Backblaze B2, E-B03-10), unlike the SDK's newer CRC checksums.
+                    MD5Digest = ContentMd5(content),
                     ObjectLockMode = ObjectLockMode.Compliance,
                     ObjectLockRetainUntilDate = _clock.UtcNow.AddDays(RetentionDays),
                 },
@@ -79,6 +81,10 @@ public sealed class S3WormStore : IWormStore
             throw new WormObjectExistsException(key);
         }
     }
+
+#pragma warning disable CA5351 // Content-MD5 is a transport integrity check required by the S3 API, not a security control.
+    private static string ContentMd5(byte[] content) => Convert.ToBase64String(System.Security.Cryptography.MD5.HashData(content));
+#pragma warning restore CA5351
 
     public async Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken)
     {

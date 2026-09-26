@@ -91,3 +91,14 @@ jobs:
           name: test-results
           path: TestResults
           if-no-files-found: warn
+
+  # E-B03-5: the deployable image must build on every change (it is pushed only by deploy-staging).
+  image:
+    name: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the image (no push)
+        run: docker build --pull -t rochell-core:ci .
