@@ -1,6 +1,7 @@
 # Staging (B-03)
 
-Approved errata E-B03-1…9. Staging runs the same image as production on the Hostinger VPS (ADR-026), with synthetic data only
+Approved errata E-B03-1…9. Staging runs the same image as production on the Hostinger `sistema` VPS (ADR-026, E-B03-11; never the portal VPS, which holds
+real production data), with synthetic data only
 (E-VS1-2, E-VS2-10). B-03 closes when the checklist at the end is done (E-B03-9).
 
 ## Pieces
@@ -49,8 +50,22 @@ Create credentials → OAuth client ID → **Web application**; authorized redir
 
 ### 3. DNS and VPS
 
+**Before anything else (E-B03-12):** the `sistema` VPS runs `sistema-contable` (test data only), whose Caddy holds 80/443.
+Back it up and remove it, as root on that VPS:
+
+```bash
+dir=$(docker inspect sistema-contable-app-1 --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}')
+mkdir -p /root/respaldo-sistema-contable
+docker exec sistema-contable-db-1 sh -c 'pg_dumpall -U "$POSTGRES_USER"' | gzip > /root/respaldo-sistema-contable/db.sql.gz
+tar czf /root/respaldo-sistema-contable/proyecto.tgz -C "$dir" .
+ls -lh /root/respaldo-sistema-contable && zcat /root/respaldo-sistema-contable/db.sql.gz | head -5   # both non-empty
+cd "$dir" && docker compose down -v --rmi local    # irreversible: stops and deletes containers, volumes and local images
+ss -tlnp | grep -E ':(443|80) ' || echo "80 and 443 are free"
+```
+
+
 1. DNS: `A` record `<STAGING_HOST>` → the VPS's IP.
-2. VPS (Ubuntu 22.04/24.04, ≥ 2 vCPU, 4 GB): a `deploy` user with sudo and the workflow's public SSH key; Docker Engine and the
+2. VPS (`sistema`: Ubuntu 26.04 LTS, 2 vCPU, 7.7 GB; Docker already installed): a `deploy` user with sudo and the workflow's public SSH key; Docker Engine and the
    compose plugin (`docs.docker.com/engine/install/ubuntu`), `deploy` in the `docker` group; firewall
    `ufw default deny incoming && ufw allow 22/tcp && ufw allow 443 && ufw enable`.
 3. Copy `deploy/staging/bootstrap.sh` to the server and run it once: it creates `/opt/rochell-staging` and the digest key pair
