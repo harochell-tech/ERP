@@ -1,4 +1,5 @@
-# Staging (B-03): E-B03-1 (VPS + Docker Compose), E-B03-2 (Caddy, only 443 exposed), E-B03-3/6 (S3 WORM, secrets).
+# Staging (B-03): E-B03-1 (VPS + Docker Compose), E-B03-2 (Caddy, only 443 exposed), E-B03-6 (secrets),
+# E-B03-10 (WORM and backups in Backblaze B2, S3-compatible Object Lock).
 # Values come from /opt/rochell-staging/.env, written by the deploy-staging workflow from the GitHub Environment "staging".
 name: rochell-staging
 
@@ -47,6 +48,7 @@ services:
       Rochell__Audit__DigestPublicKeyPemFile: /run/secrets/digest-public.pem
       Rochell__Audit__S3__Bucket: ${WORM_BUCKET:?}
       Rochell__Audit__S3__Region: ${WORM_REGION:?}
+      Rochell__Audit__S3__ServiceUrl: ${WORM_ENDPOINT:?}
       Rochell__Audit__S3__RetentionDays: "7"
       AWS_ACCESS_KEY_ID: ${WORM_ACCESS_KEY_ID:?}
       AWS_SECRET_ACCESS_KEY: ${WORM_SECRET_ACCESS_KEY:?}

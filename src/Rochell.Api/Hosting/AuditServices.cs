@@ -72,7 +72,12 @@ public sealed class WormAccess(AuditSettings settings, IClock clock, ILogger<Wor
 
     private static AmazonS3Client CreateS3Client(S3WormSettings s3)
     {
-        var config = new AmazonS3Config();
+        // Checksums only where the API requires them: S3-compatible providers (Backblaze B2, E-B03-10) reject the SDK's newer defaults.
+        var config = new AmazonS3Config
+        {
+            RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+            ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+        };
         if (!string.IsNullOrWhiteSpace(s3.ServiceUrl))
         {
             config.ServiceURL = s3.ServiceUrl;

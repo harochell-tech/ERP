@@ -58,6 +58,7 @@ jobs:
           OIDC_CLIENT_SECRET: ${{ secrets.OIDC_CLIENT_SECRET }}
           WORM_BUCKET: ${{ vars.WORM_BUCKET }}
           WORM_REGION: ${{ vars.WORM_REGION }}
+          WORM_ENDPOINT: ${{ vars.WORM_ENDPOINT }}
           WORM_ACCESS_KEY_ID: ${{ secrets.WORM_ACCESS_KEY_ID }}
           WORM_SECRET_ACCESS_KEY: ${{ secrets.WORM_SECRET_ACCESS_KEY }}
           BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
@@ -68,7 +69,7 @@ jobs:
               deploy/staging/deploy.sh deploy/staging/backup.sh "${TARGET}:/opt/rochell-staging/"
           # Values travel as environment variables (never interpolated into the script); the file is mode 600 on the server.
           vars="ROCHELL_IMAGE STAGING_HOST WORKSPACE_DOMAIN DEPLOY_DB_PASSWORD APP_DB_PASSWORD SEALER_DB_PASSWORD OIDC_CLIENT_ID
-                OIDC_CLIENT_SECRET WORM_BUCKET WORM_REGION WORM_ACCESS_KEY_ID WORM_SECRET_ACCESS_KEY BACKUP_BUCKET
+                OIDC_CLIENT_SECRET WORM_BUCKET WORM_REGION WORM_ENDPOINT WORM_ACCESS_KEY_ID WORM_SECRET_ACCESS_KEY BACKUP_BUCKET
                 BACKUP_ACCESS_KEY_ID BACKUP_SECRET_ACCESS_KEY"
           ROCHELL_IMAGE="${IMAGE}"
           for name in ${vars}; do

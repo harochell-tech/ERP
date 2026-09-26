@@ -192,6 +192,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-B03-7 | B-03 | Staging holds synthetic data only (E-VS1-2, E-VS2-10): a test company loaded with the CLI and users of the Workspace domain. |
 | E-B03-8 | B-03 | Staging backup: daily encrypted `pg_dump` to the second provider, kept 7 days; PITR and the monthly restore test are for production. |
 | E-B03-9 | B-03 | B-03 closes when, on staging, the 00:15 digest is written to WORM, `verify-hash-chain` is valid against WORM, and PF-01 is repeated with its result in `docs/acceptance/vs1.md`. |
+| E-B03-10 | B-03 | Supersedes E-B03-3's provider: WORM and backups live in **Backblaze B2** (S3-compatible Object Lock, COMPLIANCE, 7 days in staging), never on the Hostinger VPS or another Hostinger server (ADR-026 second provider). Writes carry Content-MD5 and the SDK sends checksums only where required (portable across S3-compatible providers). Staging host: `staging.industriasrochell.com.do`. |
 
 Implementation rules derived from the above (no architectural change):
 

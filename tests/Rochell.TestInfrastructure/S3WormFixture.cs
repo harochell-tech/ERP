@@ -50,7 +50,14 @@ public sealed class S3WormFixture : IAsyncLifetime
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 
     public AmazonS3Client CreateClient()
-        => new(new BasicAWSCredentials(AccessKey, SecretKey), new AmazonS3Config { ServiceURL = ServiceUrl, ForcePathStyle = true, AuthenticationRegion = Region });
+        => new(new BasicAWSCredentials(AccessKey, SecretKey), new AmazonS3Config
+        {
+            ServiceURL = ServiceUrl,
+            ForcePathStyle = true,
+            AuthenticationRegion = Region,
+            RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED, // as the host (E-B03-10)
+            ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+        });
 
     /// <summary>A new bucket, with Object Lock (and therefore versioning) enabled unless <paramref name="objectLock"/> is false.</summary>
     public async Task<string> CreateBucketAsync(bool objectLock = true)
