@@ -28,9 +28,11 @@ Staging host: `staging.industriasrochell.com.do`. Bucket names in B2 are global,
 2. Bucket `industriasrochell-worm-staging`: **Private**, **Object Lock: Enable** (no default retention: the store sets
    COMPLIANCE, 7 days, on every object). The bucket page shows the S3 endpoint (`s3.<region>.backblazeb2.com`) and the
    region (`<region>`, e.g. `us-east-005`) → `WORM_ENDPOINT` = `https://s3.<region>.backblazeb2.com`, `WORM_REGION` = `<region>`.
-3. Bucket `industriasrochell-backup-staging` in the **same region**: Private, lifecycle rule "Keep prior versions for 7 days"
-   and delete hidden files after 7 days.
-4. Application keys with the B2 CLI (`pip install b2`, `b2 account authorize` with the master key), restricted per bucket:
+3. Bucket `industriasrochell-backup-staging` in the **same region**: Private, custom lifecycle rule on prefix `staging/`:
+   hide 7 days after upload, delete 1 day after hiding (each backup has its own name, so a "prior versions" rule would never
+   remove it).
+4. Application keys with the B2 CLI (`python3 -m venv ~/b2cli && ~/b2cli/bin/pip install b2`, then `b2 account authorize`
+   with the master key), restricted per bucket — the web console only offers read-and-write keys, which include `deleteFiles`:
 
    ```bash
    b2 key create --bucket industriasrochell-worm-staging rochell-staging-sealer \
