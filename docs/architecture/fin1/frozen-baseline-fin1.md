@@ -1,7 +1,7 @@
 # FIN-1 — Diario de ajustes, balanza de comprobación y estados financieros
 
-**Estado: BORRADOR — pendiente de aprobación de Alexander Rochell.** Se congela cuando se aprueben las decisiones D-01…D-10 de
-la sección 9 (errata E-FIN1-1…10). Corre en paralelo con VS#3 porque no depende de proveedores externos.
+**Estado: CONGELADO — aprobado por Alexander Rochell el 2026-09-27**, con las decisiones D-01…D-10 tal como se recomiendan
+(errata E-FIN1-1…10). Es la especificación; cualquier cambio sigue la regla de congelamiento.
 
 Fuentes: Architecture v2 §3.A (CFO: estados financieros derivados del GL con estructura de reporte versionada) y §3.B
 (Controller: diario de ajustes con soporte y aprobación), §18 (MVP P0 Finanzas: "diario de ajustes", BI "balance, resultados");

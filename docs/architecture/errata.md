@@ -276,6 +276,32 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-UI01-6 | UI-01 | (a) New command RejectRoleChange (`role:second_approve`, mandatory reason; not the requester nor the affected user); migration 0032 adds REJECTED with rejected_by, rejected_at and rejection_reason. |
 | E-UI01-7 | UI-01 | Inicio's counters come from the existing list queries, each only with its read permission; a full page (200) shows as "200+"; no new API. |
 | E-UI01-8 | UI-01 | Playwright security journey (request → second approval → the employee's menu follows the role) and the read-only screens; API and database tests for the new queries and the rejection. |
+| E-VS3-1 | VS#3 | ¿De dónde sale el producto terminado si aún no hay producción? → Solo del **saldo inicial por documento de apertura** (v2.1 §6), a costo estándar aprobado. La entrada por producción llega con el slice de manufactura. Nada de "entradas manuales" de PT que luego haya que deshacer |
+| E-VS3-2 | VS#3 | ¿Se venden también productos comprados (reventa)? → No en VS#3: solo PT propio. La reventa se agrega luego con el mismo flujo |
+| E-VS3-3 | VS#3 | Roles de venta → Cinco roles nuevos (Vendedor, Crédito, Despacho, Facturación, Cobros) con los SoD de la sección 7 |
+| E-VS3-4 | VS#3 | ¿Cotización en VS#3? → No en el núcleo; el pedido se crea directo. Cotización como PR posterior (P0) |
+| E-VS3-5 | VS#3 | Términos de entrega → Dos: **retira en planta** (control al portón) y **entregado en obra con camión propio** (control al POD) |
+| E-VS3-6 | VS#3 | Evidencia del POD y del ticket de báscula → Nombre de quien recibe, fecha y hora, referencia y SHA-256 del archivo (foto o firma escaneada). El archivo se guarda en el almacenamiento de objetos, no en la base |
+| E-VS3-7 | VS#3 | Facturas anticipadas (antes de entregar) → Fuera de VS#3. Los pagos por adelantado se registran como **cobro no aplicado** hasta que haya factura |
+| E-VS3-8 | VS#3 | e-CF → VS#3 emite por el **canal externo del proveedor**: Core arma el paquete fiscal, el usuario emite en el portal y registra el e-NCF en Core (v2.1 §4.1). El Gateway automático es VS#4, después del contract test CT-01…16 |
+| E-VS3-9 | VS#3 | Secuencias e-NCF → PROVIDER\_MANAGED en VS#3 (las asigna el portal); Core valida formato y unicidad |
+| E-VS3-10 | VS#3 | ITBIS de ventas y hecho generador → Regla fiscal SALES\_ITBIS versionada (Tax Engine de VS#1). Mientras A-02 no confirme si el ITBIS nace con la entrega, la obligación se calcula a la **fecha de factura** y la conciliación señala los entregados sin facturar de más de 30 días |
+| E-VS3-11 | VS#3 | Cobros → Transferencia, cheque y efectivo; efectivo y cheque en tránsito hasta el depósito; retención del cliente con certificado |
+| E-VS3-12 | VS#3 | Devoluciones con reingreso de producto → Fuera de VS#3: nota de crédito solo comercial (precio, descuento, error) |
+| E-VS3-13 | VS#3 | Confotur y autorizaciones fiscales → Slice fiscal propio después de VS#3 (v2 Decisión 2); VS#3 no vende con exención |
+| E-VS3-14 | VS#3 | Exposición de crédito → CxC abierta + pedidos confirmados no entregados + entregado no facturado. Días de atraso que bloquean: parámetro de una política nueva CREDIT (A-01) |
+| E-VS3-15 | VS#3 | Cierre de despachos del día (OP-DAY) → Advertencia de conduces en tránsito > 24 h; OP-DAY como componente bloqueante llega con producción |
+| E-VS3-16 | VS#3 | Datos reales → Igual que E-VS1-2 / E-VS2-10: ninguno hasta B-02 o paralelo conciliado |
+| E-FIN1-1 | FIN-1 | ¿Quién prepara ajustes? → Rol nuevo **CONTADOR** (`manual_journal:prepare`, `ledger:read`); aprueba el Controller |
+| E-FIN1-2 | FIN-1 | Cuentas permitidas en ajustes → Solo cuentas sin rol de control (v2.1 P-34); las controladas se mueven por su documento |
+| E-FIN1-3 | FIN-1 | Catálogo de cuentas → El Controller crea, edita y desactiva cuentas desde la pantalla (hoy solo por CLI); nunca se borra una cuenta con movimientos |
+| E-FIN1-4 | FIN-1 | Clasificación → Seis clases: activo, pasivo, patrimonio, ingreso, costo, gasto; obligatoria para toda cuenta activa |
+| E-FIN1-5 | FIN-1 | Estructura de los estados → Versionada, preparada por el Controller y aprobada por el Aprobador de políticas; sin estructura aprobada los estados no se generan |
+| E-FIN1-6 | FIN-1 | Componente de cierre de los ajustes → ACR-NTX por defecto; ACR-TAX si el ajuste se marca tributario |
+| E-FIN1-7 | FIN-1 | Soporte del ajuste → Referencia y SHA-256 del documento soporte, obligatorios |
+| E-FIN1-8 | FIN-1 | Reversa automática → Opcional por ajuste; se contabiliza el día 1 del mes siguiente (servicio en segundo plano) |
+| E-FIN1-9 | FIN-1 | Permiso de lectura contable → Nuevo `ledger:read` para Contador, Controller, Auditor y Director |
+| E-FIN1-10 | FIN-1 | Exportación → CSV (UTF-8, separador coma) de balanza, mayor y estados; Excel más adelante |
 
 Implementation rules derived from the above (no architectural change):
 

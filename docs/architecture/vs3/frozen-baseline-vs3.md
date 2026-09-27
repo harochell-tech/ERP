@@ -1,7 +1,7 @@
 # Vertical Slice #3 — Ventas, despacho y cobros (Order-to-Cash)
 
-**Estado: BORRADOR — pendiente de aprobación de Alexander Rochell.** Se congela cuando se aprueben las decisiones D-01…D-16 de
-la sección 12 (errata E-VS3-1…16). Hasta entonces no se escribe código de VS#3.
+**Estado: CONGELADO — aprobado por Alexander Rochell el 2026-09-27**, con las decisiones D-01…D-16 tal como se recomiendan
+(errata E-VS3-1…16). Es la especificación; cualquier cambio sigue la regla de congelamiento.
 
 Fuentes: Architecture v2 §5 Decisión 1 (reconocimiento de ingreso por transferencia de control), §4.J (fiscal RD / e-CF), §12.3
 (máquina e-CF), §18 (MVP P0: "Ventas y cobros", "Despacho"); v2.1 §2 (título legal ≠ control contable), §3 (componentes de cierre
@@ -177,11 +177,11 @@ factura (v2 §3.C). Director y Auditor ven todo (lectura).
 
 | # | Qué | Quién | Bloquea |
 | --- | --- | --- | --- |
-| X-1 | Nombre del proveedor de e-CF y acceso a su ambiente de pruebas | Alexander | VS#4 (Gateway); VS#3 usa canal externo |
+| X-1 | Nombre del proveedor de e-CF y acceso a su ambiente de pruebas — **a definir** (2026-09-27) | Alexander | VS#4 (Gateway); VS#3 usa canal externo |
 | X-2 | Fuentes DGII vigentes: ITBIS de ventas, hecho generador (entrega o factura), retenciones de clientes, tipos de e-CF (A-02) | Fiscal | Datos reales; en staging se usan fuentes TEST |
-| X-3 | Costo estándar de cada producto terminado y lista de precios (A-01) | Controller | Datos reales |
-| X-4 | Términos de pago y límites de crédito actuales por cliente | Crédito | Datos reales |
-| X-5 | Vehículos, choferes y capacidad de báscula | Despacho | Datos reales |
+| X-3 | Costo estándar de cada producto terminado y lista de precios (A-01) — **se definen dentro del sistema** (pantallas de VS3-02/VS3-10) | Controller | Datos reales |
+| X-4 | Términos de pago y límites de crédito — **por cada cliente**, definidos en el sistema (ver E-VS3-17 para proveedores) | Crédito | Datos reales |
+| X-5 | Vehículos, choferes y capacidad de báscula — **se definen dentro del sistema** | Despacho | Datos reales |
 
 ## 11. Plan de PRs (propuesto)
 
