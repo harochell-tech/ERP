@@ -26,6 +26,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             + "period:read,period_component:close,period_component:reopen,posting_rule:approve,purchase_order:approve,purchase_order:read,"
             + "receipt_correction:approve,reconciliation:read,reconciliation:run,supplier:activate,supplier_invoice:read,supplier_invoice:reverse,"
             + "valuation_residual:approve",
+        ["DIRECTOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,master_data:read,payment:read,"
+            + "period:read,purchase_order:read,reconciliation:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission
         ["CUENTAS_POR_PAGAR"] = "bank:read,goods_receipt:read,master_data:read,payment:read,purchase_order:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_rule:activate",

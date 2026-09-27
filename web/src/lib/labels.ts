@@ -111,4 +111,5 @@ export const ROLES: Readonly<Record<string, string>> = {
   SEGUNDO_APROBADOR_CIERRE: "Segundo aprobador de cierre",
   SEGUNDO_APROBADOR_SEGURIDAD: "Segundo aprobador de seguridad",
   PROBADOR: "Probador",
+  DIRECTOR: "Director (solo lectura)",
 };

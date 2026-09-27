@@ -86,7 +86,7 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
    100+ test project exhausts `max_connections` (53300). Concurrency tests throttle themselves (e.g. `SemaphoreSlim(32)`):
    the app pool allows 100 connections, and with the sealer and fixture connections that already exceeds the server limit.
 7. SoD pairs in `iam.sod_rule` are ordered (`permission_a < permission_b`). Seed counts are asserted by tests
-   (60 permissions, 24 SoD rules; policy parameter counts in `AccountingPolicyTests`) — update them when you seed more.
+   (60 permissions, 15 roles incl. DIRECTOR (E-ADM-1), 24 SoD rules; policy parameter counts in `AccountingPolicyTests`) — update them when you seed more.
 8. The table inventory test compares `information_schema` order: check it against a real migrated database.
 9. Deferred guarantees checked at COMMIT: journal balance; **P-1** every inventory GL line ↔ exactly one value entry;
    **P-3** valuation = Σ value entries = GL inventory; **K-25** `accounting_status = POSTED` ⇔ an unreversed AUTO journal of the
