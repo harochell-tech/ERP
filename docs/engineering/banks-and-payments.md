@@ -95,3 +95,14 @@ invoices; at COMMIT a PREPARED payment's allocations, and a RELEASED/CLEARED pay
 RELEASED/CLEARED need an unreversed AUTO journal of the posting event (K-25); amounts have 2 decimals.
 
 Tests: `PaymentTests` (PAY-01…07, PAY-09, update/void, dates and decimals, late entry, released state machine).
+
+## Reversal (VS2-04)
+
+`treasury/reverse-payment` (`payment:reverse`, step-up): RELEASED or CLEARED → REVERSED with a reason of at least 10 characters,
+on today's business date (late entry if BANK-REC or AP-REC is closed). One reversal row per live application, `open_amount`
+restored, and the exact reversal (Patch 1 P-4) of the live R-09 journal. A CLEARED payment's DEBIT statement line stays matched
+(E-VS2-04-1); the bank's return line is matched to the reversal in VS2-05. Migration 0027: a REVERSED payment has no live
+application and no live journal of its posting event. A PREPARED payment is voided, not reversed. After the reversal the invoice
+is fully open again, so VS#1 can reverse it (PAY-08).
+
+Tests: `PaymentReversalTests` (PAY-08, the CLEARED path with the fixture, guards, late entry).

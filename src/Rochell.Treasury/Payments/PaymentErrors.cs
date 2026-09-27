@@ -18,4 +18,6 @@ public static class PaymentErrors
     public const string ValueDateInFuture = "VALUE_DATE_IN_FUTURE";
     public const string SamePerson = "SAME_PERSON";
     public const string ReasonRequired = "REASON_REQUIRED";
+    public const string NotReversible = "PAYMENT_NOT_REVERSIBLE";
+    public const string PostingMissing = "POSTING_PREREQUISITE_MISSING";
 }

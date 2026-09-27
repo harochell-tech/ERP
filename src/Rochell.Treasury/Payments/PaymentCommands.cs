@@ -44,3 +44,11 @@ public sealed record VoidPayment(Guid CompanyId, Guid SessionId, string Idempote
 /// AP-REC is closed, E-VS2-03-3).
 /// </summary>
 public sealed record ReleaseSupplierPayment(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PaymentId, long ExpectedVersion) : ICommand;
+
+/// <summary>
+/// RELEASED or CLEARED → REVERSED (VS#2 §4, PAY-08): the Controller, with step-up and a reason of at least 10 characters
+/// (E-VS2-04-5), reverses the whole payment (E-VS2-04-3) on today's business date (E-VS2-04-2): one reversal row per live
+/// application, invoice balances restored, and the exact reversal of the live R-09 journal (E-VS2-04-4). A CLEARED payment's
+/// statement line stays matched to it (E-VS2-04-1).
+/// </summary>
+public sealed record ReversePayment(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PaymentId, long ExpectedVersion, string Reason) : ICommand;

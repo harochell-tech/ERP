@@ -58,6 +58,7 @@ public static class CommandEndpoints
         treasury.MapCommand<UpdatePreparedPayment, UpdatePreparedPaymentHandler>();
         treasury.MapCommand<VoidPayment, VoidPaymentHandler>();
         treasury.MapCommand<ReleaseSupplierPayment, ReleaseSupplierPaymentHandler>();
+        treasury.MapCommand<ReversePayment, ReversePaymentHandler>();
 
         var procurement = company.MapGroup("/procurement").WithTags("Procurement");
         procurement.MapCommand<CreatePurchaseOrder, CreatePurchaseOrderHandler>();
@@ -124,6 +125,7 @@ public static class CommandEndpoints
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
+        typeof(ReversePaymentHandler),
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
