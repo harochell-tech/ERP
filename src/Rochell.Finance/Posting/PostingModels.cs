@@ -37,4 +37,4 @@ public sealed record PlannedLine(PostingLineInput Input, RuleLine Rule, Guid Acc
 public sealed record PostedJournal(Guid JournalId, DateOnly PostingDate, bool LateEntry, IReadOnlyList<Guid> EntryIds);
 
 /// <summary>A validated exact reversal (Patch 1 P-4): the journal to reverse and where the reversal will be posted.</summary>
-public sealed record ReversalPlan(Guid OriginalJournalId, Guid PostingRuleId, int PostingRuleVersion, Guid PeriodId, DateOnly PostingDate, bool LateEntry, DateOnly BusinessDate);
+public sealed record ReversalPlan(Guid OriginalJournalId, Guid? PostingRuleId, int? PostingRuleVersion, Guid PeriodId, DateOnly PostingDate, bool LateEntry, DateOnly BusinessDate);

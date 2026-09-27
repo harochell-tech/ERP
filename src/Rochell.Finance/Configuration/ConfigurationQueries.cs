@@ -11,7 +11,8 @@ namespace Rochell.Finance.Configuration;
 
 public sealed record ListAccounts(Guid CompanyId, Guid SessionId) : IQuery;
 
-public sealed record AccountView(Guid AccountId, string Code, string Name, bool IsControl);
+/// <summary>E-FIN1-01-1: <see cref="AccountClass"/> is null until the Controller sets it.</summary>
+public sealed record AccountView(Guid AccountId, string Code, string Name, bool IsControl, string? AccountClass, string Status);
 
 public sealed record AccountList(IReadOnlyList<AccountView> Items);
 
@@ -26,8 +27,8 @@ public sealed class ListAccountsHandler : IQueryHandler<ListAccounts>
         var items = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT account_id, code, name, is_control FROM fin.account WHERE company_id = @c ORDER BY code",
-            r => new AccountView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetBoolean(3)),
+            "SELECT account_id, code, name, is_control, account_class, status FROM fin.account WHERE company_id = @c ORDER BY code",
+            r => new AccountView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetBoolean(3), r.NullableString(4), r.GetString(5)),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false);
         return ApiJson.Serialize(new AccountList(items));

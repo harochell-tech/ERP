@@ -39,11 +39,11 @@ public sealed class ListEventJournalsHandler : IQueryHandler<ListEventJournals>
             context.Connection,
             context.Transaction,
             """
-            SELECT j.journal_id, r.code, j.posting_rule_version, j.journal_type, j.posting_generation, j.posting_date, j.late_entry, j.reverses_journal_id
+            SELECT j.journal_id, coalesce(r.code, 'P-34'), coalesce(j.posting_rule_version, 1), j.journal_type, j.posting_generation, j.posting_date, j.late_entry, j.reverses_journal_id
             FROM fin.gl_journal j
-            JOIN fin.posting_rule r ON r.posting_rule_id = j.posting_rule_id
+            LEFT JOIN fin.posting_rule r ON r.posting_rule_id = j.posting_rule_id -- a manual adjustment and its reversal have no rule (E-FIN1-01-2)
             WHERE j.company_id = @c AND j.source_event_id = @e
-            ORDER BY j.posting_generation, r.code, j.journal_id
+            ORDER BY j.posting_generation, 2, j.journal_id
             """,
             r => new GlJournalView(r.GetGuid(0), r.GetString(1), r.GetInt32(2), r.GetString(3), r.GetInt32(4), r.Date(5), r.GetBoolean(6), r.NullableGuid(7), []),
             cancellationToken,

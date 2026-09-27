@@ -198,7 +198,9 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
             ends_on = endsOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             closed_at = now.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture),
             reconciliations = runs.Select(r => new { code = r.Code, run_id = r.RunId, status = r.Status, total_a = Text(r.TotalA), total_b = Text(r.TotalB) }),
-            balances = command.Component == Components.BankReconciliation ? BankBalances(runs) : await BalancesAsync(context, command.Component, cancellationToken).ConfigureAwait(false),
+            balances = command.Component == Components.BankReconciliation ? BankBalances(runs)
+                : command.Component is Components.Accruals or Components.TaxAccruals ? await AdjustmentBalancesAsync(context, command.Component, startsOn, endsOn, cancellationToken).ConfigureAwait(false)
+                : await BalancesAsync(context, command.Component, cancellationToken).ConfigureAwait(false),
         }));
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(content));
         var snapshotId = context.Ids.NewId();
@@ -249,6 +251,39 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
     }
 
     private static string? Text(decimal? value) => value?.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>E-FIN1-6: the adjustments of the component dated in the period (number, status, total) as they stood at the close.</summary>
+    private static async Task<List<Dictionary<string, string?>>> AdjustmentBalancesAsync(CommandContext context, string component, DateOnly startsOn, DateOnly endsOn, CancellationToken cancellationToken)
+    {
+        var rows = new List<Dictionary<string, string?>>();
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT m.journal_no, m.status, (SELECT sum(l.debit)::text FROM fin.manual_journal_line l WHERE l.manual_journal_id = m.manual_journal_id
+                     AND l.journal_version = (SELECT max(x.journal_version) FROM fin.manual_journal_line x WHERE x.manual_journal_id = m.manual_journal_id))
+            FROM fin.manual_journal m
+            WHERE m.company_id = @c AND m.close_component = @k AND m.status IN ('POSTED', 'REVERSED') AND m.posting_date BETWEEN @s AND @e
+            ORDER BY m.journal_no
+            """,
+            ("c", context.CompanyId),
+            ("k", component),
+            ("s", startsOn),
+            ("e", endsOn));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            rows.Add(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["kind"] = "adjustment",
+                ["key"] = reader.GetString(0) + "/" + reader.GetString(1),
+                ["quantity"] = null,
+                ["amount"] = reader.IsDBNull(2) ? null : reader.GetString(2),
+            });
+        }
+
+        return rows;
+    }
 
     /// <summary>
     /// E-VS2-06-7: per bank account the GL balance, the statement balance, each in-transit item and the difference at the period end;

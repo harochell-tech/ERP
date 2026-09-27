@@ -3,6 +3,7 @@ using Rochell.Api.Http;
 using Rochell.Audit;
 using Rochell.Finance.Configuration;
 using Rochell.Finance.Explain;
+using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
 using Rochell.Identity.Queries;
 using Rochell.MasterData.Queries;
@@ -39,6 +40,7 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
         typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
+        typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler),
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
@@ -102,6 +104,12 @@ public static class QueryEndpoints
         finance.MapGet("/accounts", (HttpContext http, Guid companyId, ListAccountsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListAccounts(companyId, s), handler, ct))
             .Describe<AccountList>(nameof(ListAccounts));
+        finance.MapGet("/manual-journals", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListManualJournalsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListManualJournals(companyId, s, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<ManualJournalList>(nameof(ListManualJournals));
+        finance.MapGet("/manual-journals/{manualJournalId:guid}", (HttpContext http, Guid companyId, Guid manualJournalId, GetManualJournalHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetManualJournal(companyId, s, manualJournalId), handler, ct))
+            .Describe<ManualJournalDetail>(nameof(GetManualJournal));
         finance.MapGet("/account-role-maps", (HttpContext http, Guid companyId, string? status, ListAccountRoleMapsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListAccountRoleMaps(companyId, s, status), handler, ct))
             .Describe<AccountRoleMapList>(nameof(ListAccountRoleMaps));

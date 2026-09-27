@@ -105,7 +105,7 @@ public static class GroupReader
             companyId,
             journalId,
             r => new GlJournalRow(
-                r.GetGuid(0), r.GetGuid(1), r.GetFieldValue<DateOnly>(2), r.GetGuid(3), r.GetGuid(4), r.GetGuid(5), r.GetInt32(6), r.GetInt32(7),
+                r.GetGuid(0), r.GetGuid(1), r.GetFieldValue<DateOnly>(2), r.GetGuid(3), r.GetGuid(4), NullableGuid(r, 5), r.IsDBNull(6) ? null : r.GetInt32(6), r.GetInt32(7),
                 r.GetString(8), NullableGuid(r, 9), r.GetBoolean(10), r.GetDateTime(11)).ComputeRowHash(),
             12,
             cancellationToken).ConfigureAwait(false);
