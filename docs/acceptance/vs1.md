@@ -45,10 +45,10 @@ concurrent first inserts fail (23505); E-PR19-14 excludes those tables.
 | --- | --- | --- |
 | B-02 | Second-person review of the ledger code (Posting Engine, inventory ledger, receipts, corrections, invoices, repost, close) — **due 2026-11-24** | Alexander |
 | E-VS1-4 | Parallel run with the current accounting system (inventory, AP, GRNI reconciled to zero at period end) before any real use without B-02 | Controller |
-| B-03 | Staging PostgreSQL 17 and object-lock (WORM) storage; then the daily digest, hash verification over WORM, and PF-01 repeated on staging | Tech lead |
+| B-03 | Staging PostgreSQL 17 and object-lock (WORM) storage; then the daily digest, hash verification over WORM, and PF-01 repeated on staging. **2026-09-27:** staging up at `https://staging.industriasrochell.com.do` (deploy-staging run 36287377902, 23 migrations, TEST, Backblaze B2 Object Lock verified at start); pending: first digest written to WORM, verification over WORM, PF-01 on staging | Tech lead |
 | A-01 | Controller approves the account maps and policy values | Management + Controller |
 | A-02 | Official DGII sources (PRODUCTION) for purchase ITBIS and withholding; until then production activation is blocked by design (P-7, E-PR19-9) | Fiscal specialist |
-| A-03 | Google Workspace OIDC client and domain for staging | Alexander |
+| A-03 | Google Workspace OIDC client and domain for staging — **closed 2026-09-27**: first sign-in on staging with a `rochell.com.do` account | Alexander |
 | E-PR19-11 | Nightly ACC-EVIDENCE / INV-VALUE-GL runs need a service identity; until then they run on demand and CloseComponent runs the blocking ones | Operations |
 
 ## Traceability matrix

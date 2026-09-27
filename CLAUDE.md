@@ -36,11 +36,11 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-19 | CC-04, PF-01 (`tests/Rochell.LoadHarness`, workflow `load`), traceability of all 70 acceptance tests, P-7 conformance (migration 0021). Merged (#21). Acceptance: `docs/acceptance/vs1.md`; B-02 review guide: `docs/acceptance/b02-ledger-review.md` (pending) |
 
 | VS#2 | Supplier payments and banks — Frozen Baseline `docs/architecture/vs2/frozen-baseline-vs2.md` approved (E-VS2-1…10). VS2-01 (schema, E-VS2-01-1…14): `docs/engineering/banks-and-payments.md`; next: VS2-02 |
-| B-03 | Staging decisions E-B03-1…9. B03-1: `S3WormStore` (S3 Object Lock, COMPLIANCE; tests on RustFS). B03-2: `Dockerfile`, `deploy/staging/*`, workflow `deploy-staging`, runbook `docs/engineering/staging.md` (waits for VPS, domain, AWS, OIDC from Alexander) |
+| B-03 | E-B03-1…13. Staging live at `https://staging.industriasrochell.com.do` (the `sistema` VPS, 2.25.237.35; WORM + backups on Backblaze B2; company Block Rochell, S.R.L. (STAGING), RNC 131925332, synthetic data only). Deploy: Actions → `deploy-staging` on `main`. Runbook `docs/engineering/staging.md`. Pending: first digest in WORM, verify over WORM, PF-01 on staging |
 
 Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** staging PostgreSQL 17 + WORM storage;
-**A-01** Controller approves policy values and account maps; **A-02** official DGII sources for ITBIS / withholding;
-**A-03** Google Workspace OIDC client for staging.
+**A-01** Controller approves policy values and account maps; **A-02** official DGII sources for ITBIS / withholding.
+**A-03** closed 2026-09-27 (Google sign-in works on staging).
 
 ## 3. Workflow per PR
 
