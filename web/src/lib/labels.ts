@@ -55,3 +55,21 @@ export function formatDateTime(value: string | null | undefined): string {
 export function todayInDominicanRepublic(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santo_Domingo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
+
+/** Role names as seeded (§14, VS#2 §7, E-B03-14). */
+export const ROLES: Readonly<Record<string, string>> = {
+  COMPRADOR: "Comprador",
+  APROBADOR_COMPRAS: "Aprobador de compras",
+  ALMACENISTA: "Almacenista",
+  CUENTAS_POR_PAGAR: "Cuentas por pagar",
+  CONTROLLER: "Controller",
+  TESORERO: "Tesorero",
+  ESPECIALISTA_FISCAL: "Especialista fiscal",
+  ANALISTA_FISCAL: "Analista fiscal",
+  ADMIN_SEGURIDAD: "Administrador de seguridad",
+  AUDITOR: "Auditor",
+  APROBADOR_POLITICAS: "Aprobador de políticas contables",
+  SEGUNDO_APROBADOR_CIERRE: "Segundo aprobador de cierre",
+  SEGUNDO_APROBADOR_SEGURIDAD: "Segundo aprobador de seguridad",
+  PROBADOR: "Probador",
+};

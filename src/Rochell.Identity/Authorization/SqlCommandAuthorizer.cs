@@ -36,7 +36,7 @@ public sealed class SqlCommandAuthorizer : ICommandAuthorizer
         var session = await ReadSessionAsync(connection, transaction, command.SessionId, cancellationToken).ConfigureAwait(false)
             ?? throw new DomainException(AuthorizationErrors.SessionInvalid, "The session does not exist.");
 
-        SessionRules.EnsureUsable(_options, now, session.LoginAt, session.LastActivityAt, session.LogoutAt, session.Status, session.Kind);
+        SessionRules.EnsureUsable(_options, now, session.LoginAt, session.LastActivityAt, session.LogoutAt, session.Status, session.Kind, session.Parent);
 
         Guid? plantId = command is IPlantScopedCommand scoped ? scoped.PlantId : null;
         await using (var permission = Sql.Command(
@@ -99,9 +99,12 @@ public sealed class SqlCommandAuthorizer : ICommandAuthorizer
             connection,
             transaction,
             """
-            SELECT s.user_id, s.login_at, s.last_activity_at, s.last_step_up_at, s.logout_at, u.status, u.kind
+            SELECT s.user_id, s.login_at, s.last_activity_at, s.last_step_up_at, s.logout_at, u.status, u.kind,
+                   p.login_at, p.logout_at, pu.status, pu.kind
             FROM iam.session s
             JOIN iam.user u ON u.user_id = s.user_id
+            LEFT JOIN iam.session p ON p.session_id = s.authenticated_session_id
+            LEFT JOIN iam.user pu ON pu.user_id = p.user_id
             WHERE s.session_id = @session_id
             """,
             ("session_id", sessionId));
@@ -118,8 +121,15 @@ public sealed class SqlCommandAuthorizer : ICommandAuthorizer
             reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTime>(3),
             reader.IsDBNull(4) ? null : reader.GetFieldValue<DateTime>(4),
             reader.GetString(5),
-            reader.GetString(6));
+            reader.GetString(6),
+            reader.IsDBNull(7)
+                ? null
+                : new ParentSession(
+                    reader.GetFieldValue<DateTime>(7),
+                    reader.IsDBNull(8) ? null : reader.GetFieldValue<DateTime>(8),
+                    reader.GetString(9),
+                    reader.GetString(10)));
     }
 
-    private sealed record SessionRow(Guid UserId, DateTime LoginAt, DateTime LastActivityAt, DateTime? LastStepUpAt, DateTime? LogoutAt, string Status, string Kind);
+    private sealed record SessionRow(Guid UserId, DateTime LoginAt, DateTime LastActivityAt, DateTime? LastStepUpAt, DateTime? LogoutAt, string Status, string Kind, ParentSession? Parent);
 }

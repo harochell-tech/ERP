@@ -118,8 +118,13 @@ public sealed class SchemaTests(PostgresFixture postgres)
     {
         var cs = await postgres.CreateEmptyDatabaseAsync();
         using var scratch = new ScratchMigrations();
-        const string Banks = "0023__payments_and_banks.sql";
-        scratch.Delete(Banks);
+        // Migrate up to 0022 (0023 and every later file removed: numbering must stay contiguous), add a period, then the rest.
+        var later = TestPaths.MainMigrationFiles.Where(f => string.CompareOrdinal(f, "0023") >= 0).ToList();
+        foreach (var file in later)
+        {
+            scratch.Delete(file);
+        }
+
         await Db.Runner(cs).MigrateAsync(scratch.Source);
         await Db.ExecuteAsync(cs, """
             INSERT INTO md.company (company_id, rnc, legal_name) VALUES ('00000000-0000-7000-8000-00000000c001', '101000001', 'Empresa');
@@ -129,7 +134,11 @@ public sealed class SchemaTests(PostgresFixture postgres)
             SELECT '00000000-0000-7000-8000-00000000c001', '00000000-0000-7000-8000-00000000c002', c, 'OPEN', 1 FROM (VALUES ('INV-MOV'), ('AP-REC')) AS v (c);
             """);
 
-        File.Copy(Path.Combine(TestPaths.MainMigrations, Banks), Path.Combine(scratch.DirectoryPath, Banks));
+        foreach (var file in later)
+        {
+            File.Copy(Path.Combine(TestPaths.MainMigrations, file), Path.Combine(scratch.DirectoryPath, file));
+        }
+
         await Db.Runner(cs).MigrateAsync(scratch.Source);
 
         Assert.Equal("AP-REC:OPEN,BANK-REC:OPEN,INV-MOV:OPEN", await Db.ScalarAsync<string>(cs,

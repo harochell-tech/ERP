@@ -126,6 +126,167 @@
         }
       }
     },
+    "/api/v1/auth/test-identities": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Synthetic users the signed-in person may act as in a company (needs identity:act_as; TEST databases only).",
+        "operationId": "ListTestIdentities",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TestIdentity"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/act-as": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Acts as a synthetic user (E-B03-14): segregation of duties and four-eyes rules apply to it as to anyone.",
+        "operationId": "ActAs",
+        "parameters": [
+          {
+            "name": "X-Rochell-Csrf",
+            "in": "header",
+            "description": "Anti-CSRF header; must be \"1\".",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActAsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/act-as/stop": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Returns to the signed-in person's own session.",
+        "operationId": "StopActingAs",
+        "parameters": [
+          {
+            "name": "X-Rochell-Csrf",
+            "in": "header",
+            "description": "Anti-CSRF header; must be \"1\".",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/companies/{companyId}/master-data/create-supplier": {
       "post": {
         "tags": [
@@ -6744,6 +6905,24 @@
   },
   "components": {
     "schemas": {
+      "ActAsRequest": {
+        "required": [
+          "companyId",
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "companyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "ActivateFiscalRuleVersion": {
         "required": [
           "ruleVersionId"
@@ -9279,6 +9458,12 @@
             "items": {
               "$ref": "#/components/schemas/SessionCompany"
             }
+          },
+          "authenticatedEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -9718,6 +9903,30 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TestIdentity": {
+        "required": [
+          "userId",
+          "email",
+          "roles"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false
