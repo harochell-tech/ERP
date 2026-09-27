@@ -91,6 +91,14 @@ Deployment branch rule: `main` only; optionally a required reviewer (Alexander).
 Actions → deploy-staging → Run workflow (branch `main`). The job checks CI, builds and pushes the image, uploads the compose files
 and `.env` (mode 600), and runs `deploy.sh`. The VPS pulls with the job's short-lived token and logs out afterwards.
 
+## One-time synthetic setup (`seed.sh`)
+
+After the first deploy, on the VPS: `/opt/rochell-staging/seed.sh alex@rochell.com.do`. It grants the tester PROBADOR, creates
+one test identity per slice role (`comprador@staging.invalid`, `aprobador@…`, `almacen@…`, `cxp@…`, `controller@…`,
+`politicas@…`, `analista@…`, `fiscal@…`, `tesorero@…`, `auditor@…`, `cierre@…`), and loads the synthetic chart of accounts and
+DRAFT account maps in `deploy/staging/seed/` (approved in the UI, "Mapas de cuentas"). Run it once: a second run stops at the
+first identity that already exists.
+
 ## Test identities (E-B03-14)
 
 One tester exercises every role through synthetic users (see [identity.md](identity.md#test-identities-e-b03-14-test-databases-only)):
