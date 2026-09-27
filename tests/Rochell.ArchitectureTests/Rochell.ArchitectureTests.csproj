@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\Rochell.Tax\Rochell.Tax.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Audit\Rochell.Audit.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Reconciliation\Rochell.Reconciliation.csproj" />
+    <ProjectReference Include="..\..\src\Rochell.Treasury\Rochell.Treasury.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Migrations\Rochell.Migrations.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Migrations.Cli\Rochell.Migrations.Cli.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Api\Rochell.Api.csproj" />
