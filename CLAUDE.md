@@ -35,7 +35,7 @@ fiscal rules document-level, not SoD — a test in Identity enforces it).
 | PR-18b | Merged (#20): `web/` (Next.js static export served by the API), dev stack, Playwright journey |
 | PR-19 | CC-04, PF-01 (`tests/Rochell.LoadHarness`, workflow `load`), traceability of all 70 acceptance tests, P-7 conformance (migration 0021). Merged (#21). Acceptance: `docs/acceptance/vs1.md`; B-02 review guide: `docs/acceptance/b02-ledger-review.md` (pending) |
 
-| VS#2 | Supplier payments and banks — Frozen Baseline `docs/architecture/vs2/frozen-baseline-vs2.md` approved (E-VS2-1…10). VS2-01 (schema, E-VS2-01-1…14): `docs/engineering/banks-and-payments.md`; next: VS2-02 |
+| VS#2 | Supplier payments and banks — Frozen Baseline `docs/architecture/vs2/frozen-baseline-vs2.md` approved (E-VS2-1…10). VS2-01 (schema, E-VS2-01-1…14), VS2-02 (bank accounts, module `Rochell.Treasury`, E-VS2-02-1…8): `docs/engineering/banks-and-payments.md`; next: VS2-03 |
 | B-03 | E-B03-1…15. Staging live at `https://staging.industriasrochell.com.do` (the `sistema` VPS, 2.25.237.35; WORM + backups on Backblaze B2; company Block Rochell, S.R.L. (STAGING), RNC 131925332, synthetic data only). Deploy: Actions → `deploy-staging` on `main`. Runbook `docs/engineering/staging.md`. B03-3: test identities (E-B03-14, migration 0024, `identity.md`). B03-4: configuration screens (E-B03-15, migration 0025 `configuration:read`, `web.md`). Pending: first digest in WORM, verify over WORM, PF-01 on staging |
 
 Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** staging PostgreSQL 17 + WORM storage;
@@ -64,7 +64,8 @@ Open blockers / conditions: **B-02** second reviewer for ledger PRs; **B-03** st
   accounting policies or fiscal rules, never from code.
 - Every production `ICommandHandler<T>` has exactly one `[RequiresPermission]`, and that permission is seeded in `db/migrations`.
 - Test fixtures (`TEST.`, `TestStock`, `test:`, `TEST_`) live only in `tests/migrations`, never in `db/migrations`.
-- Module graph (E-PR08-1): every module → Platform; **only Procurement** may also use Finance, Inventory, MasterData and Tax.
+- Module graph (E-PR08-1): every module → Platform; **Procurement** may also use Finance, Inventory, MasterData and Tax;
+  **Treasury** may also use Finance and MasterData (E-VS2-02-1); Audit may use Finance and Inventory (E-PR15-7).
   Commands that need the Posting Engine and the inventory ledger together therefore live in Procurement (e.g. `Ledger/`).
 
 ## 5. Hard-won lessons (each one cost a CI round — do not repeat)

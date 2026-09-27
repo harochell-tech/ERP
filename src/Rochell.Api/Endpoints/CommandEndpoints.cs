@@ -5,6 +5,7 @@ using Rochell.Audit;
 using Rochell.Finance.Configuration;
 using Rochell.Finance.Policies;
 using Rochell.Identity.RoleChanges;
+using Rochell.MasterData.BankAccounts;
 using Rochell.MasterData.Items;
 using Rochell.MasterData.Suppliers;
 using Rochell.Platform.Commands;
@@ -15,6 +16,7 @@ using Rochell.Procurement.ReceiptCorrections;
 using Rochell.Procurement.SupplierInvoices;
 using Rochell.Reconciliation;
 using Rochell.Tax;
+using Rochell.Treasury.BankAccounts;
 
 namespace Rochell.Api.Endpoints;
 
@@ -43,6 +45,14 @@ public static class CommandEndpoints
         masterData.MapCommand<CreateRawMaterial, CreateRawMaterialHandler>();
         masterData.MapCommand<DefineUomConversion, DefineUomConversionHandler>();
         masterData.MapCommand<ActivateItem, ActivateItemHandler>();
+        masterData.MapCommand<RequestPartyBankAccount, RequestPartyBankAccountHandler>();
+        masterData.MapCommand<VerifyPartyBankAccount, VerifyPartyBankAccountHandler>();
+        masterData.MapCommand<RejectPartyBankAccount, RejectPartyBankAccountHandler>();
+
+        // E-VS2-02-1 / E-VS2-02-8: treasury commands (queries and screens come with VS2-07 / VS2-08).
+        var treasury = company.MapGroup("/treasury").WithTags("Treasury");
+        treasury.MapCommand<RegisterBankAccount, RegisterBankAccountHandler>();
+        treasury.MapCommand<CloseBankAccount, CloseBankAccountHandler>();
 
         var procurement = company.MapGroup("/procurement").WithTags("Procurement");
         procurement.MapCommand<CreatePurchaseOrder, CreatePurchaseOrderHandler>();
@@ -106,6 +116,8 @@ public static class CommandEndpoints
     [
         typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(CreateRawMaterialHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
+        typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
+        typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler),
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
