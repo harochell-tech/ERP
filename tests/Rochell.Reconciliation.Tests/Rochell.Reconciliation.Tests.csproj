@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\src\Rochell.Reconciliation\Rochell.Reconciliation.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Audit\Rochell.Audit.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Procurement\Rochell.Procurement.csproj" />
+    <ProjectReference Include="..\..\src\Rochell.Treasury\Rochell.Treasury.csproj" />
     <ProjectReference Include="..\Rochell.TestInfrastructure\Rochell.TestInfrastructure.csproj" />
   </ItemGroup>
 </Project>

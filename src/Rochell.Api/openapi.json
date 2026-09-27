@@ -12452,6 +12452,13 @@
             "items": {
               "type": "string"
             }
+          },
+          "cutoffDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         },
         "additionalProperties": false

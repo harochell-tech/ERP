@@ -16,11 +16,12 @@ public static class ReconciliationErrors
     public const string ReasonRequired = "REASON_REQUIRED";
 }
 
-/// <summary>Close components of VS#1 (Frozen Baseline §11.7).</summary>
+/// <summary>Close components of VS#1 (Frozen Baseline §11.7) and BANK-REC of VS#2 (E-VS2-06-7).</summary>
 public static class Components
 {
     public const string InventoryMovements = "INV-MOV";
     public const string AccountsPayable = "AP-REC";
+    public const string BankReconciliation = "BANK-REC";
 
-    public static bool IsKnown(string component) => component is InventoryMovements or AccountsPayable;
+    public static bool IsKnown(string component) => component is InventoryMovements or AccountsPayable or BankReconciliation;
 }

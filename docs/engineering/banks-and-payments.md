@@ -156,3 +156,28 @@ CREDIT line's is REVERSED, and a CHARGE_RECOGNIZED line has the unreversed AUTO 
 
 Tests: `BankStatementTests` (BNK-01…03, occurrence and kept file, rejections, missing format and closed period, the signed
 windows-1252 format with header cells, match guards, unmatch and the CLEARED → REVERSED path end to end, E-VS2-04-6; the bank's return of a reversed transfer, E-VS2-05-10).
+
+## BANK-GL, PAY-APPL and the BANK-REC close (VS2-06)
+
+Migration `0029__bank_reconciliation.sql`; approved errata E-VS2-06-1…10. `RunReconciliation` takes an optional `CutoffDate`
+(stored on `rec.recon_run.cutoff_date`); `CloseComponent` passes the period end; only BANK-GL uses it (without one: today's
+business date). "All" reconciliations are now ten: the eight of VS#1, BANK-GL and PAY-APPL. `Components.IsKnown` accepts BANK-REC.
+
+| Reconciliation | Blocks | Findings |
+| --- | --- | --- |
+| BANK-GL (`BankGl`) | BANK-REC | Per bank account at D (a CLOSED account at its closing date): `STATEMENT_MISSING` (GL movement, no statement covering D), `OPENING_DIFFERENCE` (first statement's opening ≠ GL the day before), `BANK_GL_DIFFERENCE` (the equation below does not hold), `IN_TRANSIT_AGED` warning (item older than 30 days). An account with no movement and zero balance up to D is skipped (E-VS2-06-8) |
+| PAY-APPL | BANK-REC, AP-REC | `PAYMENT_APPLICATION_DIFFERENCE` (Σ live applications ≠ amount; REVERSED: 0), `AP_DOCUMENT_APPLICATION_DIFFERENCE` (original − open ≠ Σ live applications, invoices POSTED), `APPLICATION_WITHOUT_R09_LINE` (each application and reversal row has exactly one R-09 AP line of its event, AP document and amount) |
+| ACC-EVIDENCE (extended) | + BANK-REC | `RELEASED_WITHOUT_JOURNAL` / `REVERSED_WITH_LIVE_JOURNAL` for payments, `CHARGE_WITHOUT_JOURNAL` for recognized charges |
+
+**The BANK-GL equation** (E-VS2-06-2/3/10). Statement at D = closing balance of the latest imported statement covering D minus the
+account's lines dated after D within it. GL items: each BANK entry posted ≤ D whose line is not matched ≤ D (R-09 ↔ the payment's
+DEBIT line: `OUTSTANDING_PAYMENT`; its reversal ↔ the CREDIT return line: `OUTSTANDING_RETURN`; R-10 ↔ its charge line); a
+payment and its reversal both in transit cancel and are not listed; a BANK entry of no payment or charge is never an item. Line
+items: each line dated ≤ D without its entry posted ≤ D (`UNRECORDED_DEBIT` / `UNRECORDED_CREDIT`).
+GL = statement + Σ GL items (debit − credit) − Σ line items (credit − debit).
+
+**BANK-REC snapshot** (E-VS2-06-7): per bank account `bank_gl`, `bank_statement`, one `in_transit` row per item
+(`account/kind/reference/date`) and `bank_difference`; plus `pay_appl_applications` and `pay_appl_payments`.
+
+Tests: `BankReconciliationTests` (BNK-04 close, BNK-05 in-transit items and the aged warning, missing statement and opening
+difference, a reversed payment netting out, a pending return, PAY-APPL findings and blocking).
