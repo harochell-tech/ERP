@@ -10,6 +10,9 @@ public sealed record ReconFinding(string MatchKey, decimal? ValueA, decimal? Val
 /// <summary>The outcome of one reconciliation run, as stored in rec.recon_run and rec.recon_exception.</summary>
 public sealed record ReconRun(Guid RunId, string Code, string Status, decimal? TotalA, decimal? TotalB, IReadOnlyList<ReconFinding> Findings)
 {
+    /// <summary>BANK-GL only: each bank account's equation at the cutoff (for the BANK-REC close snapshot, E-VS2-06-7).</summary>
+    public IReadOnlyList<BankAccountReconciliation> BankAccounts { get; init; } = [];
+
     public bool Blocks(string component)
         => Findings.Any(f => f.Severity == "ERROR" && (f.Component is null || f.Component == component));
 }
@@ -22,7 +25,7 @@ public sealed record ReconRun(Guid RunId, string Code, string Status, decimal? T
 public static class Reconciliations
 {
     public static IReadOnlyList<string> All { get; } =
-        ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING"];
+        ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -163,7 +166,7 @@ public static class Reconciliations
                    coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0),
                    'AP_DOCUMENT_APPLICATION_DIFFERENCE', 'ERROR', NULL
             FROM fin.ap_document d
-            JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.document_status::text = 'POSTED'
+            JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.accounting_status::text = 'POSTED'
             LEFT JOIN fin.ap_application a ON a.ap_doc_id = d.ap_doc_id
             WHERE d.company_id = @c
             GROUP BY d.ap_doc_id, d.original_amount, d.open_amount
@@ -225,6 +228,18 @@ public static class Reconciliations
         var runs = new List<ReconRun>();
         foreach (var code in codes)
         {
+            if (code == "BANK-GL")
+            {
+                var bankRunId = context.Ids.NewId();
+                var (bankFindings, bankAccounts) = await BankGl.RunAsync(context, cutoff ?? Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(asOf), cancellationToken).ConfigureAwait(false);
+                var gl = bankAccounts.Sum(a => a.GlBalance);
+                var explained = bankAccounts.Sum(a => a.GlBalance - (a.Difference ?? a.GlBalance));
+                var stored = await StoreAsync(
+                    context, bankRunId, code, asOf, cutoff, bankFindings.Count == 0 ? "MATCHED" : "EXCEPTIONS", gl, explained, [.. bankFindings], cancellationToken).ConfigureAwait(false);
+                runs.Add(stored with { BankAccounts = bankAccounts });
+                continue;
+            }
+
             if (!Definitions.TryGetValue(code, out var definition))
             {
                 throw new DomainException(ReconciliationErrors.UnknownReconciliation, $"Unknown reconciliation {code}.");

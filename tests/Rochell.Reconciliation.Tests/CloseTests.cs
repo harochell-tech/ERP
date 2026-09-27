@@ -62,7 +62,7 @@ public sealed class CloseTests(PostgresFixture postgres)
         var result = await ReconcileAsync(h, s.Purchasing.Controller, "rec");
 
         Assert.All(result.GetProperty("runs").EnumerateArray(), r => Assert.Equal("MATCHED", r.GetProperty("status").GetString()));
-        Assert.Equal(8L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_run"));
+        Assert.Equal(10L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_run")); // 8 of VS#1 + BANK-GL and PAY-APPL (VS2-06)
         Assert.Equal(0L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_exception"));
     }
 

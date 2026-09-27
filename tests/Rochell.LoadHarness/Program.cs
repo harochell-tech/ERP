@@ -117,7 +117,7 @@ internal static class LoadProgram
             await sealer.SealAllAsync(CancellationToken.None);
 
             var reconciliation = Stopwatch.StartNew();
-            var run = await h.RunAsync(new RunReconciliation(h.CompanyId, r.Purchasing.Controller, "pf01-recon"), new RunReconciliationHandler());
+            var run = await h.RunAsync(new RunReconciliation(h.CompanyId, r.Purchasing.Controller, "pf01-recon", Reconciliations.All.Take(8).ToList()), new RunReconciliationHandler());
             reconciliation.Stop();
             var reconStatuses = JsonDocument.Parse(run.ResultPayload).RootElement.GetProperty("runs").EnumerateArray()
                 .Select(x => $"{x.GetProperty("code").GetString()}:{x.GetProperty("status").GetString()}")

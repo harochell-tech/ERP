@@ -198,7 +198,7 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
             ends_on = endsOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             closed_at = now.ToString("yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'", CultureInfo.InvariantCulture),
             reconciliations = runs.Select(r => new { code = r.Code, run_id = r.RunId, status = r.Status, total_a = Text(r.TotalA), total_b = Text(r.TotalB) }),
-            balances = await BalancesAsync(context, command.Component, cancellationToken).ConfigureAwait(false),
+            balances = command.Component == Components.BankReconciliation ? BankBalances(runs) : await BalancesAsync(context, command.Component, cancellationToken).ConfigureAwait(false),
         }));
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(content));
         var snapshotId = context.Ids.NewId();
@@ -249,6 +249,40 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
     }
 
     private static string? Text(decimal? value) => value?.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// E-VS2-06-7: per bank account the GL balance, the statement balance, each in-transit item and the difference at the period end;
+    /// plus the PAY-APPL totals (live applications, released and cleared payments).
+    /// </summary>
+    private static List<Dictionary<string, string?>> BankBalances(IReadOnlyList<ReconRun> runs)
+    {
+        static Dictionary<string, string?> Row(string kind, string key, decimal? amount) => new(StringComparer.Ordinal)
+        {
+            ["kind"] = kind,
+            ["key"] = key,
+            ["quantity"] = null,
+            ["amount"] = Text(amount),
+        };
+
+        var rows = new List<Dictionary<string, string?>>();
+        foreach (var a in runs.Where(r => r.Code == "BANK-GL").SelectMany(r => r.BankAccounts))
+        {
+            var account = a.BankAccountId.ToString();
+            rows.Add(Row("bank_gl", account, a.GlBalance));
+            rows.Add(Row("bank_statement", account, a.StatementBalance));
+            rows.AddRange(a.GlItems.Concat(a.LineItems).Select(i =>
+                Row("in_transit", string.Create(CultureInfo.InvariantCulture, $"{account}/{i.Kind}/{i.Reference}/{i.Date:yyyy-MM-dd}"), i.Amount)));
+            rows.Add(Row("bank_difference", account, a.Difference));
+        }
+
+        foreach (var r in runs.Where(r => r.Code == "PAY-APPL"))
+        {
+            rows.Add(Row("pay_appl_applications", "total", r.TotalA));
+            rows.Add(Row("pay_appl_payments", "total", r.TotalB));
+        }
+
+        return rows;
+    }
 
     /// <summary>INV-MOV: valuation by area × item and the RAW_MATERIAL accounts; AP-REC: open AP and AP_CONTROL by supplier.</summary>
     private static async Task<List<Dictionary<string, string?>>> BalancesAsync(CommandContext context, string component, CancellationToken cancellationToken)

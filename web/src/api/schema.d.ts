@@ -2366,6 +2366,8 @@ export interface components {
         };
         RunReconciliation: {
             reconCodes?: null | string[];
+            /** Format: date */
+            cutoffDate?: null | string;
         };
         SessionAssignment: {
             roleCode: string;
