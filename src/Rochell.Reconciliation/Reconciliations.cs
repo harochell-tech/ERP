@@ -121,9 +121,69 @@ public static class Reconciliations
                    'ERROR' AS severity, component
             FROM evidence
             WHERE (status = 'POSTED' AND live = 0) OR (status = 'REVERSED' AND (journals = 0 OR live_auto > 0))
-               OR (status IN ('NOT_POSTED', 'POSTING_BLOCKED') AND live > 0)) f
+               OR (status IN ('NOT_POSTED', 'POSTING_BLOCKED') AND live > 0)
+            UNION ALL
+            -- E-VS2-06-6: a RELEASED or CLEARED payment has a live AUTO journal of its posting event, a REVERSED one none.
+            SELECT 'PAY:' || p.payment_no, count(j.journal_id)::numeric, count(j.journal_id) FILTER (WHERE r.journal_id IS NULL)::numeric,
+                   CASE WHEN p.status::text = 'REVERSED' THEN 'REVERSED_WITH_LIVE_JOURNAL' ELSE 'RELEASED_WITHOUT_JOURNAL' END, 'ERROR', 'BANK-REC'
+            FROM fin.payment p
+            LEFT JOIN fin.gl_journal j ON j.company_id = @c AND j.source_event_id = p.posting_event_id AND j.journal_type = 'AUTO'
+            LEFT JOIN fin.gl_journal r ON r.company_id = @c AND r.reverses_journal_id = j.journal_id
+            WHERE p.company_id = @c AND p.status::text IN ('RELEASED', 'CLEARED', 'REVERSED')
+            GROUP BY p.payment_id, p.payment_no, p.status
+            HAVING (p.status::text <> 'REVERSED' AND count(j.journal_id) FILTER (WHERE r.journal_id IS NULL) = 0)
+                OR (p.status::text = 'REVERSED' AND count(j.journal_id) FILTER (WHERE r.journal_id IS NULL) > 0)
+            UNION ALL
+            -- A recognized bank charge has the live AUTO journal of its BankChargeRecognized event.
+            SELECT 'CHG:' || l.line_id::text, count(j.journal_id)::numeric, count(j.journal_id) FILTER (WHERE r.journal_id IS NULL)::numeric,
+                   'CHARGE_WITHOUT_JOURNAL', 'ERROR', 'BANK-REC'
+            FROM fin.bank_statement_line l
+            LEFT JOIN fin.gl_journal j ON j.company_id = @c AND j.source_event_id = l.charge_event_id AND j.journal_type = 'AUTO'
+            LEFT JOIN fin.gl_journal r ON r.company_id = @c AND r.reverses_journal_id = j.journal_id
+            WHERE l.company_id = @c AND l.status = 'CHARGE_RECOGNIZED'
+            GROUP BY l.line_id
+            HAVING count(j.journal_id) FILTER (WHERE r.journal_id IS NULL) = 0) f
             """,
             null),
+        ["PAY-APPL"] = (
+            Findings + """
+            -- E-VS2-06-5, global. Each released / cleared payment: Σ live applications = amount (REVERSED: 0).
+            SELECT 'payment:' || p.payment_no AS match_key,
+                   coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0) AS value_a,
+                   CASE WHEN p.status::text = 'REVERSED' THEN 0 ELSE p.amount END AS value_b,
+                   'PAYMENT_APPLICATION_DIFFERENCE' AS classification, 'ERROR' AS severity, NULL::text AS component
+            FROM fin.payment p LEFT JOIN fin.ap_application a ON a.payment_id = p.payment_id
+            WHERE p.company_id = @c AND p.status::text IN ('RELEASED', 'CLEARED', 'REVERSED')
+            GROUP BY p.payment_id, p.payment_no, p.status, p.amount
+            HAVING coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0)
+                   <> CASE WHEN p.status::text = 'REVERSED' THEN 0 ELSE p.amount END
+            UNION ALL
+            -- Each AP document of a POSTED invoice: original − open = Σ live applications.
+            SELECT 'ap_doc:' || d.ap_doc_id::text, d.original_amount - d.open_amount,
+                   coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0),
+                   'AP_DOCUMENT_APPLICATION_DIFFERENCE', 'ERROR', NULL
+            FROM fin.ap_document d
+            JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.document_status::text = 'POSTED'
+            LEFT JOIN fin.ap_application a ON a.ap_doc_id = d.ap_doc_id
+            WHERE d.company_id = @c
+            GROUP BY d.ap_doc_id, d.original_amount, d.open_amount
+            HAVING d.original_amount - d.open_amount <> coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0)
+            UNION ALL
+            -- Each application (and each reversal row) has exactly one R-09 AP line of its event, AP document and amount.
+            SELECT 'application:' || a.application_id::text, a.amount, count(e.gl_entry_id)::numeric,
+                   'APPLICATION_WITHOUT_R09_LINE', 'ERROR', NULL
+            FROM fin.ap_application a
+            LEFT JOIN fin.gl_entry e ON e.company_id = @c AND e.source_event_id = a.event_id AND e.rule_line_code = 'R09-DR-AP'
+              AND e.subledger_ref = a.ap_doc_id
+              AND (CASE WHEN a.reverses_application_id IS NULL THEN e.debit ELSE e.credit END) = a.amount
+            WHERE a.company_id = @c
+            GROUP BY a.application_id, a.amount
+            HAVING count(e.gl_entry_id) <> 1) f
+            """,
+            """
+            SELECT (SELECT coalesce(sum(CASE WHEN reverses_application_id IS NULL THEN amount ELSE -amount END), 0) FROM fin.ap_application WHERE company_id = @c),
+                   (SELECT coalesce(sum(amount), 0) FROM fin.payment WHERE company_id = @c AND status::text IN ('RELEASED', 'CLEARED'))
+            """),
         ["VALUE-GL-LINK"] = (
             Findings + """
             SELECT v.value_entry_id::text AS match_key, v.amount AS value_a, coalesce(sum(e.debit - e.credit), 0) AS value_b,
@@ -156,8 +216,8 @@ public static class Reconciliations
             null),
     };
 
-    /// <summary>Runs the given reconciliations now and stores each run with its findings.</summary>
-    public static async Task<IReadOnlyList<ReconRun>> RunAsync(CommandContext context, IEnumerable<string> codes, CancellationToken cancellationToken)
+    /// <summary>Runs the given reconciliations now and stores each run with its findings and the cutoff date, if any (E-VS2-06-1).</summary>
+    public static async Task<IReadOnlyList<ReconRun>> RunAsync(CommandContext context, IEnumerable<string> codes, DateOnly? cutoff, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(codes);
@@ -177,7 +237,7 @@ public static class Reconciliations
                 agingDays = await AgingDaysAsync(context, asOf, cancellationToken).ConfigureAwait(false);
                 if (agingDays is null)
                 {
-                    runs.Add(await StoreAsync(context, runId, code, asOf, "FAILED", null, null, [], cancellationToken).ConfigureAwait(false));
+                    runs.Add(await StoreAsync(context, runId, code, asOf, cutoff, "FAILED", null, null, [], cancellationToken).ConfigureAwait(false));
                     continue;
                 }
             }
@@ -208,27 +268,28 @@ public static class Reconciliations
                 (totalA, totalB) = (reader.GetDecimal(0), reader.GetDecimal(1));
             }
 
-            runs.Add(await StoreAsync(context, runId, code, asOf, findings.Count == 0 ? "MATCHED" : "EXCEPTIONS", totalA, totalB, findings, cancellationToken).ConfigureAwait(false));
+            runs.Add(await StoreAsync(context, runId, code, asOf, cutoff, findings.Count == 0 ? "MATCHED" : "EXCEPTIONS", totalA, totalB, findings, cancellationToken).ConfigureAwait(false));
         }
 
         return runs;
     }
 
     private static async Task<ReconRun> StoreAsync(
-        CommandContext context, Guid runId, string code, DateTime asOf, string status, decimal? totalA, decimal? totalB, List<ReconFinding> findings, CancellationToken cancellationToken)
+        CommandContext context, Guid runId, string code, DateTime asOf, DateOnly? cutoff, string status, decimal? totalA, decimal? totalB, List<ReconFinding> findings, CancellationToken cancellationToken)
     {
         await Sql.ExecuteAsync(
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO rec.recon_run (run_id, company_id, recon_code, as_of, total_a, total_b, difference, status, command_id)
-            VALUES (@r, @c, @code, @asOf, @a, @b, @d, @s, (SELECT command_id FROM core.command_log WHERE result_ref = @ref))
+            INSERT INTO rec.recon_run (run_id, company_id, recon_code, as_of, cutoff_date, total_a, total_b, difference, status, command_id)
+            VALUES (@r, @c, @code, @asOf, @cutoff, @a, @b, @d, @s, (SELECT command_id FROM core.command_log WHERE result_ref = @ref))
             """,
             cancellationToken,
             ("r", runId),
             ("c", context.CompanyId),
             ("code", code),
             ("asOf", asOf),
+            ("cutoff", cutoff),
             ("a", totalA),
             ("b", totalB),
             ("d", totalA is null || totalB is null ? null : totalA - totalB),

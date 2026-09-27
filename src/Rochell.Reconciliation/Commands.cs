@@ -2,8 +2,11 @@ using Rochell.Platform.Commands;
 
 namespace Rochell.Reconciliation;
 
-/// <summary>Runs the given reconciliations (all when null) and stores their findings (E-PR16-9).</summary>
-public sealed record RunReconciliation(Guid CompanyId, Guid SessionId, string IdempotencyKey, IReadOnlyList<string>? ReconCodes = null) : ICommand;
+/// <summary>
+/// Runs the given reconciliations (all when null) and stores their findings (E-PR16-9). The cutoff date (E-VS2-06-1) is used by
+/// BANK-GL only; without it BANK-GL reconciles as of today's business date.
+/// </summary>
+public sealed record RunReconciliation(Guid CompanyId, Guid SessionId, string IdempotencyKey, IReadOnlyList<string>? ReconCodes = null, DateOnly? CutoffDate = null) : ICommand;
 
 /// <summary>T-13 + Patch 1 P-2: closes a period component (INV-MOV or AP-REC).</summary>
 public sealed record CloseComponent(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PeriodId, string Component) : ICommand;

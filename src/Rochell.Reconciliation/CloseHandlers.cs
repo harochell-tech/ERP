@@ -67,7 +67,7 @@ public sealed class RunReconciliationHandler : ICommandHandler<RunReconciliation
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
-        var runs = await Reconciliations.RunAsync(context, command.ReconCodes ?? Reconciliations.All, cancellationToken).ConfigureAwait(false);
+        var runs = await Reconciliations.RunAsync(context, command.ReconCodes ?? Reconciliations.All, command.CutoffDate, cancellationToken).ConfigureAwait(false);
         var summary = runs.Select(r => new
         {
             code = r.Code,
@@ -182,7 +182,7 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
             }
         }
 
-        var runs = await Reconciliations.RunAsync(context, codes, cancellationToken).ConfigureAwait(false);
+        var runs = await Reconciliations.RunAsync(context, codes, endsOn, cancellationToken).ConfigureAwait(false);
         var blocked = runs.Where(r => r.Blocks(command.Component)).Select(r => r.Code).ToList();
         if (blocked.Count > 0)
         {
