@@ -91,6 +91,19 @@ Deployment branch rule: `main` only; optionally a required reviewer (Alexander).
 Actions → deploy-staging → Run workflow (branch `main`). The job checks CI, builds and pushes the image, uploads the compose files
 and `.env` (mode 600), and runs `deploy.sh`. The VPS pulls with the job's short-lived token and logs out afterwards.
 
+## Test identities (E-B03-14)
+
+One tester exercises every role through synthetic users (see [identity.md](identity.md#test-identities-e-b03-14-test-databases-only)):
+
+```bash
+docker compose run --rm migrate grant-role alex@rochell.com.do PROBADOR 131925332
+docker compose run --rm migrate create-synthetic-user comprador@staging.invalid
+docker compose run --rm migrate grant-role comprador@staging.invalid COMPRADOR 131925332
+# likewise: aprobador (APROBADOR_COMPRAS), almacen (ALMACENISTA), cxp (CUENTAS_POR_PAGAR), tesorero (TESORERO), …
+```
+
+Then in the UI header: "Actuar como…" → pick the identity; "Volver a mi usuario" returns.
+
 ## Synthetic data (first deploy, E-B03-7)
 
 On the server, in `/opt/rochell-staging` (`set -a; . ./.env; set +a` first):

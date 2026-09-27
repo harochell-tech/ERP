@@ -119,6 +119,75 @@ public static class OidcAuthentication
             .WithSummary("Ends the session.")
             .Produces(StatusCodes.Status204NoContent);
 
+        // E-B03-14: test identities (TEST databases only; the database refuses them anywhere else).
+        auth.MapGet("/test-identities", async (HttpContext http, Guid companyId, SessionCookie cookie, SessionService sessions, ILoggerFactory logs, CancellationToken cancellationToken) =>
+            {
+                if (cookie.Read(http) is not { } sessionId)
+                {
+                    return ApiProblems.Problem(http, AuthorizationErrors.SessionInvalid, "Sign in first.");
+                }
+
+                try
+                {
+                    return Results.Json(await sessions.ListTestIdentitiesAsync(sessionId, companyId, cancellationToken).ConfigureAwait(false));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return ApiProblems.FromException(http, ex, logs.CreateLogger("Rochell.Api.Session"), isQuery: true);
+                }
+            })
+            .WithName("ListTestIdentities")
+            .WithSummary("Synthetic users the signed-in person may act as in a company (needs identity:act_as; TEST databases only).")
+            .Produces<IReadOnlyList<TestIdentity>>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        auth.MapPost("/act-as", async (HttpContext http, ActAsRequest request, SessionCookie cookie, SessionService sessions, ILoggerFactory logs, CancellationToken cancellationToken) =>
+            {
+                if (cookie.Read(http) is not { } sessionId)
+                {
+                    return ApiProblems.Problem(http, AuthorizationErrors.SessionInvalid, "Sign in first.");
+                }
+
+                try
+                {
+                    cookie.Write(http, await sessions.ActAsAsync(sessionId, request.CompanyId, request.UserId, cancellationToken).ConfigureAwait(false));
+                    return Results.NoContent();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return ApiProblems.FromException(http, ex, logs.CreateLogger("Rochell.Api.Session"), isQuery: false);
+                }
+            })
+            .WithName("ActAs")
+            .WithSummary("Acts as a synthetic user (E-B03-14): segregation of duties and four-eyes rules apply to it as to anyone.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        auth.MapPost("/act-as/stop", async (HttpContext http, SessionCookie cookie, SessionService sessions, ILoggerFactory logs, CancellationToken cancellationToken) =>
+            {
+                if (cookie.Read(http) is not { } sessionId)
+                {
+                    return ApiProblems.Problem(http, AuthorizationErrors.SessionInvalid, "Sign in first.");
+                }
+
+                try
+                {
+                    cookie.Write(http, await sessions.StopActingAsync(sessionId, cancellationToken).ConfigureAwait(false));
+                    return Results.NoContent();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    return ApiProblems.FromException(http, ex, logs.CreateLogger("Rochell.Api.Session"), isQuery: false);
+                }
+            })
+            .WithName("StopActingAs")
+            .WithSummary("Returns to the signed-in person's own session.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
         app.MapGet("/api/v1/session", async (HttpContext http, SessionCookie cookie, SessionService sessions, ILoggerFactory logs, CancellationToken cancellationToken) =>
             {
                 if (cookie.Read(http) is not { } sessionId)
@@ -209,3 +278,6 @@ public static class OidcAuthentication
         return agent.Length == 0 ? null : agent;
     }
 }
+
+/// <summary>E-B03-14: the synthetic user to act as, and the company where the tester holds identity:act_as.</summary>
+public sealed record ActAsRequest(Guid CompanyId, Guid UserId);

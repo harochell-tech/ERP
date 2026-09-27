@@ -17,6 +17,7 @@ a { color: var(--accent); }
 .nav a.active { font-weight: 700; }
 .page { padding: 1rem; max-width: 72rem; }
 .muted { color: var(--muted); }
+.acting { color: #b45309; }
 .error { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad); padding: 0.5rem 0.75rem; margin: 0.75rem 0; }
 table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1rem; }
 th, td { border-bottom: 1px solid var(--line); padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }

@@ -14,7 +14,10 @@ generated from the committed `src/Rochell.Api/openapi.json`.
 | Callback page | A small HTML page that navigates to `returnUrl` (local paths only). A plain redirect would not work: the callback is a cross-site navigation, and the browser would not send the new Strict cookie on it |
 | `GET /api/v1/auth/step-up?returnUrl=…` | New authorization with `prompt=login` and `max_age=0`. The id of the session to re-authenticate travels in the protected OIDC state, because the Strict cookie is not sent on the callback; `RecordStepUpAsync` checks that the same Google identity owns the session |
 | `POST /api/v1/auth/logout` | Sets `logout_at` and deletes the cookie |
-| `GET /api/v1/session` | User, expiry, step-up freshness, and per company the assignments (company-wide or per plant, each with the permissions it grants, E-PR18b-8) and permissions valid now. Does not refresh activity |
+| `GET /api/v1/auth/test-identities?companyId=…` | E-B03-14 (TEST databases): synthetic users the signed-in person may act as in that company, with their roles; needs `identity:act_as` (403 otherwise) |
+| `POST /api/v1/auth/act-as` `{companyId, userId}` | Opens an acting session as that synthetic user (closing a previous acting session) and points the cookie at it; the new session has no step-up yet (a step-up re-authenticates the person with Google) |
+| `POST /api/v1/auth/act-as/stop` | Ends the acting session; the cookie points at the person's own session again. Logout while acting ends both |
+| `GET /api/v1/session` | User (`authenticatedEmail` = the person behind an acting session, E-B03-14), expiry, step-up freshness, and per company the assignments (company-wide or per plant, each with the permissions it grants, E-PR18b-8) and permissions valid now. Does not refresh activity |
 
 Expiry, idle timeout, step-up age and user status stay in the database and are checked on every request (E-PR03-2, E-PR03-6).
 Every non-GET request under `/api` must send `X-Rochell-Csrf: 1` (anti-CSRF; no CORS is granted). No ASP.NET identity cookie

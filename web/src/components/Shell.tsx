@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { loginUrl, logout, query } from "@/api/client";
+import { actAs, loginUrl, logout, query, stopActingAs } from "@/api/client";
 import { ErrorBox } from "./ui";
 import { useSession } from "@/lib/session";
+import { identityLabel, showIdentitySelector, type TestIdentityOption } from "@/lib/identities";
 
 interface NavItem {
   href: string;
@@ -55,6 +56,62 @@ function PlantSelector() {
   );
 }
 
+/**
+ * E-B03-14: in TEST databases a tester acts as synthetic users (each with its own roles, so segregation of duties holds).
+ * Shown while acting, or to whoever holds identity:act_as in the selected company.
+ */
+function IdentitySelector() {
+  const { state, company, companyId, reload } = useSession();
+  const [identities, setIdentities] = useState<TestIdentityOption[]>([]);
+  const [error, setError] = useState<unknown>(null);
+  const authenticatedEmail = state.status === "ready" ? state.session.authenticatedEmail : null;
+  const visible = showIdentitySelector(company?.permissions ?? [], authenticatedEmail);
+
+  useEffect(() => {
+    if (!visible || !companyId) {
+      return;
+    }
+    query("/api/v1/auth/test-identities", { query: { companyId } })
+      .then((list) => setIdentities(list))
+      .catch(() => setIdentities([]));
+  }, [visible, companyId]);
+
+  if (!visible || state.status !== "ready") {
+    return null;
+  }
+  const current = authenticatedEmail ? state.session.userId : "";
+  return (
+    <span className="identity" data-testid="identity-selector">
+      <select
+        aria-label="Actuar como"
+        value={current}
+        onChange={async (e) => {
+          setError(null);
+          try {
+            if (e.target.value === "") {
+              await stopActingAs();
+            } else {
+              await actAs(companyId, e.target.value);
+            }
+            reload();
+          } catch (caught) {
+            setError(caught);
+          }
+        }}
+      >
+        <option value="">{authenticatedEmail ? `Volver a mi usuario (${authenticatedEmail})` : "Actuar como…"}</option>
+        {identities.map((identity) => (
+          <option key={identity.userId} value={identity.userId}>
+            {identityLabel(identity)}
+          </option>
+        ))}
+      </select>
+      {authenticatedEmail ? <strong className="acting"> Identidad de prueba</strong> : null}
+      {error ? <ErrorBox error={error} /> : null}
+    </span>
+  );
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const { state, company, selectCompany, can, reload } = useSession();
   const pathname = usePathname();
@@ -100,6 +157,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <span>{company?.legalName ?? "Sin empresa asignada"}</span>
         )}
         <PlantSelector />
+        <IdentitySelector />
         <span className="muted" data-testid="user-email">
           {session.email}
         </span>

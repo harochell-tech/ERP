@@ -6,6 +6,7 @@ using Rochell.Platform.Hosting;
 // Usage: rochell-migrate <migrate|verify|status|init-environment TEST|PRODUCTION>
 //        rochell-migrate create-company <rnc> <legal-name>                                 (E-B03-7; staging: synthetic data only)
 //        rochell-migrate create-user <email> <google-oidc-subject> <employee-id>       (E-PR03-5)
+//        rochell-migrate create-synthetic-user <email>                                    (E-B03-14; TEST databases only)
 //        rochell-migrate grant-role <email> <ROLE_CODE> <company-rnc> [plant-id]         (bootstrap grants, E-PR03-5)
 //        rochell-migrate create-plant <company-rnc> <PLANT_CODE> <VALUATION_AREA_CODE>    (E-PR04-2)
 //        rochell-migrate create-location <company-rnc> <PLANT_CODE> <LOCATION_CODE>       (E-PR04-2)
@@ -146,6 +147,29 @@ try
                 insert.Parameters.AddWithValue("subject", args[2]);
                 await insert.ExecuteNonQueryAsync();
                 Console.WriteLine($"User {args[1].ToLowerInvariant()} created: {userId}.");
+                return 0;
+            }
+
+        case "create-synthetic-user":
+            {
+                // E-B03-14: a test identity (no employee, no Google subject) that a PROBADOR may act as; the database refuses it
+                // outside TEST databases. Give it roles with grant-role.
+                if (args.Length != 2 || !args[1].Contains('@', StringComparison.Ordinal))
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate create-synthetic-user <email>   (e.g. comprador@staging.invalid)");
+                    return 1;
+                }
+
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                await using var insert = new NpgsqlCommand(
+                    "INSERT INTO iam.user (user_id, kind, email, status) VALUES (@id, 'SYNTHETIC', lower(@email), 'ACTIVE')",
+                    connection);
+                var userId = Guid.CreateVersion7();
+                insert.Parameters.AddWithValue("id", userId);
+                insert.Parameters.AddWithValue("email", args[1]);
+                await insert.ExecuteNonQueryAsync();
+                Console.WriteLine($"Synthetic user {args[1].ToLowerInvariant()} created: {userId}.");
                 return 0;
             }
 
@@ -389,7 +413,7 @@ try
             }
 
         default:
-            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods>");
+            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|create-synthetic-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods>");
             return 1;
     }
 }

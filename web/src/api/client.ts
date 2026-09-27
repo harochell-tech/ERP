@@ -100,6 +100,27 @@ export async function runCommand<P extends CompanyPostPath>(path: P, companyId: 
   return (await response.json()) as CommandResponse;
 }
 
+/** E-B03-14: act as a synthetic user (TEST databases); the server switches the session cookie. */
+export async function actAs(companyId: string, userId: string): Promise<void> {
+  const response = await fetch("/api/v1/auth/act-as", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", [CSRF_HEADER]: "1" },
+    body: JSON.stringify({ companyId, userId } satisfies Schemas["ActAsRequest"]),
+  });
+  if (!response.ok) {
+    throw await problem(response);
+  }
+}
+
+/** E-B03-14: back to the signed-in person's own session. */
+export async function stopActingAs(): Promise<void> {
+  const response = await fetch("/api/v1/auth/act-as/stop", { method: "POST", credentials: "same-origin", headers: { [CSRF_HEADER]: "1" } });
+  if (!response.ok) {
+    throw await problem(response);
+  }
+}
+
 export async function logout(): Promise<void> {
   await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin", headers: { [CSRF_HEADER]: "1" } });
 }
