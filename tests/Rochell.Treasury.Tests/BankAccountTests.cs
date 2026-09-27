@@ -1,6 +1,9 @@
+using System.Text;
 using Rochell.Platform.Commands;
+using Rochell.Platform.Time;
 using Rochell.TestInfrastructure;
 using Rochell.Treasury.BankAccounts;
+using Rochell.Treasury.Statements;
 using Xunit;
 
 namespace Rochell.Treasury.Tests;
@@ -78,31 +81,26 @@ public sealed class BankAccountTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         await h.InitTestEnvironmentAsync();
+        var ledger = await h.CreateLedgerAsync(activateRule: false);
+        await h.CreateActiveMapAsync("BANK_CHARGES", ledger.ExpenseAccount);
+        await h.AdminRequireAsync($"UPDATE fin.posting_rule_version SET status = 'ACTIVE', approved_by = '{h.UserId}' WHERE posting_rule_id = '0192f001-0000-7000-8000-000000000010'");
         await h.CreateAccountAsync("1101", "Banco", isControl: true);
         var controller = await h.SessionWithRolesAsync("CONTROLLER");
-        var bank = (await Register(h, controller, "reg", "BPD", "0123456789", "1101")).ResultRef;
-        var statement = Guid.CreateVersion7();
-        var line = Guid.CreateVersion7();
+        var treasurer = await h.SessionWithRolesAsync("TESORERO");
+        var bank = (await Register(h, controller, "reg", "TEST_BANK", "0123456789", "1101")).ResultRef;
+        var today = BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
+        var csv = $"Fecha,Referencia,Descripcion,Debito,Credito\n{today:dd/MM/yyyy},,Comisión,150.00,\n";
         await h.RunAsync(
-            new TestTreasurySql(
-                h.CompanyId, h.SessionId, "statement",
-                $"""
-                INSERT INTO fin.bank_statement VALUES ('{statement}', '{h.CompanyId}', '{bank}', current_date - 30, current_date, 0, 0, sha256('x'::bytea), @user, now());
-                INSERT INTO fin.bank_statement_line (line_id, company_id, statement_id, bank_account_id, value_date, direction, amount, description, occurrence, status, version)
-                VALUES ('{line}', '{h.CompanyId}', '{statement}', '{bank}', current_date, 'DEBIT', 150.00, 'Comisión', 1, 'UNMATCHED', 1);
-                """,
-                []),
-            new TestTreasurySqlHandler());
+            new ImportBankStatement(h.CompanyId, treasurer, "statement", bank, "extracto.csv", Convert.ToBase64String(Encoding.UTF8.GetBytes(csv)), today, today, 150m, 0m),
+            new ImportBankStatementHandler());
+        var line = await h.ScalarAsync<Guid>("SELECT line_id FROM fin.bank_statement_line");
         Task<CommandResult> Close(string key, long version, string reason)
             => h.RunAsync(new CloseBankAccount(h.CompanyId, controller, key, bank, version, reason), new CloseBankAccountHandler());
 
         var noReason = await Assert.ThrowsAsync<DomainException>(() => Close("no-reason", 1, " "));
         var stale = await Assert.ThrowsAsync<DomainException>(() => Close("stale", 2, "Cuenta cancelada por el banco"));
         var openLine = await Assert.ThrowsAsync<DomainException>(() => Close("open", 1, "Cuenta cancelada por el banco"));
-        await h.RunAsync(
-            new TestTreasurySql(h.CompanyId, h.SessionId, "charge", $"UPDATE fin.bank_statement_line SET status = 'CHARGE_RECOGNIZED', charge_event_id = @event, version = 2 WHERE line_id = '{line}'",
-                [new TestState("BankStatementLine", line, "UNMATCHED", "CHARGE_RECOGNIZED")]),
-            new TestTreasurySqlHandler());
+        await h.RunAsync(new RecognizeBankCharge(h.CompanyId, controller, "charge", line, 1), new RecognizeBankChargeHandler());
         await Close("close", 1, "Cuenta cancelada por el banco");
 
         Assert.Equal(TreasuryErrors.ReasonRequired, noReason.Code);

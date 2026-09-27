@@ -331,7 +331,8 @@ public sealed class BankSchemaTests(PostgresFixture postgres)
         var payment = await PreparedPaymentAsync(h, b, account);
         var statement = Guid.CreateVersion7();
         await Run(h, "import",
-            $"INSERT INTO fin.bank_statement VALUES ('{statement}', '{h.CompanyId}', '{b.BankAccount}', current_date - 30, current_date, 100000.00, 54960.00, sha256('extracto'::bytea), @user, now())");
+            $"INSERT INTO fin.bank_statement VALUES ('{statement}', '{h.CompanyId}', '{b.BankAccount}', current_date - 30, current_date, 100000.00, 54960.00, sha256('extracto'::bytea), @user, now()); "
+            + $"INSERT INTO fin.bank_statement_file VALUES ('{statement}', '{h.CompanyId}', '{b.BankAccount}', '0192f0b5-0000-7000-8000-000000000001', 'extracto.csv', 'extracto'::bytea)");
         string Line(Guid id, string direction, string? reference, int occurrence, string date = "current_date")
             => $"""
                INSERT INTO fin.bank_statement_line (line_id, company_id, statement_id, bank_account_id, value_date, direction, amount, bank_reference,
@@ -355,17 +356,15 @@ public sealed class BankSchemaTests(PostgresFixture postgres)
             $"UPDATE fin.bank_statement_line SET status = 'MATCHED', matched_payment_id = '{payment}', version = 2 WHERE line_id = '{credit}'",
             new TestState("BankStatementLine", credit, "UNMATCHED", "MATCHED"));
         var noHistory = await h.AppExecuteAsync($"UPDATE fin.bank_statement_line SET status = 'MATCHED', matched_payment_id = '{payment}', version = 2 WHERE line_id = '{debit}'");
-        await Run(h, "match",
+        // VS2-05 (E-VS2-05-8): a MATCHED line's payment is CLEARED at COMMIT — MatchBankLine does both (Treasury BankStatementTests).
+        var matchPrepared = await Fails(h, "match",
             $"UPDATE fin.bank_statement_line SET status = 'MATCHED', matched_payment_id = '{payment}', version = 2 WHERE line_id = '{debit}'",
             new TestState("BankStatementLine", debit, "UNMATCHED", "MATCHED"));
-        var toCharge = await Fails(h, "matched-to-charge",
-            $"UPDATE fin.bank_statement_line SET status = 'CHARGE_RECOGNIZED', matched_payment_id = NULL, charge_event_id = @event, version = 3 WHERE line_id = '{debit}'",
-            new TestState("BankStatementLine", debit, "MATCHED", "CHARGE_RECOGNIZED"));
 
         Assert.Equal(SqlStates.RaiseException, matchCredit);
         Assert.Equal(SqlStates.RaiseException, noHistory?.SqlState);
-        Assert.Equal(SqlStates.RaiseException, toCharge);
-        Assert.Equal("MATCHED:2", await h.ScalarAsync<string>($"SELECT status || ':' || version FROM fin.bank_statement_line WHERE line_id = '{debit}'"));
+        Assert.Equal(SqlStates.RaiseException, matchPrepared);
+        Assert.Equal("UNMATCHED:1", await h.ScalarAsync<string>($"SELECT status || ':' || version FROM fin.bank_statement_line WHERE line_id = '{debit}'"));
     }
 
     [Fact]

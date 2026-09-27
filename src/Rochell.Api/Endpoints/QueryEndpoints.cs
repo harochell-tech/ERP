@@ -8,6 +8,7 @@ using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
 using Rochell.Tax;
+using Rochell.Treasury.Statements;
 
 namespace Rochell.Api.Endpoints;
 
@@ -35,7 +36,7 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
         typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
-        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler),
+        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler),
     ];
 
     public static void MapQueryEndpoints(this RouteGroupBuilder company)
@@ -112,6 +113,12 @@ public static class QueryEndpoints
         tax.MapGet("/fiscal-rules", (HttpContext http, Guid companyId, ListFiscalRulesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListFiscalRules(companyId, s), handler, ct))
             .Describe<FiscalRuleList>(nameof(ListFiscalRules));
+
+        // E-VS2-05-6: match suggestions for a statement's unmatched DEBIT lines (the other treasury queries come with VS2-07).
+        var treasury = company.MapGroup("/treasury").WithTags("Treasury");
+        treasury.MapGet("/bank-statements/{statementId:guid}/match-suggestions", (HttpContext http, Guid companyId, Guid statementId, SuggestBankMatchesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new SuggestBankMatches(companyId, s, statementId), handler, ct))
+            .Describe<MatchSuggestions>(nameof(SuggestBankMatches), notFound: true);
 
         // E-PR17-6: the HTTP endpoint of "Explain this entry". Its result is the PR-17 document, returned as is.
         finance.MapGet("/entries/{glEntryId:guid}/explanation", (HttpContext http, Guid companyId, Guid glEntryId, ExplainEntryHandler handler, QueryRunner runner, CancellationToken ct)

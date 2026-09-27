@@ -267,15 +267,15 @@ public sealed class PaymentTests(PostgresFixture postgres)
         TestState To(string from, string to) => new("Payment", payment, from, to);
         var edit = await Step("edit", $"UPDATE fin.payment SET amount = 1.00, version = 3 WHERE payment_id = '{payment}'");
         var @void = await Step("void", $"UPDATE fin.payment SET status = 'VOIDED', version = 3 WHERE payment_id = '{payment}'", To("RELEASED", "VOIDED"));
-        var clear = await Step("clear", $"UPDATE fin.payment SET status = 'CLEARED', version = 3 WHERE payment_id = '{payment}'", To("RELEASED", "CLEARED"));
-        var unclear = await Step("unclear", $"UPDATE fin.payment SET status = 'RELEASED', version = 4 WHERE payment_id = '{payment}'", To("CLEARED", "RELEASED"));
-        var bareReverse = await Step("reverse", $"UPDATE fin.payment SET status = 'REVERSED', version = 5 WHERE payment_id = '{payment}'", To("RELEASED", "REVERSED"));
+        // VS2-05: CLEARED needs its matched statement line (MatchBankLine, BankStatementTests); REVERSED needs the R-09 reversal (VS2-04).
+        var bareClear = await Step("clear", $"UPDATE fin.payment SET status = 'CLEARED', version = 3 WHERE payment_id = '{payment}'", To("RELEASED", "CLEARED"));
+        var bareReverse = await Step("reverse", $"UPDATE fin.payment SET status = 'REVERSED', version = 3 WHERE payment_id = '{payment}'", To("RELEASED", "REVERSED"));
         var delete = await h.AppExecuteAsync($"DELETE FROM fin.payment WHERE payment_id = '{payment}'");
 
         Assert.Equal(("P0001", "P0001"), (edit, @void));
-        Assert.Equal((null, null, "P0001"), (clear, unclear, bareReverse));
+        Assert.Equal(("P0001", "P0001"), (bareClear, bareReverse));
         Assert.Equal("42501", delete?.SqlState);
-        Assert.Equal("PREPARED,RELEASED,CLEARED,RELEASED", await h.ScalarAsync<string>(
+        Assert.Equal("PREPARED,RELEASED", await h.ScalarAsync<string>(
             $"SELECT string_agg(h.to_state, ',' ORDER BY h.xmin::text::bigint) FROM core.state_history h WHERE h.aggregate_id = '{payment}'"));
     }
 }
