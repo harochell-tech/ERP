@@ -9,15 +9,16 @@ public sealed record RuleLine(string Code, string Side, string AccountRole, stri
 }
 
 /// <summary>
-/// Declarative posting rule: {"lines":[{"code","side":"DEBIT|CREDIT","account_role","amount","dimensions":["plant","item","party"],"subledger":"INV|AP"?}]}.
-/// Code only computes the named amounts; accounts come from the account-role map.
+/// Declarative posting rule: {"lines":[{"code","side":"DEBIT|CREDIT","account_role","amount","dimensions":["plant","item","party"],"subledger":"INV|AP|BANK"?}]}.
+/// Code only computes the named amounts; accounts come from the account-role map, except BANK lines, which post to their bank
+/// account's own GL account (E-VS2-01-1, E-VS2-03-2).
 /// </summary>
 public sealed record RuleDefinition(IReadOnlyList<RuleLine> Lines)
 {
     public const string Debit = "DEBIT";
     public const string Credit = "CREDIT";
     public static readonly IReadOnlySet<string> AllowedDimensions = new HashSet<string>(StringComparer.Ordinal) { "plant", "item", "party" };
-    public static readonly IReadOnlySet<string> AllowedSubledgers = new HashSet<string>(StringComparer.Ordinal) { "INV", "AP" };
+    public static readonly IReadOnlySet<string> AllowedSubledgers = new HashSet<string>(StringComparer.Ordinal) { "INV", "AP", "BANK" };
 
     /// <summary>Parses and validates the structure. Role existence and control consistency are checked against the database on approval.</summary>
     public static RuleDefinition Parse(string json)
@@ -72,7 +73,7 @@ public sealed record RuleDefinition(IReadOnlyList<RuleLine> Lines)
 
             if (line.Subledger is not null && !AllowedSubledgers.Contains(line.Subledger))
             {
-                throw new FormatException($"Line {line.Code}: subledger must be INV or AP.");
+                throw new FormatException($"Line {line.Code}: subledger must be INV, AP or BANK.");
             }
         }
     }

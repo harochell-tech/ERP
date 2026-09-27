@@ -31,7 +31,8 @@ public sealed record PostingPlan(
     IReadOnlyList<PlannedLine> Lines,
     Guid? RoundingPolicyVersionId = null);
 
-public sealed record PlannedLine(PostingLineInput Input, RuleLine Rule, Guid AccountId, Guid AccountRoleMapId, string? ItemCategory, decimal Debit, decimal Credit);
+/// <summary><paramref name="AccountRoleMapId"/> is null on a BANK line: its account is the bank account's own (E-VS2-01-1).</summary>
+public sealed record PlannedLine(PostingLineInput Input, RuleLine Rule, Guid AccountId, Guid? AccountRoleMapId, string? ItemCategory, decimal Debit, decimal Credit);
 
 public sealed record PostedJournal(Guid JournalId, DateOnly PostingDate, bool LateEntry, IReadOnlyList<Guid> EntryIds);
 

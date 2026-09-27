@@ -76,3 +76,22 @@ Requests and verifications of one supplier take an advisory lock per supplier, s
 (VS2-03) calls it under its locks. Events carry full account numbers (E-VS2-02-7).
 
 Tests: `tests/Rochell.Treasury.Tests` (PAY-06, PAY-07 payability halves and PAY-10 command half tagged `AcceptanceVs2`).
+
+## Payments (VS2-03)
+
+| Command | Permission (step-up) | What it does |
+| --- | --- | --- |
+| `treasury/prepare-supplier-payment` | `payment:prepare` (no) | PREPARED payment to one ACTIVE supplier (transfer, DOP), number `PAG-000001…` (E-VS2-03-7), allocations = amount (E-VS2-03-1); VERIFIED supplier account (E-VS2-03-8); each application ≤ open amount now (PAY-03), 2 decimals, value date ≥ latest invoice; no journal, nothing reserved (E-VS2-6) |
+| `treasury/update-prepared-payment` | `payment:prepare` (no) | Replaces bank accounts, value date, reference and all applications; version + 1, new allocation set (E-VS2-03-6) |
+| `treasury/void-payment` | `payment:void` (no) | PREPARED → VOIDED with a reason |
+| `treasury/release-supplier-payment` | `payment:release` (yes) | Releaser ≠ preparer; locks payment → AP documents (id order) → bank account → period × components; re-checks open amounts (PAY-05), payability now (PAY-06/07) and value date ≤ today; posts R-09 at the value date (late entry if BANK-REC or AP-REC is closed, E-VS2-03-3), writes `fin.ap_application`, lowers `open_amount` |
+
+**R-09** (E-VS2-03-2): Dr AP_CONTROL per application (subledger AP = the AP document), Cr BANK for the payment (subledger BANK = the
+bank account, posted to its own GL account). The Posting Engine now accepts the BANK subledger and rule versions that require
+more than one open component (`also_requires_components`); the E-VS1-9 guard checks all of them.
+
+**Database guarantees** (migration 0026): allocations only for the current version of a PREPARED payment and only to the supplier's
+invoices; at COMMIT a PREPARED payment's allocations, and a RELEASED/CLEARED payment's live applications, add up to its amount;
+RELEASED/CLEARED need an unreversed AUTO journal of the posting event (K-25); amounts have 2 decimals.
+
+Tests: `PaymentTests` (PAY-01…07, PAY-09, update/void, dates and decimals, late entry, released state machine).

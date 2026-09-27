@@ -31,7 +31,7 @@ public sealed class PostingEngine
         }
 
         var rule = await ActiveRuleAsync(context, request.RuleCode, request.BusinessDate, cancellationToken).ConfigureAwait(false);
-        var (periodId, postingDate, lateEntry) = await ResolvePostingDateAsync(context, rule.CloseComponent, request.BusinessDate, cancellationToken).ConfigureAwait(false);
+        var (periodId, postingDate, lateEntry) = await ResolvePostingDateAsync(context, rule.Components, request.BusinessDate, cancellationToken).ConfigureAwait(false);
 
         var lines = new List<PlannedLine>();
         foreach (var input in request.Lines)
@@ -45,7 +45,9 @@ public sealed class PostingEngine
             }
 
             var category = input.ItemId is null ? null : await ItemCategoryAsync(context, input.ItemId.Value, cancellationToken).ConfigureAwait(false);
-            var (accountId, mapId) = await ResolveAccountAsync(context, ruleLine.AccountRole, category, postingDate, cancellationToken).ConfigureAwait(false);
+            var (accountId, mapId) = ruleLine.Subledger == BankSubledger
+                ? (await BankGlAccountAsync(context, input.SubledgerRef!.Value, cancellationToken).ConfigureAwait(false), (Guid?)null)
+                : await ResolveAccountAsync(context, ruleLine.AccountRole, category, postingDate, cancellationToken).ConfigureAwait(false);
             lines.Add(new PlannedLine(input, ruleLine, accountId, mapId, category, ruleLine.IsDebit ? amount : 0, ruleLine.IsDebit ? 0 : amount));
         }
 
@@ -77,7 +79,7 @@ public sealed class PostingEngine
             throw new DomainException(FinanceErrors.PostingUnbalanced, $"Posting {request.RuleCode} does not balance after rounding (debit {debit}, credit {credit}).");
         }
 
-        return new PostingPlan(request, rule.RuleId, rule.Version, rule.EventType, rule.CloseComponent, periodId, postingDate, lateEntry, lines, roundingPolicy);
+        return new PostingPlan(request, rule.RuleId, rule.Version, rule.EventType, rule.Components[0], periodId, postingDate, lateEntry, lines, roundingPolicy);
     }
 
     public async Task<PostedJournal> WriteAsync(CommandContext context, PostingPlan plan, Guid sourceEventId, CancellationToken cancellationToken)
@@ -108,6 +110,13 @@ public sealed class PostingEngine
             if (line.Rule.Code == RoundingLineCode)
             {
                 inputs["policy_version_id"] = plan.RoundingPolicyVersionId;
+            }
+
+            if (line.Rule.Subledger == BankSubledger)
+            {
+                // E-VS2-01-1: the account comes from the bank account, not from the role map.
+                inputs["bank_account_id"] = line.Input.SubledgerRef;
+                inputs["gl_account_id"] = line.AccountId;
             }
 
             entries.Add(new GlEntryRow(
@@ -150,13 +159,8 @@ public sealed class PostingEngine
             throw new DomainException(FinanceErrors.AlreadyReversed, "The journal has already been reversed.");
         }
 
-        var component = await ScalarAsync<string>(
-            context,
-            "SELECT close_component FROM fin.posting_rule_version WHERE posting_rule_id = @r AND version = @v",
-            cancellationToken,
-            ("r", original.RuleId),
-            ("v", original.RuleVersion));
-        var (periodId, postingDate, lateEntry) = await ResolvePostingDateAsync(context, component!, businessDate, cancellationToken).ConfigureAwait(false);
+        var components = await ComponentsAsync(context, original.RuleId, original.RuleVersion, cancellationToken).ConfigureAwait(false);
+        var (periodId, postingDate, lateEntry) = await ResolvePostingDateAsync(context, components, businessDate, cancellationToken).ConfigureAwait(false);
         return new ReversalPlan(originalJournalId, original.RuleId, original.RuleVersion, periodId, postingDate, lateEntry, businessDate);
     }
 
@@ -309,7 +313,7 @@ public sealed class PostingEngine
             context.Connection,
             context.Transaction,
             """
-            SELECT r.posting_rule_id, v.version, r.event_type, v.close_component, v.definition::text
+            SELECT r.posting_rule_id, v.version, r.event_type, v.close_component, v.definition::text, v.also_requires_components
             FROM fin.posting_rule r
             JOIN fin.posting_rule_version v ON v.posting_rule_id = r.posting_rule_id
             WHERE r.code = @code AND v.status = 'ACTIVE' AND v.effective_from <= @date AND (v.effective_to IS NULL OR v.effective_to > @date)
@@ -322,17 +326,19 @@ public sealed class PostingEngine
             throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"No ACTIVE version of posting rule {ruleCode} for {date:yyyy-MM-dd}.");
         }
 
-        return new ActiveRule(reader.GetGuid(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), RuleDefinition.Parse(reader.GetString(4)));
+        return new ActiveRule(
+            reader.GetGuid(0), reader.GetInt32(1), reader.GetString(2), Components(reader.GetString(3), reader.GetFieldValue<string[]>(5)), RuleDefinition.Parse(reader.GetString(4)));
     }
 
     /// <summary>
-    /// E-PR05-4: the period of the business date if the rule's close component is open there; otherwise the first day of the
-    /// next period where it is open (late entry). Each candidate period is locked in shared mode so a concurrent close
-    /// (exclusive lock, PR-16) cannot interleave (Patch 1 K-20).
+    /// E-PR05-4 / E-VS2-03-3: the period of the business date if every close component the rule needs is open there; otherwise
+    /// the first day of the next period where all are open (late entry). Each candidate period × component is locked in shared
+    /// mode, components in a fixed (ordinal) order, so a concurrent close (exclusive lock on one component, PR-16) cannot
+    /// interleave (Patch 1 K-20) and two postings never lock in opposite orders.
     /// </summary>
     private static async Task<(Guid PeriodId, DateOnly PostingDate, bool LateEntry)> ResolvePostingDateAsync(
         CommandContext context,
-        string component,
+        IReadOnlyList<string> components,
         DateOnly businessDate,
         CancellationToken cancellationToken)
     {
@@ -360,32 +366,68 @@ public sealed class PostingEngine
             throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"No accounting period contains {businessDate:yyyy-MM-dd}.");
         }
 
+        var ordered = components.Order(StringComparer.Ordinal).ToList();
         for (var i = 0; i < candidates.Count; i++)
         {
             var (periodId, startsOn) = candidates[i];
-            await Sql.ExecuteAsync(
-                context.Connection,
-                context.Transaction,
-                "SELECT pg_advisory_xact_lock_shared(hashtextextended('period:' || @company || ':' || @period || ':' || @component, 0))",
-                cancellationToken,
-                ("company", context.CompanyId.ToString()),
-                ("period", periodId.ToString()),
-                ("component", component)).ConfigureAwait(false);
+            var allOpen = true;
+            foreach (var component in ordered)
+            {
+                await Sql.ExecuteAsync(
+                    context.Connection,
+                    context.Transaction,
+                    "SELECT pg_advisory_xact_lock_shared(hashtextextended('period:' || @company || ':' || @period || ':' || @component, 0))",
+                    cancellationToken,
+                    ("company", context.CompanyId.ToString()),
+                    ("period", periodId.ToString()),
+                    ("component", component)).ConfigureAwait(false);
 
-            var status = await ScalarAsync<string>(
-                context,
-                "SELECT status FROM fin.close_component_state WHERE period_id = @p AND component = @c",
-                cancellationToken,
-                ("p", periodId),
-                ("c", component));
-            if (status is "OPEN" or "REOPENED")
+                var status = await ScalarAsync<string>(
+                    context,
+                    "SELECT status FROM fin.close_component_state WHERE period_id = @p AND component = @c",
+                    cancellationToken,
+                    ("p", periodId),
+                    ("c", component));
+                allOpen &= status is "OPEN" or "REOPENED";
+            }
+
+            if (allOpen)
             {
                 return i == 0 ? (periodId, businessDate, false) : (periodId, startsOn, true);
             }
         }
 
-        throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"Component {component} is closed from {businessDate:yyyy-MM-dd} on; no open period to post to.");
+        throw new DomainException(
+            FinanceErrors.PostingPrerequisiteMissing,
+            $"Component(s) {string.Join(", ", ordered)} closed from {businessDate:yyyy-MM-dd} on; no period with all of them open to post to.");
     }
+
+    /// <summary>The rule version's own close component first, then those it also requires (E-VS2-03-3).</summary>
+    private static IReadOnlyList<string> Components(string own, IEnumerable<string> alsoRequired)
+        => [own, .. alsoRequired.Where(c => c != own).Distinct(StringComparer.Ordinal)];
+
+    private static async Task<IReadOnlyList<string>> ComponentsAsync(CommandContext context, Guid ruleId, int version, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT close_component, also_requires_components FROM fin.posting_rule_version WHERE posting_rule_id = @r AND version = @v",
+            ("r", ruleId),
+            ("v", version));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+        return Components(reader.GetString(0), reader.GetFieldValue<string[]>(1));
+    }
+
+    /// <summary>E-VS2-01-1: a BANK line posts to its ACTIVE bank account's own GL account.</summary>
+    private static async Task<Guid> BankGlAccountAsync(CommandContext context, Guid bankAccountId, CancellationToken cancellationToken)
+        => await ScalarAsync<Guid?>(
+               context,
+               "SELECT gl_account_id FROM fin.bank_account WHERE company_id = @c AND bank_account_id = @b AND status = 'ACTIVE'",
+               cancellationToken,
+               ("c", context.CompanyId),
+               ("b", bankAccountId))
+           ?? throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"Bank account {bankAccountId} does not exist or is not ACTIVE.");
 
     private static async Task<(Guid AccountId, Guid MapId)> ResolveAccountAsync(CommandContext context, string role, string? category, DateOnly postingDate, CancellationToken cancellationToken)
     {
@@ -578,7 +620,9 @@ public sealed class PostingEngine
         return value is null or DBNull ? default : (T)value;
     }
 
-    private sealed record ActiveRule(Guid RuleId, int Version, string EventType, string CloseComponent, RuleDefinition Definition);
+    public const string BankSubledger = "BANK";
+
+    private sealed record ActiveRule(Guid RuleId, int Version, string EventType, IReadOnlyList<string> Components, RuleDefinition Definition);
 
     private sealed record JournalHeader(Guid RuleId, int RuleVersion, string JournalType);
 }
