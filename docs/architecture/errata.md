@@ -195,6 +195,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-B03-10 | B-03 | Supersedes E-B03-3's provider: WORM and backups live in **Backblaze B2** (S3-compatible Object Lock, COMPLIANCE, 7 days in staging), never on the Hostinger VPS or another Hostinger server (ADR-026 second provider). Writes carry Content-MD5 and the SDK sends checksums only where required (portable across S3-compatible providers). Staging host: `staging.industriasrochell.com.do`. |
 | E-B03-11 | B-03 | Clarifies E-B03-1: of the two Hostinger VPS, staging runs only on the `sistema` VPS; nothing is installed on or connected to the portal VPS (`industriasrochell.com.do/portal.php`, real production data; E-VS1-2, E-VS2-10). `staging.industriasrochell.com.do` points to the `sistema` VPS. Ubuntu 26.04 LTS accepted there. |
 | E-B03-12 | B-03 | The `sistema` VPS runs a test-only system (`sistema-contable`: app, Caddy on 80/443, PostgreSQL 16). Alexander chose to remove it: its database and project files are backed up first, then it is stopped and deleted, and staging takes the VPS with its own Caddy exactly as E-B03-2. `sistema.industriasrochell.com.do` stops serving that system. |
+| E-B03-13 | B-03 | Amends E-B03-7: the staging company carries the real identification of Block Rochell, S.R.L. (RNC 131925332, public data) with the legal name suffixed "(STAGING)"; every other record stays synthetic (E-VS1-2, E-VS2-10) and the database stays TEST. |
 
 Implementation rules derived from the above (no architectural change):
 
