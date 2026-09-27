@@ -26,7 +26,7 @@ public static class Reconciliations
 {
     public static IReadOnlyList<string> All { get; } =
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
-         "MANUAL-EVIDENCE", "TB-BALANCED"];
+         "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -185,6 +185,31 @@ public static class Reconciliations
             """
             SELECT (SELECT coalesce(sum(debit), 0) FROM fin.gl_entry WHERE company_id = @c), (SELECT coalesce(sum(credit), 0) FROM fin.gl_entry WHERE company_id = @c)
             """),
+        ["STRUCT-COVERAGE"] = (
+            Findings + """
+            -- E-FIN1-03-9, a warning that blocks no close: the statements can be produced and they balance.
+            SELECT 'account:' || a.code AS match_key, 0::numeric AS value_a, 1::numeric AS value_b,
+                   'ACCOUNT_WITHOUT_CLASS' AS classification, 'WARNING' AS severity, NULL::text AS component
+            FROM fin.account a WHERE a.company_id = @c AND a.status = 'ACTIVE' AND a.account_class IS NULL
+            UNION ALL
+            SELECT 'report:' || r.report, 0, 1, 'STRUCTURE_MISSING', 'WARNING', NULL
+            FROM (VALUES ('BALANCE_SHEET'), ('INCOME_STATEMENT')) AS r (report)
+            WHERE NOT EXISTS (SELECT 1 FROM fin.report_structure_version v WHERE v.company_id = @c AND v.report = r.report AND v.status = 'ACTIVE')
+            UNION ALL
+            SELECT 'account:' || a.code, 0, 1, 'ACCOUNT_NOT_IN_STRUCTURE', 'WARNING', NULL
+            FROM fin.account a
+            JOIN fin.report_structure_version v ON v.company_id = a.company_id AND v.status = 'ACTIVE'
+              AND v.report = CASE WHEN a.account_class IN ('ASSET', 'LIABILITY', 'EQUITY') THEN 'BALANCE_SHEET' ELSE 'INCOME_STATEMENT' END
+            WHERE a.company_id = @c AND a.status = 'ACTIVE' AND a.account_class IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM fin.report_line_account x WHERE x.structure_version_id = v.structure_version_id AND x.account_id = a.account_id)
+            UNION ALL
+            -- Assets − liabilities − equity − results = Σ(debit − credit) of the classed accounts: 0 unless an unclassed account holds a balance.
+            SELECT 'balance-sheet', coalesce(sum(e.debit - e.credit), 0), 0, 'BALANCE_SHEET_DIFFERENCE', 'WARNING', NULL
+            FROM fin.gl_entry e JOIN fin.account a ON a.account_id = e.account_id
+            WHERE e.company_id = @c AND a.account_class IS NOT NULL
+            HAVING coalesce(sum(e.debit - e.credit), 0) <> 0) f
+            """,
+            null),
         ["PAY-APPL"] = (
             Findings + """
             -- E-VS2-06-5, global. Each released / cleared payment: Σ live applications = amount (REVERSED: 0).

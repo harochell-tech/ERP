@@ -107,4 +107,42 @@ public sealed class QueryRunner(QueryPipeline pipeline, SessionCookie cookie, IL
             return ApiProblems.FromException(http, ex, logger, isQuery: true);
         }
     }
+
+    /// <summary>
+    /// E-FIN1-03-10: a report as JSON, or with <c>?format=csv</c> as a UTF-8 CSV file (with BOM, so a spreadsheet reads the accents)
+    /// built from that same JSON.
+    /// </summary>
+    public async Task<IResult> RunReportAsync<TQuery>(
+        HttpContext http, string? format, Func<Guid, TQuery> query, IQueryHandler<TQuery> handler, Func<string, string> toCsv, string fileName, CancellationToken cancellationToken)
+        where TQuery : IQuery
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(toCsv);
+        if (format is null or "json")
+        {
+            return await RunAsync(http, query, handler, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (format != "csv")
+        {
+            return ApiProblems.Problem(http, QueryErrors.InvalidParameter, "format must be json or csv.", isQuery: true);
+        }
+
+        if (cookie.Read(http) is not { } sessionId)
+        {
+            return ApiProblems.Problem(http, AuthorizationErrors.SessionInvalid, "Sign in first.", isQuery: true);
+        }
+
+        try
+        {
+            var json = await pipeline.ExecuteAsync(query(sessionId), handler, cancellationToken).ConfigureAwait(false);
+            var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(toCsv(json))).ToArray();
+            return Results.File(bytes, "text/csv; charset=utf-8", fileName);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return ApiProblems.FromException(http, ex, logger, isQuery: true);
+        }
+    }
 }

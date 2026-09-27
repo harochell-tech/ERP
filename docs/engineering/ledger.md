@@ -1,6 +1,6 @@
 # General ledger: adjustments, trial balance and statements (FIN-1)
 
-Frozen Baseline `docs/architecture/fin1/frozen-baseline-fin1.md`, approved errata E-FIN1-1…10, E-FIN1-01-1…7 and E-FIN1-02-1…4.
+Frozen Baseline `docs/architecture/fin1/frozen-baseline-fin1.md`, approved errata E-FIN1-1…10, E-FIN1-01-1…7, E-FIN1-02-1…4 and E-FIN1-03-1…11. Acceptance matrix: `docs/acceptance/fin1.md`.
 
 ## Schema (FIN1-01)
 
@@ -54,3 +54,22 @@ ACR-NTX / ACR-TAX snapshots the balances of the accounts its adjustments moved i
 CLI: `import-accounts` accepts an optional fifth column with the class (E-FIN1-01-1).
 
 Tests: `ManualJournalTests` (GL-01…04, GL-07, reversal, closed period), `AdjustmentCloseTests` (ACR-NTX close).
+
+## Trial balance, ledger and statements (FIN1-03)
+
+Migration `0035__financial_statements.sql`: reconciliation STRUCT-COVERAGE (WARNING, blocks nothing; E-FIN1-03-9).
+
+| Endpoint (`/finance/…`) | Permission | Content |
+| --- | --- | --- |
+| `POST prepare-report-structure` | `account:manage` | New DRAFT version of BALANCE_SHEET (ASSET, LIABILITY, EQUITY accounts) or INCOME_STATEMENT (REVENUE, COST, EXPENSE) with all its lines: unique codes, existing parents without cycles, sign ±1, each account once and of the report's classes |
+| `POST approve-report-structure` | `report_structure:approve` + step-up | DRAFT → ACTIVE, previous ACTIVE → SUPERSEDED; refused (`STRUCTURE_INCOMPLETE`) while an active account of its classes is on no line |
+| `GET report-structures[/{id}]` | `configuration:read` | Versions; lines with their accounts and the active accounts still missing |
+| `GET trial-balance?from&to[&plantId&partyId&bankAccountId]` | `ledger:read` | Per account: opening, debits, credits, closing; income accounts open on January 1 of `from`'s year and earlier results sit on the row "Resultados de ejercicios anteriores"; `balanced` when unfiltered totals give debits = credits and Σ opening = Σ closing = 0 |
+| `GET accounts/{id}/ledger?from&to[&limit&offset]` | `ledger:read` | Opening, movements (document kind and number, rule line, running balance), closing |
+| `GET balance-sheet?asOf` | `ledger:read` | Lines of the ACTIVE structure (sign × Σ(debit − credit) of the line and its descendants), accounts the structure misses, totals, result of the year and of prior years, `difference` = 0.00 |
+| `GET income-statement?from&to` | `ledger:read` | Lines, revenue, cost, expenses, net income |
+
+The four reports take `?format=csv` (`LedgerCsv`: UTF-8 with BOM, comma, point decimal, Spanish headers). Statements refuse
+with `ACCOUNT_CLASS_MISSING` while an active account has no class and with `STRUCTURE_MISSING` without an approved structure.
+
+Tests: `StatementTests` (GL-06), `TrialBalanceTests` (GL-05), `LedgerReportApiTests`, `AcceptanceFin1TraceabilityTests`.

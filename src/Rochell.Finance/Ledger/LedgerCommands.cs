@@ -66,6 +66,20 @@ public sealed record RejectManualJournal(Guid CompanyId, Guid SessionId, string 
 /// <summary>POSTED → REVERSED (not auto-reversing ones): exact reversal on today's business date, with a reason and step-up.</summary>
 public sealed record ReverseManualJournal(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ManualJournalId, long ExpectedVersion, string Reason) : ICommand;
 
+/// <summary>One line of a report structure: its accounts (each once per structure) and the sign that presents Σ(debit − credit).</summary>
+public sealed record ReportLineInput(string LineCode, string Caption, string? ParentLineCode, int Sign, int OrderNo, IReadOnlyList<Guid> AccountIds);
+
+/// <summary>
+/// E-FIN1-5, E-FIN1-03-1: the Controller prepares a new DRAFT version of the balance sheet (ASSET, LIABILITY, EQUITY accounts) or
+/// the income statement (REVENUE, COST, EXPENSE accounts) with all its lines.
+/// </summary>
+public sealed record PrepareReportStructure(
+    Guid CompanyId, Guid SessionId, string IdempotencyKey, string Report, DateOnly EffectiveFrom, IReadOnlyList<ReportLineInput> Lines) : ICommand;
+
+/// <summary>E-FIN1-03-2: DRAFT → ACTIVE (the previous ACTIVE → SUPERSEDED) by someone other than the preparer, with step-up, when
+/// every active account of the report's classes is on a line.</summary>
+public sealed record ApproveReportStructure(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid StructureVersionId) : ICommand;
+
 public static class LedgerErrors
 {
     public const string NotFound = "NOT_FOUND";
@@ -81,4 +95,8 @@ public static class LedgerErrors
     public const string DateInvalid = "DATE_INVALID";
     public const string ReasonRequired = "REASON_REQUIRED";
     public const string FourEyes = "FOUR_EYES_REQUIRED";
+    public const string StructureInvalid = "STRUCTURE_INVALID";
+    public const string StructureIncomplete = "STRUCTURE_INCOMPLETE";
+    public const string StructureMissing = "STRUCTURE_MISSING";
+    public const string AccountClassMissing = "ACCOUNT_CLASS_MISSING";
 }

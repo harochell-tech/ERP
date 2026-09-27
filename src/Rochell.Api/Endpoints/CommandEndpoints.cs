@@ -104,6 +104,8 @@ public static class CommandEndpoints
         finance.MapCommand<ApproveManualJournal, ApproveManualJournalHandler>();
         finance.MapCommand<RejectManualJournal, RejectManualJournalHandler>();
         finance.MapCommand<ReverseManualJournal, ReverseManualJournalHandler>();
+        finance.MapCommand<PrepareReportStructure, PrepareReportStructureHandler>();
+        finance.MapCommand<ApproveReportStructure, ApproveReportStructureHandler>();
 
         var tax = company.MapGroup("/tax").WithTags("Tax");
         tax.MapCommand<RegisterFiscalSource, RegisterFiscalSourceHandler>();
@@ -155,6 +157,7 @@ public static class CommandEndpoints
         typeof(CreateAccountHandler), typeof(UpdateAccountHandler), typeof(DeactivateAccountHandler), typeof(ActivateAccountHandler),
         typeof(PrepareManualJournalHandler), typeof(UpdateManualJournalHandler), typeof(SubmitManualJournalHandler), typeof(WithdrawManualJournalHandler),
         typeof(ApproveManualJournalHandler), typeof(RejectManualJournalHandler), typeof(ReverseManualJournalHandler),
+        typeof(PrepareReportStructureHandler), typeof(ApproveReportStructureHandler),
         typeof(RegisterFiscalSourceHandler), typeof(ConfigureFiscalRuleVersionHandler), typeof(LinkFiscalSourceHandler), typeof(RunFiscalRuleTestsHandler),
         typeof(ActivateFiscalRuleVersionHandler),
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),
