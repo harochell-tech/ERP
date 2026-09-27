@@ -8,6 +8,7 @@ using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
 using Rochell.Tax;
+using Rochell.Treasury.Queries;
 using Rochell.Treasury.Statements;
 
 namespace Rochell.Api.Endpoints;
@@ -37,6 +38,8 @@ public static class QueryEndpoints
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
         typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler),
+        typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
+        typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
     ];
 
     public static void MapQueryEndpoints(this RouteGroupBuilder company)
@@ -114,11 +117,38 @@ public static class QueryEndpoints
                 => runner.RunAsync(http, s => new ListFiscalRules(companyId, s), handler, ct))
             .Describe<FiscalRuleList>(nameof(ListFiscalRules));
 
-        // E-VS2-05-6: match suggestions for a statement's unmatched DEBIT lines (the other treasury queries come with VS2-07).
+        // E-VS2-05-6 / E-VS2-07-1: treasury read side.
         var treasury = company.MapGroup("/treasury").WithTags("Treasury");
         treasury.MapGet("/bank-statements/{statementId:guid}/match-suggestions", (HttpContext http, Guid companyId, Guid statementId, SuggestBankMatchesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new SuggestBankMatches(companyId, s, statementId), handler, ct))
             .Describe<MatchSuggestions>(nameof(SuggestBankMatches), notFound: true);
+        treasury.MapGet("/ap-aging", (HttpContext http, Guid companyId, DateOnly? asOf, GetApAgingHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetApAging(companyId, s, asOf), handler, ct))
+            .Describe<ApAging>(nameof(GetApAging));
+        treasury.MapGet("/payment-proposal", (HttpContext http, Guid companyId, DateOnly dueUntil, Guid? supplierId, GetPaymentProposalHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetPaymentProposal(companyId, s, dueUntil, supplierId), handler, ct))
+            .Describe<PaymentProposal>(nameof(GetPaymentProposal));
+        treasury.MapGet("/payments", (HttpContext http, Guid companyId, string? status, Guid? supplierId, int? limit, int? offset, ListPaymentsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPayments(companyId, s, status, supplierId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<PaymentList>(nameof(ListPayments));
+        treasury.MapGet("/payments/{paymentId:guid}", (HttpContext http, Guid companyId, Guid paymentId, GetPaymentHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetPayment(companyId, s, paymentId), handler, ct))
+            .Describe<PaymentDetail>(nameof(GetPayment), notFound: true);
+        treasury.MapGet("/bank-accounts", (HttpContext http, Guid companyId, ListBankAccountsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListBankAccounts(companyId, s), handler, ct))
+            .Describe<BankAccountList>(nameof(ListBankAccounts));
+        treasury.MapGet("/bank-accounts/{bankAccountId:guid}/reconciliation", (HttpContext http, Guid companyId, Guid bankAccountId, DateOnly? asOf, GetBankReconciliationHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetBankReconciliation(companyId, s, bankAccountId, asOf), handler, ct))
+            .Describe<BankReconciliationView>(nameof(GetBankReconciliation), notFound: true);
+        treasury.MapGet("/suppliers/{partyId:guid}/bank-accounts", (HttpContext http, Guid companyId, Guid partyId, ListPartyBankAccountsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPartyBankAccounts(companyId, s, partyId), handler, ct))
+            .Describe<PartyBankAccountList>(nameof(ListPartyBankAccounts));
+        treasury.MapGet("/bank-statements", (HttpContext http, Guid companyId, Guid? bankAccountId, int? limit, int? offset, ListBankStatementsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListBankStatements(companyId, s, bankAccountId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<BankStatementList>(nameof(ListBankStatements));
+        treasury.MapGet("/bank-statement-lines", (HttpContext http, Guid companyId, Guid? statementId, Guid? bankAccountId, string? status, int? limit, int? offset, ListBankStatementLinesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListBankStatementLines(companyId, s, statementId, bankAccountId, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<BankStatementLineList>(nameof(ListBankStatementLines));
 
         // E-PR17-6: the HTTP endpoint of "Explain this entry". Its result is the PR-17 document, returned as is.
         finance.MapGet("/entries/{glEntryId:guid}/explanation", (HttpContext http, Guid companyId, Guid glEntryId, ExplainEntryHandler handler, QueryRunner runner, CancellationToken ct)

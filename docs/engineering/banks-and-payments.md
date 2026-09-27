@@ -181,3 +181,27 @@ GL = statement + Σ GL items (debit − credit) − Σ line items (credit − de
 
 Tests: `BankReconciliationTests` (BNK-04 close, BNK-05 in-transit items and the aged warning, missing statement and opening
 difference, a reversed payment netting out, a pending return, PAY-APPL findings and blocking).
+
+## Treasury queries (VS2-07)
+
+Migration `0030__treasury_queries.sql`; approved errata E-VS2-07-1…7 and E-UI-4. All under `GET /api/v1/companies/{companyId}/treasury/…`.
+
+| Route | Permission | Result |
+| --- | --- | --- |
+| `ap-aging?asOf=` | `payment:read` | Per supplier: CURRENT, BUCKET_1…3 and OVER by the TREASURY policy's `ap_aging_bucket_1/2/3_days` (no ACTIVE version: POLICY_MISSING), each document with its days overdue |
+| `payment-proposal?dueUntil=&supplierId=` | `payment:read` | POSTED invoices with an open balance due by `dueUntil`, grouped by supplier with its payability (PAYABLE, HOLD_PENDING + `payableFrom`, REVIEW, NONE) and verified account |
+| `payments?status=&supplierId=&limit=&offset=` | `payment:read` | Payments, newest number first |
+| `payments/{id}` | `payment:read` | Header, the plan of a PREPARED payment, applications and reversal rows, matched statement lines, history |
+| `bank-accounts` | `bank:read` | Company bank accounts with their GL account |
+| `bank-accounts/{id}/reconciliation?asOf=` | `bank:read` | BANK-GL of the account at the date, read-only, nothing stored (E-VS2-07-5) |
+| `suppliers/{partyId}/bank-accounts` | `bank:read` | Every version of the supplier's account with requester, verifier, evidence, `payableFrom`, rejection |
+| `bank-statements?bankAccountId=` | `bank:read` | Statements with file name, importer, line and unmatched counts |
+| `bank-statement-lines?statementId=&bankAccountId=&status=` | `bank:read` | Lines with the matched payment number |
+| `bank-statements/{id}/match-suggestions` | `bank:read` | VS2-05 |
+
+**Masking** (E-VS2-07-3): every account number is `••••` + its last 4 digits unless the reader holds `bank_account_number:read`
+(Controller, Auditor), checked by `QueryPermissions.HasAsync` on company-wide assignments. `master-data/suppliers` also returns
+`bankAccountState` and `openApAmount` (E-UI-4).
+
+Tests: `TreasuryQueryTests` (aging buckets and missing policy, proposal and payability, payment list and detail, statements, lines
+and BANK-GL read-only, masking); `AcceptanceTests.E2E01_…` (E2E-01 over HTTP, E-VS2-07-6).

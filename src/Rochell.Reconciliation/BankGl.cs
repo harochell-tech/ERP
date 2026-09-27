@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
@@ -48,10 +49,23 @@ public static class BankGl
 
     private sealed record Line(Guid LineId, DateOnly ValueDate, decimal Signed, string Status, DateOnly? EntryDate, string Reference);
 
-    public static async Task<(IReadOnlyList<ReconFinding> Findings, IReadOnlyList<BankAccountReconciliation> Accounts)> RunAsync(
+    public static Task<(IReadOnlyList<ReconFinding> Findings, IReadOnlyList<BankAccountReconciliation> Accounts)> RunAsync(
         CommandContext context, DateOnly cutoff, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
+        return RunAsync(new Db(context.Connection, context.Transaction, context.CompanyId), cutoff, null, cancellationToken);
+    }
+
+    /// <summary>Read-only (E-VS2-07-5): the same equation for one account, or all, without storing a run.</summary>
+    public static Task<(IReadOnlyList<ReconFinding> Findings, IReadOnlyList<BankAccountReconciliation> Accounts)> ReadAsync(
+        DbConnection connection, DbTransaction transaction, Guid companyId, DateOnly cutoff, Guid? bankAccountId, CancellationToken cancellationToken)
+        => RunAsync(new Db(connection, transaction, companyId), cutoff, bankAccountId, cancellationToken);
+
+    private sealed record Db(DbConnection Connection, DbTransaction Transaction, Guid CompanyId);
+
+    private static async Task<(IReadOnlyList<ReconFinding> Findings, IReadOnlyList<BankAccountReconciliation> Accounts)> RunAsync(
+        Db context, DateOnly cutoff, Guid? only, CancellationToken cancellationToken)
+    {
         var accounts = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
@@ -59,11 +73,12 @@ public static class BankGl
             SELECT b.bank_account_id, b.status,
                    (SELECT min(e.business_date) FROM core.state_history h JOIN core.domain_event e ON e.company_id = h.company_id AND e.event_id = h.event_id
                     WHERE h.company_id = b.company_id AND h.aggregate_id = b.bank_account_id AND h.to_state = 'CLOSED')
-            FROM fin.bank_account b WHERE b.company_id = @c ORDER BY b.bank_account_id
+            FROM fin.bank_account b WHERE b.company_id = @c AND (CAST(@only AS uuid) IS NULL OR b.bank_account_id = CAST(@only AS uuid)) ORDER BY b.bank_account_id
             """,
             r => new Account(r.GetGuid(0), r.GetString(1), r.IsDBNull(2) ? null : r.Date(2)),
             cancellationToken,
-            ("c", context.CompanyId)).ConfigureAwait(false);
+            ("c", context.CompanyId),
+            ("only", only)).ConfigureAwait(false);
 
         var findings = new List<ReconFinding>();
         var results = new List<BankAccountReconciliation>();
@@ -107,7 +122,8 @@ public static class BankGl
             }
 
             var after = await ReconSql.ScalarAsync<decimal>(
-                context,
+                context.Connection,
+                context.Transaction,
                 """
                 SELECT coalesce(sum(CASE WHEN direction = 'CREDIT' THEN amount ELSE -amount END), 0) FROM fin.bank_statement_line
                 WHERE company_id = @c AND bank_account_id = @b AND value_date > @d AND value_date <= @to
@@ -150,9 +166,10 @@ public static class BankGl
 
     private static string Day(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    private static async Task<decimal> GlBeforeAsync(CommandContext context, Guid account, DateOnly from, CancellationToken cancellationToken)
+    private static async Task<decimal> GlBeforeAsync(Db context, Guid account, DateOnly from, CancellationToken cancellationToken)
         => await ReconSql.ScalarAsync<decimal>(
-            context,
+            context.Connection,
+            context.Transaction,
             "SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND subledger_type = 'BANK' AND subledger_ref = @b AND posting_date < @from",
             cancellationToken,
             ("c", context.CompanyId),
@@ -160,7 +177,7 @@ public static class BankGl
             ("from", from)).ConfigureAwait(false);
 
     /// <summary>The account's BANK entries posted on or before D, each with the value date of its matched statement line, if any.</summary>
-    private static async Task<List<Entry>> EntriesAsync(CommandContext context, Guid account, DateOnly d, CancellationToken cancellationToken)
+    private static async Task<List<Entry>> EntriesAsync(Db context, Guid account, DateOnly d, CancellationToken cancellationToken)
         => await Reading.ListAsync(
             context.Connection,
             context.Transaction,
@@ -191,7 +208,7 @@ public static class BankGl
             ("d", d)).ConfigureAwait(false);
 
     /// <summary>The account's statement lines dated on or before D, each with the posting date of its entry, if any.</summary>
-    private static async Task<List<Line>> LinesAsync(CommandContext context, Guid account, DateOnly d, CancellationToken cancellationToken)
+    private static async Task<List<Line>> LinesAsync(Db context, Guid account, DateOnly d, CancellationToken cancellationToken)
         => await Reading.ListAsync(
             context.Connection,
             context.Transaction,
@@ -224,9 +241,9 @@ public static class BankGl
 
 internal static class ReconSql
 {
-    public static async Task<T> ScalarAsync<T>(CommandContext context, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters)
+    public static async Task<T> ScalarAsync<T>(DbConnection connection, DbTransaction transaction, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters)
     {
-        await using var command = Sql.Command(context.Connection, context.Transaction, sql, parameters);
+        await using var command = Sql.Command(connection, transaction, sql, parameters);
         return (T)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
     }
 }

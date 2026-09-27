@@ -179,7 +179,7 @@ public sealed class AccountingPolicyTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal("INVENTORY:4,POSTING:2,PURCHASING:6", await h.ScalarAsync<string>(
+        Assert.Equal("INVENTORY:4,POSTING:2,PURCHASING:6,TREASURY:3", await h.ScalarAsync<string>(
             "SELECT string_agg(policy_code || ':' || n, ',' ORDER BY policy_code) FROM (SELECT policy_code, count(*) n FROM acc.policy_parameter_definition GROUP BY policy_code) x"));
         Assert.Equal("accounting_policy:approve,configuration:read", await h.ScalarAsync<string>( // configuration:read: E-B03-15-1
             "SELECT string_agg(permission_code, ',' ORDER BY permission_code) FROM iam.role r JOIN iam.role_permission USING (role_id) WHERE r.code = 'APROBADOR_POLITICAS'"));
