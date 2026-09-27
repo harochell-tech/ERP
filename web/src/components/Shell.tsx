@@ -14,23 +14,125 @@ interface NavItem {
   permission: string;
 }
 
-// E-PR18b-8: navigation follows the permissions the session grants in the selected company.
-const NAV: readonly NavItem[] = [
-  { href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" },
-  { href: "/almacen/recepciones/", label: "Recepciones", permission: "goods_receipt:read" },
-  { href: "/almacen/correcciones/", label: "Correcciones", permission: "goods_receipt:read" },
-  { href: "/cxp/facturas/", label: "Facturas de proveedor", permission: "supplier_invoice:read" },
-  { href: "/cierre/conciliaciones/", label: "Conciliaciones", permission: "reconciliation:read" },
-  { href: "/cierre/periodos/", label: "Períodos y cierre", permission: "period:read" },
-  // E-B03-15-4: configuration.
-  { href: "/maestros/proveedores/", label: "Proveedores", permission: "master_data:read" },
-  { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
-  { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
-  { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
-  { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
-  { href: "/fiscal/fuentes/", label: "Fuentes fiscales", permission: "configuration:read" },
-  { href: "/fiscal/reglas/", label: "Reglas fiscales", permission: "configuration:read" },
+interface NavGroup {
+  title: string;
+  items: readonly NavItem[];
+}
+
+// E-UI-1 / E-PR18b-8: a side menu grouped by area; an item shows only with its read permission, a group only with a visible item.
+// Auditoría and Seguridad arrive with UI-01 (E-UI-2): journals are reached from the documents' "ver asientos" links.
+export const NAV: readonly NavGroup[] = [
+  {
+    title: "Maestros",
+    items: [
+      { href: "/maestros/proveedores/", label: "Proveedores", permission: "master_data:read" },
+      { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
+      { href: "/maestros/cuentas-bancarias/", label: "Cuentas bancarias de la empresa", permission: "bank:read" },
+    ],
+  },
+  { title: "Compras", items: [{ href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" }] },
+  {
+    title: "Almacén",
+    items: [
+      { href: "/almacen/recepciones/", label: "Recepciones", permission: "goods_receipt:read" },
+      { href: "/almacen/correcciones/", label: "Correcciones", permission: "goods_receipt:read" },
+    ],
+  },
+  {
+    title: "Cuentas por pagar",
+    items: [
+      { href: "/cxp/facturas/", label: "Facturas de proveedor", permission: "supplier_invoice:read" },
+      { href: "/cxp/antiguedad/", label: "Antigüedad de CxP", permission: "payment:read" },
+    ],
+  },
+  {
+    title: "Tesorería",
+    items: [
+      { href: "/tesoreria/propuesta/", label: "Propuesta de pago", permission: "payment:read" },
+      { href: "/tesoreria/pagos/", label: "Pagos", permission: "payment:read" },
+      { href: "/tesoreria/extractos/", label: "Extractos bancarios", permission: "bank:read" },
+      { href: "/tesoreria/conciliacion/", label: "Conciliación bancaria", permission: "bank:read" },
+    ],
+  },
+  {
+    title: "Contabilidad",
+    items: [
+      { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
+      { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
+      { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
+    ],
+  },
+  {
+    title: "Fiscal",
+    items: [
+      { href: "/fiscal/fuentes/", label: "Fuentes fiscales", permission: "configuration:read" },
+      { href: "/fiscal/reglas/", label: "Reglas fiscales", permission: "configuration:read" },
+    ],
+  },
+  {
+    title: "Cierre",
+    items: [
+      { href: "/cierre/periodos/", label: "Períodos y cierre", permission: "period:read" },
+      { href: "/cierre/conciliaciones/", label: "Conciliaciones", permission: "reconciliation:read" },
+    ],
+  },
 ];
+
+/** Detail pages light up their list's menu item (the static export puts the id in the query string). */
+const DETAIL_PARENTS: Readonly<Record<string, string>> = {
+  "/compras/orden/": "/compras/ordenes/",
+  "/almacen/recepcion/": "/almacen/recepciones/",
+  "/almacen/recibir/": "/compras/ordenes/",
+  "/cxp/factura/": "/cxp/facturas/",
+  "/cierre/conciliacion/": "/cierre/conciliaciones/",
+  "/tesoreria/pago/": "/tesoreria/pagos/",
+  "/maestros/proveedor/": "/maestros/proveedores/",
+};
+
+function isActive(pathname: string, href: string): boolean {
+  const parent = Object.entries(DETAIL_PARENTS).find(([detail]) => pathname.startsWith(detail))?.[1];
+  return pathname.startsWith(href) || parent === href;
+}
+
+function SideMenu({ pathname, can }: { pathname: string; can: (permission: string) => boolean }) {
+  return (
+    <nav className="sidebar" aria-label="Menú principal">
+      <Link href="/" className="brand">
+        <span className="brand-mark" aria-hidden="true">
+          R
+        </span>
+        Rochell Core
+      </Link>
+      <ul>
+        <li>
+          <Link href="/" className={pathname === "/" ? "active" : undefined}>
+            Inicio
+          </Link>
+        </li>
+      </ul>
+      {NAV.map((group) => {
+        const items = group.items.filter((item) => can(item.permission));
+        if (items.length === 0) {
+          return null;
+        }
+        return (
+          <div key={group.title}>
+            <h2>{group.title}</h2>
+            <ul>
+              {items.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href} className={isActive(pathname, item.href) ? "active" : undefined}>
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
 
 function PlantSelector() {
   const { companyId, company, plantId, selectPlant, plantScoped } = useSession();
@@ -148,45 +250,39 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const session = state.session;
   return (
-    <>
-      <header className="topbar">
-        <Link href="/" className="brand">
-          Rochell Core
-        </Link>
-        {session.companies.length > 1 ? (
-          <select aria-label="Empresa" value={company?.companyId} onChange={(e) => selectCompany(e.target.value)}>
-            {session.companies.map((c) => (
-              <option key={c.companyId} value={c.companyId}>
-                {c.legalName}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span>{company?.legalName ?? "Sin empresa asignada"}</span>
-        )}
-        <PlantSelector />
-        <IdentitySelector />
-        <span className="muted" data-testid="user-email">
-          {session.email}
-        </span>
-        <button
-          type="button"
-          onClick={async () => {
-            await logout();
-            reload();
-          }}
-        >
-          Cerrar sesión
-        </button>
-      </header>
-      <nav className="nav">
-        {NAV.filter((item) => can(item.permission)).map((item) => (
-          <Link key={item.href} href={item.href} className={pathname.startsWith(item.href) ? "active" : undefined}>
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      <main className="page">{company ? children : <p>No tiene roles asignados en ninguna empresa.</p>}</main>
-    </>
+    <div className="app">
+      <SideMenu pathname={pathname} can={can} />
+      <div className="main">
+        <header className="topbar">
+          <span className="spacer" />
+          {session.companies.length > 1 ? (
+            <select aria-label="Empresa" value={company?.companyId} onChange={(e) => selectCompany(e.target.value)}>
+              {session.companies.map((c) => (
+                <option key={c.companyId} value={c.companyId}>
+                  {c.legalName}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>{company?.legalName ?? "Sin empresa asignada"}</span>
+          )}
+          <PlantSelector />
+          <IdentitySelector />
+          <span className="muted" data-testid="user-email">
+            {session.email}
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              await logout();
+              reload();
+            }}
+          >
+            Cerrar sesión
+          </button>
+        </header>
+        <main className="page">{company ? children : <p>No tiene roles asignados en ninguna empresa.</p>}</main>
+      </div>
+    </div>
   );
 }

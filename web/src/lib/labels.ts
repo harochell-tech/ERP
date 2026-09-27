@@ -29,7 +29,41 @@ const STATUS: Readonly<Record<string, string>> = {
   BLOCKED_PENDING_SOURCE: "Bloqueada: falta fuente o prueba",
   READY: "Lista para activar",
   RETIRED: "Retirada",
+  // E-UI-5: treasury.
+  PREPARED: "Preparado",
+  RELEASED: "Liberado",
+  CLEARED: "Compensado",
+  VERIFIED: "Verificada",
+  SUPERSEDED: "Reemplazada",
+  UNMATCHED: "Sin conciliar",
+  CHARGE_RECOGNIZED: "Cargo registrado",
+  PAYABLE: "Verificada · pagable",
+  HOLD_PENDING: "Retención 72 h",
+  NONE: "Sin cuenta",
 };
+
+/** E-UI-5: a matched statement line reads "Conciliada" (an invoice match stays "Conciliado"). */
+export function lineStatusLabel(status: string | null | undefined): string {
+  return status === "MATCHED" ? "Conciliada" : statusLabel(status);
+}
+
+export type StatusTone = "neutral" | "progress" | "done" | "attention" | "error" | "reversed";
+
+// Design canvas "Componentes y reglas comunes": the colour always comes with the label.
+const TONES: Readonly<Record<string, StatusTone>> = {
+  DRAFT: "neutral", VOIDED: "neutral", SUPERSEDED: "neutral", CANCELLED: "neutral", RETIRED: "neutral", NONE: "neutral", NOT_POSTED: "neutral",
+  PENDING_APPROVAL: "progress", PREPARED: "progress", RELEASED: "progress", REVIEW: "progress", REQUESTED: "progress", PENDING: "progress",
+  OPEN: "progress", REOPENED: "progress", PARTIALLY_RECEIVED: "progress", READY: "progress",
+  APPROVED: "done", POSTED: "done", CLEARED: "done", VERIFIED: "done", ACTIVE: "done", MATCHED: "done", RECEIVED: "done", CLOSED: "done",
+  CORRECTED: "done", PAYABLE: "done", CHARGE_RECOGNIZED: "done", MATCHED_WITH_TOLERANCE: "done",
+  MATCH_EXCEPTION: "attention", UNMATCHED: "attention", HOLD_PENDING: "attention", POSTING_BLOCKED: "attention", BLOCKED_PENDING_SOURCE: "attention",
+  REJECTED: "error", EXCEPTIONS: "error", FAILED: "error",
+  REVERSED: "reversed",
+};
+
+export function statusTone(status: string | null | undefined): StatusTone {
+  return (status && TONES[status]) || "neutral";
+}
 
 export function statusLabel(status: string | null | undefined): string {
   return status ? (STATUS[status] ?? status) : "—";

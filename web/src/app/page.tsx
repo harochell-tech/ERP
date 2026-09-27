@@ -9,6 +9,10 @@ const TASKS: readonly { href: string; label: string; permission: string }[] = [
   { href: "/compras/ordenes/?estado=APPROVED", label: "Recibir material", permission: "goods_receipt:post" },
   { href: "/almacen/correcciones/", label: "Aprobar correcciones de recepción", permission: "receipt_correction:approve" },
   { href: "/cxp/facturas/nueva/", label: "Registrar una factura de proveedor", permission: "supplier_invoice:register" },
+  { href: "/tesoreria/propuesta/", label: "Preparar pagos a proveedores", permission: "payment:prepare" },
+  { href: "/tesoreria/pagos/?estado=PREPARED", label: "Liberar pagos preparados", permission: "payment:release" },
+  { href: "/tesoreria/extractos/", label: "Importar un extracto bancario", permission: "bank_statement:import" },
+  { href: "/tesoreria/conciliacion/", label: "Conciliar el banco", permission: "bank_line:match" },
   { href: "/cierre/conciliaciones/", label: "Ejecutar conciliaciones", permission: "reconciliation:run" },
   { href: "/cierre/periodos/", label: "Cerrar o reabrir períodos", permission: "period:read" },
 ];
