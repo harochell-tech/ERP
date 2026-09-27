@@ -310,6 +310,10 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIN1-01-5 | FIN1-01 | Role CONTADOR and permissions `account:manage` (Controller), `manual_journal:prepare` (Contador), `manual_journal:approve` (Controller), `report_structure:approve` (Aprobador de políticas), `ledger:read` (Contador, Controller, Auditor, Director); SoD manual_journal:prepare ≠ manual_journal:approve; 66 permissions. |
 | E-FIN1-01-6 | FIN1-01 | Amends E-FIN1-8: an auto-reversing adjustment gets its reversal in the same transaction as its approval, dated the first day of the next month; no background service. |
 | E-FIN1-01-7 | FIN1-01 | Adjustment number `AJ-000001`, unique per company, assigned when prepared. |
+| E-FIN1-02-1 | FIN1-02 | An adjustment's posting date is today's business date or earlier; never in the future. |
+| E-FIN1-02-2 | FIN1-02 | An adjustment whose ACR component is CLOSED for its date is refused (`PERIOD_CLOSED`); adjustments never move to a later period as late document postings do. |
+| E-FIN1-02-3 | FIN1-02 | A POSTED adjustment is reversed manually on today's business date with a mandatory reason; auto-reversing adjustments cannot be reversed manually. |
+| E-FIN1-02-4 | FIN1-02 | Description 1–500 characters; support = reference plus the document's SHA-256 (64 hex characters). |
 | E-VS3-01-1 | VS3-01 | A customer is the same `md.party` flagged `is_customer` (a party may be customer and supplier); RNC/cédula validated as for suppliers; created by Vendedor, activated by Crédito (create customer ≠ approve credit). |
 | E-VS3-01-2 | VS3-01 | Item type FINISHED_GOOD with categories BLOQUE, ADOQUIN, OTRO_PT (extended later by errata). |
 | E-VS3-01-3 | VS3-01 | Standard cost and price list versions are prepared by the Controller and approved by the Aprobador de políticas; prices in DOP without ITBIS, per item and unit, one list in force per company. |

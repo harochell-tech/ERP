@@ -1,6 +1,6 @@
 # General ledger: adjustments, trial balance and statements (FIN-1)
 
-Frozen Baseline `docs/architecture/fin1/frozen-baseline-fin1.md`, approved errata E-FIN1-1…10 and E-FIN1-01-1…7.
+Frozen Baseline `docs/architecture/fin1/frozen-baseline-fin1.md`, approved errata E-FIN1-1…10, E-FIN1-01-1…7 and E-FIN1-02-1…4.
 
 ## Schema (FIN1-01)
 
