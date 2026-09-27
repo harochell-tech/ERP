@@ -28,7 +28,7 @@ public sealed class FinanceSchemaTests(PostgresFixture postgres)
         await using var h = await TestHarness.CreateAsync(postgres);
 
         Assert.Equal(
-            "AP_CONTROL:t,BANK:t,BANK_CHARGES:f,GRNI:f,INVENTORY_ADJUSTMENT:f,ITBIS_RECOVERABLE:f,MATERIAL_USAGE_VARIANCE:f,PURCHASE_PRICE_VARIANCE:f,RAW_MATERIAL:t,ROUNDING_DIFFERENCE:f,WITHHOLDING_PAYABLE:f",
+            "AP_CONTROL:t,BANK:t,BANK_CHARGES:f,GRNI:f,INVENTORY_ADJUSTMENT:f,ITBIS_RECOVERABLE:f,MANUAL_ADJUSTMENT:f,MATERIAL_USAGE_VARIANCE:f,PURCHASE_PRICE_VARIANCE:f,RAW_MATERIAL:t,ROUNDING_DIFFERENCE:f,WITHHOLDING_PAYABLE:f",
             await h.ScalarAsync<string>("SELECT string_agg(role_code || ':' || CASE WHEN is_control THEN 't' ELSE 'f' END, ',' ORDER BY role_code) FROM fin.account_role WHERE role_code NOT LIKE 'TEST%'"));
     }
 
@@ -50,7 +50,7 @@ public sealed class FinanceSchemaTests(PostgresFixture postgres)
     [Theory]
     [InlineData("UPDATE fin.gl_entry SET debit = debit")]
     [InlineData("DELETE FROM fin.gl_journal")]
-    [InlineData("INSERT INTO fin.account (account_id, company_id, code, name, is_control) VALUES (gen_random_uuid(), '{0}', '9999', 'x', false)")]
+    [InlineData("DELETE FROM fin.account")] // accounts are created and edited by the Controller since FIN1-01, never deleted
     [InlineData("UPDATE fin.account_role_map SET account_id = account_id")]
     [InlineData("INSERT INTO fin.period (period_id, company_id, starts_on, ends_on) VALUES (gen_random_uuid(), '{0}', '2040-01-01', '2040-01-31')")]
     public async Task Application_role_cannot_bypass_the_posting_engine(string sqlTemplate)
