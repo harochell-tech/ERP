@@ -64,6 +64,7 @@ Lists take `limit` (1–200, default 50) and `offset`.
 | Resource | Permission |
 | --- | --- |
 | `master-data/suppliers`, `master-data/items` (with UOM conversions), `master-data/plants` (with locations) | `master_data:read` |
+| `finance/accounts`, `finance/account-role-maps?status=`, `finance/posting-rules`, `finance/accounting-policies` (definitions, versions, values), `tax/fiscal-sources`, `tax/fiscal-rules` (versions, linked sources, latest test run) — E-B03-15-1 | `configuration:read` |
 | `procurement/purchase-orders`, `…/{id}` (lines, receipts, status history) | `purchase_order:read` |
 | `procurement/goods-receipts`, `…/{id}` (lines and lots, reversal, corrections, history), `procurement/receipt-corrections` | `goods_receipt:read` |
 | `procurement/supplier-invoices`, `…/{id}` (lines with match results, determined taxes, AP document, history) | `supplier_invoice:read` |

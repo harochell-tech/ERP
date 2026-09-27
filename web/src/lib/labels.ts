@@ -24,6 +24,11 @@ const STATUS: Readonly<Record<string, string>> = {
   REQUESTED: "Solicitada",
   MATCHED_WITH_TOLERANCE: "Conciliado dentro de tolerancia",
   FAILED: "Falló",
+  REVIEW: "En revisión",
+  OBSOLETE: "Obsoleto",
+  BLOCKED_PENDING_SOURCE: "Bloqueada: falta fuente o prueba",
+  READY: "Lista para activar",
+  RETIRED: "Retirada",
 };
 
 export function statusLabel(status: string | null | undefined): string {
