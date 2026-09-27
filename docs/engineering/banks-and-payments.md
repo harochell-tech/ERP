@@ -105,4 +105,54 @@ restored, and the exact reversal (Patch 1 P-4) of the live R-09 journal. A CLEAR
 application and no live journal of its posting event. A PREPARED payment is voided, not reversed. After the reversal the invoice
 is fully open again, so VS#1 can reverse it (PAY-08).
 
-Tests: `PaymentReversalTests` (PAY-08, the CLEARED path with the fixture, guards, late entry).
+Tests: `PaymentReversalTests` (PAY-08, the CLEARED path with the fixture, guards, late entry); the CLEARED path through `MatchBankLine` is in `BankStatementTests` (VS2-05).
+
+## Statements, matching and charges (VS2-05)
+
+Migration `0028__bank_statements.sql`; approved errata E-VS2-05-1…10.
+
+| Command | Permission (step-up) | What it does |
+| --- | --- | --- |
+| `treasury/import-bank-statement` | `bank_statement:import` (no) | Reads a CSV (base64, ≤ 5 MB) of an ACTIVE bank account with the latest format of its bank code; keeps the file; creates the statement and its new lines UNMATCHED (see below) |
+| `treasury/match-bank-line` | `bank_line:match` (no) | A person confirms that an UNMATCHED **DEBIT** line is a RELEASED payment of the same account, same amount, line dated within [value date, value date + 10 days]. Line MATCHED, payment CLEARED; events BankLineMatched + PaymentCleared. **Returns** (E-VS2-05-10): a CREDIT line of the same account and amount, dated on or after the reversal, is matched to a REVERSED payment whose DEBIT line is matched; the payment keeps its status (event BankLineMatched, `kind` RETURN) |
+| `treasury/unmatch-bank-line` | `bank_line:unmatch` (yes) | MATCHED → UNMATCHED with a reason; the payment goes back from CLEARED to RELEASED (E-VS2-01-11). Refused for the DEBIT line of a REVERSED payment: it stays matched (E-VS2-04-1). A matched return (CREDIT) can be unmatched, the payment unchanged. Events BankLineUnmatched + PaymentUncleared (DEBIT only) |
+| `treasury/recognize-bank-charge` | `bank_charge:recognize` (no) | An UNMATCHED DEBIT line becomes CHARGE_RECOGNIZED and R-10 is posted for its full amount at the line's value date (late entry if BANK-REC is closed). No un-recognize in VS#2 |
+
+Query `GET treasury/bank-statements/{id}/match-suggestions` (`bank:read`): for each UNMATCHED DEBIT line, the RELEASED payments of
+the account with the exact amount whose value date puts the line in the 10-day window and that the line names (basis `PAYMENT_NO`:
+the reference or description contains `PAG-…`; `REFERENCE`: the reference equals the payment's). When none does and exactly one
+payment fits by amount and date, it is suggested with basis `AMOUNT_ONLY`. Suggestions are never applied automatically.
+
+**Formats** (E-VS2-05-1). `fin.bank_statement_format` is global and versioned per bank code, seeded by migrations, read-only for
+the application. The definition (parsed by `StatementFormat`) gives the encoding (UTF-8, ISO-8859-1, windows-1252), delimiter, rows
+to skip at the start and at the end, the date format, decimal and thousands separators, and the columns: value date, optional
+reference, description, and the amount as two columns (debit / credit), one signed column (negative = debit), or one column plus a
+direction indicator with its debit and credit values. Optional `cells` give the period and the balances from the file's header;
+what the format does not have comes from the command, and a value given both ways must agree (E-VS2-05-3). Fields may be quoted
+(RFC 4180). **The real banks' formats are pending the owner's samples**; tests use `TEST_BANK` and `TEST_SIGNED` from
+`tests/migrations/0005__test_bank_formats.sql`.
+
+**Import rules.** The same file (SHA-256) for the account again is `STATEMENT_ALREADY_IMPORTED` with the existing statement. Any
+unreadable row, a zero amount, more than 2 decimals, an empty description or a date outside the period rejects the whole file, with
+the row numbers (E-VS2-05-9); a blank reference is NULL. Opening + credits − debits must equal closing over all of the file's lines.
+Identical lines of one file are numbered by `occurrence`; a line already imported from another file of the account (IDM-04,
+E-VS2-01-12) is not inserted again but reported in the result and the event as a duplicate with the existing line and statement
+(E-VS2-05-4, BNK-01). A new line dated in a period whose BANK-REC is CLOSED refuses the import (E-VS2-05-5); each period is locked in
+shared mode on BANK-REC, as postings do. Lock order: bank account → period × BANK-REC.
+
+**Lock order for lines** (E-VS2-05-8): payment → statement line → bank account (shared). A charge: line → bank account → period ×
+BANK-REC (engine).
+
+**R-10** (E-VS2-05-7, DRAFT until the Controller approves it): Dr BANK_CHARGES, Cr BANK (subledger BANK = the bank account, posted to
+its own GL account), both `charge_amount`, business date = the line's value date. The 0.15 % DGII tax is charged to BANK_CHARGES in
+VS#2. CREDIT lines that are not a payment's return stay UNMATCHED as in-transit items.
+
+**Database guarantees** (migration 0028): `fin.bank_statement_file` keeps the bytes of every statement, append-only, with the
+statement's SHA-256 (checked on insert, and every statement has its file at COMMIT); a payment is matched to one DEBIT line and one
+CREDIT line at most (partial unique index on payment + direction); a CREDIT line only as the return of a REVERSED payment whose
+DEBIT line is matched (E-VS2-05-10); a charge is recognized on a DEBIT line only; at COMMIT a CLEARED payment has exactly one
+matched DEBIT line, a RELEASED one none, a MATCHED DEBIT line's payment is CLEARED (or REVERSED after being cleared), a MATCHED
+CREDIT line's is REVERSED, and a CHARGE_RECOGNIZED line has the unreversed AUTO journal of its BankChargeRecognized event (K-25).
+
+Tests: `BankStatementTests` (BNK-01…03, occurrence and kept file, rejections, missing format and closed period, the signed
+windows-1252 format with header cells, match guards, unmatch and the CLEARED → REVERSED path end to end, E-VS2-04-6; the bank's return of a reversed transfer, E-VS2-05-10).

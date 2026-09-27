@@ -22,7 +22,8 @@ public static class PaymentSetup
     public const string R09 = "0192f001-0000-7000-8000-000000000009";
 
     /// <param name="invoices">1 or 2 posted invoices (6 t, or 3 t + 3 t, of sand at 1,500 plus 18 % ITBIS).</param>
-    public static async Task<TestPayments> CreatePaymentSetupAsync(this TestHarness h, int invoices = 1, int verifiedHoursAgo = 73)
+    /// <param name="bankCode">The company bank account's bank; TEST_BANK and TEST_SIGNED have statement formats (tests/migrations 0005).</param>
+    public static async Task<TestPayments> CreatePaymentSetupAsync(this TestHarness h, int invoices = 1, int verifiedHoursAgo = 73, string bankCode = "BPD")
     {
         ArgumentNullException.ThrowIfNull(h);
         var inv = await h.CreateInvoicingSetupAsync();
@@ -52,7 +53,7 @@ public static class PaymentSetup
         await h.AdminRequireAsync($"UPDATE fin.posting_rule_version SET status = 'ACTIVE', approved_by = '{h.UserId}' WHERE posting_rule_id = '{R09}' AND version = 1");
         await h.CreateAccountAsync("1101", "Banco de prueba", isControl: true);
         var controller = inv.Purchasing.Controller;
-        var bank = (await h.RunAsync(new RegisterBankAccount(h.CompanyId, controller, "pay-bank", "BPD", "0123456789", "1101"), new RegisterBankAccountHandler())).ResultRef;
+        var bank = (await h.RunAsync(new RegisterBankAccount(h.CompanyId, controller, "pay-bank", bankCode, "0123456789", "1101"), new RegisterBankAccountHandler())).ResultRef;
         var treasurer = await h.SessionWithRolesAsync("TESORERO");
         var partyAccount = await h.VerifiedPartyBankAccountAsync(inv.Purchasing.SupplierId, treasurer, controller, 1, "9876543210", verifiedHoursAgo);
         return new TestPayments(inv, inv.Purchasing.SupplierId, apDocs, bank, partyAccount, treasurer, controller);

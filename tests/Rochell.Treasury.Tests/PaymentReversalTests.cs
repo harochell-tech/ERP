@@ -67,6 +67,7 @@ public sealed class PaymentReversalTests(PostgresFixture postgres)
                 h.CompanyId, h.SessionId, "clear",
                 $"""
                 INSERT INTO fin.bank_statement VALUES ('{statement}', '{h.CompanyId}', '{p.BankAccount}', current_date - 5, current_date, 100000.00, {100000m - amount:0.00}, sha256('x'::bytea), @user, now());
+                INSERT INTO fin.bank_statement_file VALUES ('{statement}', '{h.CompanyId}', '{p.BankAccount}', '0192f0b5-0000-7000-8000-000000000001', 'x.csv', 'x'::bytea);
                 INSERT INTO fin.bank_statement_line (line_id, company_id, statement_id, bank_account_id, value_date, direction, amount, description, occurrence, status, version)
                 VALUES ('{line}', '{h.CompanyId}', '{statement}', '{p.BankAccount}', current_date, 'DEBIT', {amount:0.00}, 'PAG-000001', 1, 'UNMATCHED', 1);
                 UPDATE fin.bank_statement_line SET status = 'MATCHED', matched_payment_id = '{payment}', version = 2 WHERE line_id = '{line}';

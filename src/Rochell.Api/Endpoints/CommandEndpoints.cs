@@ -18,6 +18,7 @@ using Rochell.Reconciliation;
 using Rochell.Tax;
 using Rochell.Treasury.BankAccounts;
 using Rochell.Treasury.Payments;
+using Rochell.Treasury.Statements;
 
 namespace Rochell.Api.Endpoints;
 
@@ -59,6 +60,10 @@ public static class CommandEndpoints
         treasury.MapCommand<VoidPayment, VoidPaymentHandler>();
         treasury.MapCommand<ReleaseSupplierPayment, ReleaseSupplierPaymentHandler>();
         treasury.MapCommand<ReversePayment, ReversePaymentHandler>();
+        treasury.MapCommand<ImportBankStatement, ImportBankStatementHandler>();
+        treasury.MapCommand<MatchBankLine, MatchBankLineHandler>();
+        treasury.MapCommand<UnmatchBankLine, UnmatchBankLineHandler>();
+        treasury.MapCommand<RecognizeBankCharge, RecognizeBankChargeHandler>();
 
         var procurement = company.MapGroup("/procurement").WithTags("Procurement");
         procurement.MapCommand<CreatePurchaseOrder, CreatePurchaseOrderHandler>();
@@ -125,7 +130,8 @@ public static class CommandEndpoints
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
-        typeof(ReversePaymentHandler),
+        typeof(ReversePaymentHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(UnmatchBankLineHandler),
+        typeof(RecognizeBankChargeHandler),
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
