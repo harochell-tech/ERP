@@ -71,6 +71,8 @@ Lists take `limit` (1–200, default 50) and `offset`.
 | `reconciliation/periods?year=` (component states, reopen requests) | `period:read` |
 | `reconciliation/runs`, `…/{runId}` (exceptions) | `reconciliation:read` |
 | `finance/events/{sourceEventId}/journals`, `finance/entries/{glEntryId}/explanation` (EX-01, E-PR17-6) | `audit:read` |
+| `treasury/ap-aging`, `treasury/payment-proposal`, `treasury/payments`, `…/{id}` — E-VS2-07-1 | `payment:read` |
+| `treasury/bank-accounts`, `…/{id}/reconciliation`, `treasury/suppliers/{partyId}/bank-accounts`, `treasury/bank-statements`, `treasury/bank-statement-lines`, `treasury/bank-statements/{id}/match-suggestions` (account numbers masked without `bank_account_number:read`, E-VS2-07-3; details in [banks-and-payments.md](banks-and-payments.md#treasury-queries-vs2-07)) | `bank:read` |
 
 Plant scope: purchase-order, goods-receipt and master-data queries accept `plantId`. With it, the reader needs an assignment
 for that plant or the whole company and sees only that plant's documents (a document of another plant is 404); without it a

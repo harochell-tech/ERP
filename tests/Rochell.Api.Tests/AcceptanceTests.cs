@@ -1,4 +1,7 @@
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
+using Rochell.Audit;
 using Rochell.Platform.Time;
 using Rochell.TestInfrastructure;
 using Xunit;
@@ -109,6 +112,113 @@ public sealed class AcceptanceTests(PostgresFixture postgres)
         var runId = Assert.Single(run.GetProperty("result").GetProperty("runs").EnumerateArray()).GetProperty("runId").GetGuid();
         var detail = await actors.Controller.GetOkAsync($"/api/v1/companies/{h.CompanyId}/reconciliation/runs/{runId}");
         Assert.Equal("AP-GL|MATCHED|0", $"{detail.GetProperty("run").GetProperty("reconCode").GetString()}|{detail.GetProperty("run").GetProperty("status").GetString()}|{detail.GetProperty("exceptions").GetArrayLength()}");
+    }
+
+    /// <summary>
+    /// VS#2 E2E-01 through the API (E-VS2-07-6): the AT-02 invoice (AP 45,040), then the proposal, a payment prepared by the treasurer and
+    /// released by the Controller (R-09), the bank statement imported, the suggested match confirmed, the bank charge recognized
+    /// (R-10), BANK-GL at zero and BANK-REC of the month closed after it ends. The supplier's account verified 73 h ago, the bank's GL
+    /// account, the BANK_CHARGES map and the ledger seal come from the fixtures, as deployment and time put them in a real environment.
+    /// </summary>
+    [Trait("AcceptanceVs2", "E2E-01")]
+    [Fact]
+    public async Task E2E01_invoice_payment_statement_match_charge_and_BANK_REC_close_over_HTTP()
+    {
+        var clock = new FakeClock();
+        await using var h = await TestHarness.CreateAsync(postgres, clock);
+        using var api = new ApiHost(h, clock);
+        var r = await h.CreateReceivingSetupAsync();
+        await h.EnableInvoicePostingAsync(withholdingDefinition: Withholding);
+        var actors = await Actors.SignInAsync(api, r);
+        var clerk = await api.SignInAsSessionUserAsync(await h.SessionWithRolesAsync("CUENTAS_POR_PAGAR"));
+        var treasurerSession = await h.SessionWithRolesAsync("TESORERO");
+        var treasurer = await api.SignInAsSessionUserAsync(treasurerSession);
+        var (po, poLine) = await ApprovedOrderAsync(h, r, actors);
+        await ReceiveAsync(h, r, actors, po, poLine);
+        var today = BusinessCalendar.DefaultBusinessDate(clock.UtcNow);
+        var c = h.CompanyId;
+        var si = (await clerk.OkAsync(c, "procurement", "register-supplier-invoice", new
+        {
+            partyId = r.Purchasing.SupplierId,
+            supplierFiscalNumber = "B0100000001",
+            docDate = today,
+            dueDate = today.AddDays(30),
+            lines = new[] { new { purchaseOrderLineId = poLine, quantity = "40", unitPrice = "1000" } },
+        })).GetProperty("resultRef").GetGuid();
+        await clerk.OkAsync(c, "procurement", "match-supplier-invoice", new { supplierInvoiceId = si, expectedVersion = 1 });
+        await clerk.OkAsync(c, "procurement", "post-supplier-invoice", new { supplierInvoiceId = si, expectedVersion = 2 });
+
+        // Treasury configuration: the bank's own GL account, the charges map, R-09 / R-10 approved and the bank account registered.
+        await h.CreateAccountAsync("1101", "Banco de prueba", isControl: true);
+        await h.CreateActiveMapAsync("BANK_CHARGES", await h.CreateAccountAsync("6105", "Cargos bancarios", isControl: false));
+        await actors.Controller.OkAsync(c, "finance", "approve-posting-rule-version", new { ruleCode = "R-09", version = 1 });
+        await actors.Controller.OkAsync(c, "finance", "approve-posting-rule-version", new { ruleCode = "R-10", version = 1 });
+        var bank = (await actors.Controller.OkAsync(c, "treasury", "register-bank-account", new { bankCode = "TEST_BANK", accountNumber = "0123456789", glAccountCode = "1101" }))
+            .GetProperty("resultRef").GetGuid();
+        await h.VerifiedPartyBankAccountAsync(r.Purchasing.SupplierId, treasurerSession, r.Purchasing.Controller, 1, "9876543210", 73);
+
+        // Proposal → prepare (the total comes back from the server, E-UI-3) → release (R-09).
+        var proposal = await treasurer.GetOkAsync($"/api/v1/companies/{c}/treasury/payment-proposal?dueUntil={today.AddDays(30):yyyy-MM-dd}");
+        var supplier = Assert.Single(proposal.GetProperty("suppliers").EnumerateArray());
+        Assert.Equal("PAYABLE|••••3210", $"{supplier.GetProperty("payability").GetString()}|{supplier.GetProperty("accountNumber").GetString()}");
+        var invoice = Assert.Single(supplier.GetProperty("invoices").EnumerateArray());
+        var prepared = await treasurer.OkAsync(c, "treasury", "prepare-supplier-payment", new
+        {
+            partyId = r.Purchasing.SupplierId,
+            bankAccountId = bank,
+            partyBankAccountId = supplier.GetProperty("partyBankAccountId").GetGuid(),
+            valueDate = today,
+            bankReference = "TRF-889",
+            applications = new[] { new { apDocId = invoice.GetProperty("apDocId").GetGuid(), amount = "45040.00" } },
+        });
+        var payment = prepared.GetProperty("resultRef").GetGuid();
+        Assert.Equal("PAG-000001|45040.00", $"{prepared.GetProperty("result").GetProperty("paymentNo").GetString()}|{prepared.GetProperty("result").GetProperty("amount").GetString()}");
+        await actors.Controller.OkAsync(c, "treasury", "release-supplier-payment", new { paymentId = payment, expectedVersion = 1 });
+
+        // Statement: the transfer and a 150.00 charge; opening 0.00 like the books, closing −45,190.00.
+        var csv = $"Fecha,Referencia,Descripcion,Debito,Credito\n{today:dd/MM/yyyy},TRF-889,Transferencia PAG-000001,45040.00,\n{today:dd/MM/yyyy},,Comision transferencia,150.00,\n";
+        var statement = (await treasurer.OkAsync(c, "treasury", "import-bank-statement", new
+        {
+            bankAccountId = bank,
+            fileName = "extracto.csv",
+            contentBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(csv)),
+            periodFrom = today,
+            periodTo = new DateOnly(today.Year, today.Month, 1).AddMonths(1).AddDays(-1), // it covers the month's end, the close's cutoff
+            openingBalance = "0.00",
+            closingBalance = "-45190.00",
+        })).GetProperty("resultRef").GetGuid();
+        var suggestions = await treasurer.GetOkAsync($"/api/v1/companies/{c}/treasury/bank-statements/{statement}/match-suggestions");
+        var suggested = suggestions.GetProperty("lines").EnumerateArray().Single(l => l.GetProperty("candidates").GetArrayLength() == 1);
+        Assert.Equal("PAYMENT_NO", suggested.GetProperty("candidates")[0].GetProperty("basis").GetString());
+        await treasurer.OkAsync(c, "treasury", "match-bank-line", new
+        {
+            lineId = suggested.GetProperty("lineId").GetGuid(),
+            expectedLineVersion = 1,
+            paymentId = payment,
+            expectedPaymentVersion = 2,
+        });
+        var unmatched = await treasurer.GetOkAsync($"/api/v1/companies/{c}/treasury/bank-statement-lines?statementId={statement}&status=UNMATCHED");
+        var charge = Assert.Single(unmatched.GetProperty("items").EnumerateArray()).GetProperty("lineId").GetGuid();
+        await actors.Controller.OkAsync(c, "treasury", "recognize-bank-charge", new { lineId = charge, expectedVersion = 1 });
+
+        var detail = await treasurer.GetOkAsync($"/api/v1/companies/{c}/treasury/payments/{payment}");
+        Assert.Equal("CLEARED|PREPARED>RELEASED>CLEARED", $"{detail.GetProperty("status").GetString()}|{string.Join('>', detail.GetProperty("history").EnumerateArray().Select(x => x.GetProperty("to").GetString()))}");
+        var bankGl = await treasurer.GetOkAsync($"/api/v1/companies/{c}/treasury/bank-accounts/{bank}/reconciliation?asOf={today:yyyy-MM-dd}");
+        Assert.Equal(-45190m, decimal.Parse(bankGl.GetProperty("glBalance").GetString()!, CultureInfo.InvariantCulture));
+        Assert.Equal(0m, decimal.Parse(bankGl.GetProperty("difference").GetString()!, CultureInfo.InvariantCulture));
+        Assert.Equal(0, bankGl.GetProperty("findings").GetArrayLength());
+        Assert.Equal("0.0000|0.0000", await h.ScalarAsync<string>($"SELECT {Role("AP_CONTROL")} || '|' || {Role("GRNI")}"));
+
+        // After the month ends: seal, and the Controller closes BANK-REC of the month (BANK-GL, PAY-APPL, ACC-EVIDENCE clean).
+        clock.Advance(TimeSpan.FromDays(40));
+        var controller = await api.SignInAsSessionUserAsync(r.Purchasing.Controller);
+        await new LedgerSealer(h.Sealer, h.Clock).SealAllAsync(CancellationToken.None);
+        var periods = await controller.GetOkAsync($"/api/v1/companies/{c}/reconciliation/periods?year={today.Year}");
+        var period = periods.GetProperty("items").EnumerateArray()
+            .Single(p => DateOnly.Parse(p.GetProperty("startsOn").GetString()!, CultureInfo.InvariantCulture) <= today && today <= DateOnly.Parse(p.GetProperty("endsOn").GetString()!, CultureInfo.InvariantCulture))
+            .GetProperty("periodId").GetGuid();
+        await controller.OkAsync(c, "reconciliation", "close-component", new { periodId = period, component = "BANK-REC" });
+        Assert.Equal("CLOSED", await h.ScalarAsync<string>($"SELECT status FROM fin.close_component_state WHERE period_id = '{period}' AND component = 'BANK-REC'"));
     }
 
     private static async Task<(Guid Po, Guid PoLine)> ApprovedOrderAsync(TestHarness h, TestReceiving r, Actors actors)

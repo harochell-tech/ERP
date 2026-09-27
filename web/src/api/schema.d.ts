@@ -1403,6 +1403,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/treasury/ap-aging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetApAging"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/payment-proposal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetPaymentProposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListPayments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/payments/{paymentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetPayment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/bank-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListBankAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/bank-accounts/{bankAccountId}/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetBankReconciliation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/suppliers/{partyId}/bank-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListPartyBankAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/bank-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListBankStatements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/bank-statement-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListBankStatementLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1466,6 +1610,56 @@ export interface components {
             partyId: string;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        AgingBuckets: {
+            /** Format: int32 */
+            bucket1Days: number;
+            /** Format: int32 */
+            bucket2Days: number;
+            /** Format: int32 */
+            bucket3Days: number;
+        };
+        AgingDocument: {
+            /** Format: uuid */
+            apDocId: string;
+            /** Format: uuid */
+            supplierInvoiceId: string;
+            supplierFiscalNumber: string;
+            /** Format: date */
+            docDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: decimal */
+            openAmount: string;
+            /** Format: int32 */
+            daysOverdue: number;
+            bucket: string;
+        };
+        AgingSupplier: {
+            /** Format: uuid */
+            supplierId: string;
+            supplierName: string;
+            /** Format: decimal */
+            current: string;
+            /** Format: decimal */
+            bucket1: string;
+            /** Format: decimal */
+            bucket2: string;
+            /** Format: decimal */
+            bucket3: string;
+            /** Format: decimal */
+            over: string;
+            /** Format: decimal */
+            total: string;
+            documents: components["schemas"]["AgingDocument"][];
+        };
+        ApAging: {
+            /** Format: date */
+            asOf: string;
+            buckets: components["schemas"]["AgingBuckets"];
+            suppliers: components["schemas"]["AgingSupplier"][];
+            /** Format: decimal */
+            total: string;
         };
         ApDocumentView: {
             /** Format: uuid */
@@ -1535,6 +1729,117 @@ export interface components {
             /** Format: uuid */
             itemId: string;
             reason: string;
+        };
+        BankAccountList: {
+            items: components["schemas"]["BankAccountView"][];
+        };
+        BankAccountView: {
+            /** Format: uuid */
+            bankAccountId: string;
+            bankCode: string;
+            accountNumber: string;
+            currency: string;
+            glAccountCode: string;
+            glAccountName: string;
+            status: string;
+            /** Format: int64 */
+            version: number;
+        };
+        BankItem: {
+            kind: string;
+            reference: string;
+            /** Format: date */
+            date: string;
+            /** Format: decimal */
+            amount: string;
+        };
+        BankReconciliationFinding: {
+            classification: string;
+            severity: string;
+            matchKey: string;
+            /** Format: decimal */
+            valueA: null | string;
+            /** Format: decimal */
+            valueB: null | string;
+        };
+        BankReconciliationView: {
+            /** Format: uuid */
+            bankAccountId: string;
+            /** Format: date */
+            asOf: string;
+            skipped: boolean;
+            /** Format: decimal */
+            glBalance: null | string;
+            /** Format: decimal */
+            statementBalance: null | string;
+            /** Format: decimal */
+            difference: null | string;
+            glItems: components["schemas"]["BankItem"][];
+            lineItems: components["schemas"]["BankItem"][];
+            findings: components["schemas"]["BankReconciliationFinding"][];
+        };
+        BankStatementLineList: {
+            items: components["schemas"]["BankStatementLineView"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        BankStatementLineView: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: uuid */
+            statementId: string;
+            /** Format: uuid */
+            bankAccountId: string;
+            /** Format: date */
+            valueDate: string;
+            direction: string;
+            /** Format: decimal */
+            amount: string;
+            bankReference: null | string;
+            description: string;
+            /** Format: int32 */
+            occurrence: number;
+            status: string;
+            /** Format: uuid */
+            matchedPaymentId: null | string;
+            matchedPaymentNo: null | string;
+            /** Format: uuid */
+            chargeEventId: null | string;
+            /** Format: int64 */
+            version: number;
+        };
+        BankStatementList: {
+            items: components["schemas"]["BankStatementView"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        BankStatementView: {
+            /** Format: uuid */
+            statementId: string;
+            /** Format: uuid */
+            bankAccountId: string;
+            bankCode: string;
+            accountNumber: string;
+            /** Format: date */
+            periodFrom: string;
+            /** Format: date */
+            periodTo: string;
+            /** Format: decimal */
+            openingBalance: string;
+            /** Format: decimal */
+            closingBalance: string;
+            fileName: string;
+            importedBy: null | string;
+            /** Format: date-time */
+            importedAt: string;
+            /** Format: int32 */
+            lines: number;
+            /** Format: int32 */
+            unmatched: number;
         };
         CancelPurchaseOrder: {
             /** Format: uuid */
@@ -1939,11 +2244,128 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        PartyBankAccountList: {
+            /** Format: uuid */
+            partyId: string;
+            items: components["schemas"]["PartyBankAccountView"][];
+        };
+        PartyBankAccountView: {
+            /** Format: uuid */
+            partyBankAccountId: string;
+            /** Format: int32 */
+            version: number;
+            bankCode: string;
+            accountNumber: string;
+            accountHolder: string;
+            status: string;
+            requestedBy: null | string;
+            /** Format: date-time */
+            requestedAt: string;
+            verifiedBy: null | string;
+            /** Format: date-time */
+            verifiedAt: null | string;
+            verificationEvidence: null | string;
+            /** Format: date-time */
+            payableFrom: null | string;
+            rejectedBy: null | string;
+            /** Format: date-time */
+            rejectedAt: null | string;
+            rejectionReason: null | string;
+        };
         PaymentApplication: {
             /** Format: uuid */
             apDocId: string;
             /** Format: decimal */
             amount: string;
+        };
+        PaymentApplicationView: {
+            /** Format: uuid */
+            apDocId: string;
+            /** Format: uuid */
+            supplierInvoiceId: string;
+            supplierFiscalNumber: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: decimal */
+            amount: string;
+            reversal: boolean;
+        };
+        PaymentDetail: {
+            /** Format: uuid */
+            paymentId: string;
+            paymentNo: string;
+            /** Format: uuid */
+            supplierId: string;
+            supplierName: string;
+            /** Format: uuid */
+            bankAccountId: string;
+            bankCode: string;
+            accountNumber: string;
+            /** Format: uuid */
+            partyBankAccountId: string;
+            partyBankCode: string;
+            partyAccountNumber: string;
+            partyAccountStatus: string;
+            /** Format: decimal */
+            amount: string;
+            /** Format: date */
+            valueDate: string;
+            bankReference: null | string;
+            status: string;
+            preparedBy: null | string;
+            releasedBy: null | string;
+            /** Format: uuid */
+            postingEventId: null | string;
+            /** Format: int64 */
+            version: number;
+            applications: components["schemas"]["PaymentApplicationView"][];
+            plan: components["schemas"]["PaymentApplicationView"][];
+            statementLines: components["schemas"]["PaymentLineView"][];
+            history: components["schemas"]["StateChange"][];
+        };
+        PaymentLineView: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: uuid */
+            statementId: string;
+            direction: string;
+            /** Format: date */
+            valueDate: string;
+            /** Format: decimal */
+            amount: string;
+            bankReference: null | string;
+            description: string;
+        };
+        PaymentList: {
+            items: components["schemas"]["PaymentSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        PaymentProposal: {
+            /** Format: date */
+            dueUntil: string;
+            suppliers: components["schemas"]["ProposalSupplier"][];
+        };
+        PaymentSummary: {
+            /** Format: uuid */
+            paymentId: string;
+            paymentNo: string;
+            /** Format: uuid */
+            supplierId: string;
+            supplierName: string;
+            /** Format: uuid */
+            bankAccountId: string;
+            bankCode: string;
+            accountNumber: string;
+            /** Format: decimal */
+            amount: string;
+            /** Format: date */
+            valueDate: string;
+            status: string;
+            /** Format: int64 */
+            version: number;
         };
         PeriodList: {
             /** Format: int32 */
@@ -2061,6 +2483,37 @@ export interface components {
             status?: null | number;
             detail?: null | string;
             instance?: null | string;
+        };
+        ProposalInvoice: {
+            /** Format: uuid */
+            apDocId: string;
+            /** Format: uuid */
+            supplierInvoiceId: string;
+            supplierFiscalNumber: string;
+            /** Format: date */
+            docDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: decimal */
+            originalAmount: string;
+            /** Format: decimal */
+            openAmount: string;
+        };
+        ProposalSupplier: {
+            /** Format: uuid */
+            supplierId: string;
+            supplierName: string;
+            supplierStatus: string;
+            payability: string;
+            /** Format: uuid */
+            partyBankAccountId: null | string;
+            bankCode: null | string;
+            accountNumber: null | string;
+            /** Format: date-time */
+            payableFrom: null | string;
+            /** Format: decimal */
+            openAmount: string;
+            invoices: components["schemas"]["ProposalInvoice"][];
         };
         PurchaseOrderDetail: {
             /** Format: uuid */
@@ -2521,6 +2974,9 @@ export interface components {
             rncValidatedAt: null | string;
             /** Format: int64 */
             version: number;
+            bankAccountState: string;
+            /** Format: decimal */
+            openApAmount: string;
         };
         TestIdentity: {
             /** Format: uuid */
@@ -8429,6 +8885,490 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetApAging: {
+        parameters: {
+            query?: {
+                asOf?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApAging"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPaymentProposal: {
+        parameters: {
+            query: {
+                dueUntil: string;
+                supplierId?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentProposal"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPayments: {
+        parameters: {
+            query?: {
+                status?: string;
+                supplierId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                paymentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListBankAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankAccountList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBankReconciliation: {
+        parameters: {
+            query?: {
+                asOf?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+                bankAccountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankReconciliationView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPartyBankAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                partyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartyBankAccountList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListBankStatements: {
+        parameters: {
+            query?: {
+                bankAccountId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListBankStatementLines: {
+        parameters: {
+            query?: {
+                statementId?: string;
+                bankAccountId?: string;
+                status?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankStatementLineList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

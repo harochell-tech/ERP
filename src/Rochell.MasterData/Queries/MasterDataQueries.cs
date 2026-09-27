@@ -10,7 +10,11 @@ namespace Rochell.MasterData.Queries;
 
 public sealed record ListSuppliers(Guid CompanyId, Guid SessionId, Guid? PlantId = null, string? Status = null, int Limit = 50, int Offset = 0) : IPlantScopedQuery;
 
-public sealed record SupplierView(Guid SupplierId, string PartyKind, string? Rnc, string LegalName, string Status, DateTime? RncValidatedAt, long Version);
+/// <summary>
+/// E-UI-4: <see cref="BankAccountState"/> is PAYABLE (verified, past its 72 h), HOLD_PENDING (verified, within them), REVIEW (a version
+/// waits for verification, none verified) or NONE; <see cref="OpenApAmount"/> sums the open AP documents of its posted invoices.
+/// </summary>
+public sealed record SupplierView(Guid SupplierId, string PartyKind, string? Rnc, string LegalName, string Status, DateTime? RncValidatedAt, long Version, string BankAccountState, decimal OpenApAmount);
 
 public sealed record SupplierList(IReadOnlyList<SupplierView> Items, int Limit, int Offset);
 
@@ -28,15 +32,23 @@ public sealed class ListSuppliersHandler : IQueryHandler<ListSuppliers>
             context.Connection,
             context.Transaction,
             """
-            SELECT party_id, party_kind, rnc, legal_name, status::text, rnc_validated_at, version
-            FROM md.party
-            WHERE company_id = @c AND is_supplier AND (CAST(@status AS text) IS NULL OR status::text = CAST(@status AS text))
-            ORDER BY legal_name, party_id
+            SELECT p.party_id, p.party_kind, p.rnc, p.legal_name, p.status::text, p.rnc_validated_at, p.version,
+                   CASE WHEN EXISTS (SELECT 1 FROM md.party_bank_account v WHERE v.party_id = p.party_id AND v.status = 'VERIFIED' AND v.payable_from <= @now) THEN 'PAYABLE'
+                        WHEN EXISTS (SELECT 1 FROM md.party_bank_account v WHERE v.party_id = p.party_id AND v.status = 'VERIFIED') THEN 'HOLD_PENDING'
+                        WHEN EXISTS (SELECT 1 FROM md.party_bank_account v WHERE v.party_id = p.party_id AND v.status = 'REVIEW') THEN 'REVIEW'
+                        ELSE 'NONE' END,
+                   (SELECT coalesce(sum(d.open_amount), 0) FROM fin.ap_document d
+                    JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.accounting_status::text = 'POSTED'
+                    WHERE d.party_id = p.party_id)
+            FROM md.party p
+            WHERE p.company_id = @c AND p.is_supplier AND (CAST(@status AS text) IS NULL OR p.status::text = CAST(@status AS text))
+            ORDER BY p.legal_name, p.party_id
             LIMIT @limit OFFSET @offset
             """,
-            r => new SupplierView(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.GetString(3), r.GetString(4), r.NullableUtc(5), r.GetInt64(6)),
+            r => new SupplierView(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.GetString(3), r.GetString(4), r.NullableUtc(5), r.GetInt64(6), r.GetString(7), r.GetDecimal(8)),
             cancellationToken,
             ("c", context.CompanyId),
+            ("now", context.Clock.UtcNow),
             ("status", query.Status),
             ("limit", query.Limit),
             ("offset", query.Offset)).ConfigureAwait(false);
