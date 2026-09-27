@@ -11,7 +11,7 @@ internal sealed record DevAccount(Guid UserId, string Label);
 /// active fiscal rules (TEST sources), and one user per slice role, plus a storekeeper scoped to the plant.
 /// VS2-08: a posted invoice of the supplier (6 t of sand, AP 10,620.00, due in 30 days), the company bank account TEST_BANK
 /// 0123456789 on GL 1101, the supplier's account verified 73 h ago, R-09 and R-10 approved, BANK_CHARGES mapped, the TREASURY
-/// aging buckets 30 / 60 / 90 and a treasurer.
+/// aging buckets 30 / 60 / 90 and a treasurer. UI-01: the two security roles and a new employee without roles.
 /// </summary>
 internal static class DevSeed
 {
@@ -32,6 +32,9 @@ internal static class DevSeed
         await h.SessionWithRolesAsync("AUDITOR");
         await h.SessionWithRolesAsync("SEGUNDO_APROBADOR_CIERRE");
         await h.SessionWithRolesAsync("APROBADOR_POLITICAS"); // E-B03-15-4: approves accounting policy versions
+        await h.SessionWithRolesAsync("ADMIN_SEGURIDAD"); // UI-01: requests role changes
+        await h.SessionWithRolesAsync("SEGUNDO_APROBADOR_SEGURIDAD"); // UI-01: decides them
+        var newcomer = await h.CreateUserAsync(); // UI-01: a user created with the CLI, no role yet
         var plantStorekeeper = await h.CreateUserAsync();
         await h.GrantAsync(h.CompanyId, plantStorekeeper, "ALMACENISTA", receiving.Purchasing.PlantId);
 
@@ -54,6 +57,7 @@ internal static class DevSeed
             accounts.Add(new DevAccount(reader.GetGuid(0), reader.GetString(1)));
         }
 
+        accounts.Add(new DevAccount(newcomer, "Empleado nuevo (sin roles)"));
         return accounts;
     }
 }

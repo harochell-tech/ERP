@@ -1051,6 +1051,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/identity/reject-role-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RejectRoleChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/master-data/suppliers": {
         parameters: {
             query?: never;
@@ -1539,6 +1555,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["ListBankStatementLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/identity/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/identity/role-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListRoleRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/audit/digests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListLedgerDigests"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2167,6 +2231,28 @@ export interface components {
             conversions: components["schemas"]["UomConversionView"][];
         };
         JsonElement: unknown;
+        LedgerDigestList: {
+            items: components["schemas"]["LedgerDigestView"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        LedgerDigestView: {
+            ledger: string;
+            /** Format: date */
+            digestDate: string;
+            /** Format: int64 */
+            firstSeq: number;
+            /** Format: int64 */
+            lastSeq: number;
+            /** Format: int32 */
+            itemCount: number;
+            merkleRoot: string;
+            digestHash: string;
+            prevDigestHash: null | string;
+            wormObjectKey: string;
+        };
         LineSuggestion: {
             /** Format: uuid */
             lineId: string;
@@ -2740,6 +2826,11 @@ export interface components {
             requestId: string;
             reason: string;
         };
+        RejectRoleChange: {
+            /** Format: uuid */
+            requestId: string;
+            reason: string;
+        };
         ReleaseSupplierPayment: {
             /** Format: uuid */
             paymentId: string;
@@ -2811,6 +2902,37 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             reason: string;
+        };
+        RoleRequestList: {
+            items: components["schemas"]["RoleRequestView"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        RoleRequestView: {
+            /** Format: uuid */
+            requestId: string;
+            /** Format: uuid */
+            userId: string;
+            userEmail: null | string;
+            action: string;
+            roleCode: string;
+            roleName: string;
+            /** Format: uuid */
+            plantId: null | string;
+            plantCode: null | string;
+            status: string;
+            /** Format: uuid */
+            requestedById: string;
+            requestedBy: null | string;
+            /** Format: date-time */
+            requestedAt: null | string;
+            approvedBy: null | string;
+            rejectedBy: null | string;
+            /** Format: date-time */
+            rejectedAt: null | string;
+            rejectionReason: null | string;
         };
         RunFiscalRuleTests: {
             /** Format: uuid */
@@ -3031,6 +3153,28 @@ export interface components {
             expectedVersion: number;
             rnc: string;
             legalName: string;
+        };
+        UserList: {
+            items: components["schemas"]["UserView"][];
+        };
+        UserRoleView: {
+            /** Format: uuid */
+            assignmentId: string;
+            roleCode: string;
+            roleName: string;
+            /** Format: uuid */
+            plantId: null | string;
+            plantCode: null | string;
+            /** Format: date-time */
+            validFrom: string;
+        };
+        UserView: {
+            /** Format: uuid */
+            userId: string;
+            email: null | string;
+            kind: string;
+            status: string;
+            roles: components["schemas"]["UserRoleView"][];
         };
         VerifyHashChain: Record<string, never>;
         VerifyPartyBankAccount: {
@@ -7699,6 +7843,82 @@ export interface operations {
             };
         };
     };
+    RejectRoleChange: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRoleChange"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListSuppliers: {
         parameters: {
             query?: {
@@ -9347,6 +9567,160 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BankStatementLineList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListRoleRequests: {
+        parameters: {
+            query?: {
+                status?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleRequestList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListLedgerDigests: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedgerDigestList"];
                 };
             };
             /** @description Bad Request */

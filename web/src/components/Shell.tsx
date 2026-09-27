@@ -20,7 +20,7 @@ interface NavGroup {
 }
 
 // E-UI-1 / E-PR18b-8: a side menu grouped by area; an item shows only with its read permission, a group only with a visible item.
-// Auditoría and Seguridad arrive with UI-01 (E-UI-2): journals are reached from the documents' "ver asientos" links.
+// Journals are reached from the documents' "ver asientos" links; Auditoría and Seguridad came with UI-01.
 export const NAV: readonly NavGroup[] = [
   {
     title: "Maestros",
@@ -28,6 +28,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/maestros/proveedores/", label: "Proveedores", permission: "master_data:read" },
       { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
       { href: "/maestros/cuentas-bancarias/", label: "Cuentas bancarias de la empresa", permission: "bank:read" },
+      { href: "/maestros/plantas/", label: "Plantas y ubicaciones", permission: "master_data:read" },
     ],
   },
   { title: "Compras", items: [{ href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" }] },
@@ -60,6 +61,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
       { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
       { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
+      { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
     ],
   },
   {
@@ -74,6 +76,20 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/cierre/periodos/", label: "Períodos y cierre", permission: "period:read" },
       { href: "/cierre/conciliaciones/", label: "Conciliaciones", permission: "reconciliation:read" },
+    ],
+  },
+  {
+    title: "Auditoría",
+    items: [
+      { href: "/auditoria/verificar/", label: "Verificar cadena", permission: "hash:verify" },
+      { href: "/auditoria/digests/", label: "Resúmenes en WORM", permission: "audit:read" },
+    ],
+  },
+  {
+    title: "Seguridad",
+    items: [
+      { href: "/seguridad/usuarios/", label: "Usuarios y roles", permission: "iam:read" },
+      { href: "/seguridad/solicitudes/", label: "Solicitudes de rol", permission: "iam:read" },
     ],
   },
 ];

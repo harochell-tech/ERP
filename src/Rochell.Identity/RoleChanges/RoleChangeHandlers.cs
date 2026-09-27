@@ -247,7 +247,7 @@ public sealed class ApproveRoleChangeHandler : ICommandHandler<ApproveRoleChange
         }
     }
 
-    private static async Task<RequestRow?> ReadRequestAsync(CommandContext context, Guid requestId, CancellationToken cancellationToken)
+    internal static async Task<RequestRow?> ReadRequestAsync(CommandContext context, Guid requestId, CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(
             context.Connection,
@@ -275,5 +275,58 @@ public sealed class ApproveRoleChangeHandler : ICommandHandler<ApproveRoleChange
             reader.GetString(5));
     }
 
-    private sealed record RequestRow(Guid UserId, Guid RoleId, Guid? PlantId, string Action, Guid RequestedBy, string Status);
+    internal sealed record RequestRow(Guid UserId, Guid RoleId, Guid? PlantId, string Action, Guid RequestedBy, string Status);
+}
+
+/// <summary>E-UI01-6 (a): the second approver rejects a pending role change request with a reason; nothing is granted or revoked.</summary>
+[RequiresPermission("role:second_approve")]
+public sealed class RejectRoleChangeHandler : ICommandHandler<RejectRoleChange>
+{
+    public string CommandType => "Identity.RejectRoleChange";
+
+    public async Task<string> HandleAsync(RejectRoleChange command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var reason = (command.Reason ?? string.Empty).Trim();
+        if (reason.Length == 0)
+        {
+            throw new DomainException(RoleChangeErrors.ReasonRequired, "Rejecting a role change request needs a reason.");
+        }
+
+        var rejecter = await RoleChangeSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
+        var request = await ApproveRoleChangeHandler.ReadRequestAsync(context, command.RequestId, cancellationToken).ConfigureAwait(false)
+            ?? throw new DomainException(RoleChangeErrors.RequestNotFound, "The role change request does not exist.");
+        if (request.Status != "REQUESTED")
+        {
+            throw new DomainException(RoleChangeErrors.RequestNotPending, $"The request is already {request.Status}.");
+        }
+
+        if (rejecter == request.RequestedBy || rejecter == request.UserId)
+        {
+            throw new DomainException(RoleChangeErrors.SecondApproverRequired, "The rejecter must be different from the requester and from the affected user.");
+        }
+
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(
+                "RoleChangeRejected",
+                1,
+                RoleChangeSql.RequestAggregate,
+                command.RequestId,
+                2,
+                JsonSerializer.Serialize(new { requestId = command.RequestId, rejectedBy = rejecter, reason }),
+                Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE iam.role_assignment_request SET status = 'REJECTED', rejected_by = @r, rejected_at = @now, rejection_reason = @reason WHERE request_id = @id",
+            cancellationToken,
+            ("r", rejecter),
+            ("now", context.Clock.UtcNow),
+            ("reason", reason),
+            ("id", command.RequestId)).ConfigureAwait(false);
+        await context.AppendStateAsync(RoleChangeSql.RequestAggregate, command.RequestId, "DOCUMENT", "REQUESTED", "REJECTED", CommandType, eventId, cancellationToken, reason).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { requestId = command.RequestId, status = "REJECTED" });
+    }
 }

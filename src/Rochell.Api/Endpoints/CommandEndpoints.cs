@@ -120,6 +120,7 @@ public static class CommandEndpoints
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
         identity.MapCommand<RequestRoleRevocation, RequestRoleRevocationHandler>();
         identity.MapCommand<ApproveRoleChange, ApproveRoleChangeHandler>();
+        identity.MapCommand<RejectRoleChange, RejectRoleChangeHandler>();
     }
 
     /// <summary>Every handler class the host resolves (the verifier is built by <see cref="HashVerification"/>).</summary>
@@ -142,7 +143,7 @@ public static class CommandEndpoints
         typeof(RegisterFiscalSourceHandler), typeof(ConfigureFiscalRuleVersionHandler), typeof(LinkFiscalSourceHandler), typeof(RunFiscalRuleTestsHandler),
         typeof(ActivateFiscalRuleVersionHandler),
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),
-        typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler),
+        typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 
     /// <summary>"CreatePurchaseOrder" → "create-purchase-order".</summary>

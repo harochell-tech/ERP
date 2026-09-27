@@ -155,6 +155,28 @@ public sealed class HashChainTests(PostgresFixture postgres) : IDisposable
     }
 
     [Fact]
+    public async Task The_digests_written_to_WORM_are_listed_for_audit_readers()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await h.CreateStockSetupAsync();
+        await Receive(h, s, "one");
+        await new LedgerSealer(h.Sealer, h.Clock).SealAllAsync(CancellationToken.None);
+        await new LedgerDigester(h.Sealer, Worm(), new DigestSigner(_key)).DigestDayAsync(Today(h), CancellationToken.None);
+        var auditor = await h.SessionWithRolesAsync("AUDITOR");
+        var storekeeper = await h.SessionWithRolesAsync("ALMACENISTA");
+
+        var list = JsonDocument.Parse(await h.Queries.ExecuteAsync(new ListLedgerDigests(h.CompanyId, auditor), new ListLedgerDigestsHandler())).RootElement;
+        var denied = await Assert.ThrowsAsync<DomainException>(() => h.Queries.ExecuteAsync(new ListLedgerDigests(h.CompanyId, storekeeper), new ListLedgerDigestsHandler()));
+
+        var items = list.GetProperty("items").EnumerateArray().ToList();
+        Assert.NotEmpty(items);
+        Assert.All(items, d => Assert.Equal(Today(h).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), d.GetProperty("digestDate").GetString()));
+        Assert.All(items, d => Assert.Equal(64, d.GetProperty("digestHash").GetString()!.Length));
+        Assert.Contains(items, d => d.GetProperty("ledger").GetString() == Chains.Gl);
+        Assert.Equal(AuthorizationErrors.NotAuthorized, denied.Code);
+    }
+
+    [Fact]
     public async Task A_journal_deleted_with_its_seal_leaves_a_gap_and_the_WORM_digest_disagrees()
     {
         await using var h = await TestHarness.CreateAsync(postgres);

@@ -39,3 +39,12 @@ takes part in no segregation-of-duties pair. Nobody holds every permission: SoD 
 releaser, requester ≠ verifier, creator ≠ approver…) stay. In staging the tester works every role through "Actuar como…" (test
 identities for all roles, `deploy/staging/seed.sh`). In production the Director role is granted like any other: `rochell-migrate
 grant-role` at bootstrap, then role requests with a second approver.
+
+## Screens and queries (UI-01)
+
+`iam:read` (migration `0032__ui01_identity_audit.sql`, E-UI01-4) reads `identity/users` (the company's users with their active
+roles, plus users with no assignment anywhere yet) and `identity/role-requests?status=` (pending first, with requester, approver
+or rejecter and reason). `identity/reject-role-change` (`role:second_approve`, E-UI01-6) closes a pending request as REJECTED with
+a mandatory reason; like the approval, never by the requester nor the affected user (command and CHECK). Screens: Seguridad ›
+Usuarios y roles (request assignment / revocation, company-wide) and Solicitudes de rol (approve / reject). A READ permission
+added after 0031 is granted to DIRECTOR explicitly by its migration (0032 does so for `iam:read`).

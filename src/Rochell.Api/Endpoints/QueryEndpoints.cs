@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Rochell.Api.Http;
+using Rochell.Audit;
 using Rochell.Finance.Configuration;
 using Rochell.Finance.Explain;
 using Rochell.Finance.Policies;
+using Rochell.Identity.Queries;
 using Rochell.MasterData.Queries;
 using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
@@ -40,6 +42,7 @@ public static class QueryEndpoints
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
+        typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
     public static void MapQueryEndpoints(this RouteGroupBuilder company)
@@ -149,6 +152,19 @@ public static class QueryEndpoints
         treasury.MapGet("/bank-statement-lines", (HttpContext http, Guid companyId, Guid? statementId, Guid? bankAccountId, string? status, int? limit, int? offset, ListBankStatementLinesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListBankStatementLines(companyId, s, statementId, bankAccountId, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<BankStatementLineList>(nameof(ListBankStatementLines));
+
+        // E-UI01-3/4: users, role change requests and the digests written to WORM.
+        var identity = company.MapGroup("/identity").WithTags("Identity");
+        identity.MapGet("/users", (HttpContext http, Guid companyId, ListUsersHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListUsers(companyId, s), handler, ct))
+            .Describe<UserList>(nameof(ListUsers));
+        identity.MapGet("/role-requests", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListRoleRequestsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListRoleRequests(companyId, s, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<RoleRequestList>(nameof(ListRoleRequests));
+        company.MapGroup("/audit").WithTags("Audit")
+            .MapGet("/digests", (HttpContext http, Guid companyId, int? limit, int? offset, ListLedgerDigestsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListLedgerDigests(companyId, s, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<LedgerDigestList>(nameof(ListLedgerDigests));
 
         // E-PR17-6: the HTTP endpoint of "Explain this entry". Its result is the PR-17 document, returned as is.
         finance.MapGet("/entries/{glEntryId:guid}/explanation", (HttpContext http, Guid companyId, Guid glEntryId, ExplainEntryHandler handler, QueryRunner runner, CancellationToken ct)
