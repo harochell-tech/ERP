@@ -1,0 +1,128 @@
+name: pf01-staging
+
+# E-B03-16: PF-01 repeated on the staging hardware (E-B03-9) without touching the staging data. Manual, from main only, for a
+# commit whose "ci / build-test" check passed. The harness image is built here at this commit and streamed to the VPS over SSH
+# (never pushed to a registry); deploy/staging/pf01.sh creates the temporary database rochell_pf01 on the staging PostgreSQL,
+# runs the harness on the compose internal network and drops the database and the harness's logins, whatever happened.
+on:
+  workflow_dispatch:
+    inputs:
+      receipts:
+        description: Synthetic goods receipts (PF-01 is 10000)
+        default: "10000"
+      workers:
+        description: Concurrent workers (PF-01 is 8)
+        default: "8"
+
+# Shared with deploy-staging: a deploy and a load run never overlap on the VPS.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  checks: read
+
+jobs:
+  pf-01:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: staging
+    env:
+      HARNESS_IMAGE: rochell-loadharness:${{ github.sha }}
+      RECEIPTS: ${{ github.event.inputs.receipts }}
+      WORKERS: ${{ github.event.inputs.workers }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Require a green CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          conclusion=$(gh api "repos/${REPO}/commits/${SHA}/check-runs?check_name=build-test" --jq '.check_runs | map(.conclusion) | first')
+          echo "ci / build-test: ${conclusion}"
+          test "${conclusion}" = "success"
+
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          [[ "${RECEIPTS}" =~ ^[1-9][0-9]{0,5}$ ]] || { echo "receipts must be 1..999999" >&2; exit 1; }
+          [[ "${WORKERS}" =~ ^[1-9][0-9]?$ ]] || { echo "workers must be 1..99" >&2; exit 1; }
+
+      - name: Build the harness image
+        run: docker build --pull -f Dockerfile.loadharness -t "${HARNESS_IMAGE}" .
+
+      - name: SSH setup
+        env:
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${SSH_KEY}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          # Long quiet phases (migrations, reconciliations) must not drop the session.
+          printf 'Host staging\n  HostName %s\n  User %s\n  ServerAliveInterval 30\n  ServerAliveCountMax 10\n' \
+            "${SSH_HOST}" "${SSH_USER}" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Upload the script and the harness image
+        id: upload
+        run: |
+          set -euo pipefail
+          scp deploy/staging/pf01.sh staging:/opt/rochell-staging/pf01.sh
+          docker save "${HARNESS_IMAGE}" | gzip -1 | ssh staging 'gunzip | docker load'
+
+      - name: PF-01 on staging (temporary database rochell_pf01)
+        run: |
+          set -euo pipefail
+          # Only validated values and the image tag travel on the command line; secrets stay in /opt/rochell-staging/.env.
+          # shellcheck disable=SC2029
+          ssh staging "/opt/rochell-staging/pf01.sh '${HARNESS_IMAGE}' '${RECEIPTS}' '${WORKERS}'"
+
+      # The VPS steps below run whenever the upload was attempted, including on failure or cancellation.
+      - name: Fetch the report
+        if: always() && steps.upload.outcome != 'skipped'
+        run: |
+          set -euo pipefail
+          rm -rf pf01-report
+          scp -r staging:/opt/rochell-staging/pf01-report ./pf01-report || echo "No report on the VPS."
+
+      - name: Cleanup on the VPS (always)
+        if: always() && steps.upload.outcome != 'skipped'
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2029
+          ssh staging "/opt/rochell-staging/pf01.sh --cleanup; status=\$?; docker image rm '${HARNESS_IMAGE}' >/dev/null 2>&1; exit \$status"
+
+      - name: Summary
+        if: always()
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# PF-01 on staging (E-B03-16)"
+            echo
+            echo "Commit \`${SHA}\` · ${RECEIPTS} receipts · ${WORKERS} workers · temporary database \`rochell_pf01\` (dropped)"
+            echo
+            if [[ -f pf01-report/pf01.md ]]; then
+              cat pf01-report/pf01.md
+            else
+              echo "**No report:** the harness did not finish. See the job log and the \`harness.log\` artifact, if any."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pf01-staging-report
+          path: pf01-report
+          if-no-files-found: warn

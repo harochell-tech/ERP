@@ -129,11 +129,31 @@ docker compose run --rm migrate open-periods 101999999 2026
 Posting rules, account maps, policies and fiscal rules (TEST sources) are then approved through the UI by the synthetic users,
 as in the VS#1 walkthrough. No real supplier, invoice, account or bank data (E-VS1-2, E-VS2-10).
 
+## PF-01 on staging (E-B03-16)
+
+PF-01 creates 10,000 goods receipts, so it never runs against the `rochell` database. Actions → `pf01-staging` → Run workflow
+(branch `main`; inputs `receipts` 10000 and `workers` 8 are the PF-01 values, smaller numbers are only a smoke run):
+
+| Step | What happens |
+| --- | --- |
+| Guards | `main` only, GitHub Environment `staging`, refuses a commit without a green `build-test`; concurrency group `deploy-staging`, so it never overlaps a deploy |
+| Harness image | `Dockerfile.loadharness` (the `tests/Rochell.LoadHarness` console app with the test-only migrations) is built on the runner at the same commit and streamed over SSH (`docker save \| gzip \| ssh … docker load`). It is never pushed to ghcr and never becomes the production image; the VPS needs no registry token |
+| Database | `deploy/staging/pf01.sh` (uploaded to `/opt/rochell-staging/`) creates `rochell_pf01` in the existing `postgres` container as `rochell_deploy`. Every `psql` call targets the maintenance database `postgres`; the harness only gets a connection string for `rochell_pf01`, and refuses a database that is not empty |
+| Logins | The harness creates its own cluster-wide logins `rochell_app_pf01` (∈ rochell_app) and `rochell_sealer_pf01` (∈ rochell_sealer) with random passwords generated for that run (`openssl rand`); it refuses to reuse an existing login. `rochell_app_login` / `rochell_sealer_login` and their passwords are untouched |
+| Run | Harness container (`--init`, `--rm`) on `rochell-staging_internal` (no Internet), secrets only as inherited environment variables; 8 workers, sealer running, then the 8 reconciliations |
+| Cleanup | `DROP DATABASE rochell_pf01 WITH (FORCE)` and `DROP ROLE` of both logins in a shell `trap` on exit (also on failure or signal), and again from the workflow with `if: always()` (`pf01.sh --cleanup`, which also covers a cancelled run); it then checks that neither exists. The harness image is removed from the VPS |
+| Result | `pf01.md` in the job summary; `pf01.json`, `pf01.md`, `harness.log` as the artifact `pf01-staging-report`. The job fails when PF-01 fails (p95 of PostGoodsReceipt ≥ 500 ms, reconciliations ≥ 30 s, or any failed receipt) |
+
+The staging API keeps running during the measurement (same hardware, idle load). Avoid 01:30 (backup cron). Record the result
+in `docs/acceptance/vs1.md` (PF-01 table). Locally the same script can be rehearsed with `ROCHELL_STAGING_DIR=<dir>` pointing at
+a copy of `compose.yaml` and a dummy `.env`.
+
 ## Closing B-03 (E-B03-9)
 
 1. The 00:15 digest of a day with activity is in `industriasrochell-worm-staging` (object with COMPLIANCE retention).
 2. `verify-hash-chain` (UI: Auditoría) is valid against WORM.
-3. PF-01 repeated against the staging database; result recorded in `docs/acceptance/vs1.md`.
+3. PF-01 repeated on the staging server (workflow `pf01-staging`, temporary database, E-B03-16); result recorded in
+   `docs/acceptance/vs1.md`.
 
 ## Rehearsal
 

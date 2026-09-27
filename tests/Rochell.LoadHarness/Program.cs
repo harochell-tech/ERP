@@ -22,6 +22,11 @@ namespace Rochell.LoadHarness;
 /// and exits 1 when a threshold fails.
 ///
 ///   dotnet run --project tests/Rochell.LoadHarness -c Release -- [--receipts 10000] [--workers 8] [--report load-report]
+///
+/// By default it starts its own PostgreSQL container (Testcontainers). E-B03-16 (PF-01 on staging): when
+/// ROCHELL_PF01_ADMIN_CONNECTION is set it migrates that existing, empty database instead and creates the logins named by
+/// ROCHELL_PF01_APP_LOGIN / ROCHELL_PF01_SEALER_LOGIN with ROCHELL_PF01_APP_PASSWORD / ROCHELL_PF01_SEALER_PASSWORD
+/// (the caller creates and drops the database and those logins; see deploy/staging/pf01.sh).
 /// </summary>
 internal static class LoadProgram
 {
@@ -31,11 +36,33 @@ internal static class LoadProgram
 
     public static async Task<int> Main(string[] args)
     {
+        // An unhandled exception aborts the process; as PID 1 in a container that abort can hang instead of exiting (E-B03-16).
+        try
+        {
+            return await RunAsync(args);
+        }
+        catch (Exception ex)
+        {
+            await Console.Error.WriteLineAsync($"PF-01 harness failed: {ex}");
+            return 2;
+        }
+    }
+
+    private static async Task<int> RunAsync(string[] args)
+    {
         var receipts = int.Parse(Arg(args, "--receipts") ?? "10000", CultureInfo.InvariantCulture);
         var workers = int.Parse(Arg(args, "--workers") ?? "8", CultureInfo.InvariantCulture);
         var reportDir = Path.GetFullPath(Arg(args, "--report") ?? "load-report");
 
-        var postgres = new PostgresFixture();
+        if (args.Contains("--help"))
+        {
+            Console.WriteLine("PF-01 load harness (E-PR19-3). Options: [--receipts 10000] [--workers 8] [--report load-report]. "
+                + "Set ROCHELL_PF01_ADMIN_CONNECTION (+ ROCHELL_PF01_APP_LOGIN/_PASSWORD, ROCHELL_PF01_SEALER_LOGIN/_PASSWORD) "
+                + "to use an existing empty database instead of a container (E-B03-16).");
+            return 0;
+        }
+
+        var (postgres, server) = Fixture();
         await postgres.InitializeAsync();
         try
         {
@@ -118,6 +145,7 @@ internal static class LoadProgram
                 reconciliationSeconds = Seconds(reconciliation.Elapsed),
                 reconciliationLimitSeconds = Seconds(ReconciliationLimit),
                 reconciliations = reconStatuses,
+                server,
                 machine = new { Environment.ProcessorCount, os = System.Runtime.InteropServices.RuntimeInformation.OSDescription },
                 sealedGroups = await h.ScalarAsync<long>("SELECT count(*) FROM audit.integrity_state WHERE integrity_status = 'SEALED'"),
                 pendingGroups = await h.ScalarAsync<long>("SELECT count(*) FROM audit.integrity_state WHERE integrity_status <> 'SEALED'"),
@@ -135,6 +163,7 @@ internal static class LoadProgram
                 .AppendLine(CultureInfo.InvariantCulture, $"| Duración de la carga ({workers} hilos) | {Seconds(wall.Elapsed)} s | — |")
                 .AppendLine(CultureInfo.InvariantCulture, $"| 8 conciliaciones | **{Seconds(reconciliation.Elapsed)} s** | < {Seconds(ReconciliationLimit)} s |")
                 .AppendLine(CultureInfo.InvariantCulture, $"| Resultados | {string.Join(", ", reconStatuses)} | — |")
+                .AppendLine(CultureInfo.InvariantCulture, $"| Base de datos | {server} | — |")
                 .AppendLine(CultureInfo.InvariantCulture, $"| Máquina | {Environment.ProcessorCount} CPU, {System.Runtime.InteropServices.RuntimeInformation.OSDescription} | — |");
             await File.WriteAllTextAsync(Path.Combine(reportDir, "pf01.md"), md.ToString());
             Console.WriteLine(md.ToString());
@@ -144,6 +173,29 @@ internal static class LoadProgram
         {
             await postgres.DisposeAsync();
         }
+    }
+
+    /// <summary>Own container by default; the existing database named by ROCHELL_PF01_* on staging (E-B03-16).</summary>
+    private static (PostgresFixture Fixture, string Server) Fixture()
+    {
+        var admin = Environment.GetEnvironmentVariable("ROCHELL_PF01_ADMIN_CONNECTION");
+        if (string.IsNullOrEmpty(admin))
+        {
+            return (new PostgresFixture(), "Testcontainers " + PostgresFixture.Image);
+        }
+
+        static string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"{name} is required when ROCHELL_PF01_ADMIN_CONNECTION is set.");
+
+        var existing = new ExistingDatabase(
+            admin,
+            Required("ROCHELL_PF01_APP_LOGIN"),
+            Required("ROCHELL_PF01_APP_PASSWORD"),
+            Required("ROCHELL_PF01_SEALER_LOGIN"),
+            Required("ROCHELL_PF01_SEALER_PASSWORD"));
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(admin);
+        return (PostgresFixture.ForExistingDatabase(existing), $"{builder.Host}/{builder.Database}");
     }
 
     /// <summary>Approved orders with two lines each (sand and cement), enough for <paramref name="lineCount"/> lines of 100 t.</summary>

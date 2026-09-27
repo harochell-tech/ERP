@@ -211,6 +211,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-B03-15-3 | B03-4 | A fiscal source is registered with the SHA-256 of the consulted file computed in the browser (the file is not uploaded until document WORM exists); rule definitions and regression cases are edited as JSON from prefilled templates (purchase ITBIS, withholding); the database validates as before. |
 | E-B03-15-4 | B03-4 | Screens in Spanish without visual design work (as E-PR18-6), each shown only with its permission; covered by Vitest and a Playwright journey (a policy version prepared by the Controller and approved by the policy approver). |
 | E-B03-15-5 | B03-4 | B03-4 is built on top of B03-3 (shared header and role labels) and rebased onto `main` once B03-3 merges. |
+| E-B03-16 | B-03 | PF-01 on staging: manual workflow `pf01-staging` (main only, green CI, `staging` environment, shared concurrency with deploy) builds the harness image at the same commit, streams it to the VPS over SSH (never pushed), runs it on the compose internal network against a temporary database `rochell_pf01` with its own throw-away logins, publishes the report, and always drops the database and logins; the `rochell` database is never touched. |
 
 Implementation rules derived from the above (no architectural change):
 
