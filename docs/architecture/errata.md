@@ -325,6 +325,17 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIN1-03-9 | FIN1-03 | TB-BALANCED stays debits = credits and blocks ACR-NTX and ACR-TAX (E-FIN1-01-3). New STRUCT-COVERAGE (active structure covers every classed active account; unclassed accounts; balance-sheet difference) is a WARNING that blocks no close. |
 | E-FIN1-03-10 | FIN1-03 | CSV: `GET …?format=csv` on each report; UTF-8 with BOM, comma separator, point decimal, 2 decimals, Spanish headers, file name with the dates. |
 | E-FIN1-03-11 | FIN1-03 | No comparative columns in FIN1-03: one period per query; comparatives later. |
+| E-FIN1-04-1 | FIN1-04 | Menu Contabilidad: Diario de ajustes, Balanza, Mayor, Estados financieros (`ledger:read`), Catálogo de cuentas, Estructuras de reporte, Mapas, Reglas, Políticas (`configuration:read`); each item only for its permission. |
+| E-FIN1-04-2 | FIN1-04 | Role CONTADOR gains `configuration:read` (migration 0036) to see the accounts it adjusts; READ only, in no SoD rule. |
+| E-FIN1-04-3 | FIN1-04 | Chart of accounts screen: class and status, filter "sin clase"; the Controller (`account:manage`) creates, edits name and class, deactivates and activates; a balance refusal is explained in Spanish. |
+| E-FIN1-04-4 | FIN1-04 | The adjustment form never adds amounts: GetManualJournal returns totalDebit, totalCredit and difference; "Enviar" is enabled only at difference 0.00. |
+| E-FIN1-04-5 | FIN1-04 | Support: the user types the reference and picks the file; the browser computes its SHA-256; the file is not uploaded (no document store yet). |
+| E-FIN1-04-6 | FIN1-04 | Adjustment form: lines of account (active, non-control), debit or credit, plant and memo; ACR-TAX and auto-reverse checkboxes; approve, reject and reverse by permission, with a reason where the rule asks and the usual step-up flow. |
+| E-FIN1-04-7 | FIN1-04 | Trial balance screen: range (current month by default), plant / supplier / bank filters with a visible filtered notice, CSV download, each account opens its ledger. |
+| E-FIN1-04-8 | FIN1-04 | Ledger screen: account and range, pages of 100, each movement links to Explain this entry (for `audit:read`), CSV download. |
+| E-FIN1-04-9 | FIN1-04 | Statements screen: tabs Balance general (date) and Estado de resultados (range); indented lines with expandable accounts; "Cuadra" or the difference; missing class or structure show a message with a link to the catalog or structures; CSV download. |
+| E-FIN1-04-10 | FIN1-04 | Report structures: list of versions; detail with lines, accounts and the missing active accounts; the editor starts from a copy of the active (or given) version; "Aprobar" for the Aprobador de políticas. |
+| E-FIN1-04-11 | FIN1-04 | The dev stack seeds classed accounts and approved synthetic structures; Playwright journey: the Contador prepares and submits, the Controller approves, the Contador sees the balanced trial balance, downloads the CSV and opens the statements. |
 | E-VS3-01-1 | VS3-01 | A customer is the same `md.party` flagged `is_customer` (a party may be customer and supplier); RNC/cédula validated as for suppliers; created by Vendedor, activated by Crédito (create customer ≠ approve credit). |
 | E-VS3-01-2 | VS3-01 | Item type FINISHED_GOOD with categories BLOQUE, ADOQUIN, OTRO_PT (extended later by errata). |
 | E-VS3-01-3 | VS3-01 | Standard cost and price list versions are prepared by the Controller and approved by the Aprobador de políticas; prices in DOP without ITBIS, per item and unit, one list in force per company. |

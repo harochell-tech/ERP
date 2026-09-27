@@ -1,0 +1,89 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { query } from "@/api/client";
+import { Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { COMPONENTS, formatDate, statusLabel } from "@/lib/labels";
+import { useSession } from "@/lib/session";
+import { useLoad } from "@/lib/useQuery";
+
+const STATUSES = ["", "DRAFT", "PENDING_APPROVAL", "POSTED", "REJECTED", "REVERSED"];
+
+// FIN1-04: the adjustment journal (E-FIN1-1…10). The total is the server's.
+export default function Page() {
+  const { companyId, can } = useSession();
+  const [status, setStatus] = useState("");
+  const allowed = can("ledger:read");
+  const { data, error } = useLoad(
+    allowed ? () => query("/api/v1/companies/{companyId}/finance/manual-journals", { path: { companyId }, query: { status, limit: 200 } }) : null,
+    [companyId, status, allowed],
+  );
+  if (!allowed) {
+    return <NoPermission />;
+  }
+  return (
+    <>
+      <div className="actions">
+        <h1 style={{ margin: 0 }}>Diario de ajustes</h1>
+        {can("manual_journal:prepare") ? (
+          <Link className="button primary" href="/contabilidad/ajustes/nuevo/">
+            Nuevo ajuste
+          </Link>
+        ) : null}
+      </div>
+      <p className="muted">Ajustes a cuentas que no son de control; los aprueba una persona distinta de quien los prepara.</p>
+      <label className="field">
+        <span>Estado</span>
+        <select aria-label="Estado" value={status} onChange={(e) => setStatus(e.target.value)}>
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s ? statusLabel(s) : "Todos"}
+            </option>
+          ))}
+        </select>
+      </label>
+      {data === null ? (
+        <Loading error={error} />
+      ) : data.items.length === 0 ? (
+        <p className="muted">No hay ajustes.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Número</th>
+              <th>Fecha</th>
+              <th>Descripción</th>
+              <th>Componente</th>
+              <th className="num">Total</th>
+              <th>Estado</th>
+              <th>Preparó</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((j) => (
+              <tr key={j.manualJournalId}>
+                <td className="mono">
+                  <Link href={`/contabilidad/ajuste/?id=${j.manualJournalId}`}>{j.journalNo}</Link>
+                </td>
+                <td>{formatDate(j.postingDate)}</td>
+                <td>
+                  {j.description}
+                  {j.autoReverse ? <span className="muted"> · reversa automática</span> : null}
+                </td>
+                <td>{COMPONENTS[j.closeComponent] ?? j.closeComponent}</td>
+                <td className="num">
+                  <Money value={j.total} />
+                </td>
+                <td>
+                  <StatusBadge status={j.status} />
+                </td>
+                <td>{j.preparedBy ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}

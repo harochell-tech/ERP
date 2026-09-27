@@ -58,10 +58,15 @@ export const NAV: readonly NavGroup[] = [
   {
     title: "Contabilidad",
     items: [
+      { href: "/contabilidad/ajustes/", label: "Diario de ajustes", permission: "ledger:read" },
+      { href: "/contabilidad/balanza/", label: "Balanza", permission: "ledger:read" },
+      { href: "/contabilidad/mayor/", label: "Mayor", permission: "ledger:read" },
+      { href: "/contabilidad/estados/", label: "Estados financieros", permission: "ledger:read" },
+      { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
+      { href: "/contabilidad/estructuras/", label: "Estructuras de reporte", permission: "configuration:read" },
       { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
       { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
       { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
-      { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
     ],
   },
   {

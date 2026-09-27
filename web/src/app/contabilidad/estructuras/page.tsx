@@ -1,0 +1,72 @@
+"use client";
+
+import Link from "next/link";
+import { query } from "@/api/client";
+import { Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { formatDate } from "@/lib/labels";
+import { REPORTS } from "@/lib/ledger";
+import { useSession } from "@/lib/session";
+import { useLoad } from "@/lib/useQuery";
+
+// FIN1-04 (E-FIN1-04-10): the versions of the balance sheet and income statement structures.
+export default function Page() {
+  const { companyId, can } = useSession();
+  const allowed = can("configuration:read");
+  const { data, error } = useLoad(allowed ? () => query("/api/v1/companies/{companyId}/finance/report-structures", { path: { companyId } }) : null, [companyId, allowed]);
+  if (!allowed) {
+    return <NoPermission />;
+  }
+  return (
+    <>
+      <h1>Estructuras de reporte</h1>
+      <p className="muted">Las prepara el Controller y las aprueba el Aprobador de políticas; los estados usan siempre la versión activa.</p>
+      {can("account:manage") ? (
+        <div className="actions">
+          {Object.entries(REPORTS).map(([code, label]) => (
+            <Link key={code} className="button" href={`/contabilidad/estructuras/nueva/?reporte=${code}`}>
+              Nueva versión: {label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+      {data === null ? (
+        <Loading error={error} />
+      ) : data.items.length === 0 ? (
+        <p className="muted">Todavía no hay estructuras.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Reporte</th>
+              <th>Versión</th>
+              <th>Vigente desde</th>
+              <th>Estado</th>
+              <th className="num">Líneas</th>
+              <th className="num">Cuentas</th>
+              <th>Preparó</th>
+              <th>Aprobó</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((s) => (
+              <tr key={s.structureVersionId}>
+                <td>
+                  <Link href={`/contabilidad/estructura/?id=${s.structureVersionId}`}>{REPORTS[s.report] ?? s.report}</Link>
+                </td>
+                <td>{s.version}</td>
+                <td>{formatDate(s.effectiveFrom)}</td>
+                <td>
+                  <StatusBadge status={s.status} />
+                </td>
+                <td className="num">{s.lines}</td>
+                <td className="num">{s.accounts}</td>
+                <td>{s.preparedBy ?? "—"}</td>
+                <td>{s.approvedBy ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}

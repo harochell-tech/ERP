@@ -11,7 +11,9 @@ internal sealed record DevAccount(Guid UserId, string Label);
 /// active fiscal rules (TEST sources), and one user per slice role, plus a storekeeper scoped to the plant.
 /// VS2-08: a posted invoice of the supplier (6 t of sand, AP 10,620.00, due in 30 days), the company bank account TEST_BANK
 /// 0123456789 on GL 1101, the supplier's account verified 73 h ago, R-09 and R-10 approved, BANK_CHARGES mapped, the TREASURY
-/// aging buckets 30 / 60 / 90 and a treasurer. UI-01: the two security roles and a new employee without roles.
+/// aging buckets 30 / 60 / 90 and a treasurer. UI-01: the two security roles and a new employee without roles. FIN1-04: every
+/// account classed by its first digit (1 asset … 6 expense), capital, accrued expenses and energy accounts, approved balance
+/// sheet and income statement structures, and a Contador.
 /// </summary>
 internal static class DevSeed
 {
@@ -34,6 +36,8 @@ internal static class DevSeed
         await h.SessionWithRolesAsync("APROBADOR_POLITICAS"); // E-B03-15-4: approves accounting policy versions
         await h.SessionWithRolesAsync("ADMIN_SEGURIDAD"); // UI-01: requests role changes
         await h.SessionWithRolesAsync("SEGUNDO_APROBADOR_SEGURIDAD"); // UI-01: decides them
+        await h.SessionWithRolesAsync("CONTADOR"); // FIN1-04: prepares adjustments
+        await SeedLedgerAsync(h);
         var newcomer = await h.CreateUserAsync(); // UI-01: a user created with the CLI, no role yet
         var plantStorekeeper = await h.CreateUserAsync();
         await h.GrantAsync(h.CompanyId, plantStorekeeper, "ALMACENISTA", receiving.Purchasing.PlantId);
@@ -59,5 +63,41 @@ internal static class DevSeed
 
         accounts.Add(new DevAccount(newcomer, "Empleado nuevo (sin roles)"));
         return accounts;
+    }
+
+    /// <summary>FIN1-04: classes and report structures, written directly as the fixture does (prepared by the Controller, approved
+    /// by the Aprobador de políticas).</summary>
+    private static async Task SeedLedgerAsync(TestHarness h)
+    {
+        await h.CreateAccountAsync("2200", "Gastos acumulados por pagar", isControl: false);
+        await h.CreateAccountAsync("3100", "Capital social", isControl: false);
+        await h.CreateAccountAsync("6200", "Energía eléctrica", isControl: false);
+        await h.AdminRequireAsync(
+            $"""
+            UPDATE fin.account SET account_class = CASE left(code, 1) WHEN '1' THEN 'ASSET' WHEN '2' THEN 'LIABILITY' WHEN '3' THEN 'EQUITY'
+              WHEN '4' THEN 'REVENUE' WHEN '5' THEN 'COST' ELSE 'EXPENSE' END WHERE company_id = '{h.CompanyId}';
+            """);
+        const string Controller = "(SELECT ra.user_id FROM iam.role_assignment ra JOIN iam.role r ON r.role_id = ra.role_id WHERE r.code = 'CONTROLLER' LIMIT 1)";
+        const string Approver = "(SELECT ra.user_id FROM iam.role_assignment ra JOIN iam.role r ON r.role_id = ra.role_id WHERE r.code = 'APROBADOR_POLITICAS' LIMIT 1)";
+        foreach (var (report, lines) in new (string, (string Code, string Caption, int Sign, string Class)[])[]
+        {
+            ("BALANCE_SHEET", [("A", "Activo", 1, "ASSET"), ("P", "Pasivo", -1, "LIABILITY"), ("K", "Patrimonio", -1, "EQUITY")]),
+            ("INCOME_STATEMENT", [("I", "Ingresos", -1, "REVENUE"), ("C", "Costos", 1, "COST"), ("G", "Gastos", 1, "EXPENSE")]),
+        })
+        {
+            var structure = Guid.CreateVersion7();
+            var sql = new System.Text.StringBuilder(
+                $"INSERT INTO fin.report_structure_version VALUES ('{structure}', '{h.CompanyId}', '{report}', 1, '2026-01-01', 'DRAFT', {Controller}, NULL);\n");
+            var order = 0;
+            foreach (var (code, caption, sign, accountClass) in lines)
+            {
+                var line = Guid.CreateVersion7();
+                sql.Append($"INSERT INTO fin.report_line VALUES ('{line}', '{h.CompanyId}', '{structure}', '{code}', '{caption}', NULL, {sign}, {++order});\n");
+                sql.Append($"INSERT INTO fin.report_line_account SELECT '{h.CompanyId}', '{structure}', '{line}', account_id FROM fin.account WHERE company_id = '{h.CompanyId}' AND account_class = '{accountClass}';\n");
+            }
+
+            sql.Append($"UPDATE fin.report_structure_version SET status = 'ACTIVE', approved_by = {Approver} WHERE structure_version_id = '{structure}';");
+            await h.AdminRequireAsync(sql.ToString());
+        }
     }
 }

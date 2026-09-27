@@ -15235,7 +15235,10 @@
           "postingEventId",
           "version",
           "lines",
-          "history"
+          "history",
+          "totalDebit",
+          "totalCredit",
+          "difference"
         ],
         "type": "object",
         "properties": {
@@ -15318,6 +15321,21 @@
             "items": {
               "$ref": "#/components/schemas/StateChange"
             }
+          },
+          "totalDebit": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "totalCredit": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "difference": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
           }
         },
         "additionalProperties": false
