@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1
+# PF-01 load harness image (E-B03-16), used only by the pf01-staging workflow. It is a test tool: it carries the test-only
+# migrations and fixtures, so it is never the production image (Dockerfile) and is never pushed to a registry; the workflow
+# builds it at the deployed commit and streams it to the VPS (docker save | ssh docker load).
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY global.json Directory.Build.props Directory.Packages.props Rochell.slnx ./
+COPY db/ db/
+COPY src/ src/
+COPY tests/migrations/ tests/migrations/
+COPY tests/Rochell.TestInfrastructure/ tests/Rochell.TestInfrastructure/
+COPY tests/Rochell.LoadHarness/ tests/Rochell.LoadHarness/
+RUN dotnet publish tests/Rochell.LoadHarness/Rochell.LoadHarness.csproj -c Release -o /out
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0-noble
+WORKDIR /app
+COPY --from=build /out /app
+USER app
+ENV DOTNET_ENVIRONMENT=Test
+ENTRYPOINT ["dotnet", "/app/Rochell.LoadHarness.dll"]
