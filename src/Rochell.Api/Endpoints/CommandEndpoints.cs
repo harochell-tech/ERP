@@ -17,6 +17,7 @@ using Rochell.Procurement.SupplierInvoices;
 using Rochell.Reconciliation;
 using Rochell.Tax;
 using Rochell.Treasury.BankAccounts;
+using Rochell.Treasury.Payments;
 
 namespace Rochell.Api.Endpoints;
 
@@ -53,6 +54,10 @@ public static class CommandEndpoints
         var treasury = company.MapGroup("/treasury").WithTags("Treasury");
         treasury.MapCommand<RegisterBankAccount, RegisterBankAccountHandler>();
         treasury.MapCommand<CloseBankAccount, CloseBankAccountHandler>();
+        treasury.MapCommand<PrepareSupplierPayment, PrepareSupplierPaymentHandler>();
+        treasury.MapCommand<UpdatePreparedPayment, UpdatePreparedPaymentHandler>();
+        treasury.MapCommand<VoidPayment, VoidPaymentHandler>();
+        treasury.MapCommand<ReleaseSupplierPayment, ReleaseSupplierPaymentHandler>();
 
         var procurement = company.MapGroup("/procurement").WithTags("Procurement");
         procurement.MapCommand<CreatePurchaseOrder, CreatePurchaseOrderHandler>();
@@ -118,6 +123,7 @@ public static class CommandEndpoints
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler),
+        typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),

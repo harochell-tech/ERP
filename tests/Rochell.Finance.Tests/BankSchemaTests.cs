@@ -60,18 +60,35 @@ public sealed class BankSchemaTests(PostgresFixture postgres)
         return id;
     }
 
-    private static string PrepareSql(TestHarness h, Bank b, Guid payment, Guid partyAccount, Guid? supplier = null, string method = "TRANSFER")
+    /// <summary>An AP document of <paramref name="supplier"/> without its invoice (FK off for the fixture only); VS2-03 tests pay real invoices.</summary>
+    private static async Task<Guid> ApDocAsync(TestHarness h, Guid supplier, string amount = "45040.00")
+    {
+        var id = Guid.CreateVersion7();
+        await h.AdminRequireAsync(
+            $"""
+            BEGIN;
+            SET LOCAL session_replication_role = replica;
+            INSERT INTO fin.ap_document VALUES ('{id}', '{h.CompanyId}', '{supplier}', 'SUPPLIER_INVOICE', gen_random_uuid(), current_date, current_date, {amount}, {amount}, 1);
+            COMMIT;
+            """);
+        return id;
+    }
+
+    /// <summary>A PREPARED payment of 45,040.00 with its number and its allocation (E-VS2-03-1, E-VS2-03-7).</summary>
+    private static string PrepareSql(TestHarness h, Bank b, Guid payment, Guid partyAccount, Guid apDoc, Guid? supplier = null, string method = "TRANSFER")
         => $"""
            INSERT INTO fin.payment (payment_id, company_id, direction, party_id, bank_account_id, party_bank_account_id, method, amount, currency,
-             value_date, status, prepared_by, version)
+             value_date, status, prepared_by, version, payment_no)
            VALUES ('{payment}', '{h.CompanyId}', 'DISBURSEMENT', '{supplier ?? b.Supplier}', '{b.BankAccount}', '{partyAccount}', '{method}', 45040.00, 'DOP',
-             current_date, 'PREPARED', @user, 1)
+             current_date, 'PREPARED', @user, 1, 'PAG-{(uint)payment.GetHashCode() % 900000 + 100000}');
+           INSERT INTO fin.payment_allocation VALUES ('{h.CompanyId}', '{payment}', 1, '{apDoc}', 45040.00);
            """;
 
     private static async Task<Guid> PreparedPaymentAsync(TestHarness h, Bank b, Guid partyAccount)
     {
         var payment = Guid.CreateVersion7();
-        await Run(h, "prepare-" + payment, PrepareSql(h, b, payment, partyAccount), new TestState("Payment", payment, null, "PREPARED"));
+        var apDoc = await ApDocAsync(h, b.Supplier);
+        await Run(h, "prepare-" + payment, PrepareSql(h, b, payment, partyAccount, apDoc), new TestState("Payment", payment, null, "PREPARED"));
         return payment;
     }
 
@@ -222,8 +239,9 @@ public sealed class BankSchemaTests(PostgresFixture postgres)
         var payment = await PreparedPaymentAsync(h, b, account);
         Guid Id() => Guid.CreateVersion7();
 
-        var cheque = await Fails(h, "cheque", PrepareSql(h, b, Id(), account, method: "CHEQUE"));
-        var foreignAccount = await Fails(h, "foreign", PrepareSql(h, b, Id(), otherAccount));
+        var apDoc = await ApDocAsync(h, b.Supplier);
+        var cheque = await Fails(h, "cheque", PrepareSql(h, b, Id(), account, apDoc, method: "CHEQUE"));
+        var foreignAccount = await Fails(h, "foreign", PrepareSql(h, b, Id(), otherAccount, apDoc));
         var selfRelease = await Fails(h, "self-release",
             $"UPDATE fin.payment SET status = 'RELEASED', released_by = @user, posting_event_id = @event, version = 2 WHERE payment_id = '{payment}'",
             new TestState("Payment", payment, "PREPARED", "RELEASED"));
@@ -238,33 +256,32 @@ public sealed class BankSchemaTests(PostgresFixture postgres)
         Assert.Equal("PREPARED", await h.ScalarAsync<string>($"SELECT status::text FROM fin.payment WHERE payment_id = '{payment}'"));
     }
 
+    /// <summary>
+    /// The PREPARED phase in SQL (the released states need R-09's journal and are covered with the real commands in
+    /// Rochell.Treasury.Tests): no jump to CLEARED, an edit carries its new allocations (E-VS2-03-1), RELEASED needs its journal (K-25).
+    /// </summary>
     [Fact]
-    public async Task Payment_follows_its_state_machine_and_freezes_after_preparation()
+    public async Task Payment_follows_its_state_machine_while_prepared()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         var b = await BankAsync(h);
         var account = await VerifiedAccountAsync(h, b);
         var payment = await PreparedPaymentAsync(h, b, account);
+        var apDoc = await h.ScalarAsync<Guid>($"SELECT ap_doc_id FROM fin.payment_allocation WHERE payment_id = '{payment}'");
         TestState To(string from, string to) => new("Payment", payment, from, to);
 
         var cleared = await Fails(h, "clear-prepared", $"UPDATE fin.payment SET status = 'CLEARED', version = 2 WHERE payment_id = '{payment}'", To("PREPARED", "CLEARED"));
-        await Run(h, "edit", $"UPDATE fin.payment SET amount = 45000.00, version = 2 WHERE payment_id = '{payment}'");
-        await Run(h, "release", ReleaseSql(payment, b.Verifier).Replace("version = 2", "version = 3", StringComparison.Ordinal), To("PREPARED", "RELEASED"));
-        var editReleased = await Fails(h, "edit-released", $"UPDATE fin.payment SET amount = 1.00, version = 4 WHERE payment_id = '{payment}'");
-        var voidReleased = await Fails(h, "void-released", $"UPDATE fin.payment SET status = 'VOIDED', version = 4 WHERE payment_id = '{payment}'", To("RELEASED", "VOIDED"));
-        await Run(h, "clear", $"UPDATE fin.payment SET status = 'CLEARED', version = 4 WHERE payment_id = '{payment}'", To("RELEASED", "CLEARED"));
-        // E-VS2-01-11: unmatching returns a CLEARED payment to RELEASED.
-        await Run(h, "unclear", $"UPDATE fin.payment SET status = 'RELEASED', version = 5 WHERE payment_id = '{payment}'", To("CLEARED", "RELEASED"));
-        await Run(h, "reverse", $"UPDATE fin.payment SET status = 'REVERSED', version = 6 WHERE payment_id = '{payment}'", To("RELEASED", "REVERSED"));
+        var unallocated = await Fails(h, "edit-alone", $"UPDATE fin.payment SET amount = 45000.00, version = 2 WHERE payment_id = '{payment}'");
+        await Run(h, "edit",
+            $"UPDATE fin.payment SET amount = 45000.00, version = 2 WHERE payment_id = '{payment}'; INSERT INTO fin.payment_allocation VALUES ('{h.CompanyId}', '{payment}', 2, '{apDoc}', 45000.00);");
+        var withoutJournal = await Fails(h, "release", ReleaseSql(payment, b.Verifier).Replace("version = 2", "version = 3", StringComparison.Ordinal), To("PREPARED", "RELEASED"));
         var delete = await h.AppExecuteAsync($"DELETE FROM fin.payment WHERE payment_id = '{payment}'");
 
         Assert.Equal(SqlStates.RaiseException, cleared);
-        Assert.Equal(SqlStates.RaiseException, editReleased);
-        Assert.Equal(SqlStates.RaiseException, voidReleased);
+        Assert.Equal(SqlStates.RaiseException, unallocated);
+        Assert.Equal(SqlStates.RaiseException, withoutJournal);
         Assert.Equal(InsufficientPrivilege, delete?.SqlState);
-        Assert.Equal("REVERSED:45000.0000:6", await h.ScalarAsync<string>($"SELECT status || ':' || amount || ':' || version FROM fin.payment WHERE payment_id = '{payment}'"));
-        Assert.Equal("PREPARED,RELEASED,CLEARED,RELEASED,REVERSED", await h.ScalarAsync<string>(
-            $"SELECT string_agg(h.to_state, ',' ORDER BY h.xmin::text::bigint) FROM core.state_history h WHERE h.aggregate_id = '{payment}'"));
+        Assert.Equal("PREPARED:45000.0000:2", await h.ScalarAsync<string>($"SELECT status || ':' || amount || ':' || version FROM fin.payment WHERE payment_id = '{payment}'"));
     }
 
     [Fact]
