@@ -1,0 +1,194 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { query, type Schemas } from "@/api/client";
+import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { formatDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
+import { formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labels";
+import { useSession } from "@/lib/session";
+import { useCommand } from "@/lib/useCommand";
+import { useLoad } from "@/lib/useQuery";
+
+type Supplier = Schemas["ProposalSupplier"];
+
+/** Money typed by the treasurer: at most 2 decimals (E-VS2-03-5). */
+const MONEY_SCALE = 2;
+
+// VS2-08 / E-VS2-07-4: POSTED invoices with a balance due by the chosen date, per supplier with its payability; the treasurer
+// picks invoices and amounts and prepares one payment for one supplier. Preparing reserves nothing and posts nothing (E-VS2-6);
+// the payment's total is the server's, shown on the payment once prepared (E-UI-3).
+function PrepareForm({ supplier, today }: { supplier: Supplier; today: string }) {
+  const { companyId, can } = useSession();
+  const router = useRouter();
+  const prepare = useCommand(`prepare-payment:${supplier.supplierId}`, "/api/v1/companies/{companyId}/treasury/prepare-supplier-payment");
+  const { data: banks } = useLoad(() => query("/api/v1/companies/{companyId}/treasury/bank-accounts", { path: { companyId } }), [companyId]);
+  const active = (banks?.items ?? []).filter((b) => b.status === "ACTIVE");
+  const [bankAccountId, setBankAccountId] = useState("");
+  const [valueDate, setValueDate] = useState(today);
+  const [reference, setReference] = useState("");
+  const [chosen, setChosen] = useState<Record<string, string>>(() =>
+    Object.fromEntries(supplier.invoices.map((i) => [i.apDocId, normalizeInput(formatDecimal(i.openAmount))])),
+  );
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const applications = supplier.invoices.filter((i) => picked[i.apDocId]).map((i) => ({ apDocId: i.apDocId, amount: normalizeInput(chosen[i.apDocId] ?? "") }));
+  const invalid = applications.some((a) => !isPositiveDecimal(a.amount, MONEY_SCALE));
+  const canPrepare = can("payment:prepare") && supplier.partyBankAccountId !== null;
+  const bank = bankAccountId || active[0]?.bankAccountId || "";
+
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!supplier.partyBankAccountId) {
+          return;
+        }
+        const response = await prepare.run({
+          partyId: supplier.supplierId,
+          bankAccountId: bank,
+          partyBankAccountId: supplier.partyBankAccountId,
+          valueDate,
+          bankReference: reference.trim() === "" ? null : reference.trim(),
+          applications,
+        });
+        if (response) {
+          router.push(`/tesoreria/pago/?id=${response.resultRef}`);
+        }
+      }}
+    >
+      <table>
+        <thead>
+          <tr>
+            <th>
+              <span className="muted">Pagar</span>
+            </th>
+            <th>NCF</th>
+            <th>Fecha</th>
+            <th>Vence</th>
+            <th className="num">Saldo abierto</th>
+            <th className="num">A pagar</th>
+          </tr>
+        </thead>
+        <tbody>
+          {supplier.invoices.map((i) => (
+            <tr key={i.apDocId}>
+              <td>
+                <input
+                  type="checkbox"
+                  aria-label={`Pagar ${i.supplierFiscalNumber}`}
+                  checked={picked[i.apDocId] ?? false}
+                  onChange={(e) => setPicked({ ...picked, [i.apDocId]: e.target.checked })}
+                  style={{ minHeight: 20, width: 20 }}
+                />
+              </td>
+              <td className="mono">{i.supplierFiscalNumber}</td>
+              <td>{formatDate(i.docDate)}</td>
+              <td>{i.dueDate < today ? <StatusBadge status="MATCH_EXCEPTION" label={`Vencida ${formatDate(i.dueDate)}`} /> : formatDate(i.dueDate)}</td>
+              <td className="num">
+                <Money value={i.openAmount} />
+              </td>
+              <td className="num">
+                <input
+                  aria-label={`A pagar ${i.supplierFiscalNumber}`}
+                  className="mono"
+                  style={{ width: 150, textAlign: "right" }}
+                  value={chosen[i.apDocId] ?? ""}
+                  disabled={!picked[i.apDocId]}
+                  onChange={(e) => setChosen({ ...chosen, [i.apDocId]: e.target.value })}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {canPrepare ? (
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Preparar pago</h2>
+          <Field label="Cuenta de la empresa">
+            <select value={bank} onChange={(e) => setBankAccountId(e.target.value)} required>
+              {active.map((b) => (
+                <option key={b.bankAccountId} value={b.bankAccountId}>
+                  {b.bankCode} {b.accountNumber}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Fecha valor">
+            <input type="date" value={valueDate} onChange={(e) => setValueDate(e.target.value)} required />
+          </Field>
+          <Field label="Referencia (opcional)">
+            <input value={reference} onChange={(e) => setReference(e.target.value)} />
+          </Field>
+          <div className="actions">
+            <button type="submit" className="primary" disabled={prepare.busy || applications.length === 0 || invalid || bank === ""}>
+              Preparar pago
+            </button>
+            {invalid ? <span className="muted">Montos mayores que cero con máximo 2 decimales.</span> : null}
+          </div>
+          <p className="muted">
+            Preparar no reserva saldo ni contabiliza. Al liberar se vuelven a validar saldos, la cuenta del proveedor y la fecha valor. El número PAG- y el
+            total salen del servidor: escriba el número en la transferencia.
+          </p>
+          <ErrorBox error={prepare.error} />
+        </div>
+      ) : supplier.partyBankAccountId === null ? (
+        <p className="notice">El proveedor no tiene una cuenta bancaria verificada: solicítela desde su ficha.</p>
+      ) : null}
+    </form>
+  );
+}
+
+export default function Page() {
+  const { companyId, can } = useSession();
+  const today = todayInDominicanRepublic();
+  const [dueUntil, setDueUntil] = useState(today);
+  const [supplierId, setSupplierId] = useState("");
+  const { data, error } = useLoad(
+    can("payment:read") ? () => query("/api/v1/companies/{companyId}/treasury/payment-proposal", { path: { companyId }, query: { dueUntil } }) : null,
+    [companyId, dueUntil],
+  );
+  if (!can("payment:read")) {
+    return <NoPermission />;
+  }
+  const supplier = data?.suppliers.find((s) => s.supplierId === supplierId) ?? data?.suppliers[0];
+  return (
+    <>
+      <h1>Propuesta de pago</h1>
+      <p className="muted">Facturas contabilizadas con saldo que vencen hasta la fecha elegida. Un pago es para un solo proveedor.</p>
+      <div className="card">
+        <Field label="Vence hasta">
+          <input type="date" value={dueUntil} onChange={(e) => setDueUntil(e.target.value)} />
+        </Field>
+        {data && data.suppliers.length > 0 ? (
+          <Field label="Proveedor">
+            <select value={supplier?.supplierId ?? ""} onChange={(e) => setSupplierId(e.target.value)}>
+              {data.suppliers.map((s) => (
+                <option key={s.supplierId} value={s.supplierId}>
+                  {s.supplierName} — {formatDecimal(s.openAmount)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        {supplier ? (
+          <p>
+            Cuenta del proveedor: <StatusBadge status={supplier.payability} testId="supplier-payability" />{" "}
+            {supplier.accountNumber ? (
+              <span className="mono">
+                {supplier.bankCode} {supplier.accountNumber}
+              </span>
+            ) : null}
+            {supplier.payability === "HOLD_PENDING" ? <span className="muted"> · pagable desde {formatDateTime(supplier.payableFrom)}</span> : null}
+          </p>
+        ) : null}
+      </div>
+      {data === null ? (
+        <Loading error={error} />
+      ) : !supplier ? (
+        <p className="muted">No hay facturas con saldo que venzan hasta esa fecha.</p>
+      ) : (
+        <PrepareForm key={`${supplier.supplierId}:${dueUntil}`} supplier={supplier} today={today} />
+      )}
+    </>
+  );
+}

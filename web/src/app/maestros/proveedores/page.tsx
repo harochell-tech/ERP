@@ -1,9 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
-import { statusLabel } from "@/lib/labels";
+import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -58,9 +58,21 @@ function SupplierRow({ supplier, onDone }: { supplier: Supplier; onDone: () => v
         {editing ? <input aria-label="RNC" value={rnc} onChange={(e) => setRnc(e.target.value)} /> : (supplier.rnc ?? "—")}
       </td>
       <td>
-        {editing ? <input aria-label="Razón social" value={legalName} onChange={(e) => setLegalName(e.target.value)} /> : supplier.legalName}
+        {editing ? (
+          <input aria-label="Razón social" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
+        ) : (
+          <Link href={`/maestros/proveedor/?id=${id}`}>{supplier.legalName}</Link>
+        )}
       </td>
-      <td>{statusLabel(supplier.status)}</td>
+      <td>
+        <StatusBadge status={supplier.status} />
+      </td>
+      <td>
+        <StatusBadge status={supplier.bankAccountState} />
+      </td>
+      <td className="num">
+        <Money value={supplier.openApAmount} />
+      </td>
       <td className="actions">
         {editing ? (
           <>
@@ -125,6 +137,8 @@ export default function Page() {
               <th>RNC</th>
               <th>Razón social</th>
               <th>Estado</th>
+              <th>Cuenta bancaria</th>
+              <th className="num">CxP abierta</th>
               <th />
             </tr>
           </thead>
