@@ -12,7 +12,7 @@ m grant-role "$tester" PROBADOR "$rnc"
 for pair in comprador:COMPRADOR aprobador:APROBADOR_COMPRAS almacen:ALMACENISTA cxp:CUENTAS_POR_PAGAR controller:CONTROLLER \
             politicas:APROBADOR_POLITICAS analista:ANALISTA_FISCAL fiscal:ESPECIALISTA_FISCAL tesorero:TESORERO \
             auditor:AUDITOR cierre:SEGUNDO_APROBADOR_CIERRE seguridad:ADMIN_SEGURIDAD seguridad2:SEGUNDO_APROBADOR_SEGURIDAD \
-            director:DIRECTOR; do
+            director:DIRECTOR contador:CONTADOR; do
   email="${pair%%:*}@staging.invalid"
   m create-synthetic-user "$email"
   m grant-role "$email" "${pair##*:}" "$rnc"

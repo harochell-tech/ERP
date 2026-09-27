@@ -73,6 +73,8 @@ export const COMPONENTS: Readonly<Record<string, string>> = {
   "INV-MOV": "Movimientos de inventario",
   "AP-REC": "Cuentas por pagar",
   "BANK-REC": "Bancos",
+  "ACR-NTX": "Ajustes contables",
+  "ACR-TAX": "Ajustes con efecto fiscal",
 };
 
 export function formatDate(value: string | null | undefined): string {
@@ -112,4 +114,5 @@ export const ROLES: Readonly<Record<string, string>> = {
   SEGUNDO_APROBADOR_SEGURIDAD: "Segundo aprobador de seguridad",
   PROBADOR: "Probador",
   DIRECTOR: "Director (solo lectura)",
+  CONTADOR: "Contador",
 };

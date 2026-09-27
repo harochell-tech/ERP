@@ -15,19 +15,20 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["ADMIN_SEGURIDAD"] = "iam:read,role:assign,role:revoke",
         ["ALMACENISTA"] = "goods_receipt:post,goods_receipt:read,item:create,master_data:read,purchase_order:read,receipt_correction:create",
         ["ANALISTA_FISCAL"] = "configuration:read,fiscal_rule:configure,fiscal_rule_source:register",
-        ["APROBADOR_POLITICAS"] = "accounting_policy:approve,configuration:read", // E-PR06-4
+        ["APROBADOR_POLITICAS"] = "accounting_policy:approve,configuration:read,report_structure:approve", // E-PR06-4, E-FIN1-01-5
         ["APROBADOR_COMPRAS"] = "master_data:read,purchase_order:approve,purchase_order:approve_over_receipt,purchase_order:read",
-        ["AUDITOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,master_data:read,payment:read,period:read,"
+        ["AUDITOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,ledger:read,master_data:read,payment:read,period:read,"
             + "purchase_order:read,reconciliation:read,supplier_invoice:read",
         ["COMPRADOR"] = "master_data:read,purchase_order:cancel,purchase_order:create,purchase_order:read,purchase_order:submit,supplier:create,supplier:update",
-        ["CONTROLLER"] = "account_role_map:approve,accounting_policy:approve,accounting_policy:prepare,audit:read,bank:read,bank_account:manage,"
+        ["CONTROLLER"] = "account:manage,account_role_map:approve,accounting_policy:approve,accounting_policy:prepare,audit:read,bank:read,bank_account:manage,"
             + "bank_account_number:read,bank_charge:recognize,bank_line:unmatch,configuration:read,goods_receipt:read,goods_receipt:reverse,hash:verify,item:activate,"
-            + "journal:repost,master_data:read,match_exception:approve,party_bank_account:verify,payment:read,payment:release,payment:reverse,"
+            + "journal:repost,ledger:read,manual_journal:approve,master_data:read,match_exception:approve,party_bank_account:verify,payment:read,payment:release,payment:reverse,"
             + "period:read,period_component:close,period_component:reopen,posting_rule:approve,purchase_order:approve,purchase_order:read,"
             + "receipt_correction:approve,reconciliation:read,reconciliation:run,supplier:activate,supplier_invoice:read,supplier_invoice:reverse,"
             + "valuation_residual:approve",
-        ["DIRECTOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,master_data:read,payment:read,"
+        ["DIRECTOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,ledger:read,master_data:read,payment:read,"
             + "period:read,purchase_order:read,reconciliation:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission
+        ["CONTADOR"] = "ledger:read,manual_journal:prepare", // E-FIN1-01-5
         ["CUENTAS_POR_PAGAR"] = "bank:read,goods_receipt:read,master_data:read,payment:read,purchase_order:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_rule:activate",
@@ -42,8 +43,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(61L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
-        Assert.Equal(24L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
+        Assert.Equal(66L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
+        Assert.Equal(25L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
         foreach (var (role, permissions) in ExpectedRoles)
         {
             Assert.Equal(permissions, await h.ScalarAsync<string>(
