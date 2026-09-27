@@ -57,3 +57,22 @@ against payment:release or prepare as in §7; payment:release / supplier:create,
 
 Schema tests: `tests/Rochell.Finance.Tests/BankSchemaTests.cs` (tagged `AcceptanceVs2` for PAY-04 / PAY-10 until VS2-09 extends the
 traceability test to VS#2).
+
+## Commands (VS2-02)
+
+Module `Rochell.Treasury` (E-VS2-02-1: may use Finance and MasterData). API: `POST /api/v1/companies/{companyId}/treasury/…` and
+`/master-data/…` (E-VS2-02-8).
+
+| Command | Permission (step-up) | What it does |
+| --- | --- | --- |
+| `treasury/register-bank-account` | `bank_account:manage` (yes) | Normalizes bank code and number, resolves the GL account by code (unmapped control account, not used by another bank account), creates the account ACTIVE (E-VS2-02-2) |
+| `treasury/close-bank-account` | `bank_account:manage` (yes) | ACTIVE → CLOSED with a reason and the expected version; refused with PREPARED/RELEASED payments or UNMATCHED lines (E-VS2-02-3) |
+| `master-data/request-party-bank-account` | `party_bank_account:request` (yes) | New version in REVIEW for an ACTIVE supplier; one REVIEW at a time (E-VS2-02-4) |
+| `master-data/verify-party-bank-account` | `party_bank_account:verify` (yes) | REVIEW → VERIFIED by someone other than the requester, evidence ≥ 20 characters; `payable_from` = now + 72 h; supersedes the previous VERIFIED version in the same transaction |
+| `master-data/reject-party-bank-account` | `party_bank_account:verify` (no) | REVIEW → REJECTED with a reason, by someone other than the requester (E-VS2-02-5) |
+
+Requests and verifications of one supplier take an advisory lock per supplier, so "one REVIEW, one VERIFIED" never races.
+`PartyBankAccounts.PayabilityAsync` is the "payable" rule (E-VS2-02-6): VERIFIED and now ≥ `payable_from`; payment release
+(VS2-03) calls it under its locks. Events carry full account numbers (E-VS2-02-7).
+
+Tests: `tests/Rochell.Treasury.Tests` (PAY-06, PAY-07 payability halves and PAY-10 command half tagged `AcceptanceVs2`).

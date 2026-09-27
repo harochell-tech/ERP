@@ -17,7 +17,7 @@ public sealed class EndpointCoverageTests(PostgresFixture postgres)
     [
         typeof(Identity.AssemblyMarker).Assembly, typeof(MasterData.AssemblyMarker).Assembly, typeof(Finance.AssemblyMarker).Assembly,
         typeof(Inventory.AssemblyMarker).Assembly, typeof(Procurement.AssemblyMarker).Assembly, typeof(Tax.AssemblyMarker).Assembly,
-        typeof(Audit.AssemblyMarker).Assembly, typeof(Reconciliation.AssemblyMarker).Assembly,
+        typeof(Audit.AssemblyMarker).Assembly, typeof(Reconciliation.AssemblyMarker).Assembly, typeof(Treasury.AssemblyMarker).Assembly,
     ];
 
     private static List<Type> Handled(Type handlerInterface)
@@ -40,7 +40,7 @@ public sealed class EndpointCoverageTests(PostgresFixture postgres)
 
         Assert.Equal(Handled(typeof(ICommandHandler<>)), commands);
         Assert.Equal(Handled(typeof(IQueryHandler<>)).Select(t => t.Name), queries);
-        Assert.Equal(44, commands.Count);
+        Assert.Equal(49, commands.Count); // 44 of VS#1 + 5 of VS2-02
     }
 
     [Fact]

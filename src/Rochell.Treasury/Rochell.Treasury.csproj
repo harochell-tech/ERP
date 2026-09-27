@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Rochell.Treasury</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Module rule (E-VS2-02-1): Treasury may use Platform, Finance (R-09 / R-10 postings) and MasterData (suppliers and their bank accounts). -->
+    <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+    <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
+    <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
+  </ItemGroup>
+</Project>

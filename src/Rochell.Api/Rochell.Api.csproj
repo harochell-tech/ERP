@@ -18,5 +18,6 @@
     <ProjectReference Include="..\Rochell.Tax\Rochell.Tax.csproj" />
     <ProjectReference Include="..\Rochell.Audit\Rochell.Audit.csproj" />
     <ProjectReference Include="..\Rochell.Reconciliation\Rochell.Reconciliation.csproj" />
+    <ProjectReference Include="..\Rochell.Treasury\Rochell.Treasury.csproj" />
   </ItemGroup>
 </Project>
