@@ -27,8 +27,17 @@ public sealed record ApproveRoleChange(
     string IdempotencyKey,
     Guid RequestId) : ICommand;
 
+/// <summary>E-UI01-6 (a): the second approver rejects a pending request, with a reason.</summary>
+public sealed record RejectRoleChange(
+    Guid CompanyId,
+    Guid SessionId,
+    string IdempotencyKey,
+    Guid RequestId,
+    string Reason) : ICommand;
+
 public static class RoleChangeErrors
 {
+    public const string ReasonRequired = "REASON_REQUIRED";
     public const string RoleUnknown = "ROLE_UNKNOWN";
     public const string UserInvalid = "USER_INVALID";
     public const string SelfRequest = "SELF_REQUEST";

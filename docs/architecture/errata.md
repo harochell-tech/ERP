@@ -268,6 +268,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-UI-5 | UI | Labels: CLEARED = "Compensado"; a matched statement line = "Conciliada"; PREPARED "Preparado", RELEASED "Liberado", VERIFIED "Verificada", SUPERSEDED "Reemplazada", UNMATCHED "Sin conciliar", CHARGE_RECOGNIZED "Cargo registrado". |
 | E-UI-6 | UI | The IBM Plex typefaces are bundled in `web/` (no calls to external font services). |
 | E-ADM-1 | IAM | No all-powerful user: segregation of duties and four eyes stay. (a) Staging: the tester keeps CONTROLLER + PROBADOR and acts as test identities for every role, now including ADMIN_SEGURIDAD, SEGUNDO_APROBADOR_SEGURIDAD and DIRECTOR (`deploy/staging/seed.sh`). (b) New role DIRECTOR (migration 0031): every READ permission, no WRITE or SECURITY permission — sees every screen and report, executes nothing. |
+| E-UI01-1 | UI-01 | UI-01 builds Auditoría (verify hash chain, WORM digests), Seguridad (users and roles, role requests), Maestros › plants and locations and Contabilidad › chart of accounts (read only), and task counters on Inicio. |
+| E-UI01-2 | UI-01 | The verify screen runs VerifyHashChain (`hash:verify`) and shows the report per ledger; nothing is stored; without WORM storage it says "not available". |
+| E-UI01-3 | UI-01 | New read-only query of the digests written to WORM (`audit:read`): date, ledger, seal range, count, hashes, WORM object key. |
+| E-UI01-4 | UI-01 | New READ permission `iam:read` (Administrador de seguridad, Segundo aprobador de seguridad, Auditor, Director; 61 permissions); queries of the company's users with their roles and of the role change requests. |
+| E-UI01-5 | UI-01 | (a) Users are still created with the deployment CLI; the screens only request role assignments and revocations (company-wide; plant-scoped ones stay in the CLI). |
+| E-UI01-6 | UI-01 | (a) New command RejectRoleChange (`role:second_approve`, mandatory reason; not the requester nor the affected user); migration 0032 adds REJECTED with rejected_by, rejected_at and rejection_reason. |
+| E-UI01-7 | UI-01 | Inicio's counters come from the existing list queries, each only with its read permission; a full page (200) shows as "200+"; no new API. |
+| E-UI01-8 | UI-01 | Playwright security journey (request → second approval → the employee's menu follows the role) and the read-only screens; API and database tests for the new queries and the rejection. |
 
 Implementation rules derived from the above (no architectural change):
 

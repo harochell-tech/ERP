@@ -96,6 +96,15 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MATCH_WRONG_BANK_ACCOUNT: "La línea y el pago son de cuentas bancarias distintas.",
   MATCH_AMOUNT_DIFFERS: "El monto de la línea y el del pago no son iguales.",
   MATCH_DATE_OUTSIDE_WINDOW: "La fecha de la línea está fuera de la ventana permitida.",
+  ROLE_UNKNOWN: "El rol no existe.",
+  USER_INVALID: "El usuario no existe o no está activo.",
+  SELF_REQUEST: "Nadie puede solicitar un rol para sí mismo.",
+  ASSIGNMENT_NOT_FOUND: "El usuario ya no tiene ese rol.",
+  ALREADY_ASSIGNED: "El usuario ya tiene ese rol.",
+  REQUEST_NOT_FOUND: "La solicitud no existe.",
+  REQUEST_NOT_PENDING: "La solicitud ya fue decidida.",
+  SECOND_APPROVER_REQUIRED: "La decide una persona distinta de quien la pidió y del usuario afectado.",
+  SOD_CONFLICT: "Ese rol choca con otro rol del usuario (segregación de funciones).",
   POLICY_MISSING: "Falta la política TREASURY con los tramos de antigüedad (Contabilidad › Políticas).",
 };
 
