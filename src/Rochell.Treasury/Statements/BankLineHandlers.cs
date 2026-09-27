@@ -90,19 +90,9 @@ public sealed class MatchBankLineHandler : ICommandHandler<MatchBankLine>
         var line = await BankLines.LockLineAsync(context, command.LineId, command.ExpectedLineVersion, cancellationToken).ConfigureAwait(false);
         await BankLines.ShareBankAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
 
-        if (payment.Status != "RELEASED")
-        {
-            throw new DomainException(StatementErrors.PaymentNotReleased, $"The payment is {payment.Status}; only a RELEASED payment is matched (E-VS2-05-6).");
-        }
-
         if (line.Status != "UNMATCHED")
         {
             throw new DomainException(StatementErrors.LineNotUnmatched, $"The line is {line.Status}.");
-        }
-
-        if (line.Direction != StatementFile.Debit)
-        {
-            throw new DomainException(StatementErrors.LineNotDebit, "A payment is matched to a DEBIT line (money leaving the account).");
         }
 
         if (line.BankAccountId != payment.BankAccountId)
@@ -115,6 +105,16 @@ public sealed class MatchBankLineHandler : ICommandHandler<MatchBankLine>
             throw new DomainException(
                 StatementErrors.AmountDiffers,
                 $"The line is {PaymentRules.Money(line.Amount)} and the payment {PaymentRules.Money(payment.Amount)}; the amounts must be equal (E-VS2-05-6).");
+        }
+
+        if (line.Direction == StatementFile.Credit)
+        {
+            return await MatchReturnAsync(command, context, line, payment, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (payment.Status != "RELEASED")
+        {
+            throw new DomainException(StatementErrors.PaymentNotReleased, $"The payment is {payment.Status}; only a RELEASED payment is matched to a DEBIT line (E-VS2-05-6).");
         }
 
         if (line.ValueDate < payment.ValueDate || line.ValueDate > payment.ValueDate.AddDays(MatchWindowDays))
@@ -178,6 +178,83 @@ public sealed class MatchBankLineHandler : ICommandHandler<MatchBankLine>
         await context.AppendStateAsync(PaymentRules.Aggregate, command.PaymentId, "DOCUMENT", "RELEASED", "CLEARED", CommandType, cleared, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { lineId = command.LineId, lineVersion, paymentId = command.PaymentId, paymentStatus = "CLEARED", paymentVersion });
     }
+
+    /// <summary>
+    /// E-VS2-05-10: the bank's return of a reversed transfer — a CREDIT line of the same account and amount, dated on or after the
+    /// reversal, matched to the REVERSED payment whose DEBIT line is matched. The payment keeps its status.
+    /// </summary>
+    private async Task<string> MatchReturnAsync(MatchBankLine command, CommandContext context, BankLines.Line line, BankLines.Payment payment, CancellationToken cancellationToken)
+    {
+        if (payment.Status != "REVERSED")
+        {
+            throw new DomainException(StatementErrors.PaymentNotReversed, $"The payment is {payment.Status}; a CREDIT line is matched only as the return of a reversed payment (E-VS2-05-10).");
+        }
+
+        var matchedDirections = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT direction FROM fin.bank_statement_line WHERE matched_payment_id = @p",
+            r => r.GetString(0),
+            cancellationToken,
+            ("p", command.PaymentId)).ConfigureAwait(false);
+        if (!matchedDirections.Contains(StatementFile.Debit))
+        {
+            throw new DomainException(StatementErrors.ReturnWithoutTransfer, "The reversed payment has no matched DEBIT line: the bank never debited it, so there is no return to match (E-VS2-05-10).");
+        }
+
+        if (matchedDirections.Contains(StatementFile.Credit))
+        {
+            throw new DomainException(StatementErrors.ReturnAlreadyMatched, "The payment's return is already matched to another line.");
+        }
+
+        var reversedOn = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT business_date FROM core.domain_event WHERE company_id = @c AND aggregate_id = @p AND event_type = 'PaymentReversed'",
+            r => r.Date(0),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("p", command.PaymentId)).ConfigureAwait(false)).Single();
+        if (line.ValueDate < reversedOn)
+        {
+            throw new DomainException(
+                StatementErrors.DateOutsideWindow,
+                $"The return is dated {BankLines.Date(line.ValueDate)}, before the reversal on {BankLines.Date(reversedOn)} (E-VS2-05-10).");
+        }
+
+        var lineVersion = line.Version + 1;
+        var matched = await context.AppendEventAsync(
+            new EventDraft(
+                "BankLineMatched",
+                1,
+                BankLines.Aggregate,
+                command.LineId,
+                lineVersion,
+                JsonSerializer.Serialize(new
+                {
+                    lineId = command.LineId,
+                    statementId = line.StatementId,
+                    paymentId = command.PaymentId,
+                    paymentNo = payment.PaymentNo,
+                    kind = "RETURN",
+                    amount = PaymentRules.Money(line.Amount),
+                    lineValueDate = line.ValueDate,
+                    reversedOn,
+                }),
+                Publish: true,
+                BusinessDate: line.ValueDate),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE fin.bank_statement_line SET status = 'MATCHED', matched_payment_id = @p, version = @v WHERE line_id = @id",
+            cancellationToken,
+            ("p", command.PaymentId),
+            ("v", lineVersion),
+            ("id", command.LineId)).ConfigureAwait(false);
+        await context.AppendStateAsync(BankLines.Aggregate, command.LineId, "DOCUMENT", "UNMATCHED", "MATCHED", CommandType, matched, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { lineId = command.LineId, lineVersion, paymentId = command.PaymentId, paymentStatus = payment.Status, paymentVersion = payment.Version });
+    }
 }
 
 [RequiresPermission("bank_line:unmatch", StepUp = true)]
@@ -205,6 +282,31 @@ public sealed class UnmatchBankLineHandler : ICommandHandler<UnmatchBankLine>
         }
 
         await BankLines.ShareBankAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
+        if (line.Direction == StatementFile.Credit)
+        {
+            // E-VS2-05-10: a return matched by mistake goes back to UNMATCHED; the reversed payment does not change.
+            var version = line.Version + 1;
+            var eventId = await context.AppendEventAsync(
+                new EventDraft(
+                    "BankLineUnmatched",
+                    1,
+                    BankLines.Aggregate,
+                    command.LineId,
+                    version,
+                    JsonSerializer.Serialize(new { lineId = command.LineId, statementId = line.StatementId, paymentId, paymentNo = payment.PaymentNo, kind = "RETURN", reason }),
+                    Publish: true),
+                cancellationToken).ConfigureAwait(false);
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "UPDATE fin.bank_statement_line SET status = 'UNMATCHED', matched_payment_id = NULL, version = @v WHERE line_id = @id",
+                cancellationToken,
+                ("v", version),
+                ("id", command.LineId)).ConfigureAwait(false);
+            await context.AppendStateAsync(BankLines.Aggregate, command.LineId, "DOCUMENT", "MATCHED", "UNMATCHED", CommandType, eventId, cancellationToken, reason).ConfigureAwait(false);
+            return JsonSerializer.Serialize(new { lineId = command.LineId, lineVersion = version, paymentId, paymentStatus = payment.Status, paymentVersion = payment.Version });
+        }
+
         if (payment.Status != "CLEARED")
         {
             throw new DomainException(
@@ -280,7 +382,7 @@ public sealed class RecognizeBankChargeHandler : ICommandHandler<RecognizeBankCh
 
         if (line.Direction != StatementFile.Debit)
         {
-            throw new DomainException(StatementErrors.LineNotDebit, "A bank charge is a DEBIT line; a CREDIT line stays unmatched as an in-transit item (E-VS2-05-7).");
+            throw new DomainException(StatementErrors.LineNotDebit, "A bank charge is a DEBIT line; a CREDIT line stays unmatched as an in-transit item or is matched as a payment's return (E-VS2-05-7, E-VS2-05-10).");
         }
 
         var inputs = new Dictionary<string, string> { ["value_date"] = BankLines.Date(line.ValueDate), ["description"] = line.Description };

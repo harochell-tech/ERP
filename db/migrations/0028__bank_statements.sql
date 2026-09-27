@@ -65,13 +65,15 @@ CREATE CONSTRAINT TRIGGER bank_statement_has_file AFTER INSERT ON fin.bank_state
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fin.bank_statement_has_file();
 
 -- ---------------------------------------------------------------------------------------------
--- E-VS2-05-6: a payment is matched to one statement line at most.
+-- E-VS2-05-6 / E-VS2-05-10: a payment is matched to one DEBIT line at most (the transfer) and, once reversed, to one CREDIT line
+-- at most (the bank's return).
 -- ---------------------------------------------------------------------------------------------
 DROP INDEX fin.bank_statement_line_payment;
-CREATE UNIQUE INDEX bank_statement_line_matched_payment_uq ON fin.bank_statement_line (matched_payment_id) WHERE matched_payment_id IS NOT NULL;
+CREATE UNIQUE INDEX bank_statement_line_matched_payment_uq ON fin.bank_statement_line (matched_payment_id, direction) WHERE matched_payment_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------------------------
--- Line transitions (VS#2 §4), now also: a charge is recognized on a DEBIT line only (E-VS2-05-7).
+-- Line transitions (VS#2 §4), now also: a charge is recognized on a DEBIT line only (E-VS2-05-7); a CREDIT line is matched only as
+-- the return of a REVERSED payment whose DEBIT line is matched (E-VS2-05-10).
 -- ---------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fin.bank_statement_line_guard() RETURNS trigger
   LANGUAGE plpgsql AS $$
@@ -91,9 +93,15 @@ BEGIN
   IF NOT ((OLD.status = 'UNMATCHED' AND NEW.status IN ('MATCHED', 'CHARGE_RECOGNIZED')) OR (OLD.status = 'MATCHED' AND NEW.status = 'UNMATCHED')) THEN
     RAISE EXCEPTION 'fin.bank_statement_line: transition % → % is not allowed (VS#2 §4)', OLD.status, NEW.status;
   END IF;
-  IF NEW.status = 'MATCHED' AND (NEW.direction <> 'DEBIT' OR NOT EXISTS (
-       SELECT 1 FROM fin.payment p WHERE p.payment_id = NEW.matched_payment_id AND p.bank_account_id = NEW.bank_account_id)) THEN
-    RAISE EXCEPTION 'fin.bank_statement_line: only a DEBIT line of the payment''s bank account can be matched to it';
+  IF NEW.status = 'MATCHED' AND NOT EXISTS (
+       SELECT 1 FROM fin.payment p WHERE p.payment_id = NEW.matched_payment_id AND p.bank_account_id = NEW.bank_account_id) THEN
+    RAISE EXCEPTION 'fin.bank_statement_line: a line is matched only to a payment of its bank account';
+  END IF;
+  IF NEW.status = 'MATCHED' AND NEW.direction = 'CREDIT' AND NOT EXISTS (
+       SELECT 1 FROM fin.payment p
+       JOIN fin.bank_statement_line d ON d.matched_payment_id = p.payment_id AND d.direction = 'DEBIT' AND d.status = 'MATCHED'
+       WHERE p.payment_id = NEW.matched_payment_id AND p.status::text = 'REVERSED') THEN
+    RAISE EXCEPTION 'fin.bank_statement_line: a CREDIT line is matched only as the return of a reversed payment whose DEBIT line is matched (E-VS2-05-10)';
   END IF;
   IF NEW.status = 'CHARGE_RECOGNIZED' AND NEW.direction <> 'DEBIT' THEN
     RAISE EXCEPTION 'fin.bank_statement_line: a bank charge is recognized on a DEBIT line only (E-VS2-05-7)';
@@ -102,15 +110,16 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------
--- Match coherence, checked at COMMIT (E-VS2-05-8, E-VS2-01-11, E-VS2-04-1): a CLEARED payment has its MATCHED line; a RELEASED
--- one has none; a MATCHED line's payment is CLEARED, or REVERSED after being cleared (its line stays matched).
+-- Match coherence, checked at COMMIT (E-VS2-05-8, E-VS2-01-11, E-VS2-04-1, E-VS2-05-10): a CLEARED payment has its MATCHED DEBIT
+-- line; a RELEASED one has none; a MATCHED DEBIT line's payment is CLEARED, or REVERSED after being cleared (its line stays
+-- matched); a MATCHED CREDIT line's payment is REVERSED.
 -- ---------------------------------------------------------------------------------------------
 CREATE FUNCTION fin.payment_cleared_line() RETURNS trigger
   LANGUAGE plpgsql AS $$
 DECLARE
   matched integer;
 BEGIN
-  SELECT count(*) INTO matched FROM fin.bank_statement_line l WHERE l.matched_payment_id = NEW.payment_id;
+  SELECT count(*) INTO matched FROM fin.bank_statement_line l WHERE l.matched_payment_id = NEW.payment_id AND l.direction = 'DEBIT';
   IF NEW.status::text = 'CLEARED' AND matched <> 1 THEN
     RAISE EXCEPTION 'fin.payment %: CLEARED without its matched statement line', NEW.payment_id;
   END IF;
@@ -127,10 +136,11 @@ CREATE FUNCTION fin.bank_statement_line_coherent() RETURNS trigger
   LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW.status = 'MATCHED' AND NOT EXISTS (
-       SELECT 1 FROM fin.payment p WHERE p.payment_id = NEW.matched_payment_id AND p.status::text IN ('CLEARED', 'REVERSED')) THEN
-    RAISE EXCEPTION 'fin.bank_statement_line %: MATCHED to a payment that is not CLEARED', NEW.line_id;
+       SELECT 1 FROM fin.payment p WHERE p.payment_id = NEW.matched_payment_id
+         AND p.status::text IN (CASE WHEN NEW.direction = 'DEBIT' THEN 'CLEARED' ELSE 'REVERSED' END, 'REVERSED')) THEN
+    RAISE EXCEPTION 'fin.bank_statement_line %: MATCHED to a payment that is not CLEARED (DEBIT) or REVERSED (CREDIT)', NEW.line_id;
   END IF;
-  IF OLD.status = 'MATCHED' AND NEW.status = 'UNMATCHED' AND EXISTS (
+  IF OLD.status = 'MATCHED' AND NEW.status = 'UNMATCHED' AND OLD.direction = 'DEBIT' AND EXISTS (
        SELECT 1 FROM fin.payment p WHERE p.payment_id = OLD.matched_payment_id AND p.status::text = 'CLEARED') THEN
     RAISE EXCEPTION 'fin.bank_statement_line %: unmatched while its payment is still CLEARED', NEW.line_id;
   END IF;

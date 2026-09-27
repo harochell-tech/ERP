@@ -109,13 +109,13 @@ Tests: `PaymentReversalTests` (PAY-08, the CLEARED path with the fixture, guards
 
 ## Statements, matching and charges (VS2-05)
 
-Migration `0028__bank_statements.sql`; approved errata E-VS2-05-1…9.
+Migration `0028__bank_statements.sql`; approved errata E-VS2-05-1…10.
 
 | Command | Permission (step-up) | What it does |
 | --- | --- | --- |
 | `treasury/import-bank-statement` | `bank_statement:import` (no) | Reads a CSV (base64, ≤ 5 MB) of an ACTIVE bank account with the latest format of its bank code; keeps the file; creates the statement and its new lines UNMATCHED (see below) |
-| `treasury/match-bank-line` | `bank_line:match` (no) | A person confirms that an UNMATCHED **DEBIT** line is a RELEASED payment of the same account, same amount, line dated within [value date, value date + 10 days]. Line MATCHED, payment CLEARED; events BankLineMatched + PaymentCleared |
-| `treasury/unmatch-bank-line` | `bank_line:unmatch` (yes) | MATCHED → UNMATCHED with a reason; the payment goes back from CLEARED to RELEASED (E-VS2-01-11). Refused when the payment is REVERSED: that line stays matched (E-VS2-04-1). Events BankLineUnmatched + PaymentUncleared |
+| `treasury/match-bank-line` | `bank_line:match` (no) | A person confirms that an UNMATCHED **DEBIT** line is a RELEASED payment of the same account, same amount, line dated within [value date, value date + 10 days]. Line MATCHED, payment CLEARED; events BankLineMatched + PaymentCleared. **Returns** (E-VS2-05-10): a CREDIT line of the same account and amount, dated on or after the reversal, is matched to a REVERSED payment whose DEBIT line is matched; the payment keeps its status (event BankLineMatched, `kind` RETURN) |
+| `treasury/unmatch-bank-line` | `bank_line:unmatch` (yes) | MATCHED → UNMATCHED with a reason; the payment goes back from CLEARED to RELEASED (E-VS2-01-11). Refused for the DEBIT line of a REVERSED payment: it stays matched (E-VS2-04-1). A matched return (CREDIT) can be unmatched, the payment unchanged. Events BankLineUnmatched + PaymentUncleared (DEBIT only) |
 | `treasury/recognize-bank-charge` | `bank_charge:recognize` (no) | An UNMATCHED DEBIT line becomes CHARGE_RECOGNIZED and R-10 is posted for its full amount at the line's value date (late entry if BANK-REC is closed). No un-recognize in VS#2 |
 
 Query `GET treasury/bank-statements/{id}/match-suggestions` (`bank:read`): for each UNMATCHED DEBIT line, the RELEASED payments of
@@ -145,13 +145,14 @@ BANK-REC (engine).
 
 **R-10** (E-VS2-05-7, DRAFT until the Controller approves it): Dr BANK_CHARGES, Cr BANK (subledger BANK = the bank account, posted to
 its own GL account), both `charge_amount`, business date = the line's value date. The 0.15 % DGII tax is charged to BANK_CHARGES in
-VS#2. CREDIT lines stay UNMATCHED as in-transit items.
+VS#2. CREDIT lines that are not a payment's return stay UNMATCHED as in-transit items.
 
 **Database guarantees** (migration 0028): `fin.bank_statement_file` keeps the bytes of every statement, append-only, with the
-statement's SHA-256 (checked on insert, and every statement has its file at COMMIT); a payment is matched to one line at most
-(partial unique index); a charge is recognized on a DEBIT line only; at COMMIT a CLEARED payment has exactly one matched line, a
-RELEASED one none, a MATCHED line's payment is CLEARED (or REVERSED after being cleared), and a CHARGE_RECOGNIZED line has the
-unreversed AUTO journal of its BankChargeRecognized event (K-25).
+statement's SHA-256 (checked on insert, and every statement has its file at COMMIT); a payment is matched to one DEBIT line and one
+CREDIT line at most (partial unique index on payment + direction); a CREDIT line only as the return of a REVERSED payment whose
+DEBIT line is matched (E-VS2-05-10); a charge is recognized on a DEBIT line only; at COMMIT a CLEARED payment has exactly one
+matched DEBIT line, a RELEASED one none, a MATCHED DEBIT line's payment is CLEARED (or REVERSED after being cleared), a MATCHED
+CREDIT line's is REVERSED, and a CHARGE_RECOGNIZED line has the unreversed AUTO journal of its BankChargeRecognized event (K-25).
 
 Tests: `BankStatementTests` (BNK-01…03, occurrence and kept file, rejections, missing format and closed period, the signed
-windows-1252 format with header cells, match guards, unmatch and the CLEARED → REVERSED path end to end, E-VS2-04-6).
+windows-1252 format with header cells, match guards, unmatch and the CLEARED → REVERSED path end to end, E-VS2-04-6; the bank's return of a reversed transfer, E-VS2-05-10).

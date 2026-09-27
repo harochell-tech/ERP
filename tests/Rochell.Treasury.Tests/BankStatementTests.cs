@@ -218,10 +218,10 @@ public sealed class BankStatementTests(PostgresFixture postgres)
         var controller = await Assert.ThrowsAsync<DomainException>(async () => await h.RunAsync(
             new MatchBankLine(h.CompanyId, p.Controller, "controller", await LineAsync(h, "Justo"), 1, payment, 2), new MatchBankLineHandler()));
         await h.RunAsync(new MatchBankLine(h.CompanyId, p.Treasurer, "match", await LineAsync(h, "Justo"), 1, payment, 2), new MatchBankLineHandler());
-        var twice = await Match("Diferente", "twice", paymentVersion: 3);
+        var twice = await Match("Tarde", "twice", paymentVersion: 3);
 
         Assert.Equal(
-            (StatementErrors.AmountDiffers, StatementErrors.DateOutsideWindow, StatementErrors.LineNotDebit, StatementErrors.VersionConflict, AuthorizationErrors.NotAuthorized, StatementErrors.PaymentNotReleased),
+            (StatementErrors.AmountDiffers, StatementErrors.DateOutsideWindow, StatementErrors.PaymentNotReversed, StatementErrors.VersionConflict, AuthorizationErrors.NotAuthorized, StatementErrors.PaymentNotReleased),
             (differs.Code, late.Code, credit.Code, stale.Code, controller.Code, twice.Code));
     }
 
@@ -250,6 +250,55 @@ public sealed class BankStatementTests(PostgresFixture postgres)
 
         Assert.Equal(StatementErrors.PaymentReversed, reversed.Code);
         Assert.Equal($"MATCHED:{payment}", await h.ScalarAsync<string>($"SELECT status || ':' || matched_payment_id FROM fin.bank_statement_line WHERE line_id = '{line}'"));
+    }
+
+    [Fact]
+    public async Task The_banks_return_of_a_reversed_transfer_is_matched_to_the_payment()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var (p, payment, amount) = await ReleasedAsync(h);
+        var today = Today(h);
+        await Import(h, p, "import", Csv($"{D(today)},,PAG-000001,{M(amount)},"), today, today, 100000m, 100000m - amount);
+        var debit = await LineAsync(h, "PAG-000001");
+        await Import(
+            h, p, "returns", Csv($"{D(today.AddDays(2))},,Devolucion PAG-000001,,{M(amount)}", $"{D(today.AddDays(2))},,Devolucion repetida,,{M(amount)}"),
+            today.AddDays(1), today.AddDays(2), 100000m - amount, 100000m + amount);
+        var back = await LineAsync(h, "Devolucion PAG-000001");
+        var repeated = await LineAsync(h, "Devolucion repetida");
+        Task<CommandResult> Match(string key, Guid line, long paymentVersion) => h.RunAsync(new MatchBankLine(h.CompanyId, p.Treasurer, key, line, 1, payment, paymentVersion), new MatchBankLineHandler());
+
+        var beforeReversal = await Assert.ThrowsAsync<DomainException>(() => Match("early", back, 2));
+        await h.RunAsync(new MatchBankLine(h.CompanyId, p.Treasurer, "match", debit, 1, payment, 2), new MatchBankLineHandler());
+        await h.RunAsync(new ReversePayment(h.CompanyId, p.Controller, "reverse", payment, 3, "Transferencia devuelta por el banco receptor"), new ReversePaymentHandler());
+        await Match("return", back, 4);
+        var second = await Assert.ThrowsAsync<DomainException>(() => Match("second", repeated, 4));
+
+        Assert.Equal((StatementErrors.PaymentNotReversed, StatementErrors.ReturnAlreadyMatched), (beforeReversal.Code, second.Code));
+        Assert.Equal($"MATCHED:2:{payment}", await h.ScalarAsync<string>($"SELECT status || ':' || version || ':' || matched_payment_id FROM fin.bank_statement_line WHERE line_id = '{back}'"));
+        Assert.Equal("REVERSED:4", await h.ScalarAsync<string>($"SELECT status || ':' || version FROM fin.payment WHERE payment_id = '{payment}'"));
+
+        // A return matched by mistake is unmatched; the reversed payment and its DEBIT line do not change.
+        await h.RunAsync(new UnmatchBankLine(h.CompanyId, p.Controller, "unmatch", back, 2, "Devolucion conciliada por error"), new UnmatchBankLineHandler());
+        await h.RunAsync(new MatchBankLine(h.CompanyId, p.Treasurer, "return-2", repeated, 1, payment, 4), new MatchBankLineHandler());
+
+        Assert.Equal("UNMATCHED:3", await h.ScalarAsync<string>($"SELECT status || ':' || version FROM fin.bank_statement_line WHERE line_id = '{back}'"));
+        Assert.Equal($"MATCHED:{payment}", await h.ScalarAsync<string>($"SELECT status || ':' || matched_payment_id FROM fin.bank_statement_line WHERE line_id = '{debit}'"));
+        Assert.Equal("REVERSED:4", await h.ScalarAsync<string>($"SELECT status || ':' || version FROM fin.payment WHERE payment_id = '{payment}'"));
+    }
+
+    [Fact]
+    public async Task A_payment_reversed_before_the_bank_debited_it_has_no_return()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var (p, payment, amount) = await ReleasedAsync(h);
+        var today = Today(h);
+        await h.RunAsync(new ReversePayment(h.CompanyId, p.Controller, "reverse", payment, 2, "Pago anulado antes del debito"), new ReversePaymentHandler());
+        await Import(h, p, "import", Csv($"{D(today)},,Credito PAG-000001,,{M(amount)}"), today, today, 0m, amount);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(async () => await h.RunAsync(
+            new MatchBankLine(h.CompanyId, p.Treasurer, "return", await LineAsync(h, "Credito PAG-000001"), 1, payment, 3), new MatchBankLineHandler()));
+
+        Assert.Equal(StatementErrors.ReturnWithoutTransfer, ex.Code);
     }
 
     [Trait("AcceptanceVs2", "BNK-03")]

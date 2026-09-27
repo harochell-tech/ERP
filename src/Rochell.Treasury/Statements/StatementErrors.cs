@@ -19,6 +19,9 @@ public static class StatementErrors
     public const string LineNotDebit = "LINE_NOT_DEBIT";
     public const string PaymentNotReleased = "PAYMENT_NOT_RELEASED";
     public const string PaymentReversed = "PAYMENT_REVERSED";
+    public const string PaymentNotReversed = "PAYMENT_NOT_REVERSED";
+    public const string ReturnWithoutTransfer = "RETURN_WITHOUT_TRANSFER";
+    public const string ReturnAlreadyMatched = "RETURN_ALREADY_MATCHED";
     public const string WrongBankAccount = "MATCH_WRONG_BANK_ACCOUNT";
     public const string AmountDiffers = "MATCH_AMOUNT_DIFFERS";
     public const string DateOutsideWindow = "MATCH_DATE_OUTSIDE_WINDOW";

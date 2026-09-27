@@ -23,7 +23,9 @@ public sealed record ImportBankStatement(
 
 /// <summary>
 /// A person confirms that an UNMATCHED DEBIT line is a RELEASED payment of the same bank account: exact amount, line dated within
-/// [value date, value date + 10 days] (E-VS2-05-6). The line becomes MATCHED and the payment CLEARED (E-VS2-05-8).
+/// [value date, value date + 10 days] (E-VS2-05-6). The line becomes MATCHED and the payment CLEARED (E-VS2-05-8). A CREDIT line is
+/// matched only as the bank's return of a REVERSED payment whose DEBIT line is matched: same account and amount, dated on or after
+/// the reversal; the payment keeps its status (E-VS2-05-10).
 /// </summary>
 public sealed record MatchBankLine(
     Guid CompanyId,
@@ -36,7 +38,7 @@ public sealed record MatchBankLine(
 
 /// <summary>
 /// MATCHED → UNMATCHED with step-up and a reason; the payment goes back from CLEARED to RELEASED (E-VS2-01-11, E-VS2-05-8). The
-/// line of a reversed payment stays matched (E-VS2-04-1).
+/// DEBIT line of a reversed payment stays matched (E-VS2-04-1); its return (CREDIT) can be unmatched, the payment unchanged.
 /// </summary>
 public sealed record UnmatchBankLine(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid LineId, long ExpectedVersion, string Reason) : ICommand;
 
