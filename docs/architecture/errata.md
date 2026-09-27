@@ -302,6 +302,21 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIN1-8 | FIN-1 | Reversa automática → Opcional por ajuste; se contabiliza el día 1 del mes siguiente (servicio en segundo plano) |
 | E-FIN1-9 | FIN-1 | Permiso de lectura contable → Nuevo `ledger:read` para Contador, Controller, Auditor y Director |
 | E-FIN1-10 | FIN-1 | Exportación → CSV (UTF-8, separador coma) de balanza, mayor y estados; Excel más adelante |
+| E-VS3-17 | VS#3 | (a) Customer: payment terms (days) and credit limit, versioned, prepared by Crédito and approved by the Controller. (b) Supplier: one payment term (days) per supplier that proposes the due date when its invoice is registered (still editable); added in VS3-02. |
+| E-FIN1-01-1 | FIN1-01 | `fin.account.account_class` (ASSET, LIABILITY, EQUITY, REVENUE, COST, EXPENSE) is nullable for existing accounts; the Controller fills it in the UI or `import-accounts` loads it (optional column); statements list accounts without a class and are not produced until every active account has one. |
+| E-FIN1-01-2 | FIN1-01 | Technical account role `MANUAL_ADJUSTMENT` (not control) and rule line code `P-34` on manual lines; `gl_journal.journal_type` MANUAL_ADJUSTMENT has no posting rule (CHECK) and enters the hash chain like any journal. |
+| E-FIN1-01-3 | FIN1-01 | New close components ACR-NTX and ACR-TAX, OPEN in every period; blocking reconciliations MANUAL-EVIDENCE and TB-BALANCED. |
+| E-FIN1-01-4 | FIN1-01 | Plant and party are optional on every manual line in FIN-1; per-account dimension rules later. |
+| E-FIN1-01-5 | FIN1-01 | Role CONTADOR and permissions `account:manage` (Controller), `manual_journal:prepare` (Contador), `manual_journal:approve` (Controller), `report_structure:approve` (Aprobador de políticas), `ledger:read` (Contador, Controller, Auditor, Director); SoD manual_journal:prepare ≠ manual_journal:approve; 66 permissions. |
+| E-FIN1-01-6 | FIN1-01 | Amends E-FIN1-8: an auto-reversing adjustment gets its reversal in the same transaction as its approval, dated the first day of the next month; no background service. |
+| E-FIN1-01-7 | FIN1-01 | Adjustment number `AJ-000001`, unique per company, assigned when prepared. |
+| E-VS3-01-1 | VS3-01 | A customer is the same `md.party` flagged `is_customer` (a party may be customer and supplier); RNC/cédula validated as for suppliers; created by Vendedor, activated by Crédito (create customer ≠ approve credit). |
+| E-VS3-01-2 | VS3-01 | Item type FINISHED_GOOD with categories BLOQUE, ADOQUIN, OTRO_PT (extended later by errata). |
+| E-VS3-01-3 | VS3-01 | Standard cost and price list versions are prepared by the Controller and approved by the Aprobador de políticas; prices in DOP without ITBIS, per item and unit, one list in force per company. |
+| E-VS3-01-4 | VS3-01 | Vehicles (plate, capacity kg, active/inactive) and drivers (name, cédula) are registered by Despacho in the UI. |
+| E-VS3-01-5 | VS3-01 | Opening finished goods through the deployment CLI (`import-opening-inventory`, CSV) as opening documents against `MIGRATION_CLEARING`, in a special OPENING period (v2.1 §6). |
+| E-VS3-01-6 | VS3-01 | Numbers per company: order PV-, delivery CD-, internal invoice FA- (the e-NCF is separate), credit note NC-, receipt REC-. |
+| E-VS3-01-7 | VS3-01 | The 12 account roles of the VS#3 baseline §2 plus MIGRATION_CLEARING are seeded unmapped; the Controller maps and approves them in Contabilidad › Mapas. |
 
 Implementation rules derived from the above (no architectural change):
 
