@@ -40,7 +40,8 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
         typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
-        typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler),
+        typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
+        typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
@@ -110,6 +111,26 @@ public static class QueryEndpoints
         finance.MapGet("/manual-journals/{manualJournalId:guid}", (HttpContext http, Guid companyId, Guid manualJournalId, GetManualJournalHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetManualJournal(companyId, s, manualJournalId), handler, ct))
             .Describe<ManualJournalDetail>(nameof(GetManualJournal));
+
+        // FIN1-03 (E-FIN1-03-4…11): ?format=csv returns the same report as a CSV file.
+        finance.MapGet("/trial-balance", (HttpContext http, Guid companyId, DateOnly from, DateOnly to, Guid? plantId, Guid? partyId, Guid? bankAccountId, string? format, GetTrialBalanceHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunReportAsync(http, format, s => new GetTrialBalance(companyId, s, from, to, plantId, partyId, bankAccountId), handler, LedgerCsv.TrialBalance, $"balanza-{from:yyyyMMdd}-{to:yyyyMMdd}.csv", ct))
+            .Describe<TrialBalance>(nameof(GetTrialBalance)).Csv<TrialBalance>();
+        finance.MapGet("/accounts/{accountId:guid}/ledger", (HttpContext http, Guid companyId, Guid accountId, DateOnly from, DateOnly to, int? limit, int? offset, string? format, GetAccountLedgerHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunReportAsync(http, format, s => new GetAccountLedger(companyId, s, accountId, from, to, limit ?? DefaultLimit, offset ?? 0, All: format == "csv"), handler, LedgerCsv.AccountLedger, $"mayor-{from:yyyyMMdd}-{to:yyyyMMdd}.csv", ct))
+            .Describe<AccountLedger>(nameof(GetAccountLedger), notFound: true).Csv<AccountLedger>();
+        finance.MapGet("/balance-sheet", (HttpContext http, Guid companyId, DateOnly asOf, string? format, GetBalanceSheetHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunReportAsync(http, format, s => new GetBalanceSheet(companyId, s, asOf), handler, LedgerCsv.BalanceSheet, $"balance-general-{asOf:yyyyMMdd}.csv", ct))
+            .Describe<BalanceSheet>(nameof(GetBalanceSheet)).Csv<BalanceSheet>();
+        finance.MapGet("/income-statement", (HttpContext http, Guid companyId, DateOnly from, DateOnly to, string? format, GetIncomeStatementHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunReportAsync(http, format, s => new GetIncomeStatement(companyId, s, from, to), handler, LedgerCsv.IncomeStatement, $"estado-de-resultados-{from:yyyyMMdd}-{to:yyyyMMdd}.csv", ct))
+            .Describe<IncomeStatement>(nameof(GetIncomeStatement)).Csv<IncomeStatement>();
+        finance.MapGet("/report-structures", (HttpContext http, Guid companyId, string? report, ListReportStructuresHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListReportStructures(companyId, s, report), handler, ct))
+            .Describe<ReportStructureList>(nameof(ListReportStructures));
+        finance.MapGet("/report-structures/{structureVersionId:guid}", (HttpContext http, Guid companyId, Guid structureVersionId, GetReportStructureHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetReportStructure(companyId, s, structureVersionId), handler, ct))
+            .Describe<ReportStructureDetail>(nameof(GetReportStructure), notFound: true);
         finance.MapGet("/account-role-maps", (HttpContext http, Guid companyId, string? status, ListAccountRoleMapsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListAccountRoleMaps(companyId, s, status), handler, ct))
             .Describe<AccountRoleMapList>(nameof(ListAccountRoleMaps));
@@ -179,6 +200,9 @@ public static class QueryEndpoints
                 => runner.RunAsync(http, s => new ExplainEntry(companyId, s, glEntryId), handler, ct))
             .Describe<JsonElement>(nameof(ExplainEntry), notFound: true);
     }
+
+    /// <summary>The report is also served as text/csv with <c>?format=csv</c> (the same report, see LedgerCsv).</summary>
+    private static RouteHandlerBuilder Csv<TResult>(this RouteHandlerBuilder endpoint) => endpoint.Produces<TResult>(StatusCodes.Status200OK, "application/json", "text/csv");
 
     private static RouteHandlerBuilder Describe<TResult>(this RouteHandlerBuilder endpoint, string name, bool notFound = false)
     {

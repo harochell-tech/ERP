@@ -1003,6 +1003,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/finance/prepare-report-structure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PrepareReportStructure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/approve-report-structure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ApproveReportStructure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/tax/register-fiscal-source": {
         parameters: {
             query?: never;
@@ -1515,6 +1547,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/finance/trial-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetTrialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/accounts/{accountId}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetAccountLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/balance-sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetBalanceSheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/income-statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetIncomeStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/report-structures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListReportStructures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/report-structures/{structureVersionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetReportStructure"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/finance/account-role-maps": {
         parameters: {
             query?: never;
@@ -1823,6 +1951,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountLedger: {
+            /** Format: uuid */
+            accountId: string;
+            code: string;
+            name: string;
+            accountClass: null | string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** Format: decimal */
+            opening: string;
+            /** Format: decimal */
+            totalDebit: string;
+            /** Format: decimal */
+            totalCredit: string;
+            /** Format: decimal */
+            closing: string;
+            /** Format: int32 */
+            count: number;
+            movements: components["schemas"]["LedgerMovement"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
         AccountList: {
             items: components["schemas"]["AccountView"][];
         };
@@ -2003,6 +2157,10 @@ export interface components {
             /** Format: uuid */
             requestId: string;
         };
+        ApproveReportStructure: {
+            /** Format: uuid */
+            structureVersionId: string;
+        };
         ApproveRoleChange: {
             /** Format: uuid */
             requestId: string;
@@ -2013,6 +2171,27 @@ export interface components {
             /** Format: uuid */
             itemId: string;
             reason: string;
+        };
+        BalanceSheet: {
+            /** Format: date */
+            asOf: string;
+            /** Format: int32 */
+            structureVersion: number;
+            lines: components["schemas"]["StatementLine"][];
+            unassignedAccounts: components["schemas"]["StatementAccount"][];
+            /** Format: decimal */
+            totalAssets: string;
+            /** Format: decimal */
+            totalLiabilities: string;
+            /** Format: decimal */
+            totalEquity: string;
+            /** Format: decimal */
+            currentYearResult: string;
+            /** Format: decimal */
+            priorYearsResult: string;
+            /** Format: decimal */
+            difference: string;
+            balanced: boolean;
         };
         BankAccountList: {
             items: components["schemas"]["BankAccountView"][];
@@ -2440,6 +2619,24 @@ export interface components {
             /** Format: decimal */
             closingBalance?: null | string;
         };
+        IncomeStatement: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** Format: int32 */
+            structureVersion: number;
+            lines: components["schemas"]["StatementLine"][];
+            unassignedAccounts: components["schemas"]["StatementAccount"][];
+            /** Format: decimal */
+            revenue: string;
+            /** Format: decimal */
+            cost: string;
+            /** Format: decimal */
+            expenses: string;
+            /** Format: decimal */
+            netIncome: string;
+        };
         ItemList: {
             items: components["schemas"]["ItemView"][];
             /** Format: int32 */
@@ -2482,6 +2679,27 @@ export interface components {
             digestHash: string;
             prevDigestHash: null | string;
             wormObjectKey: string;
+        };
+        LedgerMovement: {
+            /** Format: uuid */
+            glEntryId: string;
+            /** Format: date */
+            postingDate: string;
+            journalType: string;
+            eventType: null | string;
+            documentKind: null | string;
+            documentNumber: null | string;
+            ruleLineCode: string;
+            /** Format: decimal */
+            debit: string;
+            /** Format: decimal */
+            credit: string;
+            /** Format: decimal */
+            balance: string;
+            /** Format: uuid */
+            plantId: null | string;
+            /** Format: uuid */
+            partyId: null | string;
         };
         LineSuggestion: {
             /** Format: uuid */
@@ -2869,6 +3087,12 @@ export interface components {
             autoReverse: boolean;
             lines: components["schemas"]["ManualJournalLine"][];
         };
+        PrepareReportStructure: {
+            report: string;
+            /** Format: date */
+            effectiveFrom: string;
+            lines: components["schemas"]["ReportLineInput"][];
+        };
         PrepareSupplierPayment: {
             /** Format: uuid */
             partyId: string;
@@ -3177,6 +3401,59 @@ export interface components {
             secondApprovedAt: null | string;
             rejectedBy: null | string;
         };
+        ReportLineInput: {
+            lineCode: string;
+            caption: string;
+            parentLineCode: null | string;
+            /** Format: int32 */
+            sign: number;
+            /** Format: int32 */
+            orderNo: number;
+            accountIds: string[];
+        };
+        ReportStructureAccount: {
+            /** Format: uuid */
+            accountId: string;
+            code: string;
+            name: string;
+            accountClass: null | string;
+        };
+        ReportStructureDetail: {
+            header: components["schemas"]["ReportStructureSummary"];
+            lines: components["schemas"]["ReportStructureLineView"][];
+            missingAccounts: components["schemas"]["ReportStructureAccount"][];
+        };
+        ReportStructureLineView: {
+            lineCode: string;
+            caption: string;
+            parentLineCode: null | string;
+            /** Format: int32 */
+            sign: number;
+            /** Format: int32 */
+            orderNo: number;
+            accounts: components["schemas"]["ReportStructureAccount"][];
+        };
+        ReportStructureList: {
+            items: components["schemas"]["ReportStructureSummary"][];
+        };
+        ReportStructureSummary: {
+            /** Format: uuid */
+            structureVersionId: string;
+            report: string;
+            /** Format: int32 */
+            version: number;
+            /** Format: date */
+            effectiveFrom: string;
+            status: string;
+            preparedBy: null | string;
+            /** Format: uuid */
+            preparedById: string;
+            approvedBy: null | string;
+            /** Format: int32 */
+            lines: number;
+            /** Format: int32 */
+            accounts: number;
+        };
         RepostEvent: {
             /** Format: uuid */
             sourceEventId: string;
@@ -3318,6 +3595,25 @@ export interface components {
             at: string;
             by: null | string;
         };
+        StatementAccount: {
+            /** Format: uuid */
+            accountId: string;
+            code: string;
+            name: string;
+            accountClass: string;
+            /** Format: decimal */
+            amount: string;
+        };
+        StatementLine: {
+            lineCode: string;
+            caption: string;
+            parentLineCode: null | string;
+            /** Format: int32 */
+            depth: number;
+            /** Format: decimal */
+            amount: string;
+            accounts: components["schemas"]["StatementAccount"][];
+        };
         SubmitManualJournal: {
             /** Format: uuid */
             manualJournalId: string;
@@ -3444,6 +3740,38 @@ export interface components {
             userId: string;
             email: string;
             roles: string[];
+        };
+        TrialBalance: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            filtered: boolean;
+            rows: components["schemas"]["TrialBalanceRow"][];
+            /** Format: decimal */
+            totalOpening: string;
+            /** Format: decimal */
+            totalDebit: string;
+            /** Format: decimal */
+            totalCredit: string;
+            /** Format: decimal */
+            totalClosing: string;
+            balanced: boolean;
+        };
+        TrialBalanceRow: {
+            /** Format: uuid */
+            accountId: null | string;
+            code: string;
+            name: string;
+            accountClass: null | string;
+            /** Format: decimal */
+            opening: string;
+            /** Format: decimal */
+            debit: string;
+            /** Format: decimal */
+            credit: string;
+            /** Format: decimal */
+            closing: string;
         };
         UnmatchBankLine: {
             /** Format: uuid */
@@ -7971,6 +8299,158 @@ export interface operations {
             };
         };
     };
+    PrepareReportStructure: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareReportStructure"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ApproveReportStructure: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveReportStructure"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RegisterFiscalSource: {
         parameters: {
             query?: never;
@@ -10044,6 +10524,346 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetTrialBalance: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                plantId?: string;
+                partyId?: string;
+                bankAccountId?: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBalance"];
+                    "text/csv": components["schemas"]["TrialBalance"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetAccountLedger: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                limit?: number;
+                offset?: number;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+                accountId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountLedger"];
+                    "text/csv": components["schemas"]["AccountLedger"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetBalanceSheet: {
+        parameters: {
+            query: {
+                asOf: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceSheet"];
+                    "text/csv": components["schemas"]["BalanceSheet"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetIncomeStatement: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncomeStatement"];
+                    "text/csv": components["schemas"]["IncomeStatement"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListReportStructures: {
+        parameters: {
+            query?: {
+                report?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportStructureList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetReportStructure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                structureVersionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportStructureDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
