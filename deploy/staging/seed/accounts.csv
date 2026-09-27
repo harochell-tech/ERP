@@ -1,0 +1,15 @@
+code,name,is_control
+1101,Banco de prueba (STAGING),true
+1301,Inventario de materia prima - cemento,true
+1302,Inventario de materia prima - agregados,true
+1303,Inventario de materia prima - aditivos,true
+1304,Inventario de otras materias primas,true
+1401,ITBIS adelantado en compras,false
+2101,Cuentas por pagar a proveedores,true
+2102,Recibido no facturado,false
+2201,Retenciones por pagar,false
+5101,Variación de precio de compra,false
+5102,Variación de uso de material,false
+5103,Ajustes de inventario,false
+5104,Diferencias de redondeo,false
+5201,Cargos bancarios,false
