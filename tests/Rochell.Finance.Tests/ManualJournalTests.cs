@@ -82,6 +82,7 @@ public sealed class ManualJournalTests(PostgresFixture postgres)
         var detail = JsonDocument.Parse(await h.QueryAsync(new GetManualJournal(h.CompanyId, s.Controller, id), new GetManualJournalHandler())).RootElement;
         Assert.Equal(2, detail.GetProperty("lines").GetArrayLength());
         Assert.Equal(Support, detail.GetProperty("supportSha256").GetString());
+        Assert.Equal(("1250.00", "1250.00", "0.00"), (detail.GetProperty("totalDebit").GetString(), detail.GetProperty("totalCredit").GetString(), detail.GetProperty("difference").GetString()));
         var entry = await h.ScalarAsync<Guid>(
             $"SELECT e.gl_entry_id FROM fin.gl_entry e JOIN fin.manual_journal m ON m.posting_event_id = e.source_event_id WHERE m.manual_journal_id = '{id}' AND e.line_no = 1");
         var explained = await h.QueryAsync(new ExplainEntry(h.CompanyId, s.Controller, entry), new ExplainEntryHandler());

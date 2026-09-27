@@ -57,12 +57,14 @@ public sealed record ManualJournalLineView(int LineNo, Guid AccountId, string Ac
 public sealed record ManualJournalDetail(
     Guid ManualJournalId, string JournalNo, DateOnly PostingDate, string Description, string SupportRef, string SupportSha256, string CloseComponent, bool AutoReverse,
     string Status, string? PreparedBy, Guid PreparedById, string? ApprovedBy, string? RejectedBy, string? RejectionReason, Guid? PostingEventId, long Version,
-    IReadOnlyList<ManualJournalLineView> Lines, IReadOnlyList<StateChange> History);
+    IReadOnlyList<ManualJournalLineView> Lines, IReadOnlyList<StateChange> History, decimal TotalDebit, decimal TotalCredit, decimal Difference);
 
 [RequiresPermission("ledger:read")]
 public sealed class GetManualJournalHandler : IQueryHandler<GetManualJournal>
 {
     public string QueryType => "Finance.GetManualJournal";
+
+    private sealed record Totals(decimal Debit, decimal Credit);
 
     private sealed record Header(
         string JournalNo, DateOnly PostingDate, string Description, string SupportRef, string SupportSha256, string Component, bool AutoReverse, string Status,
@@ -103,8 +105,19 @@ public sealed class GetManualJournalHandler : IQueryHandler<GetManualJournal>
             cancellationToken,
             ("id", query.ManualJournalId)).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "ManualJournal", query.ManualJournalId, cancellationToken).ConfigureAwait(false);
+        // E-FIN1-04-4: the screen never adds amounts; the server gives the totals of the current version.
+        var totals = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT coalesce(sum(l.debit), 0)::numeric(19,2), coalesce(sum(l.credit), 0)::numeric(19,2) FROM fin.manual_journal_line l
+            WHERE l.manual_journal_id = @id AND l.journal_version = (SELECT max(x.journal_version) FROM fin.manual_journal_line x WHERE x.manual_journal_id = @id)
+            """,
+            r => new Totals(r.GetDecimal(0), r.GetDecimal(1)),
+            cancellationToken,
+            ("id", query.ManualJournalId)).ConfigureAwait(false) ?? throw new InvalidOperationException("An aggregate always returns a row.");
         return ApiJson.Serialize(new ManualJournalDetail(
             query.ManualJournalId, h.JournalNo, h.PostingDate, h.Description, h.SupportRef, h.SupportSha256, h.Component, h.AutoReverse, h.Status, h.PreparedBy,
-            h.PreparedById, h.ApprovedBy, h.RejectedBy, h.Reason, h.PostingEventId, h.Version, lines, history));
+            h.PreparedById, h.ApprovedBy, h.RejectedBy, h.Reason, h.PostingEventId, h.Version, lines, history, totals.Debit, totals.Credit, totals.Debit - totals.Credit));
     }
 }

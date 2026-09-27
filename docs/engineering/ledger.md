@@ -1,6 +1,6 @@
 # General ledger: adjustments, trial balance and statements (FIN-1)
 
-Frozen Baseline `docs/architecture/fin1/frozen-baseline-fin1.md`, approved errata E-FIN1-1…10, E-FIN1-01-1…7, E-FIN1-02-1…4 and E-FIN1-03-1…11. Acceptance matrix: `docs/acceptance/fin1.md`.
+Frozen Baseline `docs/architecture/fin1/frozen-baseline-fin1.md`, approved errata E-FIN1-1…10, E-FIN1-01-1…7, E-FIN1-02-1…4, E-FIN1-03-1…11 and E-FIN1-04-1…11 (screens: `web.md`). Acceptance matrix: `docs/acceptance/fin1.md`.
 
 ## Schema (FIN1-01)
 
@@ -73,3 +73,9 @@ The four reports take `?format=csv` (`LedgerCsv`: UTF-8 with BOM, comma, point d
 with `ACCOUNT_CLASS_MISSING` while an active account has no class and with `STRUCTURE_MISSING` without an approved structure.
 
 Tests: `StatementTests` (GL-06), `TrialBalanceTests` (GL-05), `LedgerReportApiTests`, `AcceptanceFin1TraceabilityTests`.
+
+## Screens (FIN1-04)
+
+Migration `0036__contador_configuration_read.sql`: the Contador reads the configuration lists (E-FIN1-04-2).
+`GET /finance/manual-journals/{id}` also returns `totalDebit`, `totalCredit` and `difference` of the current version, so the
+screen never adds amounts (E-FIN1-04-4). The pages are described in `docs/engineering/web.md`.

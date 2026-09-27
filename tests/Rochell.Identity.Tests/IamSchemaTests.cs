@@ -28,7 +28,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             + "valuation_residual:approve",
         ["DIRECTOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,ledger:read,master_data:read,payment:read,"
             + "period:read,purchase_order:read,reconciliation:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission
-        ["CONTADOR"] = "ledger:read,manual_journal:prepare", // E-FIN1-01-5
+        ["CONTADOR"] = "configuration:read,ledger:read,manual_journal:prepare", // E-FIN1-01-5, E-FIN1-04-2
         ["CUENTAS_POR_PAGAR"] = "bank:read,goods_receipt:read,master_data:read,payment:read,purchase_order:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_rule:activate",

@@ -2754,6 +2754,12 @@ export interface components {
             version: number;
             lines: components["schemas"]["ManualJournalLineView"][];
             history: components["schemas"]["StateChange"][];
+            /** Format: decimal */
+            totalDebit: string;
+            /** Format: decimal */
+            totalCredit: string;
+            /** Format: decimal */
+            difference: string;
         };
         ManualJournalLine: {
             /** Format: uuid */
