@@ -10,7 +10,7 @@ using Rochell.Platform.Hosting;
 //        rochell-migrate grant-role <email> <ROLE_CODE> <company-rnc> [plant-id]         (bootstrap grants, E-PR03-5)
 //        rochell-migrate create-plant <company-rnc> <PLANT_CODE> <VALUATION_AREA_CODE>    (E-PR04-2)
 //        rochell-migrate create-location <company-rnc> <PLANT_CODE> <LOCATION_CODE>       (E-PR04-2)
-//        rochell-migrate import-accounts <company-rnc> <accounts.csv>                     (E-PR05-1; code,name,is_control)
+//        rochell-migrate import-accounts <company-rnc> <accounts.csv>                     (E-PR05-1; code,name,is_control[,class] — E-FIN1-01-1)
 //        rochell-migrate import-account-map <company-rnc> <map.csv>                       (DRAFT maps; role,category,account_code,effective_from)
 //        rochell-migrate open-periods <company-rnc> <year>                                (E-PR05-3)
 // Environment: DOTNET_ENVIRONMENT = Development | Test | Staging
@@ -292,7 +292,9 @@ try
 
         case "import-accounts":
             {
-                // E-PR05-1: chart of accounts approved by the Controller, loaded by the deployment role. CSV: code,name,is_control
+                // E-PR05-1: chart of accounts approved by the Controller, loaded by the deployment role. CSV: code,name,is_control[,class]
+                // (E-FIN1-01-1: the optional last column is ASSET, LIABILITY, EQUITY, REVENUE, COST or EXPENSE; empty leaves it for the UI).
+                string[] classes = ["ASSET", "LIABILITY", "EQUITY", "REVENUE", "COST", "EXPENSE"];
                 if (args.Length != 3 || !File.Exists(args[2]))
                 {
                     await Console.Error.WriteLineAsync("Usage: rochell-migrate import-accounts <company-rnc> <accounts.csv>");
@@ -303,8 +305,18 @@ try
                 await connection.OpenAsync();
                 await using var tx = await connection.BeginTransactionAsync();
                 var imported = 0;
-                foreach (var fields in CsvRows(args[2], "code"))
+                foreach (var row in CsvRows(args[2], "code"))
                 {
+                    var fields = row;
+                    string? accountClass = null;
+                    if (fields.Length >= 4 && !bool.TryParse(fields[^1], out _) && bool.TryParse(fields[^2], out _))
+                    {
+                        accountClass = fields[^1].Trim().ToUpperInvariant();
+                        accountClass = accountClass.Length == 0 ? null
+                            : classes.Contains(accountClass) ? accountClass : throw new FormatException($"Invalid account class: {string.Join(",", fields)}");
+                        fields = fields[..^1];
+                    }
+
                     if (fields.Length < 3 || !bool.TryParse(fields[^1], out var isControl))
                     {
                         throw new FormatException($"Invalid account row: {string.Join(",", fields)}");
@@ -312,8 +324,8 @@ try
 
                     await using var insert = new NpgsqlCommand(
                         """
-                        INSERT INTO fin.account (account_id, company_id, code, name, is_control)
-                        SELECT @id, company_id, @code, @name, @control FROM md.company WHERE rnc = @rnc
+                        INSERT INTO fin.account (account_id, company_id, code, name, is_control, account_class)
+                        SELECT @id, company_id, @code, @name, @control, @class FROM md.company WHERE rnc = @rnc
                         """,
                         connection,
                         tx);
@@ -321,6 +333,7 @@ try
                     insert.Parameters.AddWithValue("code", fields[0]);
                     insert.Parameters.AddWithValue("name", string.Join(",", fields[1..^1]));
                     insert.Parameters.AddWithValue("control", isControl);
+                    insert.Parameters.Add(new NpgsqlParameter("class", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)accountClass ?? DBNull.Value });
                     insert.Parameters.AddWithValue("rnc", args[1]);
                     imported += await insert.ExecuteNonQueryAsync();
                 }

@@ -25,6 +25,8 @@ public sealed class CanonicalWriter
 
     public CanonicalWriter Int32(int value) => Text(value.ToString(CultureInfo.InvariantCulture));
 
+    public CanonicalWriter Int32(int? value) => value is null ? Null() : Int32(value.Value);
+
     public CanonicalWriter Int64(long value) => Text(value.ToString(CultureInfo.InvariantCulture));
 
     public CanonicalWriter Boolean(bool value) => Text(value ? "t" : "f");

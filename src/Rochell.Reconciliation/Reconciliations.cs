@@ -25,7 +25,8 @@ public sealed record ReconRun(Guid RunId, string Code, string Status, decimal? T
 public static class Reconciliations
 {
     public static IReadOnlyList<string> All { get; } =
-        ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL"];
+        ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
+         "MANUAL-EVIDENCE", "TB-BALANCED"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -148,6 +149,42 @@ public static class Reconciliations
             HAVING count(j.journal_id) FILTER (WHERE r.journal_id IS NULL) = 0) f
             """,
             null),
+        ["MANUAL-EVIDENCE"] = (
+            Findings + """
+            -- E-FIN1-01-3: every POSTED or REVERSED adjustment has its MANUAL_ADJUSTMENT journal with its lines' totals; a REVERSED or
+            -- auto-reversing one has the reversal; nothing else posts without a rule.
+            SELECT 'AJ:' || m.journal_no AS match_key,
+                   (SELECT coalesce(sum(l.debit), 0) FROM fin.manual_journal_line l WHERE l.manual_journal_id = m.manual_journal_id
+                      AND l.journal_version = (SELECT max(x.journal_version) FROM fin.manual_journal_line x WHERE x.manual_journal_id = m.manual_journal_id)) AS value_a,
+                   (SELECT coalesce(sum(e.debit), 0) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
+                      WHERE j.source_event_id = m.posting_event_id AND j.journal_type = 'MANUAL_ADJUSTMENT') AS value_b,
+                   'MANUAL_JOURNAL_EVIDENCE' AS classification, 'ERROR' AS severity, m.close_component AS component
+            FROM fin.manual_journal m
+            WHERE m.company_id = @c AND m.status IN ('POSTED', 'REVERSED')
+              AND ((SELECT coalesce(sum(l.debit), 0) FROM fin.manual_journal_line l WHERE l.manual_journal_id = m.manual_journal_id
+                      AND l.journal_version = (SELECT max(x.journal_version) FROM fin.manual_journal_line x WHERE x.manual_journal_id = m.manual_journal_id))
+                   <> (SELECT coalesce(sum(e.debit), 0) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
+                      WHERE j.source_event_id = m.posting_event_id AND j.journal_type = 'MANUAL_ADJUSTMENT')
+                OR ((m.status = 'REVERSED' OR m.auto_reverse) AND NOT EXISTS (
+                      SELECT 1 FROM fin.gl_journal j JOIN fin.gl_journal r ON r.reverses_journal_id = j.journal_id
+                      WHERE j.source_event_id = m.posting_event_id AND j.journal_type = 'MANUAL_ADJUSTMENT')))
+            UNION ALL
+            SELECT 'journal:' || j.journal_id::text, NULL, NULL, 'RULELESS_JOURNAL_WITHOUT_ADJUSTMENT', 'ERROR', NULL
+            FROM fin.gl_journal j
+            WHERE j.company_id = @c AND j.journal_type = 'MANUAL_ADJUSTMENT'
+              AND NOT EXISTS (SELECT 1 FROM fin.manual_journal m WHERE m.posting_event_id = j.source_event_id)) f
+            """,
+            null),
+        ["TB-BALANCED"] = (
+            Findings + """
+            -- The trial balance adds up: every journal and the whole ledger have equal debits and credits.
+            SELECT 'journal:' || journal_id::text AS match_key, sum(debit) AS value_a, sum(credit) AS value_b,
+                   'JOURNAL_UNBALANCED' AS classification, 'ERROR' AS severity, NULL::text AS component
+            FROM fin.gl_entry WHERE company_id = @c GROUP BY journal_id HAVING sum(debit) <> sum(credit)) f
+            """,
+            """
+            SELECT (SELECT coalesce(sum(debit), 0) FROM fin.gl_entry WHERE company_id = @c), (SELECT coalesce(sum(credit), 0) FROM fin.gl_entry WHERE company_id = @c)
+            """),
         ["PAY-APPL"] = (
             Findings + """
             -- E-VS2-06-5, global. Each released / cleared payment: Σ live applications = amount (REVERSED: 0).

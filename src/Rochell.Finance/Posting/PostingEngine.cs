@@ -159,7 +159,9 @@ public sealed class PostingEngine
             throw new DomainException(FinanceErrors.AlreadyReversed, "The journal has already been reversed.");
         }
 
-        var components = await ComponentsAsync(context, original.RuleId, original.RuleVersion, cancellationToken).ConfigureAwait(false);
+        var components = original.RuleId is null
+            ? [await ManualComponentAsync(context, originalJournalId, cancellationToken).ConfigureAwait(false)]
+            : await ComponentsAsync(context, original.RuleId, original.RuleVersion, cancellationToken).ConfigureAwait(false);
         var (periodId, postingDate, lateEntry) = await ResolvePostingDateAsync(context, components, businessDate, cancellationToken).ConfigureAwait(false);
         return new ReversalPlan(originalJournalId, original.RuleId, original.RuleVersion, periodId, postingDate, lateEntry, businessDate);
     }
@@ -406,8 +408,13 @@ public sealed class PostingEngine
     private static IReadOnlyList<string> Components(string own, IEnumerable<string> alsoRequired)
         => [own, .. alsoRequired.Where(c => c != own).Distinct(StringComparer.Ordinal)];
 
-    private static async Task<IReadOnlyList<string>> ComponentsAsync(CommandContext context, Guid ruleId, int version, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<string>> ComponentsAsync(CommandContext context, Guid? ruleId, int? version, CancellationToken cancellationToken)
     {
+        if (ruleId is null)
+        {
+            throw new InvalidOperationException("A journal without a posting rule takes its component from its adjustment.");
+        }
+
         await using var command = Sql.Command(
             context.Connection,
             context.Transaction,
@@ -565,7 +572,7 @@ public sealed class PostingEngine
             ("j", journalId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
-            ? new JournalHeader(reader.GetGuid(0), reader.GetInt32(1), reader.GetString(2))
+            ? new JournalHeader(reader.IsDBNull(0) ? null : reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetInt32(1), reader.GetString(2))
             : null;
     }
 
@@ -624,5 +631,67 @@ public sealed class PostingEngine
 
     private sealed record ActiveRule(Guid RuleId, int Version, string EventType, IReadOnlyList<string> Components, RuleDefinition Definition);
 
-    private sealed record JournalHeader(Guid RuleId, int RuleVersion, string JournalType);
+    private sealed record JournalHeader(Guid? RuleId, int? RuleVersion, string JournalType);
+
+    /// <summary>E-FIN1-6: the close component of the adjustment whose journal (or its reversal's original) this is.</summary>
+    private static async Task<string> ManualComponentAsync(CommandContext context, Guid journalId, CancellationToken cancellationToken)
+        => await ScalarAsync<string>(
+               context,
+               """
+               SELECT m.close_component FROM fin.manual_journal m
+               JOIN fin.gl_journal j ON j.source_event_id = m.posting_event_id AND j.company_id = m.company_id
+               WHERE j.journal_id = @j
+               """,
+               cancellationToken,
+               ("j", journalId))
+           ?? throw new InvalidOperationException($"Journal {journalId} has no posting rule and no adjustment.");
+
+    /// <summary>One line of a manual adjustment (P-34, E-FIN1-01-2).</summary>
+    public sealed record ManualLine(Guid AccountId, decimal Debit, decimal Credit, Guid? PlantId, Guid? PartyId, string? Memo);
+
+    /// <summary>
+    /// E-FIN1-1/6: the period of a manual adjustment's posting date, locked in shared mode on its component like any posting. An
+    /// adjustment is never a late entry: its period's component must be open.
+    /// </summary>
+    public async Task<Guid> ManualPeriodAsync(CommandContext context, string component, DateOnly postingDate, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var (periodId, date, late) = await ResolvePostingDateAsync(context, [component], postingDate, cancellationToken).ConfigureAwait(false);
+        return late || date != postingDate
+            ? throw new DomainException(FinanceErrors.PeriodClosed, $"{component} is closed for {postingDate:yyyy-MM-dd}; an adjustment is posted only into an open period.")
+            : periodId;
+    }
+
+    /// <summary>Writes a manual adjustment's journal: type MANUAL_ADJUSTMENT, no rule, role MANUAL_ADJUSTMENT and code P-34 on each line.</summary>
+    public async Task<PostedJournal> WriteManualAsync(
+        CommandContext context,
+        Guid periodId,
+        DateOnly postingDate,
+        IReadOnlyList<ManualLine> lines,
+        Guid sourceEventId,
+        IReadOnlyDictionary<string, object?> inputs,
+        DateTime occurredAt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(lines);
+        var journal = new GlJournalRow(
+            context.Ids.NewId(), context.CompanyId, postingDate, periodId, sourceEventId, null, null, 1, ManualJournalType, null, false,
+            Platform.Time.Precision.ToMicroseconds(occurredAt));
+        await InsertJournalAsync(context, journal, cancellationToken).ConfigureAwait(false);
+        var lineNo = 0;
+        var entries = lines.Select(l =>
+        {
+            var lineInputs = new Dictionary<string, object?>(inputs) { ["memo"] = l.Memo };
+            return new GlEntryRow(
+                context.Ids.NewId(), journal.JournalId, ++lineNo, context.CompanyId, postingDate, l.AccountId, ManualRole, l.Debit, l.Credit, Currency,
+                l.PlantId, null, l.PartyId, null, null, null, sourceEventId, ManualLineCode, JsonCanonicalizer.Canonicalize(JsonSerializer.Serialize(lineInputs)));
+        }).ToList();
+        await WriteEntriesAsync(context, periodId, entries, cancellationToken).ConfigureAwait(false);
+        return new PostedJournal(journal.JournalId, postingDate, false, entries.Select(e => e.GlEntryId).ToList());
+    }
+
+    public const string ManualJournalType = "MANUAL_ADJUSTMENT";
+    public const string ManualRole = "MANUAL_ADJUSTMENT";
+    public const string ManualLineCode = "P-34";
 }

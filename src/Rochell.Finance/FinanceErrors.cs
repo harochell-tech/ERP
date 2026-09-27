@@ -14,4 +14,5 @@ public static class FinanceErrors
     public const string RuleDefinitionInvalid = "RULE_DEFINITION_INVALID";
     public const string PolicyParametersInvalid = "POLICY_PARAMETERS_INVALID";
     public const string PolicyUnknown = "POLICY_UNKNOWN";
+    public const string PeriodClosed = "PERIOD_CLOSED";
 }

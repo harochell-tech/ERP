@@ -99,6 +99,10 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
             text = string.Create(CultureInfo.InvariantCulture, $"Reversa exacta{why} de la línea {original.LineNo} del asiento {original.JournalId}: {originalText}");
             complete = originalComplete;
         }
+        else if (entry.RuleLineCode == PostingEngine.ManualLineCode)
+        {
+            (text, complete) = await ManualTextAsync(context, entry, cancellationToken).ConfigureAwait(false);
+        }
         else if (entry.RuleLineCode == PostingEngine.RoundingLineCode)
         {
             text = "Diferencia de redondeo del asiento, dentro de la tolerancia de la política contable POSTING.";
@@ -226,14 +230,16 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
                    e.plant_id, e.item_id, e.party_id, e.subledger_type, e.subledger_ref, e.determination_inputs::text,
                    j.journal_id, j.journal_type, j.posting_generation, j.posting_date, j.late_entry, j.reverses_journal_id,
                    (SELECT r.journal_id FROM fin.gl_journal r WHERE r.company_id = e.company_id AND r.reverses_journal_id = j.journal_id),
-                   pr.code, j.posting_rule_version, v.explanation_templates::text, v.close_component,
+                   coalesce(pr.code, 'P-34'), coalesce(j.posting_rule_version, 1), coalesce(v.explanation_templates::text, '{}'),
+                   coalesce(v.close_component, (SELECT m.close_component FROM fin.manual_journal m WHERE m.company_id = e.company_id AND m.posting_event_id = coalesce(
+                     (SELECT o.source_event_id FROM fin.gl_journal o WHERE o.journal_id = j.reverses_journal_id), j.source_event_id))),
                    ev.event_id, ev.event_type, ev.occurred_at, ev.recorded_at, ev.business_date, ev.aggregate_type, ev.aggregate_id, ev.payload::text,
                    cl.command_type, u.email, i.integrity_status, i.ledger_sequence
             FROM fin.gl_entry e
             JOIN fin.gl_journal j ON j.journal_id = e.journal_id
             JOIN fin.account a ON a.account_id = e.account_id
-            JOIN fin.posting_rule pr ON pr.posting_rule_id = j.posting_rule_id
-            JOIN fin.posting_rule_version v ON v.posting_rule_id = j.posting_rule_id AND v.version = j.posting_rule_version
+            LEFT JOIN fin.posting_rule pr ON pr.posting_rule_id = j.posting_rule_id
+            LEFT JOIN fin.posting_rule_version v ON v.posting_rule_id = j.posting_rule_id AND v.version = j.posting_rule_version
             JOIN core.domain_event ev ON ev.event_id = j.source_event_id
             LEFT JOIN core.command_log cl ON cl.command_id = ev.command_id
             LEFT JOIN iam.session s ON s.session_id = ev.session_id
@@ -256,6 +262,32 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
             r.GetString(21), r.GetInt32(22), r.GetString(23), r.GetString(24),
             r.GetGuid(25), r.GetString(26), r.GetDateTime(27), r.GetDateTime(28), r.GetFieldValue<DateOnly>(29), r.GetString(30), r.GetGuid(31), r.GetString(32),
             S(r, 33), S(r, 34), S(r, 35), r.IsDBNull(36) ? null : r.GetInt64(36));
+    }
+
+    /// <summary>E-FIN1-01-2: a manual line is explained by its adjustment: number, description, support, preparer and approver.</summary>
+    private static async Task<(string Text, bool Complete)> ManualTextAsync(QueryContext context, EntryRow entry, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT m.journal_no, m.description, m.support_ref, pu.email, au.email
+            FROM fin.manual_journal m
+            JOIN iam.user pu ON pu.user_id = m.prepared_by
+            LEFT JOIN iam.user au ON au.user_id = m.approved_by
+            WHERE m.company_id = @c AND m.posting_event_id = @e
+            """,
+            ("c", context.CompanyId),
+            ("e", entry.EventId));
+        await using var r = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return ("(Línea manual sin ajuste que la respalde.)", false);
+        }
+
+        return (string.Create(
+            CultureInfo.InvariantCulture,
+            $"Ajuste manual {r.GetString(0)}: {r.GetString(1)}. Soporte: {r.GetString(2)}. Preparó {(r.IsDBNull(3) ? "—" : r.GetString(3))}; aprobó {(r.IsDBNull(4) ? "—" : r.GetString(4))}."), true);
     }
 
     /// <summary>The document behind an event: by its posting event, a supplier invoice by its aggregate (reversal), a repost by the event it reposts.</summary>

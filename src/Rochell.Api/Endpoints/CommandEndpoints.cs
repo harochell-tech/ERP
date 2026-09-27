@@ -3,6 +3,7 @@ using Rochell.Api.Hosting;
 using Rochell.Api.Http;
 using Rochell.Audit;
 using Rochell.Finance.Configuration;
+using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
 using Rochell.Identity.RoleChanges;
 using Rochell.MasterData.BankAccounts;
@@ -92,6 +93,17 @@ public static class CommandEndpoints
         finance.MapCommand<ApprovePostingRuleVersion, ApprovePostingRuleVersionHandler>();
         finance.MapCommand<PrepareAccountingPolicyVersion, PrepareAccountingPolicyVersionHandler>();
         finance.MapCommand<ApproveAccountingPolicyVersion, ApproveAccountingPolicyVersionHandler>();
+        finance.MapCommand<CreateAccount, CreateAccountHandler>();
+        finance.MapCommand<UpdateAccount, UpdateAccountHandler>();
+        finance.MapCommand<DeactivateAccount, DeactivateAccountHandler>();
+        finance.MapCommand<ActivateAccount, ActivateAccountHandler>();
+        finance.MapCommand<PrepareManualJournal, PrepareManualJournalHandler>();
+        finance.MapCommand<UpdateManualJournal, UpdateManualJournalHandler>();
+        finance.MapCommand<SubmitManualJournal, SubmitManualJournalHandler>();
+        finance.MapCommand<WithdrawManualJournal, WithdrawManualJournalHandler>();
+        finance.MapCommand<ApproveManualJournal, ApproveManualJournalHandler>();
+        finance.MapCommand<RejectManualJournal, RejectManualJournalHandler>();
+        finance.MapCommand<ReverseManualJournal, ReverseManualJournalHandler>();
 
         var tax = company.MapGroup("/tax").WithTags("Tax");
         tax.MapCommand<RegisterFiscalSource, RegisterFiscalSourceHandler>();
@@ -140,6 +152,9 @@ public static class CommandEndpoints
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),
         typeof(ApproveAccountingPolicyVersionHandler),
+        typeof(CreateAccountHandler), typeof(UpdateAccountHandler), typeof(DeactivateAccountHandler), typeof(ActivateAccountHandler),
+        typeof(PrepareManualJournalHandler), typeof(UpdateManualJournalHandler), typeof(SubmitManualJournalHandler), typeof(WithdrawManualJournalHandler),
+        typeof(ApproveManualJournalHandler), typeof(RejectManualJournalHandler), typeof(ReverseManualJournalHandler),
         typeof(RegisterFiscalSourceHandler), typeof(ConfigureFiscalRuleVersionHandler), typeof(LinkFiscalSourceHandler), typeof(RunFiscalRuleTestsHandler),
         typeof(ActivateFiscalRuleVersionHandler),
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),

@@ -1,6 +1,6 @@
 # General ledger: adjustments, trial balance and statements (FIN-1)
 
-Frozen Baseline `docs/architecture/fin1/frozen-baseline-fin1.md`, approved errata E-FIN1-1…10 and E-FIN1-01-1…7.
+Frozen Baseline `docs/architecture/fin1/frozen-baseline-fin1.md`, approved errata E-FIN1-1…10, E-FIN1-01-1…7 and E-FIN1-02-1…4.
 
 ## Schema (FIN1-01)
 
@@ -21,3 +21,36 @@ Role **CONTADOR** (`manual_journal:prepare`, `ledger:read`); permissions `accoun
 `manual_journal:approve` ≠ `manual_journal:prepare` (E-FIN1-01-5; 66 permissions, 25 SoD rules).
 
 Tests: `LedgerSchemaTests`.
+
+## Adjustment journal and editable chart (FIN1-02)
+
+Migration `0034__ledger_adjustments.sql`: reconciliations MANUAL-EVIDENCE and TB-BALANCED (blocking ACR-NTX and ACR-TAX), and
+0033's close gate for rule-less journals re-created (its variable shared the column's name: 42702).
+
+| Command (`/finance/…`) | Permission | Effect |
+| --- | --- | --- |
+| `create-account`, `update-account` | `account:manage` | Code (1–20 chars, unique), name, class; code and control flag never change |
+| `deactivate-account`, `activate-account` | `account:manage` | ACTIVE ⇄ INACTIVE; INACTIVE refused while Σ(debit − credit) ≠ 0 (E-FIN1-7, GL-07) |
+| `prepare-manual-journal`, `update-manual-journal` | `manual_journal:prepare` | DRAFT `AJ-nnnnnn` (numbered under an advisory lock per company); every update writes a new line version |
+| `submit-manual-journal`, `withdraw-manual-journal` | `manual_journal:prepare` | DRAFT ⇄ PENDING_APPROVAL; submit needs debits = credits and the ACR component open for the date |
+| `approve-manual-journal` | `manual_journal:approve` + step-up | POSTED: journal MANUAL_ADJUSTMENT (lines P-34, role MANUAL_ADJUSTMENT); when auto-reversing, the exact reversal dated the 1st of the next month in the same transaction (E-FIN1-01-6, GL-04) |
+| `reject-manual-journal` | `manual_journal:approve` | REJECTED with a reason |
+| `reverse-manual-journal` | `manual_journal:approve` + step-up | REVERSED: exact reversal on today's business date, with a reason (not for auto-reversing ones) |
+
+Validation: description 1–500 characters; support reference plus SHA-256 as 64 hex characters; component ACR-NTX or ACR-TAX;
+posting date not in the future and inside an open period of its component (`PERIOD_CLOSED` otherwise — adjustments never move to
+a later period the way late document postings do); at least two lines, each with exactly one positive side and at most 2
+decimals, to active non-control accounts. Approver and rejecter differ from the preparer (SoD in the roles, CHECK in the table).
+
+Queries (`ledger:read`): `GET /finance/manual-journals` (status filter, paging, total per adjustment) and
+`GET /finance/manual-journals/{id}` (lines of the current version, state history). `GET /finance/accounts` now returns
+`accountClass` and `status`. Explain this entry describes a P-34 line with the adjustment number, description, support and who
+prepared and approved it.
+
+Reconciliations: **MANUAL-EVIDENCE** — every POSTED / REVERSED adjustment has its MANUAL_ADJUSTMENT journal (and its reversal),
+and no rule-less journal exists outside an adjustment; **TB-BALANCED** — debits = credits per journal and in total. Closing
+ACR-NTX / ACR-TAX snapshots the balances of the accounts its adjustments moved in the period.
+
+CLI: `import-accounts` accepts an optional fifth column with the class (E-FIN1-01-1).
+
+Tests: `ManualJournalTests` (GL-01…04, GL-07, reversal, closed period), `AdjustmentCloseTests` (ACR-NTX close).
