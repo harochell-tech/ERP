@@ -21,6 +21,7 @@ internal static class DevSeed
         await h.SessionWithRolesAsync("CUENTAS_POR_PAGAR");
         await h.SessionWithRolesAsync("AUDITOR");
         await h.SessionWithRolesAsync("SEGUNDO_APROBADOR_CIERRE");
+        await h.SessionWithRolesAsync("APROBADOR_POLITICAS"); // E-B03-15-4: approves accounting policy versions
         var plantStorekeeper = await h.CreateUserAsync();
         await h.GrantAsync(h.CompanyId, plantStorekeeper, "ALMACENISTA", receiving.Purchasing.PlantId);
 

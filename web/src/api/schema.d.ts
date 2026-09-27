@@ -1051,6 +1051,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/finance/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/account-role-maps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListAccountRoleMaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/posting-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListPostingRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/accounting-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListAccountingPolicies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/finance/entries/{glEntryId}/explanation": {
         parameters: {
             query?: never;
@@ -1067,10 +1131,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/tax/fiscal-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListFiscalSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/tax/fiscal-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListFiscalRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountList: {
+            items: components["schemas"]["AccountView"][];
+        };
+        AccountRoleMapList: {
+            items: components["schemas"]["AccountRoleMapView"][];
+        };
+        AccountRoleMapView: {
+            /** Format: uuid */
+            mapId: string;
+            accountRole: string;
+            itemCategory: null | string;
+            accountCode: string;
+            accountName: string;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo: null | string;
+            status: string;
+            preparedBy: null | string;
+            approvedBy: null | string;
+        };
+        AccountView: {
+            /** Format: uuid */
+            accountId: string;
+            code: string;
+            name: string;
+            isControl: boolean;
+        };
+        AccountingPolicyList: {
+            items: components["schemas"]["AccountingPolicyView"][];
+        };
+        AccountingPolicyView: {
+            policyCode: string;
+            ownerRole: string;
+            description: string;
+            definitions: components["schemas"]["PolicyParameterDefinitionView"][];
+            versions: components["schemas"]["PolicyVersionView"][];
+        };
         ActAsRequest: {
             /** Format: uuid */
             companyId: string;
@@ -1265,6 +1399,53 @@ export interface components {
             amount: string;
             effect: string;
         };
+        FiscalRuleList: {
+            items: components["schemas"]["FiscalRuleView"][];
+        };
+        FiscalRuleVersionView: {
+            /** Format: uuid */
+            ruleVersionId: string;
+            /** Format: int32 */
+            version: number;
+            status: string;
+            definition: string;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo: null | string;
+            configuredBy: null | string;
+            activatedBy: null | string;
+            /** Format: int64 */
+            rowVersion: number;
+            sources: components["schemas"]["LinkedSourceView"][];
+            latestTestRun: null | components["schemas"]["FiscalTestRunView"];
+        };
+        FiscalRuleView: {
+            /** Format: uuid */
+            ruleId: string;
+            code: string;
+            ruleKind: string;
+            versions: components["schemas"]["FiscalRuleVersionView"][];
+        };
+        FiscalSourceList: {
+            items: components["schemas"]["FiscalSourceView"][];
+        };
+        FiscalSourceView: {
+            /** Format: uuid */
+            sourceId: string;
+            officialSource: string;
+            documentTitle: string;
+            documentVersion: string;
+            /** Format: date */
+            publicationDate: string;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo: null | string;
+            urlOrReference: string;
+            fileSha256: string;
+            environment: string;
+        };
         FiscalTestCase: {
             caseId: string;
             partyType: string;
@@ -1274,6 +1455,14 @@ export interface components {
             /** Format: decimal */
             itbisAmount: string;
             expected: components["schemas"]["ExpectedTax"][];
+        };
+        FiscalTestRunView: {
+            passed: boolean;
+            /** Format: int32 */
+            cases: number;
+            environment: string;
+            /** Format: date-time */
+            executedAt: string;
         };
         GlEntryView: {
             /** Format: uuid */
@@ -1418,6 +1607,12 @@ export interface components {
             /** Format: uuid */
             sourceId: string;
         };
+        LinkedSourceView: {
+            /** Format: uuid */
+            sourceId: string;
+            documentTitle: string;
+            environment: string;
+        };
         LocationView: {
             /** Format: uuid */
             locationId: string;
@@ -1472,6 +1667,33 @@ export interface components {
             valuationAreaCode: string;
             locations: components["schemas"]["LocationView"][];
         };
+        PolicyParameterDefinitionView: {
+            paramCode: string;
+            valueType: string;
+            /** Format: decimal */
+            minValue: null | string;
+            /** Format: decimal */
+            maxValue: null | string;
+            allowedValues: null | string[];
+            description: string;
+        };
+        PolicyVersionView: {
+            /** Format: uuid */
+            policyVersionId: string;
+            /** Format: int32 */
+            version: number;
+            status: string;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo: null | string;
+            preparedBy: null | string;
+            approvedBy: null | string;
+            justification: string;
+            parameters: {
+                [key: string]: string;
+            };
+        };
         PostGoodsReceipt: {
             /** Format: uuid */
             plantId: string;
@@ -1489,6 +1711,22 @@ export interface components {
             supplierInvoiceId: string;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        PostingRuleList: {
+            items: components["schemas"]["PostingRuleVersionView"][];
+        };
+        PostingRuleVersionView: {
+            ruleCode: string;
+            eventType: string;
+            /** Format: int32 */
+            version: number;
+            status: string;
+            closeComponent: string;
+            /** Format: date */
+            effectiveFrom: string;
+            /** Format: date */
+            effectiveTo: null | string;
+            approvedBy: null | string;
         };
         PrepareAccountingPolicyVersion: {
             policyCode: string;
@@ -6334,6 +6572,204 @@ export interface operations {
             };
         };
     };
+    ListAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListAccountRoleMaps: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountRoleMapList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPostingRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostingRuleList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListAccountingPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountingPolicyList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ExplainEntry: {
         parameters: {
             query?: never;
@@ -6384,6 +6820,104 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListFiscalSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalSourceList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListFiscalRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FiscalRuleList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

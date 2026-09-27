@@ -1,10 +1,13 @@
 using System.Text.Json;
 using Rochell.Api.Http;
+using Rochell.Finance.Configuration;
 using Rochell.Finance.Explain;
+using Rochell.Finance.Policies;
 using Rochell.MasterData.Queries;
 using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
+using Rochell.Tax;
 
 namespace Rochell.Api.Endpoints;
 
@@ -31,6 +34,8 @@ public static class QueryEndpoints
         typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
+        typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
+        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler),
     ];
 
     public static void MapQueryEndpoints(this RouteGroupBuilder company)
@@ -85,6 +90,28 @@ public static class QueryEndpoints
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListEventJournals(companyId, s, sourceEventId), handler, ct))
             .Describe<EventJournals>(nameof(ListEventJournals), notFound: true);
+
+        // E-B03-15-1: configuration lists for the approval screens (configuration:read).
+        finance.MapGet("/accounts", (HttpContext http, Guid companyId, ListAccountsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListAccounts(companyId, s), handler, ct))
+            .Describe<AccountList>(nameof(ListAccounts));
+        finance.MapGet("/account-role-maps", (HttpContext http, Guid companyId, string? status, ListAccountRoleMapsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListAccountRoleMaps(companyId, s, status), handler, ct))
+            .Describe<AccountRoleMapList>(nameof(ListAccountRoleMaps));
+        finance.MapGet("/posting-rules", (HttpContext http, Guid companyId, ListPostingRulesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPostingRules(companyId, s), handler, ct))
+            .Describe<PostingRuleList>(nameof(ListPostingRules));
+        finance.MapGet("/accounting-policies", (HttpContext http, Guid companyId, ListAccountingPoliciesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListAccountingPolicies(companyId, s), handler, ct))
+            .Describe<AccountingPolicyList>(nameof(ListAccountingPolicies));
+
+        var tax = company.MapGroup("/tax").WithTags("Tax");
+        tax.MapGet("/fiscal-sources", (HttpContext http, Guid companyId, ListFiscalSourcesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListFiscalSources(companyId, s), handler, ct))
+            .Describe<FiscalSourceList>(nameof(ListFiscalSources));
+        tax.MapGet("/fiscal-rules", (HttpContext http, Guid companyId, ListFiscalRulesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListFiscalRules(companyId, s), handler, ct))
+            .Describe<FiscalRuleList>(nameof(ListFiscalRules));
 
         // E-PR17-6: the HTTP endpoint of "Explain this entry". Its result is the PR-17 document, returned as is.
         finance.MapGet("/entries/{glEntryId:guid}/explanation", (HttpContext http, Guid companyId, Guid glEntryId, ExplainEntryHandler handler, QueryRunner runner, CancellationToken ct)

@@ -22,6 +22,14 @@ const NAV: readonly NavItem[] = [
   { href: "/cxp/facturas/", label: "Facturas de proveedor", permission: "supplier_invoice:read" },
   { href: "/cierre/conciliaciones/", label: "Conciliaciones", permission: "reconciliation:read" },
   { href: "/cierre/periodos/", label: "Períodos y cierre", permission: "period:read" },
+  // E-B03-15-4: configuration.
+  { href: "/maestros/proveedores/", label: "Proveedores", permission: "master_data:read" },
+  { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
+  { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
+  { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
+  { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
+  { href: "/fiscal/fuentes/", label: "Fuentes fiscales", permission: "configuration:read" },
+  { href: "/fiscal/reglas/", label: "Reglas fiscales", permission: "configuration:read" },
 ];
 
 function PlantSelector() {
