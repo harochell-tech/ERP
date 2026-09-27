@@ -267,6 +267,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-UI-4 | UI | The supplier list query gains the bank-account state (payable / hold / review / none) and the open AP amount, in VS2-07. |
 | E-UI-5 | UI | Labels: CLEARED = "Compensado"; a matched statement line = "Conciliada"; PREPARED "Preparado", RELEASED "Liberado", VERIFIED "Verificada", SUPERSEDED "Reemplazada", UNMATCHED "Sin conciliar", CHARGE_RECOGNIZED "Cargo registrado". |
 | E-UI-6 | UI | The IBM Plex typefaces are bundled in `web/` (no calls to external font services). |
+| E-ADM-1 | IAM | No all-powerful user: segregation of duties and four eyes stay. (a) Staging: the tester keeps CONTROLLER + PROBADOR and acts as test identities for every role, now including ADMIN_SEGURIDAD, SEGUNDO_APROBADOR_SEGURIDAD and DIRECTOR (`deploy/staging/seed.sh`). (b) New role DIRECTOR (migration 0031): every READ permission, no WRITE or SECURITY permission — sees every screen and report, executes nothing. |
 
 Implementation rules derived from the above (no architectural change):
 

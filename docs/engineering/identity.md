@@ -30,3 +30,12 @@ of duties and the four-eyes CHECKs apply to them exactly as to people.
 - **Provisioning**: `rochell-migrate create-synthetic-user <email>` then `grant-role`; the tester gets `grant-role … PROBADOR`.
 - **UI**: the header selector "Actuar como…" lists the identities (`GET /api/v1/auth/test-identities`), switches
   (`POST /api/v1/auth/act-as`) and returns (`POST /api/v1/auth/act-as/stop`); while acting it shows "Identidad de prueba".
+
+## Director (E-ADM-1)
+
+Role `DIRECTOR` (migration `0031__director_role.sql`) holds every READ permission of the matrix — including
+`bank_account_number:read` — and no WRITE or SECURITY permission: it opens every screen and report and executes nothing, so it
+takes part in no segregation-of-duties pair. Nobody holds every permission: SoD pairs and the four-eyes CHECKs (preparer ≠
+releaser, requester ≠ verifier, creator ≠ approver…) stay. In staging the tester works every role through "Actuar como…" (test
+identities for all roles, `deploy/staging/seed.sh`). In production the Director role is granted like any other: `rochell-migrate
+grant-role` at bootstrap, then role requests with a second approver.
