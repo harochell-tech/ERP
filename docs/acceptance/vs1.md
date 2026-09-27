@@ -30,7 +30,7 @@ security, posting engine, ledgers, deferred checks), 8 workers, sealer running; 
 | Full-position check — GitHub `ubuntu-24.04`, 4 CPU | 10,000 / 10,000 | 176 / **502** / 835 / 1599 | 0.1 s, all MATCHED | **fail** |
 | Delta form (0021) — local, 12 CPU | 10,000 / 10,000 | 29 / 60 / 78 / 269 | 0.2 s, all MATCHED | pass |
 | Delta form (0021) — GitHub `ubuntu-24.04`, 4 CPU ([run 36075519769](https://github.com/harochell-tech/ERP/actions/runs/36075519769)) | 10,000 / 10,000 | 113 / **226** / 309 / 715 | 0.1 s, all MATCHED | **PASS** |
-| B-03 staging (`sistema` VPS, temporary database `rochell_pf01`, workflow `pf01-staging`, E-B03-16) | — | — | — | Pending: recorded here after the first run |
+| B-03 staging — `sistema` VPS, 2 CPU, Ubuntu 24.04.5, temporary database `rochell_pf01`, workflow `pf01-staging` (E-B03-16), commit `1f69207` ([run 36315487038](https://github.com/harochell-tech/ERP/actions/runs/36315487038)) | 10,000 / 10,000 | 143 / **337** / 500 / 1120 | 0.1 s, all MATCHED | **PASS** |
 
 E-PR19-10: the full-position check re-summed the history of a position at every COMMIT; its cost grew with that history (median
 32 ms at 1,000 receipts, 75 ms at 10,000) and it missed the limit on the reference runner. The delta form of Patch 1 precision 1
@@ -46,7 +46,7 @@ concurrent first inserts fail (23505); E-PR19-14 excludes those tables.
 | --- | --- | --- |
 | B-02 | Second-person review of the ledger code (Posting Engine, inventory ledger, receipts, corrections, invoices, repost, close) — **due 2026-11-24** | Alexander |
 | E-VS1-4 | Parallel run with the current accounting system (inventory, AP, GRNI reconciled to zero at period end) before any real use without B-02 | Controller |
-| B-03 | Staging PostgreSQL 17 and object-lock (WORM) storage; then the daily digest, hash verification over WORM, and PF-01 repeated on staging. **2026-09-27:** staging up at `https://staging.industriasrochell.com.do` (deploy-staging run 36287377902, 23 migrations, TEST, Backblaze B2 Object Lock verified at start); pending: first digest written to WORM, verification over WORM, PF-01 on staging | Tech lead |
+| B-03 | Staging PostgreSQL 17 and object-lock (WORM) storage; then the daily digest, hash verification over WORM, and PF-01 repeated on staging. **2026-09-27:** staging up at `https://staging.industriasrochell.com.do` (deploy-staging run 36287377902, 23 migrations, TEST, Backblaze B2 Object Lock verified at start); **PF-01 on staging passed** (run 36315487038, p95 337 ms, 2026-09-27); pending: first digest written to WORM, verification over WORM | Tech lead |
 | A-01 | Controller approves the account maps and policy values | Management + Controller |
 | A-02 | Official DGII sources (PRODUCTION) for purchase ITBIS and withholding; until then production activation is blocked by design (P-7, E-PR19-9) | Fiscal specialist |
 | A-03 | Google Workspace OIDC client and domain for staging — **closed 2026-09-27**: first sign-in on staging with a `rochell.com.do` account | Alexander |
