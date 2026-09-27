@@ -205,3 +205,11 @@ Migration `0030__treasury_queries.sql`; approved errata E-VS2-07-1…7 and E-UI-
 
 Tests: `TreasuryQueryTests` (aging buckets and missing policy, proposal and payability, payment list and detail, statements, lines
 and BANK-GL read-only, masking); `AcceptanceTests.E2E01_…` (E2E-01 over HTTP, E-VS2-07-6).
+
+## Properties, concurrency and acceptance (VS2-09)
+
+Approved errata E-VS2-09-1…6. `PaymentPropertyTests` (INV-P) runs seeded sequences of every payment, statement and bank-line
+command against a simulated bank (cumulative daily statements), checking the ledger invariants after each step and AP-GL, PAY-APPL,
+ACC-EVIDENCE and BANK-GL every 25 steps; `PaymentConcurrencyTests` races releases, matches, imports and the BANK-REC close. The
+acceptance matrix, the concurrency guarantees and the open conditions of VS#2 are in [docs/acceptance/vs2.md](../acceptance/vs2.md);
+long INV-P runs: workflow `inv-p`.
