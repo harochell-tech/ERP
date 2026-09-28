@@ -115,4 +115,10 @@ export const ROLES: Readonly<Record<string, string>> = {
   PROBADOR: "Probador",
   DIRECTOR: "Director (solo lectura)",
   CONTADOR: "Contador",
+  // VS#3 (E-VS3-3)
+  VENDEDOR: "Vendedor",
+  CREDITO: "Crédito",
+  DESPACHO: "Despacho",
+  FACTURACION: "Facturación",
+  COBROS: "Cobros",
 };
