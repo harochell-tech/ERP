@@ -19,7 +19,7 @@ public static class TaxCalculator
         var result = new List<DeterminedTax>();
         foreach (var line in lines)
         {
-            var itbis = rules.Where(r => r.Definition.Kind == FiscalRuleKinds.PurchaseItbis)
+            var itbis = rules.Where(r => r.Definition.Kind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis)
                 .Select(r => Itbis(r, line))
                 .OfType<DeterminedTax>()
                 .ToList();

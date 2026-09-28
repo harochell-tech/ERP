@@ -122,3 +122,20 @@ rule, and writes an `inv.control_assessment` (GATE_OUT / POD, TRANSFERRED / RETA
 Queries: `GET /sales/deliveries[/{id}]` (lines, lots, POD, assessments, history).
 
 Tests: `DeliveryTests` (SAL-03, SAL-04, SAL-05, return trip, transport / weight / close-short rules).
+
+## Invoice, sales ITBIS and external e-CF (VS3-05)
+
+Migration `0042__sales_invoice.sql`: SALES_ITBIS / OUTPUT, close component AR-REC, `fin.ar_document`, `sal.invoice` (three
+statuses of E-1 with their valid combinations, K-25 and ADR-027 evidence), `sal.invoice_line`, `tax.external_fiscal_record`,
+link types INVOICES / FISCALIZES, rule P-18 (DRAFT), permissions and SoD; the invoiced quantity of a delivery line may go
+back on a void.
+
+| Command (`/sales/…`) | Permission | Effect |
+| --- | --- | --- |
+| `create-invoice-from-deliveries` | `invoice:create` | DRAFT FA-… of delivered, not yet invoiced lines of one customer |
+| `issue-invoice` (step-up) | `invoice:issue` | Sales ITBIS (Tax Engine, SALE), AR document, P-18, invoiced quantities; CONFIRMED / POSTED / PENDING_EXTERNAL |
+| `record-external-fiscal-document` | `fiscal_document:record` | e-NCF and evidence checked against the invoice → ACCEPTED_EXTERNAL |
+| `void-unfiscalized-invoice` (step-up) | `invoice:void` | Never fiscalized, no receipts → VOIDED / REVERSED; the delivery becomes billable again |
+
+Queries: `GET /sales/invoices[/{id}]`, `/sales/invoices/{id}/fiscal-package`, `/sales/billable-deliveries`.
+Tests: `InvoiceTests` (SAL-06, SAL-07, SAL-09 concurrent, void, fiscal gate).

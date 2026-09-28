@@ -360,7 +360,7 @@ public sealed class SubmitForCreditHandler : ICommandHandler<SubmitForCredit>
             ?? throw new DomainException(OrderErrors.TermsMissing, "The customer has no approved terms.");
         var today = SalesSql.Today(context);
         var overdueBlock = (await PolicyResolver.ResolveAsync(context, Orders.CreditPolicy, today, cancellationToken).ConfigureAwait(false)).Integer(Orders.OverdueDaysBlock);
-        var exposure = await CreditExposure.ComputeAsync(context.Connection, context.Transaction, context.CompanyId, row.PartyId, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
+        var exposure = await CreditExposure.ComputeAsync(context.Connection, context.Transaction, context.CompanyId, row.PartyId, command.SalesOrderId, today, cancellationToken).ConfigureAwait(false);
         var auto = !terms.Hold && exposure.Total + row.Total <= terms.Limit && exposure.OverdueDays <= overdueBlock;
         var checkId = context.Ids.NewId();
         await Sql.ExecuteAsync(

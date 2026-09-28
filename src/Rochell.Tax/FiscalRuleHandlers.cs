@@ -314,7 +314,7 @@ public sealed class RunFiscalRuleTestsHandler : ICommandHandler<RunFiscalRuleTes
         foreach (var testCase in command.Cases)
         {
             var line = new TaxableLine(Guid.Empty, testCase.ItemCategory, testCase.NetAmount);
-            var actual = (version.RuleKind == FiscalRuleKinds.PurchaseItbis
+            var actual = (version.RuleKind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis
                     ? TaxCalculator.Itbis(rule, line)
                     : TaxCalculator.Withholding(rule, line, testCase.PartyType, testCase.ItbisAmount)) is { } tax
                 ? new[] { new ExpectedTax(tax.TaxCode, tax.Amount, tax.Effect) }
@@ -408,7 +408,7 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
             }
         }
 
-        if (version.RuleKind == FiscalRuleKinds.PurchaseItbis)
+        if (version.RuleKind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis)
         {
             await using var other = Sql.Command(
                 context.Connection,
@@ -416,11 +416,12 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
                 """
                 SELECT EXISTS (
                   SELECT 1 FROM tax.fiscal_rule_version v JOIN tax.fiscal_rule r ON r.rule_id = v.rule_id
-                  WHERE r.company_id = @c AND r.rule_kind = 'PURCHASE_ITBIS' AND r.rule_id <> @rule AND v.status = 'ACTIVE'
+                  WHERE r.company_id = @c AND r.rule_kind = @kind AND r.rule_id <> @rule AND v.status = 'ACTIVE'
                     AND daterange(v.effective_from, v.effective_to, '[)') && daterange(@from, NULL, '[)'))
                 """,
                 ("c", context.CompanyId),
                 ("rule", version.RuleId),
+                ("kind", version.RuleKind),
                 ("from", version.EffectiveFrom));
             if (await other.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
             {

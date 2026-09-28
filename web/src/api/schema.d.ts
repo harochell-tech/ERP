@@ -1787,6 +1787,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/create-invoice-from-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateInvoiceFromDeliveries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/issue-invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["IssueInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/record-external-fiscal-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RecordExternalFiscalDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/void-unfiscalized-invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoidUnfiscalizedInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/identity/request-role-assignment": {
         parameters: {
             query?: never;
@@ -2291,6 +2355,70 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetDelivery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/invoices/{invoiceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/invoices/{invoiceId}/fiscal-package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetInvoiceFiscalPackage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/billable-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListBillableDeliveries"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3156,6 +3284,32 @@ export interface components {
             /** Format: int32 */
             unmatched: number;
         };
+        BillableDeliveryLine: {
+            /** Format: uuid */
+            deliveryLineId: string;
+            deliveryNo: string;
+            /** Format: uuid */
+            salesOrderId: string;
+            orderNo: string;
+            /** Format: uuid */
+            partyId: string;
+            customerName: string;
+            itemCode: string;
+            uom: string;
+            /** Format: decimal */
+            qtyDelivered: string;
+            /** Format: decimal */
+            qtyInvoiced: string;
+            /** Format: decimal */
+            qtyBillable: string;
+            /** Format: decimal */
+            unitPrice: string;
+            /** Format: decimal */
+            billableNet: string;
+        };
+        BillableDeliveryList: {
+            items: components["schemas"]["BillableDeliveryLine"][];
+        };
         CancelDelivery: {
             /** Format: uuid */
             deliveryId: string;
@@ -3255,6 +3409,11 @@ export interface components {
             description: string;
             baseUom: string;
             itemCategory: string;
+        };
+        CreateInvoiceFromDeliveries: {
+            /** Format: uuid */
+            partyId: string;
+            deliveryLineIds: string[];
         };
         CreatePurchaseOrder: {
             /** Format: uuid */
@@ -3547,6 +3706,15 @@ export interface components {
             amount: string;
             effect: string;
         };
+        ExternalFiscalRecordView: {
+            encf: string;
+            /** Format: date-time */
+            issuedAt: string;
+            securityCode: string;
+            evidenceRef: string;
+            evidenceSha256: string;
+            recordedBy: null | string;
+        };
         FiscalRuleList: {
             items: components["schemas"]["FiscalRuleView"][];
         };
@@ -3759,6 +3927,97 @@ export interface components {
             expenses: string;
             /** Format: decimal */
             netIncome: string;
+        };
+        InvoiceDetail: {
+            header: components["schemas"]["InvoiceSummary"];
+            voidReason: null | string;
+            issuedBy: null | string;
+            /** Format: uuid */
+            postingEventId: null | string;
+            lines: components["schemas"]["InvoiceLineView"][];
+            fiscalRecord: null | components["schemas"]["ExternalFiscalRecordView"];
+            history: components["schemas"]["StateChange"][];
+        };
+        InvoiceFiscalPackage: {
+            invoiceNo: string;
+            ecfType: string;
+            /** Format: date */
+            invoiceDate: string;
+            /** Format: date */
+            dueDate: string;
+            issuerRnc: string;
+            issuerName: string;
+            receiverRnc: string;
+            receiverName: string;
+            lines: components["schemas"]["InvoiceLineView"][];
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            taxTotal: string;
+            /** Format: decimal */
+            total: string;
+            fiscalStatus: string;
+        };
+        InvoiceLineView: {
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: uuid */
+            deliveryLineId: string;
+            deliveryNo: string;
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemDescription: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            unitPrice: string;
+            /** Format: decimal */
+            netAmount: string;
+            /** Format: decimal */
+            itbis: string;
+        };
+        InvoiceList: {
+            items: components["schemas"]["InvoiceSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        InvoiceSummary: {
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNo: string;
+            /** Format: date */
+            invoiceDate: null | string;
+            /** Format: date */
+            dueDate: null | string;
+            /** Format: uuid */
+            partyId: string;
+            customerName: string;
+            ecfType: string;
+            encf: null | string;
+            commercialStatus: string;
+            accountingStatus: string;
+            fiscalStatus: string;
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            taxTotal: null | string;
+            /** Format: decimal */
+            total: null | string;
+            /** Format: decimal */
+            openAmount: null | string;
+            /** Format: int64 */
+            version: number;
+        };
+        IssueInvoice: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            ecfType?: null | string;
         };
         ItemList: {
             items: components["schemas"]["ItemView"][];
@@ -4582,6 +4841,25 @@ export interface components {
             /** Format: int32 */
             exceptionCount: number;
         };
+        RecordExternalFiscalDocument: {
+            /** Format: uuid */
+            invoiceId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            encf: string;
+            /** Format: date-time */
+            issuedAt: string;
+            securityCode: string;
+            evidenceRef: string;
+            evidenceSha256: string;
+            receiverRnc: string;
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            taxTotal: string;
+            /** Format: decimal */
+            total: string;
+        };
         RecordGateOut: {
             /** Format: uuid */
             deliveryId: string;
@@ -5374,6 +5652,13 @@ export interface components {
         VoidSupplierInvoice: {
             /** Format: uuid */
             supplierInvoiceId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            reason: string;
+        };
+        VoidUnfiscalizedInvoice: {
+            /** Format: uuid */
+            invoiceId: string;
             /** Format: int64 */
             expectedVersion: number;
             reason: string;
@@ -13527,6 +13812,310 @@ export interface operations {
             };
         };
     };
+    CreateInvoiceFromDeliveries: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvoiceFromDeliveries"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    IssueInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueInvoice"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RecordExternalFiscalDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordExternalFiscalDocument"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VoidUnfiscalizedInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidUnfiscalizedInvoice"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RequestRoleAssignment: {
         parameters: {
             query?: never;
@@ -15365,6 +15954,230 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListInvoices: {
+        parameters: {
+            query?: {
+                commercialStatus?: string;
+                fiscalStatus?: string;
+                partyId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetInvoiceFiscalPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceFiscalPackage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListBillableDeliveries: {
+        parameters: {
+            query?: {
+                partyId?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillableDeliveryList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

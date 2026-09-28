@@ -9,8 +9,17 @@ namespace Rochell.Tax;
 /// <summary>One purchase line to determine: its id in the subject document, the item and its net amount (quantity × price).</summary>
 public sealed record TaxLineInput(Guid SubjectLineId, Guid ItemId, decimal NetAmount);
 
-/// <summary>What to determine taxes for: the subject document, its supplier and the determination date.</summary>
-public sealed record TaxRequest(string SubjectType, Guid SubjectId, DateOnly Date, Guid PartyId, IReadOnlyList<TaxLineInput> Lines);
+/// <summary>
+/// What to determine taxes for: the subject document, its supplier or customer and the determination date. A SALE applies only
+/// SALES_ITBIS rules and a PURCHASE only the purchase rules (E-VS3-05-1).
+/// </summary>
+public sealed record TaxRequest(string SubjectType, Guid SubjectId, DateOnly Date, Guid PartyId, IReadOnlyList<TaxLineInput> Lines, string Direction = TaxDirections.Purchase);
+
+public static class TaxDirections
+{
+    public const string Purchase = "PURCHASE";
+    public const string Sale = "SALE";
+}
 
 /// <summary>The recorded determination.</summary>
 public sealed record TaxDetermination(Guid DeterminationId, IReadOnlyList<DeterminedTax> Taxes)
@@ -38,7 +47,7 @@ public sealed class TaxEngine
             throw new DomainException(TaxErrors.SubjectInvalid, "A determination needs a subject and at least one line.");
         }
 
-        var rules = await ApplicableRulesAsync(context, request.Date, cancellationToken).ConfigureAwait(false);
+        var rules = await ApplicableRulesAsync(context, request.Date, request.Direction == TaxDirections.Sale, cancellationToken).ConfigureAwait(false);
         var partyType = await PartyTypeAsync(context, request.PartyId, cancellationToken).ConfigureAwait(false);
         var lines = new List<TaxableLine>();
         foreach (var line in request.Lines)
@@ -98,7 +107,7 @@ public sealed class TaxEngine
         return new TaxDetermination(determinationId, taxes);
     }
 
-    private static async Task<IReadOnlyList<ApplicableRule>> ApplicableRulesAsync(CommandContext context, DateOnly date, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<ApplicableRule>> ApplicableRulesAsync(CommandContext context, DateOnly date, bool sale, CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(
             context.Connection,
@@ -123,6 +132,11 @@ public sealed class TaxEngine
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var code = reader.GetString(0);
+            if (FiscalRuleKinds.IsSales(reader.GetString(1)) != sale)
+            {
+                continue; // the other direction's rules neither apply nor close this gate
+            }
+
             if (reader.IsDBNull(2))
             {
                 if (reader.GetBoolean(4))
@@ -141,9 +155,10 @@ public sealed class TaxEngine
             throw new DomainException(TaxErrors.FiscalGateClosed, $"Fiscal rules pending activation on {date:yyyy-MM-dd}: {string.Join(", ", closed)}.");
         }
 
-        if (!rules.Any(r => r.Definition.Kind == FiscalRuleKinds.PurchaseItbis))
+        var itbisKind = sale ? FiscalRuleKinds.SalesItbis : FiscalRuleKinds.PurchaseItbis;
+        if (!rules.Any(r => r.Definition.Kind == itbisKind))
         {
-            throw new DomainException(TaxErrors.FiscalGateClosed, $"No purchase ITBIS rule is active on {date:yyyy-MM-dd}.");
+            throw new DomainException(TaxErrors.FiscalGateClosed, $"No {(sale ? "sales" : "purchase")} ITBIS rule is active on {date:yyyy-MM-dd}.");
         }
 
         return rules;

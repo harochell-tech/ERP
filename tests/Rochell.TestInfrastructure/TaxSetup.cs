@@ -80,7 +80,7 @@ public static class TaxSetup
     {
         var rule = new ApplicableRule(Guid.Empty, "X", FiscalRuleDefinition.Parse(kind, definition));
         var line = new TaxableLine(Guid.Empty, "CEMENTO", 1000m);
-        var tax = kind == FiscalRuleKinds.PurchaseItbis ? TaxCalculator.Itbis(rule, line) : TaxCalculator.Withholding(rule, line, PartyTaxTypes.Individual, 180m);
+        var tax = kind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis ? TaxCalculator.Itbis(rule, line) : TaxCalculator.Withholding(rule, line, PartyTaxTypes.Individual, 180m);
         return new FiscalTestCase(id, PartyTaxTypes.Individual, "CEMENTO", 1000m, 180m, tax is null ? [] : [new ExpectedTax(tax.TaxCode, tax.Amount, tax.Effect)]);
     }
 

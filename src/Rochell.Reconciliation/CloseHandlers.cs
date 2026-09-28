@@ -319,7 +319,7 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
         return rows;
     }
 
-    /// <summary>INV-MOV: valuation by area × item and the inventory accounts (raw material and finished goods, VS3-02b); AP-REC: open AP and AP_CONTROL by supplier.</summary>
+    /// <summary>INV-MOV: valuation by area × item and the inventory accounts (raw material and finished goods, VS3-02b); AP-REC: open AP and AP_CONTROL by supplier; AR-REC: open AR and AR_CONTROL by customer (VS3-05).</summary>
     private static async Task<List<Dictionary<string, string?>>> BalancesAsync(CommandContext context, string component, CancellationToken cancellationToken)
     {
         var sql = component == Components.InventoryMovements
@@ -329,6 +329,14 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
               UNION ALL
               SELECT 'gl', a.code, NULL, sum(e.debit - e.credit)::text FROM fin.gl_entry e JOIN fin.account a ON a.account_id = e.account_id
               WHERE e.company_id = @c AND e.account_role IN ('RAW_MATERIAL', 'FINISHED_GOODS', 'FINISHED_GOODS_IN_TRANSIT') GROUP BY a.code
+              ORDER BY 1, 2
+              """
+            : component == Components.AccountsReceivable
+            ? """
+              SELECT 'ar_open' AS kind, party_id::text AS key, NULL AS a, sum(open_amount)::text AS b FROM fin.ar_document WHERE company_id = @c GROUP BY party_id
+              UNION ALL
+              SELECT 'ar_control', coalesce(party_id::text, '-'), NULL, sum(debit - credit)::text FROM fin.gl_entry
+              WHERE company_id = @c AND account_role = 'AR_CONTROL' GROUP BY party_id
               ORDER BY 1, 2
               """
             : """

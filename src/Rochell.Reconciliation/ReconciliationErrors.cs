@@ -24,6 +24,7 @@ public static class Components
     public const string BankReconciliation = "BANK-REC";
     public const string Accruals = "ACR-NTX";
     public const string TaxAccruals = "ACR-TAX";
+    public const string AccountsReceivable = "AR-REC";
 
-    public static bool IsKnown(string component) => component is InventoryMovements or AccountsPayable or BankReconciliation or Accruals or TaxAccruals;
+    public static bool IsKnown(string component) => component is InventoryMovements or AccountsPayable or BankReconciliation or Accruals or TaxAccruals or AccountsReceivable;
 }
