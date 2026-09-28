@@ -38,3 +38,24 @@ SoD: `customer:create` ≠ `customer:activate`; prepare ≠ approve for customer
 permissions, 21 roles, 29 SoD rules. Staging's `seed.sh` lists a synthetic identity per new role.
 
 Tests: `SalesMasterSchemaTests` (MasterData), `IamSchemaTests` (matrix), `SchemaTests` (inventory).
+
+## Master commands (VS3-02)
+
+Module `Rochell.Sales` (E-VS3-02-2). Migration `0038__supplier_payment_terms.sql`.
+
+| Command (`/sales/…`) | Permission | Effect |
+| --- | --- | --- |
+| `create-customer` | `customer:create` | New LOCAL party (DRAFT) as DRAFT customer, or an existing party with that RNC flagged as customer (`existingParty`) |
+| `update-customer` | `customer:update` | Contact data always; RNC and legal name only while the party is DRAFT |
+| `activate-customer` | `customer:activate` + step-up | DRAFT → ACTIVE; needs ACTIVE terms; activates a DRAFT party too |
+| `prepare-customer-terms` | `customer_terms:prepare` | Creates or replaces the single DRAFT (days 0–365, limit ≥ 0 with 2 decimals, credit hold) |
+| `approve-customer-terms` | `customer_terms:approve` + step-up | DRAFT → ACTIVE from today; the previous ACTIVE → SUPERSEDED; approver ≠ preparer |
+| `prepare-standard-cost`, `approve-standard-cost` | `standard_cost:*` (+ step-up to approve) | Same mechanics per item and valuation area; approval refused with `STOCK_EXISTS` while the item has stock there |
+| `prepare-price-list`, `approve-price-list` | `price_list:*` (+ step-up to approve) | A new DRAFT with all its lines; approval replaces the list in force |
+| `register-vehicle`, `update-vehicle`, `deactivate-vehicle`, `activate-vehicle`, `register-driver`, `update-driver`, `deactivate-driver`, `activate-driver` | `fleet:manage` | Fleet master data |
+| `/master-data/set-supplier-payment-terms` | `supplier:update` | Supplier's payment days (null clears); the invoice form proposes the due date |
+
+Queries (`sales:read`): `GET /sales/customers[/{partyId}]`, `/sales/customer-terms`, `/sales/standard-costs`,
+`/sales/price-lists[/{id}]`, `/sales/vehicles`, `/sales/drivers`.
+
+Tests: `CustomerTests`, `PricingTests`, `FleetTests` (`tests/Rochell.Sales.Tests`), `SupplierTests` (payment terms).

@@ -122,4 +122,21 @@ public sealed class SupplierTests(PostgresFixture postgres)
 
         Assert.Equal(AuthorizationErrors.StepUpRequired, ex.Code);
     }
+
+    [Fact]
+    public async Task An_active_supplier_gets_a_payment_term_that_proposes_its_invoice_due_dates()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var buyer = await h.SessionWithRolesAsync("COMPRADOR");
+        var supplier = await h.CreateActiveSupplierAsync("101000001", "Cementos del Este");
+
+        await h.RunAsync(new SetSupplierPaymentTerms(h.CompanyId, buyer, "terms", supplier, 1, 30), new SetSupplierPaymentTermsHandler());
+        var tooLong = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new SetSupplierPaymentTerms(h.CompanyId, buyer, "long", supplier, 2, 400), new SetSupplierPaymentTermsHandler()));
+        var stale = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new SetSupplierPaymentTerms(h.CompanyId, buyer, "stale", supplier, 1, 45), new SetSupplierPaymentTermsHandler()));
+        await h.RunAsync(new SetSupplierPaymentTerms(h.CompanyId, buyer, "clear", supplier, 2, null), new SetSupplierPaymentTermsHandler());
+        await h.RunAsync(new SetSupplierPaymentTerms(h.CompanyId, buyer, "again", supplier, 3, 45), new SetSupplierPaymentTermsHandler());
+
+        Assert.Equal((MasterDataErrors.FieldRequired, MasterDataErrors.VersionConflict), (tooLong.Code, stale.Code));
+        Assert.Equal("ACTIVE:45:4", await h.ScalarAsync<string>($"SELECT status::text || ':' || supplier_payment_terms_days || ':' || version FROM md.party WHERE party_id = '{supplier}'"));
+    }
 }

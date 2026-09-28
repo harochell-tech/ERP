@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lineStatusLabel, statusLabel, statusTone } from "@/lib/labels";
+import { addDays, lineStatusLabel, statusLabel, statusTone } from "@/lib/labels";
 
 // E-UI-5: treasury labels and the colour tone that always travels with them.
 describe("treasury labels", () => {
@@ -30,5 +30,11 @@ describe("treasury labels", () => {
       "reversed",
       "neutral",
     ]);
+  });
+});
+
+describe("addDays", () => {
+  it("adds calendar days across months and years", () => {
+    expect([addDays("2026-09-28", 30), addDays("2026-12-15", 30), addDays("2028-02-28", 1)]).toEqual(["2026-10-28", "2027-01-14", "2028-02-29"]);
   });
 });

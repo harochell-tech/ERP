@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Rochell.Sales</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Module rule (E-VS3-02-2): Sales may use Platform, Finance, Inventory, MasterData and Tax (as Procurement). -->
+    <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+    <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
+    <ProjectReference Include="..\Rochell.Inventory\Rochell.Inventory.csproj" />
+    <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
+    <ProjectReference Include="..\Rochell.Tax\Rochell.Tax.csproj" />
+  </ItemGroup>
+</Project>

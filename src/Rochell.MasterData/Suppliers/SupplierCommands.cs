@@ -10,3 +10,6 @@ public sealed record UpdateSupplier(Guid CompanyId, Guid SessionId, string Idemp
 
 /// <summary>DRAFT → ACTIVE; the Controller's activation is the approval in VS#1 (E-PR04-3).</summary>
 public sealed record ActivateSupplier(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, long ExpectedVersion) : ICommand;
+
+/// <summary>E-VS3-17 (b), E-VS3-02-10: the supplier's payment term in days (0–365, null clears it), at any time.</summary>
+public sealed record SetSupplierPaymentTerms(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, long ExpectedVersion, int? PaymentTermsDays) : ICommand;

@@ -138,3 +138,52 @@ public sealed class ActivateSupplierHandler : ICommandHandler<ActivateSupplier>
         return JsonSerializer.Serialize(new { partyId = command.PartyId, status = "ACTIVE", version = newVersion });
     }
 }
+
+[RequiresPermission("supplier:update")]
+public sealed class SetSupplierPaymentTermsHandler : ICommandHandler<SetSupplierPaymentTerms>
+{
+    public string CommandType => "MasterData.SetSupplierPaymentTerms";
+
+    public async Task<string> HandleAsync(SetSupplierPaymentTerms command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        if (command.PaymentTermsDays is < 0 or > 365)
+        {
+            throw new DomainException(MasterDataErrors.FieldRequired, "Payment terms are 0 to 365 days.");
+        }
+
+        await using (var read = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT is_supplier, version FROM md.party WHERE company_id = @c AND party_id = @p FOR UPDATE",
+            ("c", context.CompanyId),
+            ("p", command.PartyId)))
+        await using (var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || !reader.GetBoolean(0))
+            {
+                throw new DomainException(MasterDataErrors.NotFound, "The supplier does not exist.");
+            }
+
+            if (reader.GetInt64(1) != command.ExpectedVersion)
+            {
+                throw new DomainException(MasterDataErrors.VersionConflict, $"The supplier changed (version {reader.GetInt64(1)}, expected {command.ExpectedVersion}); reload and retry.");
+            }
+        }
+
+        var newVersion = command.ExpectedVersion + 1;
+        await context.AppendEventAsync(
+            new EventDraft("SupplierPaymentTermsSet", 1, SupplierRules.Aggregate, command.PartyId, newVersion, JsonSerializer.Serialize(new { partyId = command.PartyId, paymentTermsDays = command.PaymentTermsDays }), Publish: false),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE md.party SET supplier_payment_terms_days = @days, version = @version WHERE party_id = @id",
+            cancellationToken,
+            ("days", command.PaymentTermsDays),
+            ("version", newVersion),
+            ("id", command.PartyId)).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { partyId = command.PartyId, paymentTermsDays = command.PaymentTermsDays, version = newVersion });
+    }
+}

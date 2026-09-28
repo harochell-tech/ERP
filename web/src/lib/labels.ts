@@ -122,3 +122,9 @@ export const ROLES: Readonly<Record<string, string>> = {
   FACTURACION: "Facturación",
   COBROS: "Cobros",
 };
+
+/** A yyyy-MM-dd date plus whole days (calendar arithmetic, no time zone involved). */
+export function addDays(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, (day ?? 1) + days)).toISOString().slice(0, 10);
+}

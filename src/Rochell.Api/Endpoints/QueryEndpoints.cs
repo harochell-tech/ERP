@@ -10,6 +10,7 @@ using Rochell.MasterData.Queries;
 using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
+using Rochell.Sales.Queries;
 using Rochell.Tax;
 using Rochell.Treasury.Queries;
 using Rochell.Treasury.Statements;
@@ -45,6 +46,8 @@ public static class QueryEndpoints
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
+        typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
+        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler),
         typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
@@ -95,6 +98,33 @@ public static class QueryEndpoints
         reconciliation.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetReconciliationRunHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetReconciliationRun(companyId, s, runId), handler, ct))
             .Describe<ReconciliationRunDetail>(nameof(GetReconciliationRun), notFound: true);
+
+        // E-VS3-02-11: VS#3 master data (sales:read).
+        var sales = company.MapGroup("/sales").WithTags("Sales");
+        sales.MapGet("/customers", (HttpContext http, Guid companyId, string? status, string? search, int? limit, int? offset, ListCustomersHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListCustomers(companyId, s, status, search, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<CustomerList>(nameof(ListCustomers));
+        sales.MapGet("/customers/{partyId:guid}", (HttpContext http, Guid companyId, Guid partyId, GetCustomerHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetCustomer(companyId, s, partyId), handler, ct))
+            .Describe<CustomerDetail>(nameof(GetCustomer), notFound: true);
+        sales.MapGet("/customer-terms", (HttpContext http, Guid companyId, string? status, ListCustomerTermsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListCustomerTerms(companyId, s, status), handler, ct))
+            .Describe<CustomerTermsList>(nameof(ListCustomerTerms));
+        sales.MapGet("/standard-costs", (HttpContext http, Guid companyId, string? status, Guid? itemId, ListStandardCostsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListStandardCosts(companyId, s, status, itemId), handler, ct))
+            .Describe<StandardCostList>(nameof(ListStandardCosts));
+        sales.MapGet("/price-lists", (HttpContext http, Guid companyId, ListPriceListsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPriceLists(companyId, s), handler, ct))
+            .Describe<PriceListList>(nameof(ListPriceLists));
+        sales.MapGet("/price-lists/{priceListVersionId:guid}", (HttpContext http, Guid companyId, Guid priceListVersionId, GetPriceListHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetPriceList(companyId, s, priceListVersionId), handler, ct))
+            .Describe<PriceListDetail>(nameof(GetPriceList), notFound: true);
+        sales.MapGet("/vehicles", (HttpContext http, Guid companyId, string? status, ListVehiclesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListVehicles(companyId, s, status), handler, ct))
+            .Describe<VehicleList>(nameof(ListVehicles));
+        sales.MapGet("/drivers", (HttpContext http, Guid companyId, string? status, ListDriversHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListDrivers(companyId, s, status), handler, ct))
+            .Describe<DriverList>(nameof(ListDrivers));
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)
