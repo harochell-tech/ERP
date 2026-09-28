@@ -35,8 +35,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["PROBADOR"] = "identity:act_as", // E-B03-14, TEST databases only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
-        ["VENDEDOR"] = "customer:create,customer:update,sales:read", // E-VS3-01-11
-        ["CREDITO"] = "customer:activate,customer_terms:prepare,sales:read",
+        ["VENDEDOR"] = "customer:create,customer:update,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8
+        ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,sales:read",
         ["DESPACHO"] = "fleet:manage,sales:read",
         ["FACTURACION"] = "sales:read",
         ["COBROS"] = "sales:read",
@@ -48,8 +48,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(79L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
-        Assert.Equal(30L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
+        Assert.Equal(82L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
+        Assert.Equal(31L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
         foreach (var (role, permissions) in ExpectedRoles)
         {
             Assert.Equal(permissions, await h.ScalarAsync<string>(

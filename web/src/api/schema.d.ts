@@ -1563,6 +1563,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/create-sales-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateSalesOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/update-sales-order-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UpdateSalesOrderDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/submit-for-credit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SubmitForCredit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/approve-credit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ApproveCredit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/reject-credit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RejectCredit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/cancel-sales-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CancelSalesOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/identity/request-role-assignment": {
         parameters: {
             query?: never;
@@ -1987,6 +2083,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetOpeningBatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListSalesOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/orders/{salesOrderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSalesOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/customers/{partyId}/exposure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCustomerExposure"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2642,6 +2786,12 @@ export interface components {
             /** Format: uuid */
             policyVersionId: string;
         };
+        ApproveCredit: {
+            /** Format: uuid */
+            salesOrderId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         ApproveCustomerTerms: {
             /** Format: uuid */
             termsVersionId: string;
@@ -2855,6 +3005,13 @@ export interface components {
             expectedVersion: number;
             reason: string;
         };
+        CancelSalesOrder: {
+            /** Format: uuid */
+            salesOrderId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            reason: string;
+        };
         CloseBankAccount: {
             /** Format: uuid */
             bankAccountId: string;
@@ -2937,9 +3094,46 @@ export interface components {
             reason: string;
             evidenceReference: string;
         };
+        CreateSalesOrder: {
+            /** Format: uuid */
+            partyId: string;
+            /** Format: uuid */
+            plantId: string;
+            deliveryTermCode: string;
+            siteAddress: null | string;
+            /** Format: date */
+            requestedDate: null | string;
+            customerPoRef: null | string;
+            lines: components["schemas"]["SalesOrderLineInput"][];
+        };
         CreateSupplier: {
             rnc: string;
             legalName: string;
+        };
+        CreditCheckView: {
+            /** Format: uuid */
+            creditCheckId: string;
+            /** Format: date-time */
+            checkedAt: string;
+            /** Format: decimal */
+            orderAmount: string;
+            /** Format: decimal */
+            exposureAr: string;
+            /** Format: decimal */
+            exposureOrders: string;
+            /** Format: decimal */
+            exposureUninvoiced: string;
+            /** Format: decimal */
+            creditLimit: string;
+            creditHold: boolean;
+            /** Format: int32 */
+            overdueDays: number;
+            /** Format: int32 */
+            overdueDaysBlock: number;
+            decision: string;
+            outcome: null | string;
+            decidedBy: null | string;
+            reason: null | string;
         };
         CustomerDetail: {
             /** Format: uuid */
@@ -2957,6 +3151,25 @@ export interface components {
             version: number;
             terms: components["schemas"]["CustomerTermsView"][];
             history: components["schemas"]["StateChange"][];
+        };
+        CustomerExposure: {
+            /** Format: uuid */
+            partyId: string;
+            /** Format: decimal */
+            openAr: string;
+            /** Format: decimal */
+            undeliveredOrders: string;
+            /** Format: decimal */
+            deliveredUninvoiced: string;
+            /** Format: decimal */
+            exposure: string;
+            /** Format: decimal */
+            creditLimit: null | string;
+            creditHold: null | boolean;
+            /** Format: decimal */
+            available: null | string;
+            /** Format: int32 */
+            overdueDays: number;
         };
         CustomerList: {
             items: components["schemas"]["CustomerSummary"][];
@@ -4116,6 +4329,13 @@ export interface components {
             /** Format: decimal */
             capacityKg: string;
         };
+        RejectCredit: {
+            /** Format: uuid */
+            salesOrderId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            reason: string;
+        };
         RejectManualJournal: {
             /** Format: uuid */
             manualJournalId: string;
@@ -4332,6 +4552,72 @@ export interface components {
             /** Format: date */
             cutoffDate?: null | string;
         };
+        SalesOrderDetail: {
+            header: components["schemas"]["SalesOrderSummary"];
+            /** Format: uuid */
+            plantId: string;
+            siteAddress: null | string;
+            /** Format: date */
+            requestedDate: null | string;
+            customerPoRef: null | string;
+            /** Format: uuid */
+            priceListVersionId: string;
+            cancelReason: null | string;
+            lines: components["schemas"]["SalesOrderLineView"][];
+            creditChecks: components["schemas"]["CreditCheckView"][];
+            history: components["schemas"]["StateChange"][];
+        };
+        SalesOrderLineInput: {
+            /** Format: uuid */
+            itemId: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+        };
+        SalesOrderLineView: {
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemDescription: string;
+            uom: string;
+            /** Format: decimal */
+            qtyOrdered: string;
+            /** Format: decimal */
+            unitPrice: string;
+            /** Format: decimal */
+            netAmount: string;
+            /** Format: decimal */
+            qtyDelivered: string;
+            /** Format: decimal */
+            qtyInvoiced: string;
+        };
+        SalesOrderList: {
+            items: components["schemas"]["SalesOrderSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        SalesOrderSummary: {
+            /** Format: uuid */
+            salesOrderId: string;
+            orderNo: string;
+            /** Format: date */
+            orderDate: string;
+            /** Format: uuid */
+            partyId: string;
+            customerName: string;
+            plantCode: string;
+            deliveryTermCode: string;
+            /** Format: decimal */
+            totalNet: string;
+            status: string;
+            createdBy: null | string;
+            /** Format: int64 */
+            version: number;
+        };
         SessionAssignment: {
             roleCode: string;
             roleName: string;
@@ -4423,6 +4709,12 @@ export interface components {
             /** Format: decimal */
             amount: string;
             accounts: components["schemas"]["StatementAccount"][];
+        };
+        SubmitForCredit: {
+            /** Format: uuid */
+            salesOrderId: string;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         SubmitManualJournal: {
             /** Format: uuid */
@@ -4662,6 +4954,20 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             lines: components["schemas"]["PurchaseOrderLineInput"][];
+        };
+        UpdateSalesOrderDraft: {
+            /** Format: uuid */
+            salesOrderId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: uuid */
+            plantId: string;
+            deliveryTermCode: string;
+            siteAddress: null | string;
+            /** Format: date */
+            requestedDate: null | string;
+            customerPoRef: null | string;
+            lines: components["schemas"]["SalesOrderLineInput"][];
         };
         UpdateSupplier: {
             /** Format: uuid */
@@ -11819,6 +12125,462 @@ export interface operations {
             };
         };
     };
+    CreateSalesOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSalesOrder"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateSalesOrderDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSalesOrderDraft"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SubmitForCredit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitForCredit"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ApproveCredit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveCredit"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RejectCredit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectCredit"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CancelSalesOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelSalesOrder"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RequestRoleAssignment: {
         parameters: {
             query?: never;
@@ -13341,6 +14103,178 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OpeningBatchDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSalesOrders: {
+        parameters: {
+            query?: {
+                status?: string;
+                partyId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSalesOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                salesOrderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCustomerExposure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                partyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerExposure"];
                 };
             };
             /** @description Bad Request */
