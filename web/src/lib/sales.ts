@@ -1,0 +1,52 @@
+// VS3-10a: pure helpers of the sales and dispatch screens (unit-tested; no money or quantity arithmetic).
+
+/** A file's bytes as base64, for commands that carry a small file (the opening CSV, E-VS3-02b-3). */
+export function bytesToBase64(bytes: ArrayBuffer): string {
+  let binary = "";
+  const view = new Uint8Array(bytes);
+  for (let i = 0; i < view.length; i += 0x8000) {
+    binary += String.fromCharCode(...view.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+export type DeliveryStep = "START_LOADING" | "CONFIRM_LOADED" | "GATE_OUT" | "POD" | null;
+
+/** E-VS3-04-14: the dispatcher's next step for a delivery in each status; a pickup is delivered at the gate. */
+export function nextDeliveryStep(status: string): DeliveryStep {
+  switch (status) {
+    case "PLANNED":
+      return "START_LOADING";
+    case "LOADING":
+      return "CONFIRM_LOADED";
+    case "LOADED":
+      return "GATE_OUT";
+    case "IN_TRANSIT":
+      return "POD";
+    default:
+      return null;
+  }
+}
+
+/** Board columns of the dispatch screen (E-VS3-10-5), in the order the work flows. */
+export const BOARD_COLUMNS: readonly { status: string; title: string }[] = [
+  { status: "PLANNED", title: "Planificados" },
+  { status: "LOADING", title: "Cargando" },
+  { status: "LOADED", title: "Cargados" },
+  { status: "IN_TRANSIT", title: "En tránsito" },
+];
+
+/** A delivery can still be cancelled (reason required) before it leaves through the gate. */
+export function cancellable(status: string): boolean {
+  return status === "PLANNED" || status === "LOADING" || status === "LOADED";
+}
+
+/** Order statuses where the Vendedor may still cancel (the server decides; this only hides the button). */
+export function orderCancellable(status: string): boolean {
+  return status === "DRAFT" || status === "PENDING_CREDIT" || status === "CONFIRMED";
+}
+
+/** Orders that dispatch can plan deliveries for. */
+export function orderDispatchable(status: string): boolean {
+  return status === "CONFIRMED" || status === "PARTIALLY_DELIVERED";
+}

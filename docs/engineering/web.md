@@ -90,6 +90,26 @@ de reporte, Mapas, Reglas, Políticas (`configuration:read`, which the Contador 
 CSV links are plain `GET …?format=csv` (the session cookie goes with them). The dev stack classes every account by its first
 digit and seeds approved structures and a Contador.
 
+## Sales screens (VS3-10a, E-VS3-10-1…13)
+
+Menu **Ventas** (Pedidos, Clientes), **Despacho** (Tablero de despacho); **Maestros** adds Productos terminados, Costos estándar,
+Lista de precios, Vehículos y choferes; **Contabilidad** adds Apertura de inventario. Plants and locations come from
+`GET /sales/plants` (`sales:read`), so sellers and dispatchers need no `master_data:read` (E-VS3-10-13).
+
+| Page | What it does |
+| --- | --- |
+| `/ventas/clientes/`, `/ventas/cliente/?id=` | List and search; create (`customer:create`); edit contact data (RNC and name only while DRAFT); credit exposure; prepare terms (`customer_terms:prepare`), approve DRAFT terms (`customer_terms:approve`, step-up); activate (`customer:activate`, step-up) |
+| `/maestros/productos-terminados/` | Finished goods: create (`item:create`, category BLOQUE / ADOQUIN / OTRO_PT), activate (`item:activate`) |
+| `/maestros/costos-estandar/` | Versions; prepare (`standard_cost:prepare`: product, area by plant, unit cost), approve (`standard_cost:approve`) |
+| `/maestros/precios/` | Versions with their lines; "Preparar nueva lista" starts from the list in force (`price_list:prepare`); approve (`price_list:approve`) |
+| `/maestros/flota/` | Vehicles (plate, capacity) and drivers (cédula): register, change, activate / deactivate (`fleet:manage`) |
+| `/contabilidad/apertura/`, `/contabilidad/apertura-lote/?id=` | Opening batches from a CSV sent base64 (`opening_inventory:prepare`); post (OPEN-INV) or reverse with a reason (`opening_inventory:post`, step-up) |
+| `/ventas/pedidos/`, `/ventas/pedidos/nuevo/[?id=]`, `/ventas/pedido/?id=` | List by status; DRAFT form (products of the price list in force; the total is the server's); detail with lines, credit checks and exposure: edit / submit / cancel (Vendedor), approve (step-up) / reject (Crédito), close short (`sales_order:close`), plan a delivery (`delivery:manage`) |
+| `/despacho/tablero/`, `/despacho/planificar/?pedido=`, `/despacho/conduce/?id=` | Orders to dispatch and deliveries by status; plan quantities per order line; the delivery's next step (start loading with our truck or the customer's plate, source location per line, weighing and gate with the ticket's SHA-256, POD with receiver, time, evidence and received / returned per line), return trip and cancel with a reason |
+
+The screens never add or multiply amounts or quantities: ordered and delivered are shown side by side and the server refuses
+what exceeds the open quantity. `lib/sales.ts` holds the pure helpers (base64 of the opening file, the next dispatch step).
+
 ## Local development (E-PR18b-9)
 
 `tests/Rochell.DevStack` starts PostgreSQL 17 in Docker, applies every migration, seeds a company from the test fixtures

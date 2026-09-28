@@ -29,8 +29,20 @@ export const NAV: readonly NavGroup[] = [
       { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
       { href: "/maestros/cuentas-bancarias/", label: "Cuentas bancarias de la empresa", permission: "bank:read" },
       { href: "/maestros/plantas/", label: "Plantas y ubicaciones", permission: "master_data:read" },
+      { href: "/maestros/productos-terminados/", label: "Productos terminados", permission: "master_data:read" },
+      { href: "/maestros/costos-estandar/", label: "Costos estándar", permission: "sales:read" },
+      { href: "/maestros/precios/", label: "Lista de precios", permission: "sales:read" },
+      { href: "/maestros/flota/", label: "Vehículos y choferes", permission: "sales:read" },
     ],
   },
+  {
+    title: "Ventas",
+    items: [
+      { href: "/ventas/pedidos/", label: "Pedidos", permission: "sales:read" },
+      { href: "/ventas/clientes/", label: "Clientes", permission: "sales:read" },
+    ],
+  },
+  { title: "Despacho", items: [{ href: "/despacho/tablero/", label: "Tablero de despacho", permission: "sales:read" }] },
   { title: "Compras", items: [{ href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" }] },
   {
     title: "Almacén",
@@ -67,6 +79,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
       { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
       { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
+      { href: "/contabilidad/apertura/", label: "Apertura de inventario", permission: "configuration:read" },
     ],
   },
   {
@@ -108,6 +121,11 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/cierre/conciliacion/": "/cierre/conciliaciones/",
   "/tesoreria/pago/": "/tesoreria/pagos/",
   "/maestros/proveedor/": "/maestros/proveedores/",
+  "/ventas/cliente/": "/ventas/clientes/",
+  "/ventas/pedido/": "/ventas/pedidos/",
+  "/despacho/conduce/": "/despacho/tablero/",
+  "/despacho/planificar/": "/despacho/tablero/",
+  "/contabilidad/apertura-lote/": "/contabilidad/apertura/",
 };
 
 function isActive(pathname: string, href: string): boolean {

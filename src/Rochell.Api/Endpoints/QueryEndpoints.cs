@@ -51,7 +51,7 @@ public static class QueryEndpoints
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
-        typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler),
+        typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler),
         typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
@@ -105,6 +105,9 @@ public static class QueryEndpoints
 
         // E-VS3-02-11: VS#3 master data (sales:read).
         var sales = company.MapGroup("/sales").WithTags("Sales");
+        sales.MapGet("/plants", (HttpContext http, Guid companyId, ListSalesPlantsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListSalesPlants(companyId, s), handler, ct))
+            .Describe<SalesPlantList>(nameof(ListSalesPlants));
         sales.MapGet("/customers", (HttpContext http, Guid companyId, string? status, string? search, int? limit, int? offset, ListCustomersHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListCustomers(companyId, s, status, search, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<CustomerList>(nameof(ListCustomers));
