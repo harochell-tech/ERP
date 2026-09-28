@@ -37,8 +37,25 @@ public sealed record MatchBankLine(
     long ExpectedPaymentVersion) : ICommand;
 
 /// <summary>
+/// E-VS3-07-10: MatchBankLine for customer receipts. Exactly one of <paramref name="ReceiptId"/> / <paramref name="DepositId"/>, with its
+/// version. A CREDIT line is a TRANSFER receipt of the same account and amount dated within ±10 days of its value date, or a deposit
+/// slip of the same account and total dated within [deposit date, +10 days]; both become MATCHED. A DEBIT line is the bank taking back a
+/// BOUNCED cheque of that account and amount, dated on or after its deposit.
+/// </summary>
+public sealed record MatchBankLineToReceipt(
+    Guid CompanyId,
+    Guid SessionId,
+    string IdempotencyKey,
+    Guid LineId,
+    long ExpectedLineVersion,
+    Guid? ReceiptId,
+    Guid? DepositId,
+    long ExpectedVersion) : ICommand;
+
+/// <summary>
 /// MATCHED → UNMATCHED with step-up and a reason; the payment goes back from CLEARED to RELEASED (E-VS2-01-11, E-VS2-05-8). The
-/// DEBIT line of a reversed payment stays matched (E-VS2-04-1); its return (CREDIT) can be unmatched, the payment unchanged.
+/// DEBIT line of a reversed payment stays matched (E-VS2-04-1); its return (CREDIT) can be unmatched, the payment unchanged. A receipt's
+/// or deposit's line goes back too, and the receipt or deposit (with its receipts) returns to DEPOSITED; a bounce line only unmatches.
 /// </summary>
 public sealed record UnmatchBankLine(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid LineId, long ExpectedVersion, string Reason) : ICommand;
 

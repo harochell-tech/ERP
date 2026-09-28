@@ -283,19 +283,8 @@ public sealed class IssueCreditNoteHandler : ICommandHandler<IssueCreditNote>
         await context.AppendStateAsync(Crediting.Aggregate, command.CreditNoteId, "DOCUMENT", "DRAFT", "CONFIRMED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(Crediting.Aggregate, command.CreditNoteId, "ACCOUNTING", "NOT_POSTED", "POSTED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
 
-        // E-VS3-06-4: fully credited → CREDITED.
-        var credited = await SalesSql.ScalarAsync<decimal?>(
-            context, "SELECT sum(total) FROM sal.credit_note WHERE invoice_id = @i AND commercial_status = 'CONFIRMED'", cancellationToken, ("i", invoiceId)).ConfigureAwait(false) ?? 0m;
-        var invoiceStatus = invoice.Commercial;
-        if (credited == invoice.Total)
-        {
-            var creditedEvent = await context.AppendEventAsync(
-                new EventDraft("InvoiceCredited", 1, Invoicing.Aggregate, invoiceId, invoice.Version + 1, JsonSerializer.Serialize(new { invoiceId, invoiceNo = invoice.InvoiceNo, creditNoteId = command.CreditNoteId }), Publish: true),
-                cancellationToken).ConfigureAwait(false);
-            await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE sal.invoice SET commercial_status = 'CREDITED', version = version + 1 WHERE invoice_id = @i", cancellationToken, ("i", invoiceId)).ConfigureAwait(false);
-            await context.AppendStateAsync(Invoicing.Aggregate, invoiceId, "DOCUMENT", invoice.Commercial, "CREDITED", CommandType, creditedEvent, cancellationToken).ConfigureAwait(false);
-            invoiceStatus = "CREDITED";
-        }
+        // E-VS3-06-4 / E-VS3-07-11: fully credited → CREDITED; a partly paid invoice the note closes → PAID.
+        var invoiceStatus = await InvoiceStanding.RefreshAsync(context, invoiceId, CommandType, eventId, cancellationToken).ConfigureAwait(false);
 
         var journal = await _engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { creditNoteId = command.CreditNoteId, commercialStatus = "CONFIRMED", accountingStatus = "POSTED", fiscalStatus = "PENDING_EXTERNAL", invoiceStatus, journalId = journal.JournalId, version });

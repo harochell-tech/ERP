@@ -27,4 +27,6 @@ public static class StatementErrors
     public const string DateOutsideWindow = "MATCH_DATE_OUTSIDE_WINDOW";
     public const string ReasonRequired = "REASON_REQUIRED";
     public const string AmountInvalid = "AMOUNT_INVALID";
+    public const string ReceiptNotMatchable = "RECEIPT_NOT_MATCHABLE";
+    public const string MatchTargetRequired = "MATCH_TARGET_REQUIRED";
 }
