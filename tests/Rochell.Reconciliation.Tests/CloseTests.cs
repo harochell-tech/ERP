@@ -60,7 +60,9 @@ public sealed class CloseTests(PostgresFixture postgres)
         await h.RunAsync(new PostSupplierInvoice(h.CompanyId, s.Clerk, "p", si, 2), new PostSupplierInvoiceHandler());
         await h.CreateActivePolicyAsync("REVENUE_ACCOUNTING", new Dictionary<string, string>
         {
-            ["unbilled_delivery_presentation"] = "CONTRACT_ASSET", ["unbilled_aging_alert_days"] = "30", ["delivery_open_alert_hours"] = "24", // DELIVERY-OPEN reads it
+            ["unbilled_delivery_presentation"] = "CONTRACT_ASSET",
+            ["unbilled_aging_alert_days"] = "30",
+            ["delivery_open_alert_hours"] = "24", // DELIVERY-OPEN reads it
         });
 
         var result = await ReconcileAsync(h, s.Purchasing.Controller, "rec");
