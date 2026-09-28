@@ -157,7 +157,7 @@ public sealed class GetCustomerExposureHandler : IQueryHandler<GetCustomerExposu
             throw new DomainException(QueryErrors.NotFound, "The customer does not exist.");
         }
 
-        var parts = await CreditExposure.ComputeAsync(context.Connection, context.Transaction, context.CompanyId, query.PartyId, null, cancellationToken).ConfigureAwait(false);
+        var parts = await CreditExposure.ComputeAsync(context.Connection, context.Transaction, context.CompanyId, query.PartyId, null, Platform.Time.BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow), cancellationToken).ConfigureAwait(false);
         var (_, limit, hold) = terms[0];
         return ApiJson.Serialize(new CustomerExposure(query.PartyId, parts.OpenAr, parts.UndeliveredOrders, parts.DeliveredUninvoiced, parts.Total, limit, hold, limit - parts.Total, parts.OverdueDays));
     }

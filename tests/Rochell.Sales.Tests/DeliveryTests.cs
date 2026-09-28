@@ -18,15 +18,15 @@ namespace Rochell.Sales.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class DeliveryTests(PostgresFixture postgres)
 {
-    private const string Hash = "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef";
+    internal const string Hash = "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef";
 
-    private sealed record Setup(Guid Seller, Guid Credit, Guid Dispatch, Guid Customer, Guid Plant, Guid Patio, Guid Block, Guid Truck, Guid Driver, Dictionary<string, Guid> Accounts);
+    internal sealed record Setup(Guid Seller, Guid Credit, Guid Dispatch, Guid Customer, Guid Plant, Guid Patio, Guid Block, Guid Truck, Guid Driver, Dictionary<string, Guid> Accounts);
 
     /// <summary>
     /// 2,000 blocks opened at the 32.75 standard cost (lots AP-…-1: 1,200 and AP-…-2: 800, value 65,500.00), a price of 50.00 per
     /// block, an ACTIVE customer with a 1,000,000.00 limit, our truck of 12,000 kg and its driver; every VS#3 rule approved.
     /// </summary>
-    private static async Task<Setup> SetupAsync(TestHarness h, string presentation = "CONTRACT_ASSET")
+    internal static async Task<Setup> SetupAsync(TestHarness h, string presentation = "CONTRACT_ASSET")
     {
         var today = BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
         for (var y = today.Year - 1; y <= today.Year + 1; y++)
@@ -42,13 +42,14 @@ public sealed class DeliveryTests(PostgresFixture postgres)
             $"""
             INSERT INTO md.item VALUES ('{block}', '{h.CompanyId}', 'BLOQUE-6', 'Bloque de 6 pulgadas', 'FINISHED_GOOD', 'un', 'BLOQUE', 'ACTIVE', 1);
             UPDATE fin.posting_rule_version v SET status = 'ACTIVE', approved_by = '{h.UserId}'
-            FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND r.code IN ('OPEN-INV', 'P-15', 'P-15R', 'P-16', 'P-30');
+            FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND r.code IN ('OPEN-INV', 'P-15', 'P-15R', 'P-16', 'P-30', 'P-18');
             """);
         var accounts = new Dictionary<string, Guid>();
         foreach (var (role, code, control) in new[]
         {
             ("FINISHED_GOODS", "1350", true), ("FINISHED_GOODS_IN_TRANSIT", "1351", true), ("MIGRATION_CLEARING", "3990", false), ("COGS", "5100", false),
             ("CONTRACT_ASSET", "1240", true), ("UNBILLED_RECEIVABLE", "1245", true), ("REVENUE_PRODUCT", "4100", false), ("TRANSIT_LOSS", "6900", false),
+            ("AR_CONTROL", "1210", true), ("ITBIS_PAYABLE", "2150", false),
         })
         {
             accounts[role] = await h.CreateAccountAsync(code, role, control);
@@ -82,7 +83,7 @@ public sealed class DeliveryTests(PostgresFixture postgres)
         return new Setup(seller, credit, dispatch, customer, plant, patio, block, truck, driver, accounts);
     }
 
-    private static async Task<(Guid Order, Guid Line)> ConfirmedOrderAsync(TestHarness h, Setup s, string term, decimal quantity, string key = "o")
+    internal static async Task<(Guid Order, Guid Line)> ConfirmedOrderAsync(TestHarness h, Setup s, string term, decimal quantity, string key = "o")
     {
         var order = (await h.RunAsync(
             new CreateSalesOrder(h.CompanyId, s.Seller, key, s.Customer, s.Plant, term, term == DeliveryTerms.DeliveredOwnTransport ? "Obra Punta Cana" : null, null, null, [new(s.Block, "un", quantity)]),
@@ -92,7 +93,7 @@ public sealed class DeliveryTests(PostgresFixture postgres)
     }
 
     /// <summary>Plan, load and gate out one delivery; returns it and its line.</summary>
-    private static async Task<(Guid Delivery, Guid Line)> DispatchAsync(TestHarness h, Setup s, Guid order, Guid orderLine, decimal quantity, bool own, string key, decimal netKg = 10000m)
+    internal static async Task<(Guid Delivery, Guid Line)> DispatchAsync(TestHarness h, Setup s, Guid order, Guid orderLine, decimal quantity, bool own, string key, decimal netKg = 10000m)
     {
         var delivery = (await h.RunAsync(new PlanDelivery(h.CompanyId, s.Dispatch, key, order, [new(orderLine, quantity)]), new PlanDeliveryHandler())).ResultRef;
         var line = await h.ScalarAsync<Guid>("SELECT delivery_line_id FROM log.delivery_line WHERE delivery_id = @d", ("d", delivery));
@@ -104,10 +105,10 @@ public sealed class DeliveryTests(PostgresFixture postgres)
         return (delivery, line);
     }
 
-    private static Task<string?> Balance(TestHarness h, Setup s, string role)
+    internal static Task<string?> Balance(TestHarness h, Setup s, string role)
         => h.ScalarAsync<string>("SELECT coalesce(sum(debit - credit), 0)::numeric(19,2)::text FROM fin.gl_entry WHERE account_id = @a", ("a", s.Accounts[role]));
 
-    private static async Task<string> Balances(TestHarness h, Setup s, params string[] roles)
+    internal static async Task<string> Balances(TestHarness h, Setup s, params string[] roles)
         => string.Join('|', await Task.WhenAll(roles.Select(async r => $"{r}={await Balance(h, s, r)}")));
 
     [Trait("AcceptanceVs3", "SAL-03")]

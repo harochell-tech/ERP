@@ -22,6 +22,11 @@ public static class FiscalRuleKinds
 {
     public const string PurchaseItbis = "PURCHASE_ITBIS";
     public const string PurchaseWithholding = "PURCHASE_WITHHOLDING";
+
+    /// <summary>E-VS3-05-1: output ITBIS of sales invoices.</summary>
+    public const string SalesItbis = "SALES_ITBIS";
+
+    public static bool IsSales(string kind) => kind == SalesItbis;
 }
 
 public static class TaxEffects
@@ -29,6 +34,9 @@ public static class TaxEffects
     public const string RecoverableInput = "RECOVERABLE_INPUT";
     public const string NonRecoverableInput = "NON_RECOVERABLE_INPUT";
     public const string Withholding = "WITHHOLDING";
+
+    /// <summary>E-VS3-05-1: ITBIS charged on a sale (payable).</summary>
+    public const string Output = "OUTPUT";
 }
 
 public static class FiscalRuleStatus

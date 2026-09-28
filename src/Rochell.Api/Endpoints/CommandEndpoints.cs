@@ -19,6 +19,7 @@ using Rochell.Reconciliation;
 using Rochell.Sales.Customers;
 using Rochell.Sales.Deliveries;
 using Rochell.Sales.Fleet;
+using Rochell.Sales.Invoices;
 using Rochell.Sales.Opening;
 using Rochell.Sales.Orders;
 using Rochell.Sales.Pricing;
@@ -173,6 +174,10 @@ public static class CommandEndpoints
         sales.MapCommand<RecordReturnTrip, RecordReturnTripHandler>();
         sales.MapCommand<CancelDelivery, CancelDeliveryHandler>();
         sales.MapCommand<CloseShortSalesOrder, CloseShortSalesOrderHandler>();
+        sales.MapCommand<CreateInvoiceFromDeliveries, CreateInvoiceFromDeliveriesHandler>();
+        sales.MapCommand<IssueInvoice, IssueInvoiceHandler>();
+        sales.MapCommand<RecordExternalFiscalDocument, RecordExternalFiscalDocumentHandler>();
+        sales.MapCommand<VoidUnfiscalizedInvoice, VoidUnfiscalizedInvoiceHandler>();
 
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
@@ -210,6 +215,7 @@ public static class CommandEndpoints
         typeof(PrepareOpeningInventoryHandler), typeof(PostOpeningInventoryHandler), typeof(ReverseOpeningInventoryHandler),
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),
         typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
+        typeof(CreateInvoiceFromDeliveriesHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 

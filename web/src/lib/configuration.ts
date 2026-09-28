@@ -7,12 +7,13 @@ export async function sha256Hex(data: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export const FISCAL_RULE_KINDS = ["PURCHASE_ITBIS", "PURCHASE_WITHHOLDING"] as const;
+export const FISCAL_RULE_KINDS = ["PURCHASE_ITBIS", "PURCHASE_WITHHOLDING", "SALES_ITBIS"] as const;
 export type FiscalRuleKind = (typeof FISCAL_RULE_KINDS)[number];
 
 export const FISCAL_KIND_LABELS: Readonly<Record<string, string>> = {
   PURCHASE_ITBIS: "ITBIS de compras",
   PURCHASE_WITHHOLDING: "Retención en compras",
+  SALES_ITBIS: "ITBIS de ventas",
 };
 
 /**
@@ -22,6 +23,7 @@ export const FISCAL_KIND_LABELS: Readonly<Record<string, string>> = {
 export const DEFINITION_TEMPLATES: Readonly<Record<FiscalRuleKind, string>> = {
   PURCHASE_ITBIS: JSON.stringify({ tax_code: "ITBIS", rate: "0.18", effect: "RECOVERABLE_INPUT", exempt_item_categories: [] }, null, 2),
   PURCHASE_WITHHOLDING: JSON.stringify({ tax_code: "RET_ITBIS", rate: "0.30", base: "ITBIS", party_types: ["INDIVIDUAL"] }, null, 2),
+  SALES_ITBIS: JSON.stringify({ tax_code: "ITBIS", rate: "0.18", effect: "OUTPUT", exempt_item_categories: [] }, null, 2),
 };
 
 /** One regression case to start from; the analyst writes the expected taxes the source dictates. */

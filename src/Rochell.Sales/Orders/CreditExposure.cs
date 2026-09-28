@@ -5,8 +5,8 @@ namespace Rochell.Sales.Orders;
 
 /// <summary>
 /// E-VS3-14, E-VS3-03-1/2: exposure = open AR (with ITBIS) + confirmed orders not yet delivered + delivered not yet invoiced
-/// (orders net of ITBIS). Open AR and its overdue days arrive with the receivables of VS3-05/07 (no AR exists before);
-/// the order parts read the current lines of CONFIRMED and PARTIALLY_DELIVERED orders.
+/// (orders net of ITBIS). Open AR and its overdue days read <c>fin.ar_document</c> (VS3-05); the order parts read the current
+/// lines of CONFIRMED, PARTIALLY_DELIVERED and DELIVERED orders.
 /// </summary>
 public static class CreditExposure
 {
@@ -15,7 +15,8 @@ public static class CreditExposure
         public decimal Total => OpenAr + UndeliveredOrders + DeliveredUninvoiced;
     }
 
-    public static async Task<Parts> ComputeAsync(DbConnection connection, DbTransaction transaction, Guid companyId, Guid partyId, Guid? excludeOrderId, CancellationToken cancellationToken)
+    public static async Task<Parts> ComputeAsync(
+        DbConnection connection, DbTransaction transaction, Guid companyId, Guid partyId, Guid? excludeOrderId, DateOnly today, CancellationToken cancellationToken)
     {
         var parts = await Reading.ListAsync(
             connection,
@@ -33,7 +34,21 @@ public static class CreditExposure
             ("c", companyId),
             ("p", partyId),
             ("x", excludeOrderId)).ConfigureAwait(false);
+        var ar = await Reading.ListAsync(
+            connection,
+            transaction,
+            """
+            SELECT coalesce(sum(open_amount), 0)::numeric(19,2),
+                   coalesce(max(CAST(@today AS date) - due_date) FILTER (WHERE open_amount > 0 AND due_date < CAST(@today AS date)), 0)
+            FROM fin.ar_document WHERE company_id = @c AND party_id = @p
+            """,
+            r => (r.GetDecimal(0), r.GetInt32(1)),
+            cancellationToken,
+            ("c", companyId),
+            ("p", partyId),
+            ("today", today)).ConfigureAwait(false);
         var (undelivered, uninvoiced) = parts[0];
-        return new Parts(SalesSql.Zero, undelivered, uninvoiced, 0);
+        var (openAr, overdue) = ar[0];
+        return new Parts(openAr, undelivered, uninvoiced, overdue);
     }
 }

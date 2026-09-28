@@ -49,6 +49,7 @@ public static class QueryEndpoints
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
+        typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
@@ -147,6 +148,18 @@ public static class QueryEndpoints
         sales.MapGet("/deliveries/{deliveryId:guid}", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDelivery(companyId, s, deliveryId), handler, ct))
             .Describe<DeliveryDetail>(nameof(GetDelivery), notFound: true);
+        sales.MapGet("/invoices", (HttpContext http, Guid companyId, string? commercialStatus, string? fiscalStatus, Guid? partyId, int? limit, int? offset, ListInvoicesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListInvoices(companyId, s, commercialStatus, fiscalStatus, partyId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<InvoiceList>(nameof(ListInvoices));
+        sales.MapGet("/invoices/{invoiceId:guid}", (HttpContext http, Guid companyId, Guid invoiceId, GetInvoiceHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetInvoice(companyId, s, invoiceId), handler, ct))
+            .Describe<InvoiceDetail>(nameof(GetInvoice), notFound: true);
+        sales.MapGet("/invoices/{invoiceId:guid}/fiscal-package", (HttpContext http, Guid companyId, Guid invoiceId, GetInvoiceFiscalPackageHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetInvoiceFiscalPackage(companyId, s, invoiceId), handler, ct))
+            .Describe<InvoiceFiscalPackage>(nameof(GetInvoiceFiscalPackage), notFound: true);
+        sales.MapGet("/billable-deliveries", (HttpContext http, Guid companyId, Guid? partyId, ListBillableDeliveriesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListBillableDeliveries(companyId, s, partyId), handler, ct))
+            .Describe<BillableDeliveryList>(nameof(ListBillableDeliveries));
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)

@@ -8,6 +8,7 @@ namespace Rochell.Tax;
 /// E-PR12-3: declarative definition of a purchase fiscal rule. Every normative value (code, rate, exemptions, who is
 /// withheld) comes from the activated definition, never from code.
 /// PURCHASE_ITBIS: {"tax_code","rate","effect" (RECOVERABLE_INPUT | NON_RECOVERABLE_INPUT), "exempt_item_categories"?}.
+/// SALES_ITBIS (E-VS3-05-1): {"tax_code","rate","effect" (OUTPUT), "exempt_item_categories"?}.
 /// PURCHASE_WITHHOLDING: {"tax_code","rate","base" (NET | ITBIS),"party_types" (COMPANY | INDIVIDUAL)}.
 /// Rates are decimal strings (E-PR06-5), 0 &lt; rate ≤ 1, at most 6 decimals.
 /// </summary>
@@ -21,7 +22,10 @@ public sealed record FiscalRuleDefinition(
     IReadOnlySet<string> PartyTypes)
 {
     /// <summary>The closed item category list of md.item (E-PR04-7).</summary>
-    public static readonly IReadOnlySet<string> ItemCategories = new HashSet<string>(StringComparer.Ordinal) { "CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA" };
+    public static readonly IReadOnlySet<string> ItemCategories = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA", "BLOQUE", "ADOQUIN", "OTRO_PT", // finished goods since E-VS3-05-1
+    };
 
     private static readonly string[] ItbisKeys = ["tax_code", "rate", "effect", "exempt_item_categories"];
     private static readonly string[] WithholdingKeys = ["tax_code", "rate", "base", "party_types"];
@@ -45,7 +49,7 @@ public sealed record FiscalRuleDefinition(
 
         var allowed = kind switch
         {
-            FiscalRuleKinds.PurchaseItbis => ItbisKeys,
+            FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis => ItbisKeys,
             FiscalRuleKinds.PurchaseWithholding => WithholdingKeys,
             _ => throw Invalid($"Unknown rule kind {kind}."),
         };
@@ -66,12 +70,17 @@ public sealed record FiscalRuleDefinition(
             throw Invalid("rate must be a decimal string greater than 0 and at most 1, with at most 6 decimals.");
         }
 
-        if (kind == FiscalRuleKinds.PurchaseItbis)
+        if (kind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis)
         {
             var effect = RequiredString(root, "effect");
-            if (effect is not (TaxEffects.RecoverableInput or TaxEffects.NonRecoverableInput))
+            if (kind == FiscalRuleKinds.PurchaseItbis && effect is not (TaxEffects.RecoverableInput or TaxEffects.NonRecoverableInput))
             {
                 throw Invalid("effect must be RECOVERABLE_INPUT or NON_RECOVERABLE_INPUT.");
+            }
+
+            if (kind == FiscalRuleKinds.SalesItbis && effect != TaxEffects.Output)
+            {
+                throw Invalid("effect of SALES_ITBIS must be OUTPUT.");
             }
 
             var exempt = root.TryGetProperty("exempt_item_categories", out var categories) ? StringSet(categories, "exempt_item_categories", ItemCategories) : new HashSet<string>(StringComparer.Ordinal);
