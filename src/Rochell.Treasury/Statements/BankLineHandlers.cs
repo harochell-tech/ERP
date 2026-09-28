@@ -272,6 +272,13 @@ public sealed class UnmatchBankLineHandler : ICommandHandler<UnmatchBankLine>
             throw new DomainException(StatementErrors.ReasonRequired, "Unmatching a line needs a reason (E-VS2-05-8).");
         }
 
+        // E-VS3-07-10: a receipt's or deposit's line.
+        var (receiptId, depositId) = await ReceiptLines.MatchedAsync(context, command.LineId, cancellationToken).ConfigureAwait(false);
+        if (receiptId is not null || depositId is not null)
+        {
+            return await ReceiptUnmatching.UnmatchAsync(command, context, receiptId, depositId, reason, CommandType, cancellationToken).ConfigureAwait(false);
+        }
+
         // Lock order (E-VS2-05-8): payment → statement line → bank account. The line names its payment; it is read again under lock.
         var paymentId = await BankLines.MatchedPaymentAsync(context, command.LineId, cancellationToken).ConfigureAwait(false);
         var payment = paymentId is { } p ? await BankLines.LockPaymentAsync(context, p, cancellationToken).ConfigureAwait(false) : null;

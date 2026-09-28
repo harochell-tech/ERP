@@ -7,7 +7,9 @@ namespace Rochell.Sales.Queries;
 
 // E-VS3-05-14: invoices, their fiscal package and what can be billed, read with sales:read.
 
-public sealed record ListInvoices(Guid CompanyId, Guid SessionId, string? CommercialStatus = null, string? FiscalStatus = null, Guid? PartyId = null, int Limit = 50, int Offset = 0) : IQuery;
+/// <summary><paramref name="OpenOnly"/> (E-VS3-07-14): issued invoices with an open amount, to apply receipts to.</summary>
+public sealed record ListInvoices(
+    Guid CompanyId, Guid SessionId, string? CommercialStatus = null, string? FiscalStatus = null, Guid? PartyId = null, int Limit = 50, int Offset = 0, bool OpenOnly = false) : IQuery;
 
 public sealed record InvoiceSummary(
     Guid InvoiceId, string InvoiceNo, DateOnly? InvoiceDate, DateOnly? DueDate, Guid PartyId, string CustomerName, string EcfType, string? Encf, string CommercialStatus,
@@ -47,6 +49,7 @@ public sealed class ListInvoicesHandler : IQueryHandler<ListInvoices>
             InvoiceReading.Select + """
              WHERE i.company_id = @c AND (CAST(@cs AS text) IS NULL OR i.commercial_status = CAST(@cs AS text))
               AND (CAST(@fs AS text) IS NULL OR i.fiscal_status = CAST(@fs AS text)) AND (CAST(@p AS uuid) IS NULL OR i.party_id = CAST(@p AS uuid))
+              AND (NOT @open OR (i.commercial_status IN ('CONFIRMED', 'PARTIALLY_PAID') AND a.open_amount > 0))
             ORDER BY i.invoice_no DESC
             LIMIT @limit OFFSET @offset
             """,
@@ -56,6 +59,7 @@ public sealed class ListInvoicesHandler : IQueryHandler<ListInvoices>
             ("cs", query.CommercialStatus),
             ("fs", query.FiscalStatus),
             ("p", query.PartyId),
+            ("open", query.OpenOnly),
             ("limit", query.Limit),
             ("offset", query.Offset)).ConfigureAwait(false);
         return ApiJson.Serialize(new InvoiceList(items, query.Limit, query.Offset));

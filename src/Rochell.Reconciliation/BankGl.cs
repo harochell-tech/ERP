@@ -26,8 +26,9 @@ public sealed record BankAccountReconciliation(
 /// <item>Statement = closing balance of the latest imported statement covering D, minus the account's lines dated after D within
 /// it (credit − debit). No covering statement while the account has GL movement: STATEMENT_MISSING.</item>
 /// <item>GL items: each BANK entry ≤ D whose statement line is not matched on or before D — R-09 ↔ the payment's DEBIT line, the
-/// R-09 reversal ↔ its CREDIT return line, R-10 ↔ its charge line. A payment and its reversal both in transit cancel out and are
-/// not listed.</item>
+/// R-09 reversal ↔ its CREDIT return line, R-10 ↔ its charge line; E-VS3-07-10: a transfer receipt's P-23 ↔ its CREDIT line, a
+/// deposit's P-29 ↔ its CREDIT line, a bounce's P-24 ↔ its DEBIT line. A payment (or transfer receipt) and its reversal both in
+/// transit cancel out and are not listed.</item>
 /// <item>Line items: each line dated ≤ D without its entry posted ≤ D (unmatched lines, or matched ones posted later).</item>
 /// <item>A BANK entry of no payment or charge is never an item: it shows as a difference.</item>
 /// </list>
@@ -135,11 +136,14 @@ public static class BankGl
                 ("to", covering.To)).ConfigureAwait(false);
             var statement = covering.Closing - after;
 
-            // GL items: entries whose line is not matched on or before D; a payment's R-09 and its reversal both in transit cancel.
+            // GL items: entries whose line is not matched on or before D; a payment's R-09 and its reversal both in transit cancel, and
+            // so do a transfer receipt's P-23 and its reversal (E-VS3-07-10).
             var glItems = entries.Where(e => e.Kind != "UNLINKED_ENTRY" && (e.LineDate is null || e.LineDate > d)).ToList();
             var cancelled = glItems.Where(e => e.PaymentId is not null)
                 .GroupBy(e => e.PaymentId)
-                .Where(g => g.Any(e => e.Kind == "OUTSTANDING_PAYMENT") && g.Any(e => e.Kind == "OUTSTANDING_RETURN") && g.Sum(e => e.Signed) == 0m)
+                .Where(g => ((g.Any(e => e.Kind == "OUTSTANDING_PAYMENT") && g.Any(e => e.Kind == "OUTSTANDING_RETURN"))
+                             || (g.Any(e => e.Kind == "OUTSTANDING_RECEIPT") && g.Any(e => e.Kind == "OUTSTANDING_RECEIPT_REVERSAL")))
+                            && g.Sum(e => e.Signed) == 0m)
                 .SelectMany(g => g)
                 .ToHashSet();
             var glList = glItems.Where(e => !cancelled.Contains(e)).Select(e => new BankItem(e.Kind, e.Reference, e.PostingDate, e.Signed)).ToList();
@@ -186,10 +190,14 @@ public static class BankGl
                    CASE WHEN pay.payment_id IS NOT NULL THEN 'OUTSTANDING_PAYMENT'
                         WHEN rev.payment_id IS NOT NULL THEN 'OUTSTANDING_RETURN'
                         WHEN chg.line_id IS NOT NULL THEN 'OUTSTANDING_CHARGE'
+                        WHEN rc.receipt_id IS NOT NULL THEN 'OUTSTANDING_RECEIPT'
+                        WHEN rr.receipt_id IS NOT NULL THEN 'OUTSTANDING_RECEIPT_REVERSAL'
+                        WHEN rb.receipt_id IS NOT NULL THEN 'OUTSTANDING_BOUNCE'
+                        WHEN dp.deposit_id IS NOT NULL THEN 'OUTSTANDING_DEPOSIT'
                         ELSE 'UNLINKED_ENTRY' END,
-                   coalesce(pay.payment_no, rev.payment_no, chg.line_id::text, e.gl_entry_id::text),
-                   coalesce(dl.value_date, cl.value_date, chg.value_date),
-                   coalesce(pay.payment_id, rev.payment_id)
+                   coalesce(pay.payment_no, rev.payment_no, chg.line_id::text, rc.receipt_no, rr.receipt_no, rb.receipt_no, dp.deposit_no, e.gl_entry_id::text),
+                   coalesce(dl.value_date, cl.value_date, chg.value_date, rcl.value_date, rbl.value_date, dpl.value_date),
+                   coalesce(pay.payment_id, rev.payment_id, rc.receipt_id, rr.receipt_id)
             FROM fin.gl_entry e
             JOIN fin.gl_journal j ON j.journal_id = e.journal_id
             LEFT JOIN fin.gl_journal o ON o.journal_id = j.reverses_journal_id
@@ -198,6 +206,13 @@ public static class BankGl
             LEFT JOIN fin.bank_statement_line dl ON dl.matched_payment_id = pay.payment_id AND dl.direction = 'DEBIT' AND dl.status = 'MATCHED'
             LEFT JOIN fin.bank_statement_line cl ON cl.matched_payment_id = rev.payment_id AND cl.direction = 'CREDIT' AND cl.status = 'MATCHED'
             LEFT JOIN fin.bank_statement_line chg ON chg.company_id = e.company_id AND chg.status = 'CHARGE_RECOGNIZED' AND chg.charge_event_id = j.source_event_id
+            LEFT JOIN fin.receipt rc ON j.journal_type = 'AUTO' AND rc.company_id = e.company_id AND rc.posting_event_id = j.source_event_id
+            LEFT JOIN fin.receipt rr ON j.journal_type = 'REVERSAL' AND rr.company_id = e.company_id AND rr.posting_event_id = o.source_event_id
+            LEFT JOIN fin.receipt rb ON j.journal_type = 'AUTO' AND rb.company_id = e.company_id AND rb.status = 'BOUNCED' AND rb.closing_event_id = j.source_event_id
+            LEFT JOIN fin.receipt_deposit dp ON j.journal_type = 'AUTO' AND dp.company_id = e.company_id AND dp.posting_event_id = j.source_event_id
+            LEFT JOIN fin.bank_statement_line rcl ON rcl.matched_receipt_id = rc.receipt_id AND rcl.direction = 'CREDIT'
+            LEFT JOIN fin.bank_statement_line rbl ON rbl.matched_receipt_id = rb.receipt_id AND rbl.direction = 'DEBIT'
+            LEFT JOIN fin.bank_statement_line dpl ON dpl.matched_deposit_id = dp.deposit_id
             WHERE e.company_id = @c AND e.subledger_type = 'BANK' AND e.subledger_ref = @b AND e.posting_date <= @d
             ORDER BY e.posting_date, e.gl_entry_id
             """,
@@ -214,7 +229,15 @@ public static class BankGl
             context.Transaction,
             """
             SELECT l.line_id, l.value_date, CASE WHEN l.direction = 'CREDIT' THEN l.amount ELSE -l.amount END, l.status,
-                   CASE WHEN l.status = 'CHARGE_RECOGNIZED' THEN
+                   CASE WHEN l.matched_receipt_id IS NOT NULL THEN
+                          (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
+                           JOIN fin.receipt r ON j.source_event_id = CASE WHEN l.direction = 'CREDIT' THEN r.posting_event_id ELSE r.closing_event_id END
+                           WHERE r.receipt_id = l.matched_receipt_id AND j.journal_type = 'AUTO' AND e.subledger_type = 'BANK')
+                        WHEN l.matched_deposit_id IS NOT NULL THEN
+                          (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
+                           JOIN fin.receipt_deposit d ON d.posting_event_id = j.source_event_id
+                           WHERE d.deposit_id = l.matched_deposit_id AND j.journal_type = 'AUTO' AND e.subledger_type = 'BANK')
+                        WHEN l.status = 'CHARGE_RECOGNIZED' THEN
                           (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
                            WHERE j.source_event_id = l.charge_event_id AND j.journal_type = 'AUTO' AND e.subledger_type = 'BANK')
                         WHEN l.status = 'MATCHED' AND l.direction = 'DEBIT' THEN

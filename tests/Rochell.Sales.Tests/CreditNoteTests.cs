@@ -82,8 +82,9 @@ public sealed class CreditNoteTests(PostgresFixture postgres)
         Assert.Equal(("ACCEPTED_EXTERNAL", "E340000000001", "E310000000001", "Z9Y8X7"), (detail.GetProperty("header").GetProperty("fiscalStatus").GetString(),
             detail.GetProperty("header").GetProperty("encf").GetString(), detail.GetProperty("header").GetProperty("invoiceEncf").GetString(),
             detail.GetProperty("fiscalRecord").GetProperty("securityCode").GetString()));
-        Assert.Equal("DOCUMENT:DRAFT|DOCUMENT:CONFIRMED|ACCOUNTING:POSTED", string.Join('|', detail.GetProperty("history").EnumerateArray()
-            .Select(c => $"{c.GetProperty("statusKind").GetString()}:{c.GetProperty("to").GetString()}")));
+        // The issue writes two rows of one event; their relative order is not defined, so they are compared sorted.
+        Assert.Equal("ACCOUNTING:POSTED|DOCUMENT:CONFIRMED|DOCUMENT:DRAFT", string.Join('|', detail.GetProperty("history").EnumerateArray()
+            .Select(c => $"{c.GetProperty("statusKind").GetString()}:{c.GetProperty("to").GetString()}").Order(StringComparer.Ordinal)));
         var invoice = JsonDocument.Parse(await h.QueryAsync(new GetInvoice(h.CompanyId, w.S.Seller, w.Invoice), new GetInvoiceHandler())).RootElement;
         Assert.Equal(("NC-000001", "5000.00", "45000.00"), (invoice.GetProperty("creditNotes")[0].GetProperty("creditNoteNo").GetString(),
             invoice.GetProperty("creditable")[0].GetProperty("creditedNet").GetString(), invoice.GetProperty("creditable")[0].GetProperty("remainingNet").GetString()));

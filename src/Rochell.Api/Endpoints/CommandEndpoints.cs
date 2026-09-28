@@ -24,6 +24,7 @@ using Rochell.Sales.Invoices;
 using Rochell.Sales.Opening;
 using Rochell.Sales.Orders;
 using Rochell.Sales.Pricing;
+using Rochell.Sales.Receipts;
 using Rochell.Tax;
 using Rochell.Treasury.BankAccounts;
 using Rochell.Treasury.Payments;
@@ -73,6 +74,7 @@ public static class CommandEndpoints
         treasury.MapCommand<ReversePayment, ReversePaymentHandler>();
         treasury.MapCommand<ImportBankStatement, ImportBankStatementHandler>();
         treasury.MapCommand<MatchBankLine, MatchBankLineHandler>();
+        treasury.MapCommand<MatchBankLineToReceipt, MatchBankLineToReceiptHandler>();
         treasury.MapCommand<UnmatchBankLine, UnmatchBankLineHandler>();
         treasury.MapCommand<RecognizeBankCharge, RecognizeBankChargeHandler>();
 
@@ -182,6 +184,14 @@ public static class CommandEndpoints
         sales.MapCommand<CreateCreditNote, CreateCreditNoteHandler>();
         sales.MapCommand<IssueCreditNote, IssueCreditNoteHandler>();
         sales.MapCommand<RecordExternalCreditNoteDocument, RecordExternalCreditNoteDocumentHandler>();
+        sales.MapCommand<RecordReceipt, RecordReceiptHandler>();
+        sales.MapCommand<DepositReceipts, DepositReceiptsHandler>();
+        sales.MapCommand<ApplyReceipt, ApplyReceiptHandler>();
+        sales.MapCommand<UnapplyReceipt, UnapplyReceiptHandler>();
+        sales.MapCommand<MarkReceiptBounced, MarkReceiptBouncedHandler>();
+        sales.MapCommand<ReverseReceipt, ReverseReceiptHandler>();
+        sales.MapCommand<RecordCustomerWithholding, RecordCustomerWithholdingHandler>();
+        sales.MapCommand<ReverseCustomerWithholding, ReverseCustomerWithholdingHandler>();
 
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
@@ -198,7 +208,7 @@ public static class CommandEndpoints
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
-        typeof(ReversePaymentHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(UnmatchBankLineHandler),
+        typeof(ReversePaymentHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(MatchBankLineToReceiptHandler), typeof(UnmatchBankLineHandler),
         typeof(RecognizeBankChargeHandler),
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
@@ -221,6 +231,8 @@ public static class CommandEndpoints
         typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),
+        typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
+        typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 

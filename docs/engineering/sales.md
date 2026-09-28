@@ -161,3 +161,32 @@ invoice first, so two notes of the same invoice are serialized; a DRAFT that ano
 Queries: `GET /sales/credit-notes[/{id}]`, `/sales/credit-notes/{id}/fiscal-package` (with the modified e-NCF); `GetInvoice`
 adds `creditNotes` and `creditable` (per line: credited and remaining net).
 Tests: `CreditNoteTests` (SAL-08, remainder ITBIS and CREDITED, permissions and four eyes, overtaken draft).
+
+## Customer receipts (VS3-07)
+
+Migration `0044__customer_receipts.sql`: `fin.receipt` (REC-…, three status columns: RECORDED / BOUNCED / REVERSED,
+UNAPPLIED / PARTIALLY_APPLIED / APPLIED, IN_TRANSIT / DEPOSITED / MATCHED; ADR-027 on the life cycle, K-25 on P-23 / P-24),
+`fin.receipt_deposit` (DEP-…, total = its receipts, K-25 on P-29), `fin.ar_application` (append-only, an unapply adds the mirror
+row), `fin.customer_withholding` (ACTIVE / REVERSED, certificate unique per customer and kind), statement lines matched to a
+receipt or a deposit, rules P-23, P-24, P-25, P-27, P-29 (DRAFT), permissions and SoD.
+
+| Command | Permission | Effect |
+| --- | --- | --- |
+| `sales/record-receipt` | `receipt:record` | REC-…; P-23: transfer → BANK at its value date, cheque / cash → CASH_IN_TRANSIT; Cr UNAPPLIED_RECEIPTS |
+| `sales/deposit-receipts` | `receipt:deposit` | DEP-… of cheques and cash in transit; P-29 BANK / CASH_IN_TRANSIT |
+| `sales/apply-receipt` | `receipt:apply` | P-25 per invoice; open amounts down; invoice PARTIALLY_PAID / PAID |
+| `sales/unapply-receipt` | `receipt:apply` | Exact reversal of one application's P-25 |
+| `sales/record-customer-withholding` | `customer_withholding:record` | ITBIS or ISR from the certificate; P-27 |
+| `sales/reverse-customer-withholding` (step-up) | `customer_withholding:reverse` | Exact reversal of P-27 |
+| `sales/mark-receipt-bounced` (step-up) | `receipt:bounce` | Deposited cheque: reversals of its live P-25, then P-24; BOUNCED |
+| `sales/reverse-receipt` (step-up) | `receipt:reverse` | Nothing applied, not deposited or matched: exact reversal of P-23; REVERSED |
+| `treasury/match-bank-line-to-receipt` | `bank_line:match` | CREDIT ↔ transfer receipt (±10 days) or deposit (+10 days); DEBIT ↔ bounced cheque |
+
+`UnmatchBankLine` also takes back a receipt's or deposit's line (receipt / deposit and its receipts back to DEPOSITED).
+Lock order: invoices (id order) → AR documents (id order) → receipt → bank account; a bounce refuses if an application was
+added between its read and its locks. The invoice status follows its AR document (`InvoiceStanding`, E-VS3-07-11), also for
+credit notes. BANK-GL items now include `OUTSTANDING_RECEIPT`, `OUTSTANDING_DEPOSIT`, `OUTSTANDING_BOUNCE`, and a transfer
+receipt with its reversal both in transit cancel out.
+
+Queries: `GET /sales/receipts[/{id}]`, `/sales/deposits[/{id}]`, `/sales/invoices?openOnly=true&partyId=`.
+Tests: `ReceiptTests` (AR-01, AR-02, AR-03, concurrent applications, unapply / reverse / withholding corrections).
