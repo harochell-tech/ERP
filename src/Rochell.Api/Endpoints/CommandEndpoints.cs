@@ -50,6 +50,7 @@ public static class CommandEndpoints
         masterData.MapCommand<ActivateSupplier, ActivateSupplierHandler>();
         masterData.MapCommand<SetSupplierPaymentTerms, SetSupplierPaymentTermsHandler>();
         masterData.MapCommand<CreateRawMaterial, CreateRawMaterialHandler>();
+        masterData.MapCommand<CreateFinishedGood, CreateFinishedGoodHandler>();
         masterData.MapCommand<DefineUomConversion, DefineUomConversionHandler>();
         masterData.MapCommand<ActivateItem, ActivateItemHandler>();
         masterData.MapCommand<RequestPartyBankAccount, RequestPartyBankAccountHandler>();
@@ -163,7 +164,7 @@ public static class CommandEndpoints
     /// <summary>Every handler class the host resolves (the verifier is built by <see cref="HashVerification"/>).</summary>
     public static IReadOnlyList<Type> Handlers { get; } =
     [
-        typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler), typeof(CreateRawMaterialHandler),
+        typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler),

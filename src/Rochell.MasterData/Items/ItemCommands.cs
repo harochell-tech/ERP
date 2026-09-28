@@ -13,6 +13,19 @@ public sealed record CreateRawMaterial(
     string ItemCategory) : ICommand;
 
 /// <summary>
+/// E-VS3-02-12: creates a finished good in DRAFT (categories BLOQUE, ADOQUIN, OTRO_PT) with the same permission as raw materials;
+/// the Controller activates it with <see cref="ActivateItem"/>.
+/// </summary>
+public sealed record CreateFinishedGood(
+    Guid CompanyId,
+    Guid SessionId,
+    string IdempotencyKey,
+    string Code,
+    string Description,
+    string BaseUom,
+    string ItemCategory) : ICommand;
+
+/// <summary>
 /// Defines "1 <paramref name="FromUom"/> = <paramref name="Factor"/> base UOM" from <paramref name="EffectiveFrom"/> on
 /// (E-PR04-8: always towards the base UOM; closes the open conversion; never retroactive).
 /// </summary>

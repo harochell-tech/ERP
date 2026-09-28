@@ -364,6 +364,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-02-9 | VS3-02 | Fleet commands with `fleet:manage`: RegisterVehicle (plate normalized to upper case without spaces or dashes), UpdateVehicle (capacity), Deactivate/ActivateVehicle, RegisterDriver (cédula without dashes), UpdateDriver (name), Deactivate/ActivateDriver. |
 | E-VS3-02-10 | VS3-02 | `md.party.supplier_payment_terms_days` (0–365, suppliers only, migration 0038) set by SetSupplierPaymentTerms (`supplier:update`) at any time; the invoice form proposes docDate + days; the API still requires the due date. |
 | E-VS3-02-11 | VS3-02 | Queries with `sales:read`: ListCustomers (status, search), GetCustomer (terms and history), ListCustomerTerms (status), ListStandardCosts, ListPriceLists, GetPriceList, ListVehicles, ListDrivers; the supplier list also returns `paymentTermsDays`. |
+| E-VS3-02-12 | VS3-02 | CreateFinishedGood (code, description, base UoM, category BLOQUE / ADOQUIN / OTRO_PT) with `item:create`, created DRAFT and activated by the Controller with ActivateItem; UoM conversions with DefineUomConversion. |
 
 Implementation rules derived from the above (no architectural change):
 

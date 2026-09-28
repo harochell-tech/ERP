@@ -40,7 +40,7 @@ public sealed class EndpointCoverageTests(PostgresFixture postgres)
 
         Assert.Equal(Handled(typeof(ICommandHandler<>)), commands);
         Assert.Equal(Handled(typeof(IQueryHandler<>)).Select(t => t.Name), queries);
-        Assert.Equal(90, commands.Count); // 44 of VS#1 + 5 of VS2-02 + 4 of VS2-03 + 1 of VS2-04 + 4 of VS2-05 + 1 of UI-01 + 11 of FIN1-02 + 2 of FIN1-03 + 18 of VS3-02
+        Assert.Equal(91, commands.Count); // 44 of VS#1 + 5 of VS2-02 + 4 of VS2-03 + 1 of VS2-04 + 4 of VS2-05 + 1 of UI-01 + 11 of FIN1-02 + 2 of FIN1-03 + 19 of VS3-02
     }
 
     [Fact]

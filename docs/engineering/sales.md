@@ -54,8 +54,9 @@ Module `Rochell.Sales` (E-VS3-02-2). Migration `0038__supplier_payment_terms.sql
 | `prepare-price-list`, `approve-price-list` | `price_list:*` (+ step-up to approve) | A new DRAFT with all its lines; approval replaces the list in force |
 | `register-vehicle`, `update-vehicle`, `deactivate-vehicle`, `activate-vehicle`, `register-driver`, `update-driver`, `deactivate-driver`, `activate-driver` | `fleet:manage` | Fleet master data |
 | `/master-data/set-supplier-payment-terms` | `supplier:update` | Supplier's payment days (null clears); the invoice form proposes the due date |
+| `/master-data/create-finished-good` | `item:create` | Finished good in DRAFT (BLOQUE, ADOQUIN, OTRO_PT); `activate-item` (Controller) activates it (E-VS3-02-12) |
 
 Queries (`sales:read`): `GET /sales/customers[/{partyId}]`, `/sales/customer-terms`, `/sales/standard-costs`,
 `/sales/price-lists[/{id}]`, `/sales/vehicles`, `/sales/drivers`.
 
-Tests: `CustomerTests`, `PricingTests`, `FleetTests` (`tests/Rochell.Sales.Tests`), `SupplierTests` (payment terms).
+Tests: `CustomerTests`, `PricingTests`, `FleetTests` (`tests/Rochell.Sales.Tests`), `SupplierTests` (payment terms), `ItemTests` (finished goods).
