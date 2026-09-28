@@ -365,6 +365,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-02-10 | VS3-02 | `md.party.supplier_payment_terms_days` (0–365, suppliers only, migration 0038) set by SetSupplierPaymentTerms (`supplier:update`) at any time; the invoice form proposes docDate + days; the API still requires the due date. |
 | E-VS3-02-11 | VS3-02 | Queries with `sales:read`: ListCustomers (status, search), GetCustomer (terms and history), ListCustomerTerms (status), ListStandardCosts, ListPriceLists, GetPriceList, ListVehicles, ListDrivers; the supplier list also returns `paymentTermsDays`. |
 | E-VS3-02-12 | VS3-02 | CreateFinishedGood (code, description, base UoM, category BLOQUE / ADOQUIN / OTRO_PT) with `item:create`, created DRAFT and activated by the Controller with ActivateItem; UoM conversions with DefineUomConversion. |
+| E-VS3-02b-1 | VS3-02b | Amends E-VS3-01-5: the opening is an API command (same pipeline, Posting Engine, hash chain and audit as any document); the CSV is uploaded as base64 and kept by its SHA-256. |
+| E-VS3-02b-2 | VS3-02b | Four eyes: PrepareOpeningInventory (Controller, `opening_inventory:prepare`) creates a DRAFT batch with validated lines; PostOpeningInventory (Aprobador de políticas, `opening_inventory:post`, step-up, not the preparer) posts it; SoD between both permissions (79 permissions, 30 SoD rules). |
+| E-VS3-02b-3 | VS3-02b | CSV columns planta, ubicacion, producto, cantidad, documento (base UoM, up to 6 decimals, one document per line); active finished goods only; raw material and the other opening balances come with the full migration. |
+| E-VS3-02b-4 | VS3-02b | One lot per line, code `AP-<item code>-<cutover yyyyMMdd>-<n>`. |
+| E-VS3-02b-5 | VS3-02b | Value = quantity × ACTIVE standard cost of the item in the plant's valuation area, 2 decimals half away from zero (as receipts); a line without approved cost refuses the batch; posting refuses a batch whose cost changed since preparation (`STANDARD_COST_CHANGED`). |
+| E-VS3-02b-6 | VS3-02b | Posting date = the day before the cutover, in its normal monthly period, whose INV-MOV must be open (`PERIOD_CLOSED` otherwise, never moved to a later period); the special OPENING period and the sign-off close come with the full migration. |
+| E-VS3-02b-7 | VS3-02b | Rule OPEN-INV (Dr FINISHED_GOODS [plant, item, INV] / Cr MIGRATION_CLEARING [plant]) seeded DRAFT for the Controller; movement type OPENING; P-3 and the inventory reconciliations (INV-VALUE-GL, VALUE-GL-LINK, INV-MOV snapshot) include FINISHED_GOODS and FINISHED_GOODS_IN_TRANSIT. |
+| E-VS3-02b-8 | VS3-02b | Reconciliation MIGRATION-CLEARING: a warning with the balance of MIGRATION_CLEARING; it blocks nothing until the full migration. |
+| E-VS3-02b-9 | VS3-02b | A batch is unique by file SHA-256 among POSTED batches and a line by source document among live lines; a whole POSTED batch is reversed exactly (with a reason) while none of its lots moved and INV-MOV of its date is open; its file can then be loaded again. |
+| E-VS3-02b-10 | VS3-02b | Opening movements never call the Tax Engine (test: no tax determination) and carry document type OPENING_INVENTORY. |
 
 Implementation rules derived from the above (no architectural change):
 

@@ -60,3 +60,22 @@ Queries (`sales:read`): `GET /sales/customers[/{partyId}]`, `/sales/customer-ter
 `/sales/price-lists[/{id}]`, `/sales/vehicles`, `/sales/drivers`.
 
 Tests: `CustomerTests`, `PricingTests`, `FleetTests` (`tests/Rochell.Sales.Tests`), `SupplierTests` (payment terms), `ItemTests` (finished goods).
+
+## Opening finished goods (VS3-02b)
+
+Migration `0039__opening_finished_goods.sql`: movement type OPENING, schema `mig` (`migration_batch`,
+`opening_inventory_line`), rule OPEN-INV (DRAFT), reconciliation MIGRATION-CLEARING (warning), permissions
+`opening_inventory:prepare` (Controller) and `opening_inventory:post` (Aprobador de políticas). E-VS3-02b-1 amends E-VS3-01-5:
+no CLI insert.
+
+| Command (`/sales/…`) | Effect |
+| --- | --- |
+| `prepare-opening-inventory` | CSV `planta,ubicacion,producto,cantidad,documento` (base64) and cutover date → DRAFT batch; every line valued at the ACTIVE standard cost (2 decimals) |
+| `post-opening-inventory` (step-up, not the preparer) | Posting date = cutover − 1 (INV-MOV open, never moved); one lot per line `AP-<item>-<cutover>-<n>`; OPENING quantity and value entries; OPEN-INV journal; the lines become live |
+| `reverse-opening-inventory` (step-up, reason) | Exact reversal of the whole batch while no lot moved and INV-MOV is open; the lines stop being live, so the file can be loaded again |
+
+Guarantees: batch four eyes and status evidence (ADR-027, K-25 against its journal); lines only in DRAFT and only finished goods;
+unique live document and posted file. P-3 now counts FINISHED_GOODS and FINISHED_GOODS_IN_TRANSIT with RAW_MATERIAL, and so do
+INV-VALUE-GL, VALUE-GL-LINK and the INV-MOV close snapshot.
+
+Queries (`configuration:read`): `GET /sales/opening-batches[/{batchId}]`. Tests: `OpeningInventoryTests`.

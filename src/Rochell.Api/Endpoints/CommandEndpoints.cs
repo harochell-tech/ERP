@@ -18,6 +18,7 @@ using Rochell.Procurement.SupplierInvoices;
 using Rochell.Reconciliation;
 using Rochell.Sales.Customers;
 using Rochell.Sales.Fleet;
+using Rochell.Sales.Opening;
 using Rochell.Sales.Pricing;
 using Rochell.Tax;
 using Rochell.Treasury.BankAccounts;
@@ -153,6 +154,9 @@ public static class CommandEndpoints
         sales.MapCommand<UpdateDriver, UpdateDriverHandler>();
         sales.MapCommand<DeactivateDriver, DeactivateDriverHandler>();
         sales.MapCommand<ActivateDriver, ActivateDriverHandler>();
+        sales.MapCommand<PrepareOpeningInventory, PrepareOpeningInventoryHandler>();
+        sales.MapCommand<PostOpeningInventory, PostOpeningInventoryHandler>();
+        sales.MapCommand<ReverseOpeningInventory, ReverseOpeningInventoryHandler>();
 
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
@@ -187,6 +191,7 @@ public static class CommandEndpoints
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),
         typeof(CreateCustomerHandler), typeof(UpdateCustomerHandler), typeof(ActivateCustomerHandler), typeof(PrepareCustomerTermsHandler), typeof(ApproveCustomerTermsHandler), typeof(PrepareStandardCostHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler),
         typeof(RegisterVehicleHandler), typeof(UpdateVehicleHandler), typeof(DeactivateVehicleHandler), typeof(ActivateVehicleHandler), typeof(RegisterDriverHandler), typeof(UpdateDriverHandler), typeof(DeactivateDriverHandler), typeof(ActivateDriverHandler),
+        typeof(PrepareOpeningInventoryHandler), typeof(PostOpeningInventoryHandler), typeof(ReverseOpeningInventoryHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 

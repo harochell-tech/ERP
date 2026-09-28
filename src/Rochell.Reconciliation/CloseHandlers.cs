@@ -319,7 +319,7 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
         return rows;
     }
 
-    /// <summary>INV-MOV: valuation by area × item and the RAW_MATERIAL accounts; AP-REC: open AP and AP_CONTROL by supplier.</summary>
+    /// <summary>INV-MOV: valuation by area × item and the inventory accounts (raw material and finished goods, VS3-02b); AP-REC: open AP and AP_CONTROL by supplier.</summary>
     private static async Task<List<Dictionary<string, string?>>> BalancesAsync(CommandContext context, string component, CancellationToken cancellationToken)
     {
         var sql = component == Components.InventoryMovements
@@ -328,7 +328,7 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
               FROM inv.inv_valuation_balance WHERE company_id = @c
               UNION ALL
               SELECT 'gl', a.code, NULL, sum(e.debit - e.credit)::text FROM fin.gl_entry e JOIN fin.account a ON a.account_id = e.account_id
-              WHERE e.company_id = @c AND e.account_role = 'RAW_MATERIAL' GROUP BY a.code
+              WHERE e.company_id = @c AND e.account_role IN ('RAW_MATERIAL', 'FINISHED_GOODS', 'FINISHED_GOODS_IN_TRANSIT') GROUP BY a.code
               ORDER BY 1, 2
               """
             : """

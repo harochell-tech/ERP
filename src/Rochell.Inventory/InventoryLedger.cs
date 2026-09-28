@@ -30,8 +30,8 @@ public sealed record IssueReservation(Guid PlantId, Guid ValuationAreaId, Guid L
 /// </summary>
 public sealed class InventoryLedger
 {
-    /// <summary>Creates the lot of a receipt line (E-PR07-3).</summary>
-    public async Task<Guid> CreateLotAsync(CommandContext context, Guid itemId, Guid? supplierPartyId, string? supplierLotNumber, Guid sourceEventId, DateOnly businessDate, CancellationToken cancellationToken)
+    /// <summary>Creates the lot of a receipt line (E-PR07-3); <paramref name="lotCode"/> overrides the generated code (opening lots, E-VS3-02b-4).</summary>
+    public async Task<Guid> CreateLotAsync(CommandContext context, Guid itemId, Guid? supplierPartyId, string? supplierLotNumber, Guid sourceEventId, DateOnly businessDate, CancellationToken cancellationToken, string? lotCode = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         var lotId = context.Ids.NewId();
@@ -46,16 +46,24 @@ public sealed class InventoryLedger
             ("id", lotId),
             ("company", context.CompanyId),
             ("item", itemId),
-            ("code", $"L{businessDate:yyyyMMdd}-{lotId.ToString("N")[^8..].ToUpperInvariant()}"),
+            ("code", lotCode ?? $"L{businessDate:yyyyMMdd}-{lotId.ToString("N")[^8..].ToUpperInvariant()}"),
             ("supplier", supplierPartyId),
             ("supplier_lot", string.IsNullOrWhiteSpace(supplierLotNumber) ? null : supplierLotNumber.Trim()),
             ("event", sourceEventId)).ConfigureAwait(false);
         return lotId;
     }
 
-    /// <summary>Writes a receipt: quantity entry, value entry and both balances. Returns the quantity entry id.</summary>
-    public async Task<Guid> ReceiveAsync(CommandContext context, ReceiptMovement movement, MovementSource source, MovementDates dates, CancellationToken cancellationToken)
+    /// <summary>
+    /// Writes a receipt: quantity entry, value entry and both balances. Returns the quantity entry id. <paramref name="movementType"/>
+    /// is RECEIPT or OPENING (an opening balance, E-VS3-02b-7).
+    /// </summary>
+    public async Task<Guid> ReceiveAsync(CommandContext context, ReceiptMovement movement, MovementSource source, MovementDates dates, CancellationToken cancellationToken, string movementType = MovementTypes.Receipt)
     {
+        if (movementType is not (MovementTypes.Receipt or MovementTypes.Opening))
+        {
+            throw new InvalidOperationException($"A receipt is RECEIPT or OPENING, not {movementType}.");
+        }
+
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(movement);
         ArgumentNullException.ThrowIfNull(source);
@@ -73,13 +81,13 @@ public sealed class InventoryLedger
         var (plantId, areaId) = await PlantAndAreaAsync(context, movement.LocationId, cancellationToken).ConfigureAwait(false);
         var recordedAt = context.Clock.UtcNow;
         var quantityEntry = new QuantityEntryRow(
-            context.Ids.NewId(), context.CompanyId, MovementTypes.Receipt, plantId, movement.LocationId, movement.ItemId, movement.LotId, movement.Quantity,
+            context.Ids.NewId(), context.CompanyId, movementType, plantId, movement.LocationId, movement.ItemId, movement.LotId, movement.Quantity,
             source.EventId, source.DocumentType, source.DocumentId, source.LineId, null, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate);
         await InsertQuantityAsync(context, quantityEntry, cancellationToken).ConfigureAwait(false);
         await InsertValueAsync(
             context,
             new ValueEntryRow(
-                movement.ValueEntryId, context.CompanyId, MovementTypes.Receipt, areaId, plantId, movement.ItemId, quantityEntry.QuantityEntryId, movement.Value,
+                movement.ValueEntryId, context.CompanyId, movementType, areaId, plantId, movement.ItemId, quantityEntry.QuantityEntryId, movement.Value,
                 source.EventId, null, quantityEntry.OccurredAt, recordedAt, dates.BusinessDate, dates.PostingDate),
             cancellationToken).ConfigureAwait(false);
 
@@ -387,7 +395,7 @@ public sealed class InventoryLedger
             : (0, 0);
     }
 
-    /// <summary>The receipt movements of a source line (e.g. a goods receipt line): its quantity entry and value entry.</summary>
+    /// <summary>The receipt (or opening) movements of a source line (e.g. a goods receipt line): its quantity entry and value entry.</summary>
     public async Task<ReceiptEntries> ReceiptEntriesAsync(CommandContext context, Guid sourceLineId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -397,8 +405,8 @@ public sealed class InventoryLedger
             """
             SELECT q.quantity_entry_id, q.plant_id, q.location_id, q.item_id, q.lot_id, q.quantity, v.value_entry_id, v.valuation_area_id, v.amount
             FROM inv.inv_quantity_entry q
-            JOIN inv.inv_value_entry v ON v.quantity_entry_id = q.quantity_entry_id AND v.movement_type = 'RECEIPT'
-            WHERE q.company_id = @c AND q.source_line_id = @line AND q.movement_type = 'RECEIPT'
+            JOIN inv.inv_value_entry v ON v.quantity_entry_id = q.quantity_entry_id AND v.movement_type IN ('RECEIPT', 'OPENING')
+            WHERE q.company_id = @c AND q.source_line_id = @line AND q.movement_type IN ('RECEIPT', 'OPENING')
             """,
             ("c", context.CompanyId),
             ("line", sourceLineId));
