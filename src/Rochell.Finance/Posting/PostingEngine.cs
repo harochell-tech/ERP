@@ -82,6 +82,18 @@ public sealed class PostingEngine
         return new PostingPlan(request, rule.RuleId, rule.Version, rule.EventType, rule.Components[0], periodId, postingDate, lateEntry, lines, roundingPolicy);
     }
 
+    /// <summary>
+    /// The posting date a rule would use for <paramref name="businessDate"/> (its period and close components), so inventory
+    /// movements can be written before their plan is prepared (VS3-04: issue by issue, each at the valuation after the previous).
+    /// </summary>
+    public async Task<DateOnly> PostingDateAsync(CommandContext context, string ruleCode, DateOnly businessDate, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var rule = await ActiveRuleAsync(context, ruleCode, businessDate, cancellationToken).ConfigureAwait(false);
+        var (_, postingDate, _) = await ResolvePostingDateAsync(context, rule.Components, businessDate, cancellationToken).ConfigureAwait(false);
+        return postingDate;
+    }
+
     public async Task<PostedJournal> WriteAsync(CommandContext context, PostingPlan plan, Guid sourceEventId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);

@@ -17,6 +17,7 @@ using Rochell.Procurement.ReceiptCorrections;
 using Rochell.Procurement.SupplierInvoices;
 using Rochell.Reconciliation;
 using Rochell.Sales.Customers;
+using Rochell.Sales.Deliveries;
 using Rochell.Sales.Fleet;
 using Rochell.Sales.Opening;
 using Rochell.Sales.Orders;
@@ -164,6 +165,14 @@ public static class CommandEndpoints
         sales.MapCommand<ApproveCredit, ApproveCreditHandler>();
         sales.MapCommand<RejectCredit, RejectCreditHandler>();
         sales.MapCommand<CancelSalesOrder, CancelSalesOrderHandler>();
+        sales.MapCommand<PlanDelivery, PlanDeliveryHandler>();
+        sales.MapCommand<StartLoading, StartLoadingHandler>();
+        sales.MapCommand<ConfirmLoaded, ConfirmLoadedHandler>();
+        sales.MapCommand<RecordGateOut, RecordGateOutHandler>();
+        sales.MapCommand<RecordPod, RecordPodHandler>();
+        sales.MapCommand<RecordReturnTrip, RecordReturnTripHandler>();
+        sales.MapCommand<CancelDelivery, CancelDeliveryHandler>();
+        sales.MapCommand<CloseShortSalesOrder, CloseShortSalesOrderHandler>();
 
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
@@ -200,6 +209,7 @@ public static class CommandEndpoints
         typeof(RegisterVehicleHandler), typeof(UpdateVehicleHandler), typeof(DeactivateVehicleHandler), typeof(ActivateVehicleHandler), typeof(RegisterDriverHandler), typeof(UpdateDriverHandler), typeof(DeactivateDriverHandler), typeof(ActivateDriverHandler),
         typeof(PrepareOpeningInventoryHandler), typeof(PostOpeningInventoryHandler), typeof(ReverseOpeningInventoryHandler),
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),
+        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 

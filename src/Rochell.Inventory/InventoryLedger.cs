@@ -525,6 +525,74 @@ public sealed class InventoryLedger
             ("item", itemId)).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// E-VS3-04-2: writes a reserved quantity (<see cref="ReserveIssueAsync"/> on the origin) into another location of the same
+    /// plant (patio ⇄ TRANSITO) at the area's valuation cost: a TRANSFER pair (−quantity / −value out, +quantity / +value in, value
+    /// entries pre-assigned for their two GL lines). The valuation balance of the area does not change.
+    /// </summary>
+    public async Task WriteTransferAsync(
+        CommandContext context,
+        IssueReservation reservation,
+        Guid toLocationId,
+        Guid outValueEntryId,
+        Guid inValueEntryId,
+        MovementSource source,
+        MovementDates dates,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(reservation);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(dates);
+        var (toPlant, toArea) = await PlantAndAreaAsync(context, toLocationId, cancellationToken).ConfigureAwait(false);
+        var (fromLocationId, itemId, lotId, quantity) = (reservation.LocationId, reservation.ItemId, reservation.LotId, reservation.Quantity);
+        if (reservation.PlantId != toPlant || reservation.ValuationAreaId != toArea)
+        {
+            throw new InvalidOperationException("A transfer stays within one plant.");
+        }
+
+        if (reservation.Value <= 0)
+        {
+            throw new DomainException(InventoryErrors.InsufficientStock, "The transferred quantity has no value to move.");
+        }
+
+        var recordedAt = context.Clock.UtcNow;
+        var occurredAt = Precision.ToMicroseconds(dates.OccurredAt);
+        var outEntry = new QuantityEntryRow(
+            context.Ids.NewId(), context.CompanyId, MovementTypes.Transfer, reservation.PlantId, fromLocationId, itemId, lotId, -quantity,
+            source.EventId, source.DocumentType, source.DocumentId, source.LineId, null, occurredAt, recordedAt, dates.BusinessDate, dates.PostingDate);
+        await InsertQuantityAsync(context, outEntry, cancellationToken).ConfigureAwait(false);
+        await InsertValueAsync(
+            context,
+            new ValueEntryRow(outValueEntryId, context.CompanyId, MovementTypes.Transfer, reservation.ValuationAreaId, reservation.PlantId, itemId, outEntry.QuantityEntryId,
+                -reservation.Value, source.EventId, null, occurredAt, recordedAt, dates.BusinessDate, dates.PostingDate),
+            cancellationToken).ConfigureAwait(false);
+        var inEntry = new QuantityEntryRow(
+            context.Ids.NewId(), context.CompanyId, MovementTypes.Transfer, reservation.PlantId, toLocationId, itemId, lotId, quantity,
+            source.EventId, source.DocumentType, source.DocumentId, source.LineId, null, occurredAt, recordedAt, dates.BusinessDate, dates.PostingDate);
+        await InsertQuantityAsync(context, inEntry, cancellationToken).ConfigureAwait(false);
+        await InsertValueAsync(
+            context,
+            new ValueEntryRow(inValueEntryId, context.CompanyId, MovementTypes.Transfer, reservation.ValuationAreaId, reservation.PlantId, itemId, inEntry.QuantityEntryId,
+                reservation.Value, source.EventId, null, occurredAt, recordedAt, dates.BusinessDate, dates.PostingDate),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO inv.inv_stock_balance (company_id, plant_id, location_id, item_id, lot_id, quantity)
+            VALUES (@company, @plant, @location, @item, @lot, @qty)
+            ON CONFLICT (location_id, item_id, lot_id) DO UPDATE SET quantity = inv.inv_stock_balance.quantity + EXCLUDED.quantity
+            """,
+            cancellationToken,
+            ("company", context.CompanyId),
+            ("plant", reservation.PlantId),
+            ("location", toLocationId),
+            ("item", itemId),
+            ("lot", lotId),
+            ("qty", quantity)).ConfigureAwait(false);
+    }
+
     private static async Task<(Guid PlantId, Guid AreaId)> PlantAndAreaAsync(CommandContext context, Guid locationId, CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(

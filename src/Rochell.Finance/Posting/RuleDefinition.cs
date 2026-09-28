@@ -18,7 +18,8 @@ public sealed record RuleDefinition(IReadOnlyList<RuleLine> Lines)
     public const string Debit = "DEBIT";
     public const string Credit = "CREDIT";
     public static readonly IReadOnlySet<string> AllowedDimensions = new HashSet<string>(StringComparer.Ordinal) { "plant", "item", "party" };
-    public static readonly IReadOnlySet<string> AllowedSubledgers = new HashSet<string>(StringComparer.Ordinal) { "INV", "AP", "BANK" };
+    /// <summary>AR since VS#3 (E-VS3-01-16): receivables, contract assets and unapplied receipts.</summary>
+    public static readonly IReadOnlySet<string> AllowedSubledgers = new HashSet<string>(StringComparer.Ordinal) { "INV", "AP", "BANK", "AR" };
 
     /// <summary>Parses and validates the structure. Role existence and control consistency are checked against the database on approval.</summary>
     public static RuleDefinition Parse(string json)
@@ -73,7 +74,7 @@ public sealed record RuleDefinition(IReadOnlyList<RuleLine> Lines)
 
             if (line.Subledger is not null && !AllowedSubledgers.Contains(line.Subledger))
             {
-                throw new FormatException($"Line {line.Code}: subledger must be INV, AP or BANK.");
+                throw new FormatException($"Line {line.Code}: subledger must be INV, AP, BANK or AR.");
             }
         }
     }

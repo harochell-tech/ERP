@@ -98,3 +98,27 @@ Migration `0040__sales_order_credit.sql`: `sal.sales_order` (PV-…, statuses DR
 are serialized by an advisory lock. Queries: `GET /sales/orders[/{id}]`, `GET /sales/customers/{partyId}/exposure`.
 
 Tests: `SalesOrderTests` (SAL-01, SAL-02, rejection and resubmission, validations, concurrency).
+
+## Deliveries and control transfer (VS3-04)
+
+Migration `0041__delivery_control_transfer.sql`: movement type TRANSFER, `md.location.is_transit`, role UNBILLED_RECEIVABLE,
+policy REVENUE_ACCOUNTING, `log.delivery_term_policy`, `log.delivery`, `log.delivery_line`, `log.delivery_line_lot`, `log.pod`,
+`inv.control_assessment`, rules P-15, P-15R, P-16, P-30 (DRAFT), permissions `delivery:manage` and `sales_order:close`.
+
+| Command (`/sales/…`) | Effect |
+| --- | --- |
+| `plan-delivery` | CD-… of a CONFIRMED / PARTIALLY_DELIVERED order; quantity ≤ ordered − delivered − planned |
+| `start-loading` | Our vehicle and driver (site) or the customer's plate and driver (pickup) |
+| `confirm-loaded` | Source location per line; the base quantity must be there (unit conversion in force) |
+| `record-gate-out` (C-08) | Weighing (net ≤ capacity), FIFO lots; pickup: ISSUE + P-16 (COGS / FINISHED_GOODS, CONTRACT_ASSET or UNBILLED_RECEIVABLE / REVENUE_PRODUCT), order delivered; site: TRANSFER to TRANSITO + P-15 |
+| `record-pod` (C-09) | Received → ISSUE + P-16 from transit; returned → TRANSFER back + P-15R; missing → ISSUE + P-30; exceptions need a reason |
+| `record-return-trip` | Everything back (P-15R), RETURNED |
+| `cancel-delivery` | Before the gate, with a reason |
+| `close-short-sales-order` (`sales_order:close`) | PARTIALLY_DELIVERED → CLOSED, reason, no open deliveries, not the order's creator |
+
+Each step appends its own events (GoodsIssued, ControlTransferred, GoodsReturnedFromTransit, TransitLossRecognized), one per
+rule, and writes an `inv.control_assessment` (GATE_OUT / POD, TRANSFERRED / RETAINED with the revenue policy version).
+`PostingEngine.PostingDateAsync` dates the movements before their journals, so each issue is valued after the previous one.
+Queries: `GET /sales/deliveries[/{id}]` (lines, lots, POD, assessments, history).
+
+Tests: `DeliveryTests` (SAL-03, SAL-04, SAL-05, return trip, transport / weight / close-short rules).
