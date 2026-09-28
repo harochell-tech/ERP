@@ -385,6 +385,21 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-03-8 | VS3-03 | Permissions `sales_order:create`, `sales_order:cancel` (Vendedor) and `credit:approve` (Crédito); SoD credit:approve ≠ sales_order:create (82 permissions, 31 SoD rules); the decider also differs from the order's creator. |
 | E-VS3-03-9 | VS3-03 | Credit evaluations and decisions are serialized per customer (advisory lock), so concurrent submissions never auto-approve above the limit (concurrency test). |
 | E-VS3-03-10 | VS3-03 | Queries with `sales:read`: ListSalesOrders, GetSalesOrder (lines, credit checks, history), GetCustomerExposure. |
+| E-VS3-04-1 | VS3-04 | Each plant has a system location TRANSITO (`md.location.is_transit`, code TRANSITO), created by its first dispatch in our truck; goods on their way to a site stay in our balance there (P-15). |
+| E-VS3-04-2 | VS3-04 | Movement type TRANSFER for the out/in pairs between locations (gate out to TRANSITO, return from TRANSITO); control transfer and loss use ISSUE: after the control transfer the goods leave the inventory ledger and their site is only on the delivery. |
+| E-VS3-04-3 | VS3-04 | Goods leave at the area's valuation cost (the existing moving average; finished goods enter only at standard, so it is the standard up to rounding cents). |
+| E-VS3-04-4 | VS3-04 | No order reservations in VS3-04: stock is checked when loading and the conditional issue never goes negative. |
+| E-VS3-04-5 | VS3-04 | ConfirmLoaded names each line's source location; the gate out takes lots oldest code first (FIFO) and records them in `log.delivery_line_lot`. |
+| E-VS3-04-6 | VS3-04 | Site delivery: our ACTIVE vehicle and driver; pickup: the customer's plate and driver as text. |
+| E-VS3-04-7 | VS3-04 | Weighing: gross, tare, ticket reference and SHA-256 (E-VS3-6); with our vehicle the net weight cannot exceed its capacity; the theoretical-weight tolerance waits for unit weights. |
+| E-VS3-04-8 | VS3-04 | POD per line: received and returned quantities; received transfers control (P-16), returned goes back from TRANSITO to its location (P-15R), the rest is a transit loss (P-30); receiver, date and time, evidence reference and SHA-256; one POD per delivery; RecordReturnTrip is the total rejection (RETURNED). |
+| E-VS3-04-9 | VS3-04 | Reference table `log.delivery_term_policy` seeded by migration: PICKUP_AT_PLANT → GATE_OUT, DELIVERED_OWN_TRANSPORT → POD; changed only by errata and migration. |
+| E-VS3-04-10 | VS3-04 | Policy REVENUE_ACCOUNTING with `unbilled_delivery_presentation` (CONTRACT_ASSET / UNBILLED_RECEIVABLE); role UNBILLED_RECEIVABLE (control, subledger AR); P-16 carries both lines and the policy picks one (as R-06); without an ACTIVE policy the dispatch is refused; the Posting Engine accepts subledger AR. |
+| E-VS3-04-11 | VS3-04 | P-16 revenue = transferred quantity × order price (2 decimals), cost = the value issued; the contract asset / unbilled receivable is kept per delivery line (subledger reference); `inv.control_assessment`, one per triggering event. |
+| E-VS3-04-12 | VS3-04 | P-15, P-15R, P-16 and P-30 in INV-MOV; AR-REC joins as also-required when it exists (VS3-08). |
+| E-VS3-04-13 | VS3-04 | Delivery CD-000001 per company, one order per delivery, several deliveries per order; delivered never exceeds ordered; the order moves itself to PARTIALLY_DELIVERED / DELIVERED; CloseShortSalesOrder (Crédito, reason, not the order's creator, no open deliveries) closes a PARTIALLY_DELIVERED order. |
+| E-VS3-04-14 | VS3-04 | PLANNED → LOADING → LOADED → IN_TRANSIT (site) or DELIVERED (pickup) → DELIVERED / DELIVERED_WITH_EXCEPTIONS / RETURNED; CANCELLED (reason) before the gate. |
+| E-VS3-04-15 | VS3-04 | Permissions `delivery:manage` (Despacho) and `sales_order:close` (Crédito); SoD sales_order:close ≠ sales_order:create (84 permissions, 32 SoD rules). Reason columns use coalesce so a NULL reason cannot pass their CHECK (also fixes 0040's cancel reason). |
 
 Implementation rules derived from the above (no architectural change):
 

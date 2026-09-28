@@ -21,4 +21,7 @@ public static class MovementTypes
 
     /// <summary>E-VS3-02b-7: an opening balance (an inflow, v2.1 §6).</summary>
     public const string Opening = "OPENING";
+
+    /// <summary>E-VS3-04-2: a move between two locations of a plant (patio ⇄ TRANSITO).</summary>
+    public const string Transfer = "TRANSFER";
 }

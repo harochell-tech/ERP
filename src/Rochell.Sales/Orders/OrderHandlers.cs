@@ -135,6 +135,40 @@ internal static class Orders
             : throw new DomainException(SalesErrors.VersionConflict, $"The order changed (version {row.Version}, expected {expectedVersion}); reload and retry.");
     }
 
+    /// <summary>Locks an order without a version check (deliveries move it; lock order: sales order → delivery → lines).</summary>
+    public static async Task<Row> LockCurrentAsync(CommandContext context, Guid orderId, CancellationToken cancellationToken)
+    {
+        var version = await SalesSql.ScalarAsync<long?>(
+            context, "SELECT version FROM sal.sales_order WHERE company_id = @c AND sales_order_id = @o", cancellationToken, ("c", context.CompanyId), ("o", orderId)).ConfigureAwait(false)
+            ?? throw new DomainException(SalesErrors.NotFound, "The sales order does not exist.");
+        return await LockAsync(context, orderId, version, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>E-VS3-04-13: adds delivered quantities to the order's current lines and moves it to PARTIALLY_DELIVERED / DELIVERED.</summary>
+    public static async Task AddDeliveredAsync(CommandContext context, Row order, Guid orderId, IReadOnlyDictionary<Guid, decimal> delivered, string commandType, CancellationToken cancellationToken)
+    {
+        foreach (var (line, quantity) in delivered.Where(d => d.Value > 0m))
+        {
+            await Sql.ExecuteAsync(
+                context.Connection, context.Transaction, "UPDATE sal.sales_order_line SET qty_delivered = qty_delivered + @q WHERE line_id = @l", cancellationToken,
+                ("q", quantity), ("l", line)).ConfigureAwait(false);
+        }
+
+        var complete = await SalesSql.ScalarAsync<bool?>(
+            context,
+            """
+            SELECT bool_and(l.qty_delivered >= l.qty_ordered) FROM sal.sales_order o
+            JOIN sal.sales_order_line l ON l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version WHERE o.sales_order_id = @o
+            """,
+            cancellationToken,
+            ("o", orderId)).ConfigureAwait(false) == true;
+        var to = complete ? "DELIVERED" : "PARTIALLY_DELIVERED";
+        if (to != order.Status && delivered.Values.Any(q => q > 0m))
+        {
+            await TransitionAsync(context, orderId, order, to, complete ? "SalesOrderDelivered" : "SalesOrderPartiallyDelivered", new { salesOrderId = orderId, orderNo = order.OrderNo, status = to }, commandType, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     public static async Task<string?> CustomerStatusAsync(CommandContext context, Guid partyId, CancellationToken cancellationToken)
         => await SalesSql.ScalarAsync<string>(
             context, "SELECT customer_status FROM md.party WHERE company_id = @c AND party_id = @p AND is_customer", cancellationToken, ("c", context.CompanyId), ("p", partyId)).ConfigureAwait(false);
@@ -144,7 +178,8 @@ internal static class Orders
         => SalesSql.LockAsync(context, "credit:" + partyId.ToString(), cancellationToken);
 
     public static async Task<Guid> TransitionAsync(
-        CommandContext context, Guid orderId, Row row, string to, string eventType, object payload, string commandType, CancellationToken cancellationToken, string? reason = null, string? cancelReason = null)
+        CommandContext context, Guid orderId, Row row, string to, string eventType, object payload, string commandType, CancellationToken cancellationToken, string? reason = null, string? cancelReason = null,
+        string? closeReason = null)
     {
         var version = row.Version + 1;
         var eventId = await context.AppendEventAsync(
@@ -152,10 +187,11 @@ internal static class Orders
         await Sql.ExecuteAsync(
             context.Connection,
             context.Transaction,
-            "UPDATE sal.sales_order SET status = @s, cancel_reason = coalesce(@cr, cancel_reason), version = @v WHERE sales_order_id = @o",
+            "UPDATE sal.sales_order SET status = @s, cancel_reason = coalesce(@cr, cancel_reason), close_reason = coalesce(@clr, close_reason), version = @v WHERE sales_order_id = @o",
             cancellationToken,
             ("s", to),
             ("cr", cancelReason),
+            ("clr", closeReason),
             ("v", version),
             ("o", orderId)).ConfigureAwait(false);
         await context.AppendStateAsync(Aggregate, orderId, "DOCUMENT", row.Status, to, commandType, eventId, cancellationToken, reason).ConfigureAwait(false);
