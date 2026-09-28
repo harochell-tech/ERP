@@ -451,6 +451,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-08-10 | VS3-08 | The AR-REC snapshot adds the CONTRACT_ASSET + UNBILLED_RECEIVABLE total and the UNAPPLIED_RECEIPTS total to open AR and AR_CONTROL by customer. |
 | E-VS3-08-11 | VS3-08 | AR-04: a month with delivery, invoice, credit note, applied receipt, unapplied advance and withholding reconciles (MATCHED) and AR-REC closes; a receipt dated in the closed month is a late entry. Negative: a tampered AR document and a pending e-CF are found and block the close. |
 | E-VS3-08-12 | VS3-08 | No new permissions (`reconciliation:run`, `period_component:close`); migration 0045 with the definitions, blockings, the two parameters and the rule correction; REVENUE_ACCOUNTING has 3 parameters. |
+| E-VS3-09-1 | VS3-09 | GetArAging(as of): open invoices per customer by days past due — current, bucket 1, bucket 2, bucket 3, over — with the buckets from new CREDIT parameters `ar_aging_bucket_1/2/3_days` (A-01; 30/60/90 recommended); without them POLICY_MISSING, never invented buckets. |
+| E-VS3-09-2 | VS3-09 | Unapplied receipts appear apart, in the customer's favour, not netted into the buckets; net = open − unapplied. |
+| E-VS3-09-3 | VS3-09 | GetCustomerStatement(customer, from, to) from the customer's entries in AR_CONTROL and UNAPPLIED_RECEIPTS (so it agrees with AR-GL): opening balance, invoices, voids, credit notes, withholdings and their reversals, receipts, bounces and reversals, with running balance; applications net to zero and are left out; at most 366 days. |
+| E-VS3-09-4 | VS3-09 | Both reports also as CSV with the FIN1-03 mechanism (`?format=csv`, UTF-8 with BOM); no PDF. |
+| E-VS3-09-5 | VS3-09 | ListSalesOrders filters by order date; ListDeliveries by customer and by date (gate-out date in the Dominican Republic, else the date it was planned). The order detail now gives each line's `salesOrderLineId`, which a delivery plan names. |
+| E-VS3-09-6 | VS3-09 | Everything read with `sales:read`; no new permissions. |
+| E-VS3-09-7 | VS3-09 | E2E-S1 over HTTP with separate actors: order (credit auto-approved) → own-truck delivery (loading, gate, POD) → invoice → e-CF 31 recorded → transfer receipt → application (PAID) → statement → match → AR-GL, CONTRACT-ASSET, RECEIPT-APPL, FISC-DOC, BANK-GL MATCHED → AR-REC and BANK-REC closed after the month ends. Masters, cost, prices and opening stock through their commands; maps, fiscal rule, periods and seal from fixtures. `MatchBankLineToReceipt` takes `receiptId` or `depositId` as optional fields after the expected version. |
+| E-VS3-09-8 | VS3-09 | The VS#3 traceability matrix (`docs/acceptance/vs3.md` and its test) arrives with VS3-11. |
+| E-VS3-09-9 | VS3-09 | OpenAPI and web types regenerated; no screens (VS3-10). |
+| E-VS3-09-10 | VS3-09 | Migration 0046 with the three CREDIT parameters only (CREDIT: 4 parameters). |
 
 Implementation rules derived from the above (no architectural change):
 

@@ -56,7 +56,13 @@ public sealed class DeliveryTests(PostgresFixture postgres)
             await h.CreateActiveMapAsync(role, accounts[role]);
         }
 
-        await h.CreateActivePolicyAsync("CREDIT", new Dictionary<string, string> { ["overdue_days_block"] = "30" });
+        await h.CreateActivePolicyAsync("CREDIT", new Dictionary<string, string>
+        {
+            ["overdue_days_block"] = "30",
+            ["ar_aging_bucket_1_days"] = "30",
+            ["ar_aging_bucket_2_days"] = "60",
+            ["ar_aging_bucket_3_days"] = "90",
+        });
         await h.CreateActivePolicyAsync("REVENUE_ACCOUNTING", new Dictionary<string, string> { ["unbilled_delivery_presentation"] = presentation });
         var seller = await h.SessionWithRolesAsync("VENDEDOR");
         var credit = await h.SessionWithRolesAsync("CREDITO");

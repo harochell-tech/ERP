@@ -7,7 +7,12 @@ namespace Rochell.Sales.Queries;
 
 // VS3-04: deliveries (conduces), read with sales:read.
 
-public sealed record ListDeliveries(Guid CompanyId, Guid SessionId, string? Status = null, Guid? SalesOrderId = null, int Limit = 50, int Offset = 0) : IQuery;
+/// <summary>
+/// E-VS3-09-5: <paramref name="PartyId"/>, and <paramref name="From"/> / <paramref name="To"/> on the delivery's date — its gate-out date
+/// (Dominican Republic), or the business date it was planned on while it has not left.
+/// </summary>
+public sealed record ListDeliveries(
+    Guid CompanyId, Guid SessionId, string? Status = null, Guid? SalesOrderId = null, int Limit = 50, int Offset = 0, Guid? PartyId = null, DateOnly? From = null, DateOnly? To = null) : IQuery;
 
 public sealed record DeliverySummary(
     Guid DeliveryId, string DeliveryNo, Guid SalesOrderId, string OrderNo, string CustomerName, string PlantCode, string DeliveryTermCode, string ControlTransfersAt, string Status,
@@ -45,6 +50,10 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
             context.Transaction,
             DeliveryReading.Select + """
              WHERE d.company_id = @c AND (CAST(@s AS text) IS NULL OR d.status = CAST(@s AS text)) AND (CAST(@o AS uuid) IS NULL OR d.sales_order_id = CAST(@o AS uuid))
+              AND (CAST(@p AS uuid) IS NULL OR o.party_id = CAST(@p AS uuid))
+              AND ((CAST(@from AS date) IS NULL AND CAST(@to AS date) IS NULL) OR coalesce((d.gate_out_at AT TIME ZONE 'America/Santo_Domingo')::date,
+                     (SELECT min(e.business_date) FROM core.domain_event e WHERE e.company_id = d.company_id AND e.aggregate_id = d.delivery_id))
+                   BETWEEN coalesce(CAST(@from AS date), DATE '0001-01-01') AND coalesce(CAST(@to AS date), DATE '9999-12-31'))
             ORDER BY d.delivery_no DESC
             LIMIT @limit OFFSET @offset
             """,
@@ -53,6 +62,9 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
             ("c", context.CompanyId),
             ("s", query.Status),
             ("o", query.SalesOrderId),
+            ("p", query.PartyId),
+            ("from", query.From),
+            ("to", query.To),
             ("limit", query.Limit),
             ("offset", query.Offset)).ConfigureAwait(false);
         return ApiJson.Serialize(new DeliveryList(items, query.Limit, query.Offset));

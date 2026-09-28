@@ -2523,6 +2523,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/ar-aging": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetArAging"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/customers/{partyId}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCustomerStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/deliveries": {
         parameters: {
             query?: never;
@@ -3463,6 +3495,65 @@ export interface components {
             itemId: string;
             reason: string;
         };
+        ArAging: {
+            /** Format: date */
+            asOf: string;
+            buckets: components["schemas"]["ArAgingBuckets"];
+            customers: components["schemas"]["ArAgingCustomer"][];
+            /** Format: decimal */
+            total: string;
+            /** Format: decimal */
+            unapplied: string;
+            /** Format: decimal */
+            net: string;
+        };
+        ArAgingBuckets: {
+            /** Format: int32 */
+            bucket1Days: number;
+            /** Format: int32 */
+            bucket2Days: number;
+            /** Format: int32 */
+            bucket3Days: number;
+        };
+        ArAgingCustomer: {
+            /** Format: uuid */
+            customerId: string;
+            customerName: string;
+            /** Format: decimal */
+            current: string;
+            /** Format: decimal */
+            bucket1: string;
+            /** Format: decimal */
+            bucket2: string;
+            /** Format: decimal */
+            bucket3: string;
+            /** Format: decimal */
+            over: string;
+            /** Format: decimal */
+            total: string;
+            /** Format: decimal */
+            unapplied: string;
+            /** Format: decimal */
+            net: string;
+            documents: components["schemas"]["ArAgingDocument"][];
+        };
+        ArAgingDocument: {
+            /** Format: uuid */
+            arDocId: string;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNo: string;
+            encf: null | string;
+            /** Format: date */
+            docDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: decimal */
+            openAmount: string;
+            /** Format: int32 */
+            daysOverdue: number;
+            bucket: string;
+        };
         BalanceSheet: {
             /** Format: date */
             asOf: string;
@@ -3949,6 +4040,25 @@ export interface components {
             limit: number;
             /** Format: int32 */
             offset: number;
+        };
+        CustomerStatement: {
+            /** Format: uuid */
+            partyId: string;
+            customerName: string;
+            rnc: null | string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** Format: decimal */
+            opening: string;
+            entries: components["schemas"]["StatementEntry"][];
+            /** Format: decimal */
+            totalDebit: string;
+            /** Format: decimal */
+            totalCredit: string;
+            /** Format: decimal */
+            closing: string;
         };
         CustomerSummary: {
             /** Format: uuid */
@@ -4692,12 +4802,12 @@ export interface components {
             lineId: string;
             /** Format: int64 */
             expectedLineVersion: number;
-            /** Format: uuid */
-            receiptId: null | string;
-            /** Format: uuid */
-            depositId: null | string;
             /** Format: int64 */
             expectedVersion: number;
+            /** Format: uuid */
+            receiptId?: null | string;
+            /** Format: uuid */
+            depositId?: null | string;
         };
         MatchCandidate: {
             /** Format: uuid */
@@ -5823,6 +5933,8 @@ export interface components {
             qtyDelivered: string;
             /** Format: decimal */
             qtyInvoiced: string;
+            /** Format: uuid */
+            salesOrderLineId: string;
         };
         SalesOrderList: {
             items: components["schemas"]["SalesOrderSummary"][];
@@ -5942,6 +6054,19 @@ export interface components {
             accountClass: string;
             /** Format: decimal */
             amount: string;
+        };
+        StatementEntry: {
+            /** Format: date */
+            postingDate: string;
+            kind: string;
+            documentNo: null | string;
+            eventType: string;
+            /** Format: decimal */
+            debit: string;
+            /** Format: decimal */
+            credit: string;
+            /** Format: decimal */
+            balance: string;
         };
         StatementLine: {
             lineCode: string;
@@ -17231,6 +17356,8 @@ export interface operations {
                 partyId?: string;
                 limit?: number;
                 offset?: number;
+                from?: string;
+                to?: string;
             };
             header?: never;
             path: {
@@ -17396,6 +17523,123 @@ export interface operations {
             };
         };
     };
+    GetArAging: {
+        parameters: {
+            query?: {
+                asOf?: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArAging"];
+                    "text/csv": components["schemas"]["ArAging"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCustomerStatement: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+                partyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerStatement"];
+                    "text/csv": components["schemas"]["CustomerStatement"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListDeliveries: {
         parameters: {
             query?: {
@@ -17403,6 +17647,9 @@ export interface operations {
                 salesOrderId?: string;
                 limit?: number;
                 offset?: number;
+                partyId?: string;
+                from?: string;
+                to?: string;
             };
             header?: never;
             path: {

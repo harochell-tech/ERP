@@ -51,7 +51,7 @@ public static class QueryEndpoints
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
-        typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler),
+        typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler),
         typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
@@ -135,8 +135,8 @@ public static class QueryEndpoints
         sales.MapGet("/opening-batches/{batchId:guid}", (HttpContext http, Guid companyId, Guid batchId, GetOpeningBatchHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetOpeningBatch(companyId, s, batchId), handler, ct))
             .Describe<OpeningBatchDetail>(nameof(GetOpeningBatch), notFound: true);
-        sales.MapGet("/orders", (HttpContext http, Guid companyId, string? status, Guid? partyId, int? limit, int? offset, ListSalesOrdersHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunAsync(http, s => new ListSalesOrders(companyId, s, status, partyId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+        sales.MapGet("/orders", (HttpContext http, Guid companyId, string? status, Guid? partyId, int? limit, int? offset, DateOnly? from, DateOnly? to, ListSalesOrdersHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListSalesOrders(companyId, s, status, partyId, limit ?? DefaultLimit, offset ?? 0, from, to), handler, ct))
             .Describe<SalesOrderList>(nameof(ListSalesOrders));
         sales.MapGet("/orders/{salesOrderId:guid}", (HttpContext http, Guid companyId, Guid salesOrderId, GetSalesOrderHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetSalesOrder(companyId, s, salesOrderId), handler, ct))
@@ -144,8 +144,16 @@ public static class QueryEndpoints
         sales.MapGet("/customers/{partyId:guid}/exposure", (HttpContext http, Guid companyId, Guid partyId, GetCustomerExposureHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetCustomerExposure(companyId, s, partyId), handler, ct))
             .Describe<CustomerExposure>(nameof(GetCustomerExposure), notFound: true);
-        sales.MapGet("/deliveries", (HttpContext http, Guid companyId, string? status, Guid? salesOrderId, int? limit, int? offset, ListDeliveriesHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunAsync(http, s => new ListDeliveries(companyId, s, status, salesOrderId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+
+        // E-VS3-09-1…4: AR aging and the statement of account; ?format=csv as the ledger reports.
+        sales.MapGet("/ar-aging", (HttpContext http, Guid companyId, DateOnly? asOf, string? format, GetArAgingHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunReportAsync(http, format, s => new GetArAging(companyId, s, asOf), handler, ArCsv.Aging, asOf is { } day ? $"antiguedad-cxc-{day:yyyyMMdd}.csv" : "antiguedad-cxc.csv", ct))
+            .Describe<ArAging>(nameof(GetArAging)).Csv<ArAging>();
+        sales.MapGet("/customers/{partyId:guid}/statement", (HttpContext http, Guid companyId, Guid partyId, DateOnly from, DateOnly to, string? format, GetCustomerStatementHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunReportAsync(http, format, s => new GetCustomerStatement(companyId, s, partyId, from, to), handler, ArCsv.Statement, $"estado-de-cuenta-{from:yyyyMMdd}-{to:yyyyMMdd}.csv", ct))
+            .Describe<CustomerStatement>(nameof(GetCustomerStatement), notFound: true).Csv<CustomerStatement>();
+        sales.MapGet("/deliveries", (HttpContext http, Guid companyId, string? status, Guid? salesOrderId, int? limit, int? offset, Guid? partyId, DateOnly? from, DateOnly? to, ListDeliveriesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListDeliveries(companyId, s, status, salesOrderId, limit ?? DefaultLimit, offset ?? 0, partyId, from, to), handler, ct))
             .Describe<DeliveryList>(nameof(ListDeliveries));
         sales.MapGet("/deliveries/{deliveryId:guid}", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDelivery(companyId, s, deliveryId), handler, ct))
