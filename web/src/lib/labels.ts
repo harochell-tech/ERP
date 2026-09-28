@@ -40,6 +40,36 @@ const STATUS: Readonly<Record<string, string>> = {
   PAYABLE: "Verificada · pagable",
   HOLD_PENDING: "Retención 72 h",
   NONE: "Sin cuenta",
+  // VS#3 (VS3-10a): customers, orders and deliveries.
+  BLOCKED: "Bloqueado",
+  INACTIVE: "Inactivo",
+  PENDING_CREDIT: "Pendiente de crédito",
+  CONFIRMED: "Confirmado",
+  PARTIALLY_DELIVERED: "Entregado parcialmente",
+  DELIVERED: "Entregado",
+  PLANNED: "Planificado",
+  LOADING: "Cargando",
+  LOADED: "Cargado",
+  IN_TRANSIT: "En tránsito",
+  DELIVERED_WITH_EXCEPTIONS: "Entregado con excepciones",
+  RETURNED: "Devuelto",
+  AUTO_APPROVED: "Aprobado automáticamente",
+  NEEDS_APPROVAL: "Requiere aprobación",
+  TRANSFERRED: "Control transferido",
+  RETAINED: "Control retenido",
+};
+
+/** E-VS3-5: the two delivery terms. */
+export const DELIVERY_TERMS: Readonly<Record<string, string>> = {
+  PICKUP_AT_PLANT: "Retira en planta",
+  DELIVERED_OWN_TRANSPORT: "Entregado en obra (camión propio)",
+};
+
+/** E-VS3-01-16: categories of finished goods. */
+export const FINISHED_GOOD_CATEGORIES: Readonly<Record<string, string>> = {
+  BLOQUE: "Bloque",
+  ADOQUIN: "Adoquín",
+  OTRO_PT: "Otro producto terminado",
 };
 
 /** E-UI-5: a matched statement line reads "Conciliada" (an invoice match stays "Conciliado"). */
@@ -58,6 +88,10 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   CORRECTED: "done", PAYABLE: "done", CHARGE_RECOGNIZED: "done", MATCHED_WITH_TOLERANCE: "done",
   MATCH_EXCEPTION: "attention", UNMATCHED: "attention", HOLD_PENDING: "attention", POSTING_BLOCKED: "attention", BLOCKED_PENDING_SOURCE: "attention",
   REJECTED: "error", EXCEPTIONS: "error", FAILED: "error",
+  INACTIVE: "neutral", PLANNED: "neutral", RETAINED: "neutral",
+  PENDING_CREDIT: "progress", PARTIALLY_DELIVERED: "progress", LOADING: "progress", LOADED: "progress", IN_TRANSIT: "progress", NEEDS_APPROVAL: "progress",
+  CONFIRMED: "done", DELIVERED: "done", AUTO_APPROVED: "done", TRANSFERRED: "done",
+  BLOCKED: "attention", DELIVERED_WITH_EXCEPTIONS: "attention", RETURNED: "attention",
   REVERSED: "reversed",
 };
 

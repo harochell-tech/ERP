@@ -461,6 +461,19 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-09-8 | VS3-09 | The VS#3 traceability matrix (`docs/acceptance/vs3.md` and its test) arrives with VS3-11. |
 | E-VS3-09-9 | VS3-09 | OpenAPI and web types regenerated; no screens (VS3-10). |
 | E-VS3-09-10 | VS3-09 | Migration 0046 with the three CREDIT parameters only (CREDIT: 4 parameters). |
+| E-VS3-10-1 | VS3-10 | Two PRs: VS3-10a (sales masters, opening stock, orders, dispatch) and VS3-10b (billing, credit notes, receipts, receipt matching in Treasury, AR aging, statement, Inicio counters, Playwright E2E-S1). |
+| E-VS3-10-2 | VS3-10 | No new design canvas: the approved design (E-UI-1…6) and its components are reused. |
+| E-VS3-10-3 | VS3-10 | Menu areas Ventas (`/ventas/…`), Despacho (`/despacho/…`), Facturación (`/facturacion/…`), Cobros (`/cobros/…`); Maestros adds finished goods, vehicles and drivers, price list, standard costs; Contabilidad adds the opening stock. Each item with its read permission, each button with its command's permission. |
+| E-VS3-10-4 | VS3-10 | Order form: customer, plant, delivery term, site and lines (product and quantity); prices and totals are the server's after saving; the order shows the customer's exposure and the credit checks; Crédito approves or rejects, never the seller. |
+| E-VS3-10-5 | VS3-10 | Dispatch board by status with the action each delivery needs; weighing and gate, POD and return trip forms; weigh ticket and POD evidence by the SHA-256 computed in the browser, the file not uploaded. |
+| E-VS3-10-6 | VS3-10 | Billing: "Por facturar" by customer → create → issue (step-up) → fiscal package with copy buttons → record the e-CF (e-NCF, security code, XML hashed in the browser); credit note from the invoice, per line with what remains, issued by another Facturación user. |
+| E-VS3-10-7 | VS3-10 | Receipts: form per method; application with one amount per open invoice of the customer (totals from the server); deposit of receipts in transit; withholding with its certificate hashed; the Controller reverses receipts and withholdings. |
+| E-VS3-10-8 | VS3-10 | Receipt lines matched from the Treasury reconciliation screen with a new candidates query (`bank:read`): transfer receipts or deposits for a CREDIT line, deposited cheques for a DEBIT line, same account and amount; "Cheque devuelto" marks the cheque bounced (step-up) and matches the line. |
+| E-VS3-10-9 | VS3-10 | Inicio counters from existing list queries, by permission: orders pending credit, deliveries in transit, invoices with a pending e-CF, unapplied receipts. |
+| E-VS3-10-10 | VS3-10 | The dev stack seeds VS#3 (rules, maps, policies, SALES_ITBIS, product with cost, price and opening, an active customer, truck, driver, one user per new role); `web/e2e/sales-journey.spec.ts` runs E2E-S1 in the browser. |
+| E-VS3-10-11 | VS3-10 | Synthetic test identities for the five VS#3 roles on staging (E-B03-14); still no real data (E-VS1-2). |
+| E-VS3-10-12 | VS3-10 | No migration in VS3-10a; VS3-10b adds the candidates query (and a migration only if the staging identities need one). |
+| E-VS3-10-13 | VS3-10a | `GET /sales/plants` (`sales:read`): plants and their stock locations without the transit one, so the Vendedor and Despacho pick a plant and a source location without `master_data:read`. |
 
 Implementation rules derived from the above (no architectural change):
 

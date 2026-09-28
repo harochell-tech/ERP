@@ -297,3 +297,43 @@ public sealed class ListDriversHandler : IQueryHandler<ListDrivers>
         return ApiJson.Serialize(new DriverList(items));
     }
 }
+
+public sealed record ListSalesPlants(Guid CompanyId, Guid SessionId) : IQuery;
+
+public sealed record SalesLocationView(Guid LocationId, string Code);
+
+public sealed record SalesPlantView(Guid PlantId, string Code, Guid ValuationAreaId, IReadOnlyList<SalesLocationView> Locations);
+
+public sealed record SalesPlantList(IReadOnlyList<SalesPlantView> Items);
+
+/// <summary>
+/// E-VS3-10-13: the plants and their stock locations (not the transit one) for the sales and dispatch screens, read with sales:read
+/// so the Vendedor and Despacho need no master_data:read.
+/// </summary>
+[RequiresPermission("sales:read")]
+public sealed class ListSalesPlantsHandler : IQueryHandler<ListSalesPlants>
+{
+    public string QueryType => "Sales.ListSalesPlants";
+
+    public async Task<string> HandleAsync(ListSalesPlants query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var plants = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT plant_id, code, valuation_area_id FROM md.plant WHERE company_id = @c ORDER BY code",
+            r => new SalesPlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), []),
+            cancellationToken,
+            ("c", context.CompanyId)).ConfigureAwait(false);
+        var locations = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT plant_id, location_id, code FROM md.location WHERE company_id = @c AND NOT is_transit ORDER BY code",
+            r => (PlantId: r.GetGuid(0), View: new SalesLocationView(r.GetGuid(1), r.GetString(2))),
+            cancellationToken,
+            ("c", context.CompanyId)).ConfigureAwait(false))
+            .ToLookup(l => l.PlantId, l => l.View);
+        return ApiJson.Serialize(new SalesPlantList(plants.Select(p => p with { Locations = locations[p.PlantId].ToList() }).ToList()));
+    }
+}
