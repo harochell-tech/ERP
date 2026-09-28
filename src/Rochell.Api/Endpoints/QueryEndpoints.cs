@@ -47,7 +47,7 @@ public static class QueryEndpoints
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
-        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler),
+        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
@@ -125,6 +125,12 @@ public static class QueryEndpoints
         sales.MapGet("/drivers", (HttpContext http, Guid companyId, string? status, ListDriversHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListDrivers(companyId, s, status), handler, ct))
             .Describe<DriverList>(nameof(ListDrivers));
+        sales.MapGet("/opening-batches", (HttpContext http, Guid companyId, string? status, ListOpeningBatchesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListOpeningBatches(companyId, s, status), handler, ct))
+            .Describe<OpeningBatchList>(nameof(ListOpeningBatches));
+        sales.MapGet("/opening-batches/{batchId:guid}", (HttpContext http, Guid companyId, Guid batchId, GetOpeningBatchHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetOpeningBatch(companyId, s, batchId), handler, ct))
+            .Describe<OpeningBatchDetail>(nameof(GetOpeningBatch), notFound: true);
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)

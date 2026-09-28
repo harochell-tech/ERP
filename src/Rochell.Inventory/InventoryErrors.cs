@@ -18,4 +18,7 @@ public static class MovementTypes
     public const string PriceAdjustment = "PRICE_ADJUSTMENT";
     public const string Repost = "REPOST";
     public const string ResidualAdjustment = "RESIDUAL_ADJUSTMENT";
+
+    /// <summary>E-VS3-02b-7: an opening balance (an inflow, v2.1 §6).</summary>
+    public const string Opening = "OPENING";
 }

@@ -26,7 +26,7 @@ public static class Reconciliations
 {
     public static IReadOnlyList<string> All { get; } =
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
-         "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE"];
+         "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -49,14 +49,14 @@ public static class Reconciliations
             WITH v AS (SELECT valuation_area_id AS area, item_id, value AS a FROM inv.inv_valuation_balance WHERE company_id = @c),
                  g AS (SELECT p.valuation_area_id AS area, e.item_id, sum(e.debit - e.credit) AS b
                        FROM fin.gl_entry e JOIN md.plant p ON p.plant_id = e.plant_id
-                       WHERE e.company_id = @c AND e.account_role = 'RAW_MATERIAL' GROUP BY 1, 2)
+                       WHERE e.company_id = @c AND e.account_role IN ('RAW_MATERIAL', 'FINISHED_GOODS', 'FINISHED_GOODS_IN_TRANSIT') GROUP BY 1, 2)
             SELECT coalesce(v.area, g.area)::text || '/' || coalesce(v.item_id, g.item_id)::text AS match_key, coalesce(a, 0) AS value_a,
                    coalesce(b, 0) AS value_b, 'VALUE_GL_DIFFERENCE' AS classification, 'ERROR' AS severity, 'INV-MOV' AS component
             FROM v FULL JOIN g ON g.area = v.area AND g.item_id = v.item_id WHERE coalesce(a, 0) <> coalesce(b, 0)) f
             """,
             """
             SELECT (SELECT coalesce(sum(value), 0) FROM inv.inv_valuation_balance WHERE company_id = @c),
-                   (SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role = 'RAW_MATERIAL')
+                   (SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role IN ('RAW_MATERIAL', 'FINISHED_GOODS', 'FINISHED_GOODS_IN_TRANSIT'))
             """),
         ["INV-QTY-BALANCE"] = (
             Findings + """
@@ -185,6 +185,15 @@ public static class Reconciliations
             """
             SELECT (SELECT coalesce(sum(debit), 0) FROM fin.gl_entry WHERE company_id = @c), (SELECT coalesce(sum(credit), 0) FROM fin.gl_entry WHERE company_id = @c)
             """),
+        ["MIGRATION-CLEARING"] = (
+            Findings + """
+            -- E-VS3-02b-8: the migration counter-account ends at zero once every opening document is loaded; a warning until then.
+            SELECT 'migration-clearing' AS match_key, coalesce(sum(debit - credit), 0) AS value_a, 0::numeric AS value_b,
+                   'MIGRATION_CLEARING_NOT_ZERO' AS classification, 'WARNING' AS severity, NULL::text AS component
+            FROM fin.gl_entry WHERE company_id = @c AND account_role = 'MIGRATION_CLEARING'
+            HAVING coalesce(sum(debit - credit), 0) <> 0) f
+            """,
+            null),
         ["STRUCT-COVERAGE"] = (
             Findings + """
             -- E-FIN1-03-9, a warning that blocks no close: the statements can be produced and they balance.
@@ -260,7 +269,7 @@ public static class Reconciliations
             HAVING count(e.gl_entry_id) <> 1 OR coalesce(sum(e.debit - e.credit), 0) <> v.amount
             UNION ALL
             SELECT gl_entry_id::text, NULL, debit - credit, 'INVENTORY_GL_WITHOUT_VALUE', 'ERROR', 'INV-MOV'
-            FROM fin.gl_entry WHERE company_id = @c AND account_role = 'RAW_MATERIAL' AND inv_value_entry_id IS NULL) f
+            FROM fin.gl_entry WHERE company_id = @c AND account_role IN ('RAW_MATERIAL', 'FINISHED_GOODS', 'FINISHED_GOODS_IN_TRANSIT') AND inv_value_entry_id IS NULL) f
             """,
             """
             SELECT (SELECT coalesce(sum(amount), 0) FROM inv.inv_value_entry WHERE company_id = @c),
