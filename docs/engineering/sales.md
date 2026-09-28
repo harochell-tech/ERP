@@ -190,3 +190,20 @@ receipt with its reversal both in transit cancel out.
 
 Queries: `GET /sales/receipts[/{id}]`, `/sales/deposits[/{id}]`, `/sales/invoices?openOnly=true&partyId=`.
 Tests: `ReceiptTests` (AR-01, AR-02, AR-03, concurrent applications, unapply / reverse / withholding corrections).
+
+## AR reconciliations and the AR-REC close (VS3-08)
+
+Migration `0045__ar_reconciliations.sql`: five reconciliations, their blocking, two REVENUE_ACCOUNTING parameters and AR-REC as
+also required by P-15, P-15R, P-16 and P-30 (version 1, corrected while DRAFT).
+
+| Reconciliation | Checks | Blocks |
+| --- | --- | --- |
+| AR-GL | Open AR documents = AR_CONTROL, per customer | AR-REC |
+| CONTRACT-ASSET | Per delivery line: (delivered − invoiced) × order price = CONTRACT_ASSET + UNBILLED_RECEIVABLE (subledger = line); warning UNBILLED_AGED after `unbilled_aging_alert_days` | AR-REC |
+| RECEIPT-APPL | Receipt applications + unapplied = amount; AR document original − open = applications + withholdings + credit notes; one P-25 AR line per application row; UNAPPLIED_RECEIPTS and CASH_IN_TRANSIT per receipt | AR-REC, BANK-REC |
+| FISC-DOC | Invoices and credit notes dated ≤ cutoff with a pending e-CF | AR-REC |
+| DELIVERY-OPEN | Deliveries in transit longer than `delivery_open_alert_hours` (warning; FAILED without the parameter) | — |
+| ACC-EVIDENCE | Now also invoices, credit notes, withholdings, receipts, bounces and deposit slips | + AR-REC |
+
+The AR-REC snapshot holds open AR and AR_CONTROL by customer plus the contract asset and unapplied receipts totals.
+Tests: `ArCloseTests` (AR-04, and a pending e-CF plus a tampered AR document blocking the close).

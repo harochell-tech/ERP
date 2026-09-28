@@ -92,7 +92,7 @@ public sealed class BankReconciliationTests(PostgresFixture postgres)
 
         Assert.Contains("snapshotHash", closed.ResultPayload, StringComparison.Ordinal);
         Assert.Equal("CLOSED", await h.ScalarAsync<string>($"SELECT status FROM fin.close_component_state WHERE period_id = '{period}' AND component = 'BANK-REC'"));
-        Assert.Equal("ACC-EVIDENCE:MATCHED,BANK-GL:MATCHED,PAY-APPL:MATCHED", await h.ScalarAsync<string>(
+        Assert.Equal("ACC-EVIDENCE:MATCHED,BANK-GL:MATCHED,PAY-APPL:MATCHED,RECEIPT-APPL:MATCHED", await h.ScalarAsync<string>(
             "SELECT string_agg(recon_code || ':' || status, ',' ORDER BY recon_code) FROM rec.recon_run"));
         Assert.Equal(EndOfMonth(month).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), await h.ScalarAsync<string>("SELECT DISTINCT cutoff_date::text FROM rec.recon_run"));
         // The snapshot holds the bank account's GL and statement balances (−amount − 150.00 both) and a zero difference.

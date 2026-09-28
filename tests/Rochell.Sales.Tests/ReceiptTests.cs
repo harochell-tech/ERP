@@ -20,10 +20,10 @@ public sealed class ReceiptTests(PostgresFixture postgres)
 {
     private const string SalesItbis = """{"tax_code":"ITBIS","rate":"0.18","effect":"OUTPUT","exempt_item_categories":[]}""";
 
-    private sealed record World(DeliveryTests.Setup S, Guid Cobros, Guid Treasurer, Guid Controller, Guid Billing, Guid Bank, Guid Invoice, Guid ArDoc);
+    internal sealed record World(DeliveryTests.Setup S, Guid Cobros, Guid Treasurer, Guid Controller, Guid Billing, Guid Bank, Guid Invoice, Guid ArDoc);
 
     /// <summary>An issued invoice of <paramref name="blocks"/> blocks at 50.00 + 18 % ITBIS, the receipt rules approved, a TEST_BANK account.</summary>
-    private static async Task<World> WorldAsync(TestHarness h, decimal blocks = 1000m)
+    internal static async Task<World> WorldAsync(TestHarness h, decimal blocks = 1000m)
     {
         var s = await DeliveryTests.SetupAsync(h);
         var actors = await h.FiscalActorsAsync();
@@ -52,9 +52,9 @@ public sealed class ReceiptTests(PostgresFixture postgres)
         return new World(s, await h.SessionWithRolesAsync("COBROS"), await h.SessionWithRolesAsync("TESORERO"), controller, billing, bank, invoice, arDoc);
     }
 
-    private static DateOnly Today(TestHarness h) => Platform.Time.BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
+    internal static DateOnly Today(TestHarness h) => Platform.Time.BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
 
-    private static Task<CommandResult> Transfer(TestHarness h, World w, string key, decimal amount, Guid? session = null)
+    internal static Task<CommandResult> Transfer(TestHarness h, World w, string key, decimal amount, Guid? session = null)
         => h.RunAsync(new RecordReceipt(h.CompanyId, session ?? w.Cobros, key, w.S.Customer, "TRANSFER", amount, Today(h), w.Bank, "TRF-001"), new RecordReceiptHandler());
 
     private static Task<CommandResult> Apply(TestHarness h, World w, string key, Guid receipt, long version, decimal amount)
