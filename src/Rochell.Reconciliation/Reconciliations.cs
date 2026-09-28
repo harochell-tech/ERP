@@ -18,7 +18,8 @@ public sealed record ReconRun(Guid RunId, string Code, string Status, decimal? T
 }
 
 /// <summary>
-/// The eight reconciliations of VS#1 (Frozen Baseline §9.4, E-PR16-1…4, E-PR16-9). They evaluate the whole ledger as of the run
+/// The reconciliations of VS#1 (Frozen Baseline §9.4, E-PR16-1…4, E-PR16-9) and of the later slices (VS#2, FIN-1, VS#3 §8,
+/// E-VS3-08-1…8). Except BANK-GL and FISC-DOC, which use the cutoff date, they evaluate the whole ledger as of the run
 /// (they are global invariants), with zero tolerance: amounts are exact by construction (P-1), so any difference is a finding.
 /// Written in SQL over the tables (the module graph lets Reconciliation depend on Platform only).
 /// </summary>
@@ -26,7 +27,7 @@ public static class Reconciliations
 {
     public static IReadOnlyList<string> All { get; } =
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
-         "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING"];
+         "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -108,7 +109,16 @@ public static class Reconciliations
                    FROM pur.goods_receipt WHERE company_id = @c
                    UNION ALL SELECT 'GRR', grr_id, accounting_status::text, posting_event_id, 'INV-MOV' FROM pur.goods_receipt_reversal WHERE company_id = @c
                    UNION ALL SELECT 'RC', rc_id, accounting_status::text, posting_event_id, 'INV-MOV' FROM pur.receipt_correction WHERE company_id = @c
-                   UNION ALL SELECT 'SI', si_id, accounting_status::text, posting_event_id, 'AP-REC' FROM pur.supplier_invoice WHERE company_id = @c),
+                   UNION ALL SELECT 'SI', si_id, accounting_status::text, posting_event_id, 'AP-REC' FROM pur.supplier_invoice WHERE company_id = @c
+                   -- E-VS3-08-5: the VS#3 documents. A receipt answers to BANK-REC and AR-REC; a bounce has its own P-24 journal.
+                   UNION ALL SELECT 'FA', invoice_id, accounting_status, posting_event_id, 'AR-REC' FROM sal.invoice WHERE company_id = @c
+                   UNION ALL SELECT 'NC', credit_note_id, accounting_status, posting_event_id, 'AR-REC' FROM sal.credit_note WHERE company_id = @c
+                   UNION ALL SELECT 'REC', receipt_id, CASE WHEN status = 'REVERSED' THEN 'REVERSED' ELSE 'POSTED' END, posting_event_id, k.component
+                     FROM fin.receipt CROSS JOIN (VALUES ('BANK-REC'), ('AR-REC')) AS k (component) WHERE company_id = @c
+                   UNION ALL SELECT 'BNC', receipt_id, 'POSTED', closing_event_id, 'BANK-REC' FROM fin.receipt WHERE company_id = @c AND status = 'BOUNCED'
+                   UNION ALL SELECT 'DEP', deposit_id, 'POSTED', posting_event_id, 'BANK-REC' FROM fin.receipt_deposit WHERE company_id = @c
+                   UNION ALL SELECT 'RET', withholding_id, CASE WHEN status = 'REVERSED' THEN 'REVERSED' ELSE 'POSTED' END, posting_event_id, 'AR-REC'
+                     FROM fin.customer_withholding WHERE company_id = @c),
                  evidence AS (
                    SELECT d.kind, d.id, d.status, d.component, count(j.journal_id) AS journals,
                           count(j.journal_id) FILTER (WHERE r.journal_id IS NULL) AS live,
@@ -275,6 +285,127 @@ public static class Reconciliations
             SELECT (SELECT coalesce(sum(amount), 0) FROM inv.inv_value_entry WHERE company_id = @c),
                    (SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND inv_value_entry_id IS NOT NULL)
             """),
+        ["AR-GL"] = (
+            Findings + """
+            -- E-VS3-08-1: per customer, the open AR documents equal the customer's AR_CONTROL balance.
+            WITH ar AS (SELECT party_id, sum(open_amount) AS a FROM fin.ar_document WHERE company_id = @c GROUP BY party_id),
+                 gl AS (SELECT party_id, sum(debit - credit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_role = 'AR_CONTROL' GROUP BY party_id)
+            SELECT coalesce(coalesce(ar.party_id, gl.party_id)::text, '(sin cliente)') AS match_key, coalesce(a, 0) AS value_a, coalesce(b, 0) AS value_b,
+                   'AR_GL_DIFFERENCE' AS classification, 'ERROR' AS severity, 'AR-REC' AS component
+            FROM ar FULL JOIN gl ON gl.party_id = ar.party_id WHERE coalesce(a, 0) <> coalesce(b, 0)) f
+            """,
+            """
+            SELECT (SELECT coalesce(sum(open_amount), 0) FROM fin.ar_document WHERE company_id = @c),
+                   (SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role = 'AR_CONTROL')
+            """),
+        ["CONTRACT-ASSET"] = (
+            Findings + """
+            -- E-VS3-08-2: per delivery line with control transferred, (delivered − invoiced) × order price equals the line's CONTRACT_ASSET
+            -- + UNBILLED_RECEIVABLE balance (subledger = the delivery line). E-VS3-08-3: aged when older than unbilled_aging_alert_days.
+            WITH ex AS (SELECT dl.delivery_line_id AS id,
+                               CASE WHEN dl.qty_invoiced >= dl.qty_delivered THEN 0 ELSE round((dl.qty_delivered - dl.qty_invoiced) * ol.unit_price, 2) END AS a
+                        FROM log.delivery_line dl JOIN sal.sales_order_line ol ON ol.line_id = dl.sales_order_line_id
+                        WHERE dl.company_id = @c AND dl.qty_delivered > 0),
+                 gl AS (SELECT subledger_ref AS id, sum(debit - credit) AS b, min(posting_date) AS since FROM fin.gl_entry
+                        WHERE company_id = @c AND account_role IN ('CONTRACT_ASSET', 'UNBILLED_RECEIVABLE') GROUP BY subledger_ref)
+            SELECT 'line:' || coalesce(ex.id, gl.id)::text AS match_key, coalesce(ex.a, 0) AS value_a, coalesce(gl.b, 0) AS value_b,
+                   'CONTRACT_ASSET_DIFFERENCE' AS classification, 'ERROR' AS severity, 'AR-REC' AS component
+            FROM ex FULL JOIN gl ON gl.id = ex.id WHERE coalesce(ex.a, 0) <> coalesce(gl.b, 0)
+            UNION ALL
+            SELECT 'aged:' || ex.id::text, ex.a, (@cutoff - gl.since)::numeric, 'UNBILLED_AGED', 'WARNING', NULL
+            FROM ex JOIN gl ON gl.id = ex.id
+            WHERE CAST(@udays AS integer) IS NOT NULL AND ex.a > 0 AND gl.since < @cutoff - CAST(@udays AS integer)) f
+            """,
+            """
+            SELECT (SELECT coalesce(sum(CASE WHEN dl.qty_invoiced >= dl.qty_delivered THEN 0 ELSE round((dl.qty_delivered - dl.qty_invoiced) * ol.unit_price, 2) END), 0)
+                    FROM log.delivery_line dl JOIN sal.sales_order_line ol ON ol.line_id = dl.sales_order_line_id WHERE dl.company_id = @c),
+                   (SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role IN ('CONTRACT_ASSET', 'UNBILLED_RECEIVABLE'))
+            """),
+        ["RECEIPT-APPL"] = (
+            Findings + """
+            -- E-VS3-08-4 (blocks AR-REC and BANK-REC, so its findings name no single component).
+            WITH live AS (SELECT x.* FROM fin.ar_application x
+                          WHERE x.company_id = @c AND x.reverses_application_id IS NULL
+                            AND NOT EXISTS (SELECT 1 FROM fin.ar_application u WHERE u.reverses_application_id = x.application_id)),
+                 per_receipt AS (SELECT r.receipt_no, r.status, r.amount, r.unapplied_amount,
+                                        coalesce((SELECT sum(l.amount) FROM live l WHERE l.receipt_id = r.receipt_id), 0) AS applied
+                                 FROM fin.receipt r WHERE r.company_id = @c)
+            -- (a) a live receipt: applications + unapplied = amount; a bounced or reversed one keeps no live application.
+            SELECT 'REC:' || receipt_no AS match_key, CASE WHEN status = 'RECORDED' THEN amount ELSE 0 END AS value_a,
+                   applied + CASE WHEN status = 'RECORDED' THEN unapplied_amount ELSE 0 END AS value_b,
+                   'RECEIPT_APPLICATION_DIFFERENCE' AS classification, 'ERROR' AS severity, NULL::text AS component
+            FROM per_receipt
+            WHERE (status = 'RECORDED' AND applied + unapplied_amount <> amount) OR (status <> 'RECORDED' AND applied <> 0)
+            UNION ALL
+            -- (b) an AR document: original − open = live applications + active withholdings + confirmed credit notes (or the void).
+            SELECT 'AR:' || d.doc_no, d.original_amount - d.open_amount,
+                   coalesce((SELECT sum(l.amount) FROM live l WHERE l.ar_doc_id = d.ar_doc_id), 0)
+                   + coalesce((SELECT sum(w.amount) FROM fin.customer_withholding w WHERE w.ar_doc_id = d.ar_doc_id AND w.status = 'ACTIVE'), 0)
+                   + coalesce((SELECT sum(n.total) FROM sal.credit_note n WHERE n.invoice_id = i.invoice_id AND n.commercial_status = 'CONFIRMED'), 0)
+                   + CASE WHEN i.commercial_status = 'VOIDED' THEN d.original_amount ELSE 0 END,
+                   'AR_DOCUMENT_SETTLEMENT_DIFFERENCE', 'ERROR', NULL
+            FROM fin.ar_document d JOIN sal.invoice i ON i.ar_doc_id = d.ar_doc_id
+            WHERE d.company_id = @c
+              AND d.original_amount - d.open_amount
+                  <> coalesce((SELECT sum(l.amount) FROM live l WHERE l.ar_doc_id = d.ar_doc_id), 0)
+                   + coalesce((SELECT sum(w.amount) FROM fin.customer_withholding w WHERE w.ar_doc_id = d.ar_doc_id AND w.status = 'ACTIVE'), 0)
+                   + coalesce((SELECT sum(n.total) FROM sal.credit_note n WHERE n.invoice_id = i.invoice_id AND n.commercial_status = 'CONFIRMED'), 0)
+                   + CASE WHEN i.commercial_status = 'VOIDED' THEN d.original_amount ELSE 0 END
+            UNION ALL
+            -- (c) each application or unapply row has exactly one AR_CONTROL line of its event's P-25 (or its reversal), document and amount.
+            SELECT 'APP:' || x.application_id::text, x.amount,
+                   (SELECT count(*) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
+                    WHERE j.company_id = @c AND j.source_event_id = x.event_id AND e.account_role = 'AR_CONTROL' AND e.subledger_ref = x.ar_doc_id
+                      AND e.debit + e.credit = x.amount)::numeric,
+                   'APPLICATION_WITHOUT_P25_LINE', 'ERROR', NULL
+            FROM fin.ar_application x
+            WHERE x.company_id = @c
+              AND (SELECT count(*) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
+                   WHERE j.company_id = @c AND j.source_event_id = x.event_id AND e.account_role = 'AR_CONTROL' AND e.subledger_ref = x.ar_doc_id
+                     AND e.debit + e.credit = x.amount) <> 1
+            UNION ALL
+            -- (d) per receipt in the GL: UNAPPLIED_RECEIPTS = unapplied while RECORDED (else 0); CASH_IN_TRANSIT = amount while not deposited.
+            SELECT 'GL:' || coalesce(r.receipt_no, g.id::text) || ':' || g.role,
+                   CASE WHEN r.status IS DISTINCT FROM 'RECORDED' THEN 0
+                        WHEN g.role = 'UNAPPLIED_RECEIPTS' THEN r.unapplied_amount
+                        WHEN r.bank_status = 'IN_TRANSIT' THEN r.amount ELSE 0 END,
+                   g.b, 'RECEIPT_GL_DIFFERENCE', 'ERROR', NULL
+            FROM (SELECT subledger_ref AS id, account_role AS role,
+                         sum(CASE WHEN account_role = 'UNAPPLIED_RECEIPTS' THEN credit - debit ELSE debit - credit END) AS b
+                  FROM fin.gl_entry WHERE company_id = @c AND account_role IN ('UNAPPLIED_RECEIPTS', 'CASH_IN_TRANSIT') GROUP BY 1, 2
+                  UNION ALL
+                  SELECT r.receipt_id, k.role, 0 FROM fin.receipt r CROSS JOIN (VALUES ('UNAPPLIED_RECEIPTS'), ('CASH_IN_TRANSIT')) AS k (role)
+                  WHERE r.company_id = @c AND NOT EXISTS (SELECT 1 FROM fin.gl_entry e WHERE e.subledger_ref = r.receipt_id AND e.account_role = k.role)) g
+            LEFT JOIN fin.receipt r ON r.receipt_id = g.id
+            WHERE g.b <> CASE WHEN r.status IS DISTINCT FROM 'RECORDED' THEN 0
+                              WHEN g.role = 'UNAPPLIED_RECEIPTS' THEN r.unapplied_amount
+                              WHEN r.bank_status = 'IN_TRANSIT' THEN r.amount ELSE 0 END) f
+            """,
+            """
+            SELECT (SELECT coalesce(sum(x.amount), 0) FROM fin.ar_application x WHERE x.company_id = @c AND x.reverses_application_id IS NULL
+                      AND NOT EXISTS (SELECT 1 FROM fin.ar_application u WHERE u.reverses_application_id = x.application_id))
+                   + (SELECT coalesce(sum(unapplied_amount), 0) FROM fin.receipt WHERE company_id = @c AND status = 'RECORDED'),
+                   (SELECT coalesce(sum(amount), 0) FROM fin.receipt WHERE company_id = @c AND status = 'RECORDED')
+            """),
+        ["FISC-DOC"] = (
+            Findings + """
+            -- E-VS3-08-6: issued invoices and credit notes dated on or before the cutoff whose e-CF is not final yet.
+            SELECT 'FA:' || invoice_no AS match_key, total AS value_a, NULL::numeric AS value_b, 'FISCAL_DOCUMENT_PENDING' AS classification,
+                   'ERROR' AS severity, 'AR-REC' AS component
+            FROM sal.invoice WHERE company_id = @c AND commercial_status NOT IN ('DRAFT', 'VOIDED') AND fiscal_status = 'PENDING_EXTERNAL' AND invoice_date <= @cutoff
+            UNION ALL
+            SELECT 'NC:' || credit_note_no, total, NULL, 'FISCAL_DOCUMENT_PENDING', 'ERROR', 'AR-REC'
+            FROM sal.credit_note WHERE company_id = @c AND commercial_status = 'CONFIRMED' AND fiscal_status = 'PENDING_EXTERNAL' AND credit_date <= @cutoff) f
+            """,
+            null),
+        ["DELIVERY-OPEN"] = (
+            Findings + """
+            -- E-VS3-08-7: deliveries in transit longer than delivery_open_alert_hours (a warning).
+            SELECT 'CD:' || delivery_no AS match_key, NULL::numeric AS value_a, round(extract(epoch FROM @asOf - gate_out_at) / 3600)::numeric AS value_b,
+                   'DELIVERY_OPEN' AS classification, 'WARNING' AS severity, NULL::text AS component
+            FROM log.delivery WHERE company_id = @c AND status = 'IN_TRANSIT' AND gate_out_at < @asOf - make_interval(hours => @hours)) f
+            """,
+            null),
         ["GRNI-AGING"] = (
             Findings + """
             SELECT l.po_line_id::text AS match_key, l.qty_received - l.qty_invoiced AS value_a,
@@ -318,18 +449,32 @@ public static class Reconciliations
 
             var runId = context.Ids.NewId();
             int? agingDays = null;
-            if (code == "GRNI-AGING")
+            int? openHours = null;
+            if (code is "GRNI-AGING" or "DELIVERY-OPEN")
             {
-                agingDays = await AgingDaysAsync(context, asOf, cancellationToken).ConfigureAwait(false);
-                if (agingDays is null)
+                agingDays = code == "GRNI-AGING" ? await PolicyIntegerAsync(context, asOf, "INVENTORY", "grni_aging_alert_days", cancellationToken).ConfigureAwait(false) : null;
+                openHours = code == "DELIVERY-OPEN" ? await PolicyIntegerAsync(context, asOf, "REVENUE_ACCOUNTING", "delivery_open_alert_hours", cancellationToken).ConfigureAwait(false) : null;
+                if (agingDays is null && openHours is null)
                 {
                     runs.Add(await StoreAsync(context, runId, code, asOf, cutoff, "FAILED", null, null, [], cancellationToken).ConfigureAwait(false));
                     continue;
                 }
             }
 
+            var unbilledDays = code == "CONTRACT-ASSET"
+                ? await PolicyIntegerAsync(context, asOf, "REVENUE_ACCOUNTING", "unbilled_aging_alert_days", cancellationToken).ConfigureAwait(false)
+                : null;
             var findings = new List<ReconFinding>();
-            await using (var command = Sql.Command(context.Connection, context.Transaction, definition.Findings, ("c", context.CompanyId), ("asOf", asOf), ("days", agingDays ?? 0)))
+            await using (var command = Sql.Command(
+                context.Connection,
+                context.Transaction,
+                definition.Findings,
+                ("c", context.CompanyId),
+                ("asOf", asOf),
+                ("days", agingDays ?? 0),
+                ("hours", openHours ?? 0),
+                ("udays", unbilledDays),
+                ("cutoff", cutoff ?? Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(asOf))))
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -405,8 +550,8 @@ public static class Reconciliations
         return new ReconRun(runId, code, status, totalA, totalB, findings);
     }
 
-    /// <summary>grni_aging_alert_days of the INVENTORY policy in force (read directly: Reconciliation depends on Platform only).</summary>
-    private static async Task<int?> AgingDaysAsync(CommandContext context, DateTime asOf, CancellationToken cancellationToken)
+    /// <summary>An INTEGER parameter of a policy in force (read directly: Reconciliation depends on Platform only); null without it.</summary>
+    private static async Task<int?> PolicyIntegerAsync(CommandContext context, DateTime asOf, string policy, string parameter, CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(
             context.Connection,
@@ -414,10 +559,12 @@ public static class Reconciliations
             """
             SELECT p.value #>> '{}' FROM acc.accounting_policy_version v
             JOIN acc.accounting_policy_parameter p ON p.policy_version_id = v.policy_version_id
-            WHERE v.company_id = @c AND v.policy_code = 'INVENTORY' AND v.status = 'ACTIVE' AND p.param_code = 'grni_aging_alert_days'
+            WHERE v.company_id = @c AND v.policy_code = @policy AND v.status = 'ACTIVE' AND p.param_code = @param
               AND v.effective_from <= @d AND (v.effective_to IS NULL OR v.effective_to > @d)
             """,
             ("c", context.CompanyId),
+            ("policy", policy),
+            ("param", parameter),
             ("d", Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(asOf)));
         return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string days
             ? int.Parse(days, NumberStyles.None, CultureInfo.InvariantCulture)

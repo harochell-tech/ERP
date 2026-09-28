@@ -58,12 +58,16 @@ public sealed class CloseTests(PostgresFixture postgres)
             new RegisterSupplierInvoiceHandler())).ResultRef;
         await h.RunAsync(new MatchSupplierInvoice(h.CompanyId, s.Clerk, "m", si, 1), new MatchSupplierInvoiceHandler());
         await h.RunAsync(new PostSupplierInvoice(h.CompanyId, s.Clerk, "p", si, 2), new PostSupplierInvoiceHandler());
+        await h.CreateActivePolicyAsync("REVENUE_ACCOUNTING", new Dictionary<string, string>
+        {
+            ["unbilled_delivery_presentation"] = "CONTRACT_ASSET", ["unbilled_aging_alert_days"] = "30", ["delivery_open_alert_hours"] = "24", // DELIVERY-OPEN reads it
+        });
 
         var result = await ReconcileAsync(h, s.Purchasing.Controller, "rec");
 
         // STRUCT-COVERAGE (FIN1-03) only warns: this fixture's accounts have no class and there is no report structure.
         Assert.All(result.GetProperty("runs").EnumerateArray().Where(r => r.GetProperty("code").GetString() is not ("STRUCT-COVERAGE" or "MIGRATION-CLEARING")), r => Assert.Equal("MATCHED", r.GetProperty("status").GetString()));
-        Assert.Equal(14L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_run")); // 8 of VS#1 + BANK-GL and PAY-APPL (VS2-06) + MANUAL-EVIDENCE and TB-BALANCED (FIN1-02) + STRUCT-COVERAGE + MIGRATION-CLEARING
+        Assert.Equal(19L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_run")); // 8 of VS#1 + BANK-GL and PAY-APPL (VS2-06) + MANUAL-EVIDENCE and TB-BALANCED (FIN1-02) + STRUCT-COVERAGE + MIGRATION-CLEARING + 5 of VS3-08
         Assert.Equal(0L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_exception WHERE severity <> 'WARNING'"));
     }
 

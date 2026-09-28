@@ -319,7 +319,7 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
         return rows;
     }
 
-    /// <summary>INV-MOV: valuation by area × item and the inventory accounts (raw material and finished goods, VS3-02b); AP-REC: open AP and AP_CONTROL by supplier; AR-REC: open AR and AR_CONTROL by customer (VS3-05).</summary>
+    /// <summary>INV-MOV: valuation by area × item and the inventory accounts (raw material and finished goods, VS3-02b); AP-REC: open AP and AP_CONTROL by supplier; AR-REC: open AR and AR_CONTROL by customer (VS3-05), contract asset and unapplied receipts in total (E-VS3-08-10).</summary>
     private static async Task<List<Dictionary<string, string?>>> BalancesAsync(CommandContext context, string component, CancellationToken cancellationToken)
     {
         var sql = component == Components.InventoryMovements
@@ -337,6 +337,13 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
               UNION ALL
               SELECT 'ar_control', coalesce(party_id::text, '-'), NULL, sum(debit - credit)::text FROM fin.gl_entry
               WHERE company_id = @c AND account_role = 'AR_CONTROL' GROUP BY party_id
+              UNION ALL
+              -- E-VS3-08-10: delivered not invoiced and receipts not applied, in total.
+              SELECT 'contract_asset', 'total', NULL, coalesce(sum(debit - credit), 0)::text FROM fin.gl_entry
+              WHERE company_id = @c AND account_role IN ('CONTRACT_ASSET', 'UNBILLED_RECEIVABLE')
+              UNION ALL
+              SELECT 'unapplied_receipts', 'total', NULL, coalesce(sum(credit - debit), 0)::text FROM fin.gl_entry
+              WHERE company_id = @c AND account_role = 'UNAPPLIED_RECEIPTS'
               ORDER BY 1, 2
               """
             : """
