@@ -87,7 +87,8 @@ public static class LedgerCsv
 
     private static string D(DateOnly value) => value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    private sealed class Writer
+    /// <summary>The CSV writer of the reports (also used by the AR reports of Sales, E-VS3-09-4).</summary>
+    public sealed class Writer
     {
         private readonly StringBuilder _text = new();
 

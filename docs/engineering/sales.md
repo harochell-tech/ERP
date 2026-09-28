@@ -207,3 +207,18 @@ also required by P-15, P-15R, P-16 and P-30 (version 1, corrected while DRAFT).
 
 The AR-REC snapshot holds open AR and AR_CONTROL by customer plus the contract asset and unapplied receipts totals.
 Tests: `ArCloseTests` (AR-04, and a pending e-CF plus a tampered AR document blocking the close).
+
+## AR queries and E2E-S1 over the API (VS3-09)
+
+Migration `0046__ar_aging.sql`: CREDIT parameters `ar_aging_bucket_1_days`, `ar_aging_bucket_2_days`, `ar_aging_bucket_3_days`.
+
+| Query | Route | Notes |
+| --- | --- | --- |
+| GetArAging | `GET /sales/ar-aging?asOf=[&format=csv]` | Open invoices per customer by days past due in the CREDIT buckets (POLICY_MISSING without them); unapplied receipts apart; net |
+| GetCustomerStatement | `GET /sales/customers/{id}/statement?from=&to=[&format=csv]` | From AR_CONTROL + UNAPPLIED_RECEIPTS of the customer; applications left out; ≤ 366 days |
+| ListSalesOrders | `GET /sales/orders?from=&to=` | Order date |
+| ListDeliveries | `GET /sales/deliveries?partyId=&from=&to=` | Gate-out date (Dominican Republic) or the planning date |
+
+The order detail gives `salesOrderLineId` per line. CSV files share the ledger reports' writer (`LedgerCsv.Writer`).
+Tests: `ArQueryTests` (buckets, advance apart, missing policy, statement and CSV, filters);
+`Rochell.Api.Tests` · `SalesAcceptanceTests.E2ES1_…` (E2E-S1 over HTTP, E-VS3-09-7).

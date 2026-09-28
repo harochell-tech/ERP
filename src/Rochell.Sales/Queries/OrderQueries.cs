@@ -8,7 +8,9 @@ namespace Rochell.Sales.Queries;
 
 // E-VS3-03-10: sales orders and credit exposure, read with sales:read.
 
-public sealed record ListSalesOrders(Guid CompanyId, Guid SessionId, string? Status = null, Guid? PartyId = null, int Limit = 50, int Offset = 0) : IQuery;
+/// <summary><paramref name="From"/> / <paramref name="To"/> (E-VS3-09-5): the order date, both optional.</summary>
+public sealed record ListSalesOrders(
+    Guid CompanyId, Guid SessionId, string? Status = null, Guid? PartyId = null, int Limit = 50, int Offset = 0, DateOnly? From = null, DateOnly? To = null) : IQuery;
 
 public sealed record SalesOrderSummary(
     Guid SalesOrderId, string OrderNo, DateOnly OrderDate, Guid PartyId, string CustomerName, string PlantCode, string DeliveryTermCode, decimal TotalNet, string Status,
@@ -45,6 +47,7 @@ public sealed class ListSalesOrdersHandler : IQueryHandler<ListSalesOrders>
             context.Transaction,
             OrderReading.Select + """
              WHERE o.company_id = @c AND (CAST(@s AS text) IS NULL OR o.status = CAST(@s AS text)) AND (CAST(@p AS uuid) IS NULL OR o.party_id = CAST(@p AS uuid))
+              AND (CAST(@from AS date) IS NULL OR o.order_date >= CAST(@from AS date)) AND (CAST(@to AS date) IS NULL OR o.order_date <= CAST(@to AS date))
             ORDER BY o.order_no DESC
             LIMIT @limit OFFSET @offset
             """,
@@ -53,6 +56,8 @@ public sealed class ListSalesOrdersHandler : IQueryHandler<ListSalesOrders>
             ("c", context.CompanyId),
             ("s", query.Status),
             ("p", query.PartyId),
+            ("from", query.From),
+            ("to", query.To),
             ("limit", query.Limit),
             ("offset", query.Offset)).ConfigureAwait(false);
         return ApiJson.Serialize(new SalesOrderList(items, query.Limit, query.Offset));
@@ -61,7 +66,10 @@ public sealed class ListSalesOrdersHandler : IQueryHandler<ListSalesOrders>
 
 public sealed record GetSalesOrder(Guid CompanyId, Guid SessionId, Guid SalesOrderId) : IQuery;
 
-public sealed record SalesOrderLineView(int LineNo, Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal QtyOrdered, decimal UnitPrice, decimal NetAmount, decimal QtyDelivered, decimal QtyInvoiced);
+/// <summary><paramref name="SalesOrderLineId"/> (VS3-09): what a delivery plan names.</summary>
+public sealed record SalesOrderLineView(
+    int LineNo, Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal QtyOrdered, decimal UnitPrice, decimal NetAmount, decimal QtyDelivered, decimal QtyInvoiced,
+    Guid SalesOrderLineId);
 
 public sealed record CreditCheckView(
     Guid CreditCheckId, DateTime CheckedAt, decimal OrderAmount, decimal ExposureAr, decimal ExposureOrders, decimal ExposureUninvoiced, decimal CreditLimit, bool CreditHold,
@@ -97,13 +105,13 @@ public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
             context.Connection,
             context.Transaction,
             """
-            SELECT l.line_no, l.item_id, i.code, i.description, l.uom, l.qty_ordered, l.unit_price, l.net_amount::numeric(19,2), l.qty_delivered, l.qty_invoiced
+            SELECT l.line_no, l.item_id, i.code, i.description, l.uom, l.qty_ordered, l.unit_price, l.net_amount::numeric(19,2), l.qty_delivered, l.qty_invoiced, l.line_id
             FROM sal.sales_order o
             JOIN sal.sales_order_line l ON l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version
             JOIN md.item i ON i.item_id = l.item_id
             WHERE o.sales_order_id = @o ORDER BY l.line_no
             """,
-            r => new SalesOrderLineView(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9)),
+            r => new SalesOrderLineView(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9), r.GetGuid(10)),
             cancellationToken,
             ("o", query.SalesOrderId)).ConfigureAwait(false);
         var checks = await Reading.ListAsync(

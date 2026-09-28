@@ -48,9 +48,9 @@ public sealed record MatchBankLineToReceipt(
     string IdempotencyKey,
     Guid LineId,
     long ExpectedLineVersion,
-    Guid? ReceiptId,
-    Guid? DepositId,
-    long ExpectedVersion) : ICommand;
+    long ExpectedVersion,
+    Guid? ReceiptId = null,
+    Guid? DepositId = null) : ICommand;
 
 /// <summary>
 /// MATCHED → UNMATCHED with step-up and a reason; the payment goes back from CLEARED to RELEASED (E-VS2-01-11, E-VS2-05-8). The

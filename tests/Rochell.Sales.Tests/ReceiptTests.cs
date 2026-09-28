@@ -134,11 +134,11 @@ public sealed class ReceiptTests(PostgresFixture postgres)
         await Apply(h, w, "a", receipt, 2, 59000.00m);
         var paid = await InvoiceState(h, w);
         await Import(h, w, "st", "DEP-1,Deposito cheques,,59000.00", "DEV-1,Cheque devuelto 000123,59000.00,");
-        await h.RunAsync(new MatchBankLineToReceipt(h.CompanyId, w.Treasurer, "m-dep", await LineAsync(h, "Deposito cheques"), 1, null, deposit, 1), new MatchBankLineToReceiptHandler());
+        await h.RunAsync(new MatchBankLineToReceipt(h.CompanyId, w.Treasurer, "m-dep", await LineAsync(h, "Deposito cheques"), 1, 1, DepositId: deposit), new MatchBankLineToReceiptHandler());
 
         var cobrosBounces = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new MarkReceiptBounced(h.CompanyId, w.Cobros, "b0", receipt, 4, "Fondos insuficientes"), new MarkReceiptBouncedHandler()));
         var bounced = JsonDocument.Parse((await h.RunAsync(new MarkReceiptBounced(h.CompanyId, w.Treasurer, "b", receipt, 4, "Fondos insuficientes"), new MarkReceiptBouncedHandler())).ResultPayload).RootElement;
-        await h.RunAsync(new MatchBankLineToReceipt(h.CompanyId, w.Treasurer, "m-dev", await LineAsync(h, "Cheque devuelto 000123"), 1, receipt, null, 6), new MatchBankLineToReceiptHandler());
+        await h.RunAsync(new MatchBankLineToReceipt(h.CompanyId, w.Treasurer, "m-dev", await LineAsync(h, "Cheque devuelto 000123"), 1, 6, ReceiptId: receipt), new MatchBankLineToReceiptHandler());
 
         Assert.Equal("CASH_IN_TRANSIT=59000.00|BANK=0.00", inTransit);
         Assert.Equal("PAID:0.00", paid);
@@ -168,10 +168,10 @@ public sealed class ReceiptTests(PostgresFixture postgres)
 
         var other = await LineAsync(h, "Otro deposito");
         var wrongAmount = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
-            new MatchBankLineToReceipt(h.CompanyId, w.Treasurer, "m0", other, 1, receipt, null, 1), new MatchBankLineToReceiptHandler()));
+            new MatchBankLineToReceipt(h.CompanyId, w.Treasurer, "m0", other, 1, 1, ReceiptId: receipt), new MatchBankLineToReceiptHandler()));
         var cobrosMatches = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
-            new MatchBankLineToReceipt(h.CompanyId, w.Cobros, "m1", line, 1, receipt, null, 1), new MatchBankLineToReceiptHandler()));
-        await h.RunAsync(new MatchBankLineToReceipt(h.CompanyId, w.Treasurer, "m", line, 1, receipt, null, 1), new MatchBankLineToReceiptHandler());
+            new MatchBankLineToReceipt(h.CompanyId, w.Cobros, "m1", line, 1, 1, ReceiptId: receipt), new MatchBankLineToReceiptHandler()));
+        await h.RunAsync(new MatchBankLineToReceipt(h.CompanyId, w.Treasurer, "m", line, 1, 1, ReceiptId: receipt), new MatchBankLineToReceiptHandler());
         var after = await BankGlAsync(h, w);
 
         // Before: GL 59,000.00 vs statement 59,500.00, the receipt in transit and both lines unrecorded; after: only the 500.00 line.
