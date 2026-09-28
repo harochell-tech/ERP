@@ -68,8 +68,12 @@ public sealed record InvoiceLineView(int LineNo, Guid DeliveryLineId, string Del
 
 public sealed record ExternalFiscalRecordView(string Encf, DateTime IssuedAt, string SecurityCode, string EvidenceRef, string EvidenceSha256, string? RecordedBy);
 
+/// <summary>E-VS3-06-10: what each invoice line can still credit (net of CONFIRMED credit notes).</summary>
+public sealed record CreditableLine(Guid InvoiceLineId, int LineNo, string ItemCode, decimal NetAmount, decimal Rate, decimal CreditedNet, decimal RemainingNet);
+
 public sealed record InvoiceDetail(
-    InvoiceSummary Header, string? VoidReason, string? IssuedBy, Guid? PostingEventId, IReadOnlyList<InvoiceLineView> Lines, ExternalFiscalRecordView? FiscalRecord, IReadOnlyList<StateChange> History);
+    InvoiceSummary Header, string? VoidReason, string? IssuedBy, Guid? PostingEventId, IReadOnlyList<InvoiceLineView> Lines, ExternalFiscalRecordView? FiscalRecord, IReadOnlyList<StateChange> History,
+    IReadOnlyList<CreditNoteSummary> CreditNotes, IReadOnlyList<CreditableLine> Creditable);
 
 internal static class InvoiceLines
 {
@@ -123,7 +127,24 @@ public sealed class GetInvoiceHandler : IQueryHandler<GetInvoice>
             ("i", query.InvoiceId)).ConfigureAwait(false);
         var lines = await InvoiceLines.ReadAsync(context, query.InvoiceId, cancellationToken).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "Invoice", query.InvoiceId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new InvoiceDetail(header, extra.VoidReason, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history));
+        var notes = await CreditNoteReading.ForInvoiceAsync(context, query.InvoiceId, cancellationToken).ConfigureAwait(false);
+        var creditable = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT il.invoice_line_id, il.line_no, it.code, il.net_amount::numeric(19,2), coalesce(t.rate, 0), x.credited::numeric(19,2), (il.net_amount - x.credited)::numeric(19,2)
+            FROM sal.invoice_line il
+            JOIN sal.invoice i ON i.invoice_id = il.invoice_id
+            JOIN md.item it ON it.item_id = il.item_id
+            LEFT JOIN tax.tax_determination_line t ON t.determination_id = i.tax_determination_id AND t.subject_line_id = il.invoice_line_id AND t.effect = 'OUTPUT'
+            CROSS JOIN LATERAL (SELECT coalesce(sum(cl.net_amount), 0) AS credited FROM sal.credit_note_line cl JOIN sal.credit_note n ON n.credit_note_id = cl.credit_note_id
+                                WHERE cl.invoice_line_id = il.invoice_line_id AND n.commercial_status = 'CONFIRMED') x
+            WHERE il.invoice_id = @i ORDER BY il.line_no
+            """,
+            r => new CreditableLine(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), r.GetDecimal(6)),
+            cancellationToken,
+            ("i", query.InvoiceId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new InvoiceDetail(header, extra.VoidReason, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, notes, creditable));
     }
 }
 

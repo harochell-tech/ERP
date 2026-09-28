@@ -139,3 +139,25 @@ back on a void.
 
 Queries: `GET /sales/invoices[/{id}]`, `/sales/invoices/{id}/fiscal-package`, `/sales/billable-deliveries`.
 Tests: `InvoiceTests` (SAL-06, SAL-07, SAL-09 concurrent, void, fiscal gate).
+
+## Commercial credit note (VS3-06)
+
+Migration `0043__sales_credit_note.sql`: `sal.credit_note` (NC-…, reason category and text, the three statuses with their
+valid combinations, K-25 and ADR-027 evidence, e-NCF `E34…`), `sal.credit_note_line` (lines only while DRAFT and only of the
+note's own invoice), `tax.external_fiscal_record` now for exactly one invoice or credit note, invoice status CREDITED, rule
+P-22 (DRAFT), permissions `credit_note:create` / `credit_note:issue` for Facturación.
+
+| Command (`/sales/…`) | Permission | Effect |
+| --- | --- | --- |
+| `create-credit-note` | `credit_note:create` | DRAFT NC-… on a fiscalized invoice: net per invoice line (≤ what it still has to credit), ITBIS at the invoice line's rate |
+| `issue-credit-note` (step-up) | `credit_note:issue` | Not the invoice's issuer; rechecks the lines, AR open ≥ total; P-22, AR open down; CONFIRMED / POSTED / PENDING_EXTERNAL; invoice CREDITED once fully credited |
+| `record-external-credit-note-document` | `fiscal_document:record` | e-NCF E34 and evidence checked against the note → ACCEPTED_EXTERNAL, FISCALIZES link |
+
+P-22: Dr SALES_DISCOUNTS (party) net / Dr ITBIS_PAYABLE ITBIS / Cr AR_CONTROL (party, the invoice's AR document) total, in
+AR-REC. The ITBIS of a credited line is `round(net × rate, 2)`, except the note that credits the rest of the line, which takes
+the rest of its ITBIS, so a fully credited invoice leaves ITBIS_PAYABLE and AR_CONTROL at exactly 0. Issuing locks the
+invoice first, so two notes of the same invoice are serialized; a DRAFT that another note overtook is refused at issue.
+
+Queries: `GET /sales/credit-notes[/{id}]`, `/sales/credit-notes/{id}/fiscal-package` (with the modified e-NCF); `GetInvoice`
+adds `creditNotes` and `creditable` (per line: credited and remaining net).
+Tests: `CreditNoteTests` (SAL-08, remainder ITBIS and CREDITED, permissions and four eyes, overtaken draft).

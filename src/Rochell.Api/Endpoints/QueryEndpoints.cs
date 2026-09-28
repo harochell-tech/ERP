@@ -50,6 +50,7 @@ public static class QueryEndpoints
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
+        typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
@@ -160,6 +161,15 @@ public static class QueryEndpoints
         sales.MapGet("/billable-deliveries", (HttpContext http, Guid companyId, Guid? partyId, ListBillableDeliveriesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListBillableDeliveries(companyId, s, partyId), handler, ct))
             .Describe<BillableDeliveryList>(nameof(ListBillableDeliveries));
+        sales.MapGet("/credit-notes", (HttpContext http, Guid companyId, Guid? invoiceId, string? fiscalStatus, Guid? partyId, int? limit, int? offset, ListCreditNotesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListCreditNotes(companyId, s, invoiceId, fiscalStatus, partyId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<CreditNoteList>(nameof(ListCreditNotes));
+        sales.MapGet("/credit-notes/{creditNoteId:guid}", (HttpContext http, Guid companyId, Guid creditNoteId, GetCreditNoteHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetCreditNote(companyId, s, creditNoteId), handler, ct))
+            .Describe<CreditNoteDetail>(nameof(GetCreditNote), notFound: true);
+        sales.MapGet("/credit-notes/{creditNoteId:guid}/fiscal-package", (HttpContext http, Guid companyId, Guid creditNoteId, GetCreditNoteFiscalPackageHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetCreditNoteFiscalPackage(companyId, s, creditNoteId), handler, ct))
+            .Describe<CreditNoteFiscalPackage>(nameof(GetCreditNoteFiscalPackage), notFound: true);
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)

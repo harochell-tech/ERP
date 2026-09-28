@@ -42,14 +42,14 @@ public sealed class DeliveryTests(PostgresFixture postgres)
             $"""
             INSERT INTO md.item VALUES ('{block}', '{h.CompanyId}', 'BLOQUE-6', 'Bloque de 6 pulgadas', 'FINISHED_GOOD', 'un', 'BLOQUE', 'ACTIVE', 1);
             UPDATE fin.posting_rule_version v SET status = 'ACTIVE', approved_by = '{h.UserId}'
-            FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND r.code IN ('OPEN-INV', 'P-15', 'P-15R', 'P-16', 'P-30', 'P-18');
+            FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND r.code IN ('OPEN-INV', 'P-15', 'P-15R', 'P-16', 'P-30', 'P-18', 'P-22');
             """);
         var accounts = new Dictionary<string, Guid>();
         foreach (var (role, code, control) in new[]
         {
             ("FINISHED_GOODS", "1350", true), ("FINISHED_GOODS_IN_TRANSIT", "1351", true), ("MIGRATION_CLEARING", "3990", false), ("COGS", "5100", false),
             ("CONTRACT_ASSET", "1240", true), ("UNBILLED_RECEIVABLE", "1245", true), ("REVENUE_PRODUCT", "4100", false), ("TRANSIT_LOSS", "6900", false),
-            ("AR_CONTROL", "1210", true), ("ITBIS_PAYABLE", "2150", false),
+            ("AR_CONTROL", "1210", true), ("ITBIS_PAYABLE", "2150", false), ("SALES_DISCOUNTS", "4190", false),
         })
         {
             accounts[role] = await h.CreateAccountAsync(code, role, control);

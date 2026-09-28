@@ -414,6 +414,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-05-12 | VS3-05 | Permissions `invoice:create`, `invoice:issue`, `fiscal_document:record` (Facturación) and `invoice:void` (Controller); SoD invoice:issue ≠ fiscal_rule:configure and invoice:void ≠ invoice:issue (88 permissions, 34 SoD rules). |
 | E-VS3-05-13 | VS3-05 | Issuing locks its delivery lines in id order and checks what is still delivered and not invoiced; `qty_invoiced ≤ qty_delivered` (CHECK); a concurrent test issues two invoices of the same line (SAL-09). |
 | E-VS3-05-14 | VS3-05 | Queries with `sales:read`: ListInvoices, GetInvoice, GetInvoiceFiscalPackage, ListBillableDeliveries. |
+| E-VS3-06-1 | VS3-06 | A credit note only on an invoice with fiscal ACCEPTED_EXTERNAL (commercial CONFIRMED / PARTIALLY_PAID / PAID), per invoice line: net ≤ what the line still has to credit (its net − the CONFIRMED notes on it); reason category DESCUENTO / ERROR_DE_PRECIO / OTRO plus text. No returns of goods in VS#3. |
+| E-VS3-06-2 | VS3-06 | ITBIS per credited line = net × the rate of the invoice line's tax determination, 2 decimals half away from zero; the note that credits the rest of a line takes the rest of its ITBIS. |
+| E-VS3-06-3 | VS3-06 | Issuing lowers the invoice's AR document open amount by the note total; refused when the total exceeds the open amount (credit balances and refunds are out of VS#3). |
+| E-VS3-06-4 | VS3-06 | Statuses DRAFT → CONFIRMED, NOT_POSTED → POSTED (P-22), PENDING → PENDING_EXTERNAL → ACCEPTED_EXTERNAL; the invoice becomes CREDITED when its CONFIRMED notes add up to its total. |
+| E-VS3-06-5 | VS3-06 | Numbering NC-000001 per company; e-CF type 34, e-NCF E34 + 10 digits; GetCreditNoteFiscalPackage carries the modified invoice's e-NCF. |
+| E-VS3-06-6 | VS3-06 | P-22 (AR-REC): Dr SALES_DISCOUNTS (party) note net / Dr ITBIS_PAYABLE note ITBIS / Cr AR_CONTROL (party, the invoice's AR document) note total. |
+| E-VS3-06-7 | VS3-06 | Permissions `credit_note:create` and `credit_note:issue` (Facturación); IssueCreditNote needs step-up and someone other than who issued the invoice (90 permissions, 34 SoD rules). |
+| E-VS3-06-8 | VS3-06 | RecordExternalCreditNoteDocument uses `fiscal_document:record` and the same checks as the invoice's; `tax.external_fiscal_record` references exactly one invoice or credit note. |
+| E-VS3-06-9 | VS3-06 | No void of credit notes in VS3-06. |
+| E-VS3-06-10 | VS3-06 | Queries with `sales:read`: ListCreditNotes, GetCreditNote, GetCreditNoteFiscalPackage; GetInvoice adds its credit notes and what each line can still credit. |
 
 Implementation rules derived from the above (no architectural change):
 
