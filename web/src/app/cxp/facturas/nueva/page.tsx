@@ -5,7 +5,7 @@ import { useState } from "react";
 import { query } from "@/api/client";
 import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
 import { formatDecimal, formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
-import { todayInDominicanRepublic } from "@/lib/labels";
+import { addDays, todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -56,6 +56,8 @@ export default function NewInvoice() {
   if (suppliers.data === null) {
     return <Loading error={suppliers.error} />;
   }
+  // E-VS3-02-10: the supplier's payment term proposes the due date; the user keeps the last word.
+  const termsDays = suppliers.data.items.find((s) => s.supplierId === values.partyId)?.paymentTermsDays ?? null;
 
   const setLine = (poLineId: string, change: Partial<{ quantity: string; unitPrice: string }>) =>
     setValues((v) => ({ ...v, lines: { ...v.lines, [poLineId]: { quantity: "", unitPrice: "", ...v.lines[poLineId], ...change } } }));
@@ -111,6 +113,14 @@ export default function NewInvoice() {
         <Field label="Vencimiento">
           <input type="date" aria-label="Vencimiento" value={values.dueDate} onChange={(e) => setValues({ ...values, dueDate: e.target.value })} />
         </Field>
+        {termsDays !== null && values.docDate ? (
+          <span className="muted" data-testid="due-date-proposal">
+            Plazo del proveedor: {termsDays} días →{" "}
+            <button type="button" className="link" onClick={() => setValues({ ...values, dueDate: addDays(values.docDate, termsDays) })}>
+              usar {addDays(values.docDate, termsDays)}
+            </button>
+          </span>
+        ) : null}
         <Field label="Orden de compra">
           <select aria-label="Orden de compra" value={values.purchaseOrderId} onChange={(e) => setValues({ ...values, purchaseOrderId: e.target.value, lines: {} })}>
             <option value="">—</option>

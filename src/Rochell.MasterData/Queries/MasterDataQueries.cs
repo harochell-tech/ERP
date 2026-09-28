@@ -14,7 +14,8 @@ public sealed record ListSuppliers(Guid CompanyId, Guid SessionId, Guid? PlantId
 /// E-UI-4: <see cref="BankAccountState"/> is PAYABLE (verified, past its 72 h), HOLD_PENDING (verified, within them), REVIEW (a version
 /// waits for verification, none verified) or NONE; <see cref="OpenApAmount"/> sums the open AP documents of its posted invoices.
 /// </summary>
-public sealed record SupplierView(Guid SupplierId, string PartyKind, string? Rnc, string LegalName, string Status, DateTime? RncValidatedAt, long Version, string BankAccountState, decimal OpenApAmount);
+/// <summary>E-VS3-02-10: <see cref="PaymentTermsDays"/> proposes the due date of the supplier's invoices on screen.</summary>
+public sealed record SupplierView(Guid SupplierId, string PartyKind, string? Rnc, string LegalName, string Status, DateTime? RncValidatedAt, long Version, string BankAccountState, decimal OpenApAmount, int? PaymentTermsDays);
 
 public sealed record SupplierList(IReadOnlyList<SupplierView> Items, int Limit, int Offset);
 
@@ -39,13 +40,14 @@ public sealed class ListSuppliersHandler : IQueryHandler<ListSuppliers>
                         ELSE 'NONE' END,
                    (SELECT coalesce(sum(d.open_amount), 0) FROM fin.ap_document d
                     JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.accounting_status::text = 'POSTED'
-                    WHERE d.party_id = p.party_id)
+                    WHERE d.party_id = p.party_id),
+                   p.supplier_payment_terms_days
             FROM md.party p
             WHERE p.company_id = @c AND p.is_supplier AND (CAST(@status AS text) IS NULL OR p.status::text = CAST(@status AS text))
             ORDER BY p.legal_name, p.party_id
             LIMIT @limit OFFSET @offset
             """,
-            r => new SupplierView(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.GetString(3), r.GetString(4), r.NullableUtc(5), r.GetInt64(6), r.GetString(7), r.GetDecimal(8)),
+            r => new SupplierView(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.GetString(3), r.GetString(4), r.NullableUtc(5), r.GetInt64(6), r.GetString(7), r.GetDecimal(8), r.IsDBNull(9) ? null : r.GetInt32(9)),
             cancellationToken,
             ("c", context.CompanyId),
             ("now", context.Clock.UtcNow),

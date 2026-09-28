@@ -16,6 +16,9 @@ using Rochell.Procurement.PurchaseOrders;
 using Rochell.Procurement.ReceiptCorrections;
 using Rochell.Procurement.SupplierInvoices;
 using Rochell.Reconciliation;
+using Rochell.Sales.Customers;
+using Rochell.Sales.Fleet;
+using Rochell.Sales.Pricing;
 using Rochell.Tax;
 using Rochell.Treasury.BankAccounts;
 using Rochell.Treasury.Payments;
@@ -45,7 +48,9 @@ public static class CommandEndpoints
         masterData.MapCommand<CreateSupplier, CreateSupplierHandler>();
         masterData.MapCommand<UpdateSupplier, UpdateSupplierHandler>();
         masterData.MapCommand<ActivateSupplier, ActivateSupplierHandler>();
+        masterData.MapCommand<SetSupplierPaymentTerms, SetSupplierPaymentTermsHandler>();
         masterData.MapCommand<CreateRawMaterial, CreateRawMaterialHandler>();
+        masterData.MapCommand<CreateFinishedGood, CreateFinishedGoodHandler>();
         masterData.MapCommand<DefineUomConversion, DefineUomConversionHandler>();
         masterData.MapCommand<ActivateItem, ActivateItemHandler>();
         masterData.MapCommand<RequestPartyBankAccount, RequestPartyBankAccountHandler>();
@@ -130,6 +135,25 @@ public static class CommandEndpoints
             .Describe<VerifyHashChain>()
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
+        var sales = company.MapGroup("/sales").WithTags("Sales");
+        sales.MapCommand<CreateCustomer, CreateCustomerHandler>();
+        sales.MapCommand<UpdateCustomer, UpdateCustomerHandler>();
+        sales.MapCommand<ActivateCustomer, ActivateCustomerHandler>();
+        sales.MapCommand<PrepareCustomerTerms, PrepareCustomerTermsHandler>();
+        sales.MapCommand<ApproveCustomerTerms, ApproveCustomerTermsHandler>();
+        sales.MapCommand<PrepareStandardCost, PrepareStandardCostHandler>();
+        sales.MapCommand<ApproveStandardCost, ApproveStandardCostHandler>();
+        sales.MapCommand<PreparePriceList, PreparePriceListHandler>();
+        sales.MapCommand<ApprovePriceList, ApprovePriceListHandler>();
+        sales.MapCommand<RegisterVehicle, RegisterVehicleHandler>();
+        sales.MapCommand<UpdateVehicle, UpdateVehicleHandler>();
+        sales.MapCommand<DeactivateVehicle, DeactivateVehicleHandler>();
+        sales.MapCommand<ActivateVehicle, ActivateVehicleHandler>();
+        sales.MapCommand<RegisterDriver, RegisterDriverHandler>();
+        sales.MapCommand<UpdateDriver, UpdateDriverHandler>();
+        sales.MapCommand<DeactivateDriver, DeactivateDriverHandler>();
+        sales.MapCommand<ActivateDriver, ActivateDriverHandler>();
+
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
         identity.MapCommand<RequestRoleRevocation, RequestRoleRevocationHandler>();
@@ -140,7 +164,7 @@ public static class CommandEndpoints
     /// <summary>Every handler class the host resolves (the verifier is built by <see cref="HashVerification"/>).</summary>
     public static IReadOnlyList<Type> Handlers { get; } =
     [
-        typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(CreateRawMaterialHandler),
+        typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler),
@@ -161,6 +185,8 @@ public static class CommandEndpoints
         typeof(RegisterFiscalSourceHandler), typeof(ConfigureFiscalRuleVersionHandler), typeof(LinkFiscalSourceHandler), typeof(RunFiscalRuleTestsHandler),
         typeof(ActivateFiscalRuleVersionHandler),
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),
+        typeof(CreateCustomerHandler), typeof(UpdateCustomerHandler), typeof(ActivateCustomerHandler), typeof(PrepareCustomerTermsHandler), typeof(ApproveCustomerTermsHandler), typeof(PrepareStandardCostHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler),
+        typeof(RegisterVehicleHandler), typeof(UpdateVehicleHandler), typeof(DeactivateVehicleHandler), typeof(ActivateVehicleHandler), typeof(RegisterDriverHandler), typeof(UpdateDriverHandler), typeof(DeactivateDriverHandler), typeof(ActivateDriverHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 

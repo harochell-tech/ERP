@@ -22,34 +22,30 @@ internal static partial class ItemRules
     }
 }
 
-[RequiresPermission("item:create")]
-public sealed class CreateRawMaterialHandler : ICommandHandler<CreateRawMaterial>
+internal static class ItemCreation
 {
-    public string CommandType => "MasterData.CreateRawMaterial";
-
-    public async Task<string> HandleAsync(CreateRawMaterial command, CommandContext context, CancellationToken cancellationToken)
+    public static async Task<string> CreateAsync(
+        CommandContext context, string itemType, IReadOnlyList<string> categories, string? rawCode, string? description, string baseUom, string category, string commandType, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(command);
-        ArgumentNullException.ThrowIfNull(context);
-        var code = (command.Code ?? string.Empty).Trim().ToUpperInvariant();
+        var code = (rawCode ?? string.Empty).Trim().ToUpperInvariant();
         if (!ItemRules.CodeFormat().IsMatch(code))
         {
             throw new DomainException(MasterDataErrors.ItemCodeInvalid, "Item code must be 2–40 characters: A–Z, 0–9, '-' or '_'.");
         }
 
-        if (string.IsNullOrWhiteSpace(command.Description))
+        if (string.IsNullOrWhiteSpace(description))
         {
             throw new DomainException(MasterDataErrors.FieldRequired, "The description is required.");
         }
 
-        if (!ItemCategories.All.Contains(command.ItemCategory, StringComparer.Ordinal))
+        if (!categories.Contains(category, StringComparer.Ordinal))
         {
-            throw new DomainException(MasterDataErrors.CategoryInvalid, $"Category must be one of: {string.Join(", ", ItemCategories.All)}.");
+            throw new DomainException(MasterDataErrors.CategoryInvalid, $"Category must be one of: {string.Join(", ", categories)}.");
         }
 
-        if (!await ItemRules.UomExistsAsync(context, command.BaseUom, cancellationToken).ConfigureAwait(false))
+        if (!await ItemRules.UomExistsAsync(context, baseUom, cancellationToken).ConfigureAwait(false))
         {
-            throw new DomainException(MasterDataErrors.UomUnknown, $"Unit of measure '{command.BaseUom}' does not exist.");
+            throw new DomainException(MasterDataErrors.UomUnknown, $"Unit of measure '{baseUom}' does not exist.");
         }
 
         var eventId = await context.AppendEventAsync(
@@ -59,7 +55,7 @@ public sealed class CreateRawMaterialHandler : ICommandHandler<CreateRawMaterial
                 ItemRules.Aggregate,
                 context.ResultRef,
                 1,
-                JsonSerializer.Serialize(new { itemId = context.ResultRef, code, description = command.Description.Trim(), baseUom = command.BaseUom, itemCategory = command.ItemCategory }),
+                JsonSerializer.Serialize(new { itemId = context.ResultRef, code, description = description.Trim(), itemType, baseUom, itemCategory = category }),
                 Publish: false),
             cancellationToken).ConfigureAwait(false);
 
@@ -70,23 +66,50 @@ public sealed class CreateRawMaterialHandler : ICommandHandler<CreateRawMaterial
                 context.Transaction,
                 """
                 INSERT INTO md.item (item_id, company_id, code, description, item_type, base_uom, item_category, status, version)
-                VALUES (@id, @company_id, @code, @description, 'RAW_MATERIAL', @base_uom, @category, 'DRAFT', 1)
+                VALUES (@id, @company_id, @code, @description, @type, @base_uom, @category, 'DRAFT', 1)
                 """,
                 cancellationToken,
                 ("id", context.ResultRef),
                 ("company_id", context.CompanyId),
                 ("code", code),
-                ("description", command.Description.Trim()),
-                ("base_uom", command.BaseUom),
-                ("category", command.ItemCategory)).ConfigureAwait(false);
+                ("description", description.Trim()),
+                ("type", itemType),
+                ("base_uom", baseUom),
+                ("category", category)).ConfigureAwait(false);
         }
         catch (DbException ex) when (MasterRows.IsUniqueViolation(ex))
         {
             throw new DomainException(MasterDataErrors.ItemCodeDuplicate, $"Item code {code} already exists in this company.");
         }
 
-        await context.AppendStateAsync(ItemRules.Aggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        await context.AppendStateAsync(ItemRules.Aggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", commandType, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { itemId = context.ResultRef, code, status = "DRAFT", version = 1 });
+    }
+}
+
+[RequiresPermission("item:create")]
+public sealed class CreateRawMaterialHandler : ICommandHandler<CreateRawMaterial>
+{
+    public string CommandType => "MasterData.CreateRawMaterial";
+
+    public Task<string> HandleAsync(CreateRawMaterial command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        return ItemCreation.CreateAsync(context, "RAW_MATERIAL", ItemCategories.All, command.Code, command.Description, command.BaseUom, command.ItemCategory, CommandType, cancellationToken);
+    }
+}
+
+[RequiresPermission("item:create")]
+public sealed class CreateFinishedGoodHandler : ICommandHandler<CreateFinishedGood>
+{
+    public string CommandType => "MasterData.CreateFinishedGood";
+
+    public Task<string> HandleAsync(CreateFinishedGood command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        return ItemCreation.CreateAsync(context, "FINISHED_GOOD", ItemCategories.FinishedGoods, command.Code, command.Description, command.BaseUom, command.ItemCategory, CommandType, cancellationToken);
     }
 }
 

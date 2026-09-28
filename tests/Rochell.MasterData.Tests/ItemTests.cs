@@ -135,4 +135,22 @@ public sealed class ItemTests(PostgresFixture postgres)
         Assert.Equal("23P01", overlap?.SqlState); // exclusion_violation
         Assert.Contains("base UOM", toNonBase!.MessageText, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task A_finished_good_is_created_in_draft_with_its_own_categories_and_activated_by_the_controller()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var storekeeper = await h.SessionWithRolesAsync("ALMACENISTA");
+        var controller = await h.SessionWithRolesAsync("CONTROLLER");
+
+        var block = await h.RunAsync(new CreateFinishedGood(h.CompanyId, storekeeper, "fg", "bloque-6", "Bloque de 6 pulgadas", "un", "BLOQUE"), new CreateFinishedGoodHandler());
+        var rawCategory = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
+            new CreateFinishedGood(h.CompanyId, storekeeper, "bad", "BLOQUE-8", "Bloque de 8", "un", "CEMENTO"), new CreateFinishedGoodHandler()));
+        var fgCategoryAsRaw = await Assert.ThrowsAsync<DomainException>(() => CreateItem(h, storekeeper, "raw", "ARENA-2", "t", "BLOQUE"));
+        await h.RunAsync(new ActivateItem(h.CompanyId, controller, "activate", block.ResultRef, 1), new ActivateItemHandler());
+
+        Assert.Equal((MasterDataErrors.CategoryInvalid, MasterDataErrors.CategoryInvalid), (rawCategory.Code, fgCategoryAsRaw.Code));
+        Assert.Equal("BLOQUE-6:FINISHED_GOOD:BLOQUE:ACTIVE", await h.ScalarAsync<string>(
+            "SELECT code || ':' || item_type || ':' || item_category || ':' || status::text FROM md.item WHERE item_id = @i", ("i", block.ResultRef)));
+    }
 }

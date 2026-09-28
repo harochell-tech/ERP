@@ -20,4 +20,7 @@ public static class ItemCategories
 {
     /// <summary>E-PR04-7: closed list (also enforced by a CHECK constraint).</summary>
     public static IReadOnlyList<string> All { get; } = ["CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA"];
+
+    /// <summary>E-VS3-01-2: categories of finished goods.</summary>
+    public static IReadOnlyList<string> FinishedGoods { get; } = ["BLOQUE", "ADOQUIN", "OTRO_PT"];
 }

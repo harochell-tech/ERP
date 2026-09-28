@@ -5,7 +5,7 @@ namespace Rochell.ArchitectureTests;
 internal static class Repo
 {
     public static readonly string[] Modules =
-        ["Identity", "MasterData", "Finance", "Inventory", "Procurement", "Tax", "Audit", "Reconciliation", "Treasury"];
+        ["Identity", "MasterData", "Finance", "Inventory", "Procurement", "Tax", "Audit", "Reconciliation", "Treasury", "Sales"];
 
     /// <summary>Every production assembly under src/. Loaded by name so internal Program types are included.</summary>
     public static readonly string[] ProductionAssemblyNames =
