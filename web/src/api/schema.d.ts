@@ -1851,6 +1851,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/create-credit-note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateCreditNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/issue-credit-note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["IssueCreditNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/record-external-credit-note-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RecordExternalCreditNoteDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/identity/request-role-assignment": {
         parameters: {
             query?: never;
@@ -2419,6 +2467,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["ListBillableDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListCreditNotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/credit-notes/{creditNoteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCreditNote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/credit-notes/{creditNoteId}/fiscal-package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCreditNoteFiscalPackage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3397,6 +3493,13 @@ export interface components {
             accountClass: string;
             isControl: boolean;
         };
+        CreateCreditNote: {
+            /** Format: uuid */
+            invoiceId: string;
+            reasonCategory: string;
+            reason: string;
+            lines: components["schemas"]["CreditNoteLineInput"][];
+        };
         CreateCustomer: {
             rnc: string;
             legalName: string;
@@ -3482,6 +3585,112 @@ export interface components {
             outcome: null | string;
             decidedBy: null | string;
             reason: null | string;
+        };
+        CreditNoteDetail: {
+            header: components["schemas"]["CreditNoteSummary"];
+            createdBy: null | string;
+            issuedBy: null | string;
+            /** Format: uuid */
+            postingEventId: null | string;
+            lines: components["schemas"]["CreditNoteLineView"][];
+            fiscalRecord: null | components["schemas"]["ExternalFiscalRecordView"];
+            history: components["schemas"]["StateChange"][];
+        };
+        CreditNoteFiscalPackage: {
+            creditNoteNo: string;
+            ecfType: string;
+            /** Format: date */
+            creditDate: string;
+            modifiedEncf: string;
+            invoiceNo: string;
+            /** Format: date */
+            invoiceDate: string;
+            reasonCategory: string;
+            reason: string;
+            issuerRnc: string;
+            issuerName: string;
+            receiverRnc: string;
+            receiverName: string;
+            lines: components["schemas"]["CreditNoteLineView"][];
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            taxTotal: string;
+            /** Format: decimal */
+            total: string;
+            fiscalStatus: string;
+        };
+        CreditNoteLineInput: {
+            /** Format: uuid */
+            invoiceLineId: string;
+            /** Format: decimal */
+            netAmount: string;
+        };
+        CreditNoteLineView: {
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: uuid */
+            invoiceLineId: string;
+            /** Format: int32 */
+            invoiceLineNo: number;
+            itemCode: string;
+            itemDescription: string;
+            /** Format: decimal */
+            netAmount: string;
+            /** Format: decimal */
+            rate: string;
+            /** Format: decimal */
+            itbis: string;
+        };
+        CreditNoteList: {
+            items: components["schemas"]["CreditNoteSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        CreditNoteSummary: {
+            /** Format: uuid */
+            creditNoteId: string;
+            creditNoteNo: string;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNo: string;
+            invoiceEncf: null | string;
+            /** Format: uuid */
+            partyId: string;
+            customerName: string;
+            reasonCategory: string;
+            reason: string;
+            /** Format: date */
+            creditDate: null | string;
+            encf: null | string;
+            commercialStatus: string;
+            accountingStatus: string;
+            fiscalStatus: string;
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            taxTotal: string;
+            /** Format: decimal */
+            total: string;
+            /** Format: int64 */
+            version: number;
+        };
+        CreditableLine: {
+            /** Format: uuid */
+            invoiceLineId: string;
+            /** Format: int32 */
+            lineNo: number;
+            itemCode: string;
+            /** Format: decimal */
+            netAmount: string;
+            /** Format: decimal */
+            rate: string;
+            /** Format: decimal */
+            creditedNet: string;
+            /** Format: decimal */
+            remainingNet: string;
         };
         CustomerDetail: {
             /** Format: uuid */
@@ -3937,6 +4146,8 @@ export interface components {
             lines: components["schemas"]["InvoiceLineView"][];
             fiscalRecord: null | components["schemas"]["ExternalFiscalRecordView"];
             history: components["schemas"]["StateChange"][];
+            creditNotes: components["schemas"]["CreditNoteSummary"][];
+            creditable: components["schemas"]["CreditableLine"][];
         };
         InvoiceFiscalPackage: {
             invoiceNo: string;
@@ -4011,6 +4222,12 @@ export interface components {
             openAmount: null | string;
             /** Format: int64 */
             version: number;
+        };
+        IssueCreditNote: {
+            /** Format: uuid */
+            creditNoteId: string;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         IssueInvoice: {
             /** Format: uuid */
@@ -4840,6 +5057,25 @@ export interface components {
             status: string;
             /** Format: int32 */
             exceptionCount: number;
+        };
+        RecordExternalCreditNoteDocument: {
+            /** Format: uuid */
+            creditNoteId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            encf: string;
+            /** Format: date-time */
+            issuedAt: string;
+            securityCode: string;
+            evidenceRef: string;
+            evidenceSha256: string;
+            receiverRnc: string;
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            taxTotal: string;
+            /** Format: decimal */
+            total: string;
         };
         RecordExternalFiscalDocument: {
             /** Format: uuid */
@@ -14116,6 +14352,234 @@ export interface operations {
             };
         };
     };
+    CreateCreditNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCreditNote"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    IssueCreditNote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueCreditNote"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RecordExternalCreditNoteDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordExternalCreditNoteDocument"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RequestRoleAssignment: {
         parameters: {
             query?: never;
@@ -16178,6 +16642,179 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListCreditNotes: {
+        parameters: {
+            query?: {
+                invoiceId?: string;
+                fiscalStatus?: string;
+                partyId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCreditNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                creditNoteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCreditNoteFiscalPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                creditNoteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteFiscalPackage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
