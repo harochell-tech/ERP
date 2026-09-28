@@ -5,6 +5,9 @@ namespace Rochell.Sales;
 
 internal static class SalesSql
 {
+    /// <summary>0.00: keeps two decimals in JSON where a bare 0m would print "0".</summary>
+    public static readonly decimal Zero = new(0, 0, 0, false, 2);
+
     public static async Task<T?> ScalarAsync<T>(CommandContext context, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters)
     {
         await using var command = Sql.Command(context.Connection, context.Transaction, sql, parameters);

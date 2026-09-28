@@ -48,6 +48,7 @@ public static class QueryEndpoints
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
+        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler),
         typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
@@ -131,6 +132,15 @@ public static class QueryEndpoints
         sales.MapGet("/opening-batches/{batchId:guid}", (HttpContext http, Guid companyId, Guid batchId, GetOpeningBatchHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetOpeningBatch(companyId, s, batchId), handler, ct))
             .Describe<OpeningBatchDetail>(nameof(GetOpeningBatch), notFound: true);
+        sales.MapGet("/orders", (HttpContext http, Guid companyId, string? status, Guid? partyId, int? limit, int? offset, ListSalesOrdersHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListSalesOrders(companyId, s, status, partyId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<SalesOrderList>(nameof(ListSalesOrders));
+        sales.MapGet("/orders/{salesOrderId:guid}", (HttpContext http, Guid companyId, Guid salesOrderId, GetSalesOrderHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetSalesOrder(companyId, s, salesOrderId), handler, ct))
+            .Describe<SalesOrderDetail>(nameof(GetSalesOrder), notFound: true);
+        sales.MapGet("/customers/{partyId:guid}/exposure", (HttpContext http, Guid companyId, Guid partyId, GetCustomerExposureHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetCustomerExposure(companyId, s, partyId), handler, ct))
+            .Describe<CustomerExposure>(nameof(GetCustomerExposure), notFound: true);
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)

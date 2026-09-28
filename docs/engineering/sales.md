@@ -79,3 +79,22 @@ unique live document and posted file. P-3 now counts FINISHED_GOODS and FINISHED
 INV-VALUE-GL, VALUE-GL-LINK and the INV-MOV close snapshot.
 
 Queries (`configuration:read`): `GET /sales/opening-batches[/{batchId}]`. Tests: `OpeningInventoryTests`.
+
+## Sales order and credit (VS3-03)
+
+Migration `0040__sales_order_credit.sql`: `sal.sales_order` (PV-…, statuses DRAFT, PENDING_CREDIT, CONFIRMED, … CANCELLED),
+`sal.sales_order_line` (versioned while DRAFT; delivered and invoiced quantities with `qty_invoiced ≤ qty_delivered`),
+`sal.credit_check` (every evaluation, decided once), policy CREDIT (`overdue_days_block`), permissions `sales_order:create`,
+`sales_order:cancel`, `credit:approve` and SoD credit:approve ≠ sales_order:create.
+
+| Command (`/sales/…`) | Permission | Effect |
+| --- | --- | --- |
+| `create-sales-order`, `update-sales-order-draft` | `sales_order:create` | DRAFT priced from the list in force (net of ITBIS) |
+| `submit-for-credit` | `sales_order:create` | Evaluates exposure + order against the limit, hold and overdue days → CONFIRMED (auto) or PENDING_CREDIT |
+| `approve-credit` (step-up), `reject-credit` (reason) | `credit:approve` | PENDING_CREDIT → CONFIRMED / DRAFT; not the order's creator |
+| `cancel-sales-order` | `sales_order:cancel` | DRAFT, PENDING_CREDIT or CONFIRMED without deliveries → CANCELLED with a reason |
+
+`CreditExposure` computes the parts (open AR and overdue days are 0 until the receivables exist). A customer's credit decisions
+are serialized by an advisory lock. Queries: `GET /sales/orders[/{id}]`, `GET /sales/customers/{partyId}/exposure`.
+
+Tests: `SalesOrderTests` (SAL-01, SAL-02, rejection and resubmission, validations, concurrency).

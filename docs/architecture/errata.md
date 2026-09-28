@@ -375,6 +375,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-02b-8 | VS3-02b | Reconciliation MIGRATION-CLEARING: a warning with the balance of MIGRATION_CLEARING; it blocks nothing until the full migration. |
 | E-VS3-02b-9 | VS3-02b | A batch is unique by file SHA-256 among POSTED batches and a line by source document among live lines; a whole POSTED batch is reversed exactly (with a reason) while none of its lots moved and INV-MOV of its date is open; its file can then be loaded again. |
 | E-VS3-02b-10 | VS3-02b | Opening movements never call the Tax Engine (test: no tax determination) and carry document type OPENING_INVENTORY. |
+| E-VS3-03-1 | VS3-03 | Exposure = open AR (with ITBIS) + confirmed orders not delivered + delivered not invoiced; the order parts read the current lines of CONFIRMED / PARTIALLY_DELIVERED / DELIVERED orders; open AR and overdue days count from 0 until the receivables exist (VS3-05/07), without changing the rule. |
+| E-VS3-03-2 | VS3-03 | Order amounts are quantity × list price, net of ITBIS; orders count net in the exposure, AR with ITBIS. |
+| E-VS3-03-3 | VS3-03 | Accounting policy CREDIT with `overdue_days_block` (0–3650), approved by the Aprobador de políticas. |
+| E-VS3-03-4 | VS3-03 | Auto-approval iff the customer is ACTIVE with ACTIVE terms, no credit hold, exposure + order ≤ limit and overdue days ≤ `overdue_days_block`; otherwise PENDING_CREDIT for Crédito; a DRAFT or BLOCKED customer cannot submit (a BLOCKED one cannot create orders either); every evaluation is kept in `sal.credit_check`. |
+| E-VS3-03-5 | VS3-03 | Prices from the price list in force when the order is created or its draft updated, per item and unit; a missing price refuses the order; no manual price or discount in VS3-03. |
+| E-VS3-03-6 | VS3-03 | Order PV-000001 per company: customer, dispatching plant, delivery term (PICKUP_AT_PLANT / DELIVERED_OWN_TRANSPORT, site address required for the latter), optional requested date and customer PO; one line per item and unit, quantity > 0 (6 decimals); no stock check at ordering. |
+| E-VS3-03-7 | VS3-03 | Commands CreateSalesOrder, UpdateSalesOrderDraft (DRAFT only, new lines version), SubmitForCredit, ApproveCredit (step-up), RejectCredit (reason, back to DRAFT), CancelSalesOrder (reason, no deliveries); CloseShort moves to VS3-04. |
+| E-VS3-03-8 | VS3-03 | Permissions `sales_order:create`, `sales_order:cancel` (Vendedor) and `credit:approve` (Crédito); SoD credit:approve ≠ sales_order:create (82 permissions, 31 SoD rules); the decider also differs from the order's creator. |
+| E-VS3-03-9 | VS3-03 | Credit evaluations and decisions are serialized per customer (advisory lock), so concurrent submissions never auto-approve above the limit (concurrency test). |
+| E-VS3-03-10 | VS3-03 | Queries with `sales:read`: ListSalesOrders, GetSalesOrder (lines, credit checks, history), GetCustomerExposure. |
 
 Implementation rules derived from the above (no architectural change):
 
