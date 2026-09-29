@@ -650,6 +650,20 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS1-05-10 | FIS1-05 | Spanish labels for the 7 statuses and the 3 reconciliations and their findings; Inicio counter "Autorizaciones por verificar" from the list query (as E-UI01-7). |
 | E-FIS1-05-11 | FIS1-05 | E2E-F1 over the API (`FiscalAcceptanceTests`), Playwright `fiscal-journey`, matrix `docs/acceptance/fis1.md` and `AcceptanceFis1TraceabilityTests`. |
 | E-FIS1-05-12 | FIS1-05 | The dev seed creates an ACTIVE synthetic authorization (CERT-DEV-0001, 500 blocks / 25,000.00) for the sample customer; no staging seed script — authorizations are created from the screens with synthetic data (E-VS1-2). |
+| E-QUO1-1 | QUO-1 | ¿A quién se cotiza? → A un **cliente del maestro**, ACTIVE o en borrador (el prospecto se crea como cliente DRAFT con RNC / cédula, como hoy). Sin prospectos de texto libre. Solo se convierte si el cliente está ACTIVE |
+| E-QUO1-2 | QUO-1 | Precio → Por defecto el de la **lista vigente** al crear. El Vendedor puede bajarlo (precio especial) o subirlo |
+| E-QUO1-3 | QUO-1 | Precio especial → Toda línea por debajo de la lista requiere aprobación del **Aprobador de políticas** antes de enviar (sin umbral en el código; A-01 puede pedir luego un umbral por política) |
+| E-QUO1-4 | QUO-1 | Validez → El Vendedor pone `valid_until` (obligatoria, ≥ fecha). Vencida = SENT con fecha pasada: se muestra y no se convierte; no hay estado ni proceso diario |
+| E-QUO1-5 | QUO-1 | ITBIS → Informativo con la regla SALES_ITBIS vigente (igual que la proforma); no se guarda determinación |
+| E-QUO1-6 | QUO-1 | Crédito e inventario → La cotización no evalúa crédito ni reserva stock; el crédito se evalúa en el pedido (SubmitForCredit) |
+| E-QUO1-7 | QUO-1 | Conversión → Toda la cotización en **un pedido DRAFT** con los precios cotizados, la planta, el término y la dirección; el pedido guarda `quote_id` (QUOTED_AS). El pedido se puede ajustar antes de enviarlo a crédito como cualquier borrador |
+| E-QUO1-8 | QUO-1 | Cambios después de enviar → La cotización enviada queda congelada; para cambiarla se **copia** (CopyQuote) y la anterior se anula o se marca perdida |
+| E-QUO1-9 | QUO-1 | Estados → DRAFT, PENDING_APPROVAL, SENT, CONVERTED, LOST, CANCELLED (sección 4) |
+| E-QUO1-10 | QUO-1 | Numeración → `COT-` + 6 dígitos por empresa, como `PV-` |
+| E-QUO1-11 | QUO-1 | Roles y permisos → `quote:manage` (Vendedor), `quote:approve_price` (Aprobador de políticas), lectura `sales:read`; SoD entre ambos; sin roles nuevos |
+| E-QUO1-12 | QUO-1 | Impresión → Vista imprimible con emisor, cliente, líneas, ITBIS, total, validez y condiciones; el formato final lo da Alexander (X-Q1). Puede servir de proforma para la DGII antes del pedido |
+| E-QUO1-13 | QUO-1 | Asientos y fiscal → Ninguno: la cotización no postea, no mueve inventario ni emite e-CF |
+| E-QUO1-14 | QUO-1 | Pantallas → Ventas › Cotizaciones: lista (estado, cliente, vencidas), formulario, detalle con acciones, impresión y «Convertir en pedido»; contador en Inicio de precios por aprobar |
 
 Implementation rules derived from the above (no architectural change):
 
