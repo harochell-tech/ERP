@@ -8,7 +8,7 @@ namespace Rochell.ArchitectureTests;
 /// <summary>
 /// ADR-001 + E-PR08-1: module dependencies are an explicit allow-list (acyclic). Every module may use Rochell.Platform;
 /// Procurement may also use Finance, Inventory, MasterData and Tax; Audit may also use Finance and Inventory, only to recompute their
-/// row hashes (E-PR15-7); Treasury may also use Finance and MasterData (E-VS2-02-1); Sales may also use Finance, Inventory, MasterData and Tax (E-VS3-02-2). Platform depends on no module.
+/// row hashes (E-PR15-7); Treasury may also use Finance and MasterData (E-VS2-02-1); Sales may also use Finance, Inventory, MasterData and Tax (E-VS3-02-2); Manufacturing may also use Finance, Inventory and MasterData (E-MFG1-02-1). Platform depends on no module.
 /// </summary>
 public sealed class ModuleBoundaryTests
 {
@@ -18,6 +18,7 @@ public sealed class ModuleBoundaryTests
         ["Audit"] = ["Finance", "Inventory"],
         ["Treasury"] = ["Finance", "MasterData"], // E-VS2-02-1
         ["Sales"] = ["Finance", "Inventory", "MasterData", "Tax"], // E-VS3-02-2
+        ["Manufacturing"] = ["Finance", "Inventory", "MasterData"], // E-MFG1-02-1
     };
 
     public static TheoryData<string> Modules() => new(Repo.Modules);

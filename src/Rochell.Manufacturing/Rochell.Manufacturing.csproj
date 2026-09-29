@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Rochell.Manufacturing</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Module rule (E-MFG1-02-1): Manufacturing may use Platform, Finance, Inventory and MasterData. -->
+    <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+    <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
+    <ProjectReference Include="..\Rochell.Inventory\Rochell.Inventory.csproj" />
+    <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
+  </ItemGroup>
+</Project>

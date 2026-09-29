@@ -6,6 +6,7 @@ using Rochell.Finance.Explain;
 using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
 using Rochell.Identity.Queries;
+using Rochell.Manufacturing.Queries;
 using Rochell.MasterData.Queries;
 using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
@@ -47,7 +48,7 @@ public static class QueryEndpoints
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
-        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
+        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
@@ -109,6 +110,21 @@ public static class QueryEndpoints
         reconciliation.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetReconciliationRunHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetReconciliationRun(companyId, s, runId), handler, ct))
             .Describe<ReconciliationRunDetail>(nameof(GetReconciliationRun), notFound: true);
+
+        // E-MFG1-02-9: production master data (production:read).
+        var manufacturing = company.MapGroup("/manufacturing").WithTags("Manufacturing");
+        manufacturing.MapGet("/machines", (HttpContext http, Guid companyId, Guid? plantId, string? status, ListMachinesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListMachines(companyId, s, plantId, status), handler, ct))
+            .Describe<MachineList>(nameof(ListMachines));
+        manufacturing.MapGet("/shifts", (HttpContext http, Guid companyId, Guid? plantId, string? status, ListShiftsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListShifts(companyId, s, plantId, status), handler, ct))
+            .Describe<ShiftList>(nameof(ListShifts));
+        manufacturing.MapGet("/recipes", (HttpContext http, Guid companyId, Guid? plantId, Guid? itemId, string? status, ListRecipesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListRecipes(companyId, s, plantId, itemId, status), handler, ct))
+            .Describe<RecipeList>(nameof(ListRecipes));
+        manufacturing.MapGet("/recipes/{recipeVersionId:guid}", (HttpContext http, Guid companyId, Guid recipeVersionId, GetRecipeHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetRecipe(companyId, s, recipeVersionId), handler, ct))
+            .Describe<RecipeDetail>(nameof(GetRecipe), notFound: true);
 
         // E-VS3-02-11: VS#3 master data (sales:read).
         var sales = company.MapGroup("/sales").WithTags("Sales");

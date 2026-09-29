@@ -18,7 +18,9 @@ public static class SalesErrors
     public const string UomNotConvertible = "UOM_NOT_CONVERTIBLE";
     public const string DuplicateLine = "DUPLICATE_LINE";
     public const string LinesRequired = "LINES_REQUIRED";
-    public const string StockExists = "STOCK_EXISTS";
+    public const string InTransitExists = "IN_TRANSIT_EXISTS";
+    public const string RecipeNotActive = "RECIPE_NOT_ACTIVE";
+    public const string MaterialPricesMismatch = "MATERIAL_PRICES_MISMATCH";
     public const string PlateInvalid = "PLATE_INVALID";
     public const string PlateDuplicate = "PLATE_DUPLICATE";
     public const string NationalIdInvalid = "NATIONAL_ID_INVALID";
