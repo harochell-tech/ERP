@@ -601,6 +601,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS1-14 | FIS-1 | Conciliaciones → AUTH-CONSUMPTION y EXEMPT-WITHOUT-AUTH bloquean AR-REC; AUTH-EXPIRY solo avisa |
 | E-FIS1-15 | FIS-1 | Reportes y proporcionalidad → Fuera: los datos quedan listos para el 607 (NCF E44, ITBIS 0) y la proporcionalidad (ventas exentas por destino) del slice de reportes |
 | E-FIS1-16 | FIS-1 | Datos reales → Igual que siempre: ninguno hasta B-02 o paralelo conciliado |
+| E-FIS1-01-1 | FIS1-01 | Schema only (like MFG1-01): authorization tables, the invoice column, e-CF 44 and the permissions; commands in FIS1-02/03. |
+| E-FIS1-01-2 | FIS1-01 | Tables in schema `tax.` (`tax.fiscal_authorization`, `_line`, `_document`, `_consumption`) with company RLS. |
+| E-FIS1-01-3 | FIS1-01 | Authorization: customer with an RNC, regime `CONFOTUR` (closed list, widened by errata), certificate number unique per company, issued on, valid until (optional), project name, CONFOTUR resolution number, project term end (optional), source sales order (optional), status, registrar, verifier, version. |
+| E-FIS1-01-4 | FIS1-01 | Scope per finished good and sale unit: authorized quantity and net amount, consumed ones between 0 and the authorized (CHECK); lines change only while DRAFT, afterwards only their consumption. |
+| E-FIS1-01-5 | FIS1-01 | Documents CERTIFICADO_DGII, RESOLUCION_CONFOTUR, LISTA_MATERIALES, PROFORMA with reference and SHA-256; never deleted or changed. |
+| E-FIS1-01-6 | FIS1-01 | Consumption: one row per exempt invoice line (quantity, net, event); a release is an inverse row (`reverses_consumption_id`), never an edit. |
+| E-FIS1-01-7 | FIS1-01 | `sal.invoice.fiscal_authorization_id`; `ecf_type` admits 44; CHECK e-CF 44 ⇔ authorization and no ITBIS; the e-NCF pattern covers E44. |
+| E-FIS1-01-8 | FIS1-01 | States DRAFT, PENDING_VERIFICATION, ACTIVE, SUSPENDED, EXHAUSTED, EXPIRED, REJECTED with a database transition guard and `core.state_history`; verifier ≠ registrar (CHECK); data frozen once submitted. |
+| E-FIS1-01-9 | FIS1-01 | `fiscal_authorization:register` (CREDITO, FACTURACION), `:verify` and `:suspend` (ESPECIALISTA_FISCAL, who also gets `sales:read`); SoD register ≠ verify; 111 permissions, 41 SoD rules. |
+| E-FIS1-01-10 | FIS1-01 | Migration 0054. |
 
 Implementation rules derived from the above (no architectural change):
 
