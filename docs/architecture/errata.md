@@ -638,6 +638,18 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS1-04-5 | FIS1-04 | `ExpireFiscalAuthorizations` (`fiscal_authorization:suspend`, no step-up) moves authorizations past `valid_until` to EXPIRED; run by a daily API process and by hand. An expired authorization is already refused at use (FIS1-03). |
 | E-FIS1-04-6 | FIS1-04 | Migration 0056: the 3 reconciliations, their blocking and the policy parameter; 28 reconciliations, REVENUE_ACCOUNTING has 4 parameters. |
 | E-FIS1-04-7 | FIS1-04 | (a) The daily run acts as a new service identity "Proceso diario" (not the deployment identity) with system role `PROCESO_DIARIO` granting only `fiscal_authorization:suspend`, assigned per company (migration 0056 for existing ones, `create-company` for new ones), on SERVICE sessions that only the API opens internally: no Google, no cookie, no screens. The audit shows the daily process as the actor. |
+| E-FIS1-05-1 | FIS1-05 | Menu: "Autorizaciones fiscales" in the Fiscal group with `sales:read` (Crédito, Facturación and the Especialista fiscal see it without `configuration:read`). |
+| E-FIS1-05-2 | FIS1-05 | List: filters by status and customer; certificate, customer, project, validity, status, net authorized and consumed; "Registrar autorización" (register); "Vencer autorizaciones vencidas" (the manual expiry, `fiscal_authorization:suspend`). |
+| E-FIS1-05-3 | FIS1-05 | One form registers and edits the draft: header (customer, certificate, issued, valid until, project, CONFOTUR resolution, project term, optional origin order) and lines (finished good, unit, quantity, net); amounts are text validated by the server. |
+| E-FIS1-05-4 | FIS1-05 | Documents of the 4 kinds attached on the detail: file name + SHA-256 computed in the browser; the file is not uploaded (as e-CF and fiscal sources). |
+| E-FIS1-05-5 | FIS1-05 | Detail: header, lines (authorized, consumed, available), documents, history; actions by state and permission (submit; verify with step-up; return and reject with a reason; suspend and reactivate with a reason); "Verificar" hidden for the registrar. |
+| E-FIS1-05-6 | FIS1-05 | The detail query adds `consumptions` (invoice, line, quantity, net, release, date); API change without migration. |
+| E-FIS1-05-7 | FIS1-05 | "Proforma" on the sales order: printable view of the proforma query with a blank signature and stamp area; browser print, no PDF. |
+| E-FIS1-05-8 | FIS1-05 | "Por facturar": with ACTIVE authorizations of the customer, a selector "Autorización fiscal (e-CF 44)" defaulting to none (with ITBIS), showing certificate and available; the server decides coverage. |
+| E-FIS1-05-9 | FIS1-05 | An e-CF 44 invoice hides the 31/32 selector, shows the exemption (regime, certificate, project, indicator 4); the e-CF record accepts `E44`. |
+| E-FIS1-05-10 | FIS1-05 | Spanish labels for the 7 statuses and the 3 reconciliations and their findings; Inicio counter "Autorizaciones por verificar" from the list query (as E-UI01-7). |
+| E-FIS1-05-11 | FIS1-05 | E2E-F1 over the API (`FiscalAcceptanceTests`), Playwright `fiscal-journey`, matrix `docs/acceptance/fis1.md` and `AcceptanceFis1TraceabilityTests`. |
+| E-FIS1-05-12 | FIS1-05 | The dev seed creates an ACTIVE synthetic authorization (CERT-DEV-0001, 500 blocks / 25,000.00) for the sample customer; no staging seed script — authorizations are created from the screens with synthetic data (E-VS1-2). |
 
 Implementation rules derived from the above (no architectural change):
 

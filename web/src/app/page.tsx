@@ -98,6 +98,15 @@ const TASKS: readonly Task[] = [
     count: async (companyId) =>
       (await query("/api/v1/companies/{companyId}/sales/receipts", { path: { companyId }, query: { status: "RECORDED", applicationStatus: "UNAPPLIED", limit: COUNT_LIMIT } })).items.length,
   },
+  // FIS1-05 (E-FIS1-05-10): CONFOTUR authorizations waiting for the Especialista fiscal.
+  {
+    href: "/fiscal/autorizaciones/?estado=PENDING_VERIFICATION",
+    label: "Autorizaciones por verificar",
+    permission: "fiscal_authorization:verify",
+    countPermission: "sales:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/tax/fiscal-authorizations", { path: { companyId }, query: { status: "PENDING_VERIFICATION" } })).items.length,
+  },
   { href: "/cierre/conciliaciones/", label: "Ejecutar conciliaciones", permission: "reconciliation:run" },
   { href: "/cierre/periodos/", label: "Cerrar o reabrir períodos", permission: "period:read" },
   { href: "/seguridad/usuarios/", label: "Solicitar cambios de rol", permission: "role:assign" },

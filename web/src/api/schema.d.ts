@@ -5176,6 +5176,22 @@ export interface components {
             /** Format: int32 */
             racks: number;
         };
+        FiscalAuthorizationConsumptionView: {
+            /** Format: uuid */
+            consumptionId: string;
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNo: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            net: string;
+            release: boolean;
+            /** Format: date-time */
+            at: string;
+        };
         FiscalAuthorizationDetail: {
             header: components["schemas"]["FiscalAuthorizationSummary"];
             confoturResolutionNo: string;
@@ -5190,6 +5206,7 @@ export interface components {
             lines: components["schemas"]["FiscalAuthorizationLineView"][];
             documents: components["schemas"]["FiscalAuthorizationDocumentView"][];
             history: components["schemas"]["FiscalAuthorizationHistoryView"][];
+            consumptions: components["schemas"]["FiscalAuthorizationConsumptionView"][];
         };
         FiscalAuthorizationDocumentView: {
             /** Format: uuid */

@@ -51,3 +51,11 @@ no step-up) moves every ACTIVE, SUSPENDED or EXHAUSTED authorization past `valid
 `FiscalAuthorizationExpired`), locking rows in id order; a second run finds nothing. The API runs it daily at 00:30 as the daily process
 (E-FIS1-04-7, `identity.md`, `api.md`; on in Staging). Tests: `FiscalAuthorizationReconciliationTests`
 (FIS-09), `ServiceSessionTests`, `BackgroundServiceTests` (the daily run).
+
+## FIS1-05 — screens and end to end (E-FIS1-05-1…12)
+
+Screens (Fiscal › Autorizaciones fiscales, the proforma, exempt invoicing from "Por facturar", the e-CF 44 invoice): `web.md`. The
+detail query now returns `consumptions` — each consumption at an invoice's issue and each release (void, credit note), with the
+invoice number. The dev seed adds an ACTIVE authorization `CERT-DEV-0001` of the sample customer (500 blocks / 25,000.00). E2E-F1:
+`FiscalAcceptanceTests` over the API and `web/e2e/fiscal-journey.spec.ts`; acceptance matrix `docs/acceptance/fis1.md`
+(`AcceptanceFis1TraceabilityTests`).

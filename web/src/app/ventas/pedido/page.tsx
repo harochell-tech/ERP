@@ -51,6 +51,10 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
             <ReasonAction label="Rechazar crédito" busy={busy} onConfirm={async (reason) => after(await reject.run({ ...target, reason }))} />
           </>
         ) : null}
+        {/* FIS1-05 (E-FIS1-05-7): the proforma the customer takes to the DGII for a CONFOTUR exemption. */}
+        <Link className="button" href={`/ventas/proforma/?id=${h.salesOrderId}`}>
+          Proforma
+        </Link>
         {orderDispatchable(h.status) && can("delivery:manage") ? (
           <Link className="button" href={`/despacho/planificar/?pedido=${h.salesOrderId}`}>
             Planificar conduce

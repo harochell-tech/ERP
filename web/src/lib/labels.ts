@@ -78,6 +78,11 @@ const STATUS: Readonly<Record<string, string>> = {
   CURING: "En curado",
   SCRAPPED: "Desechado",
   SETTLED: "Liquidado",
+  // FIS-1 (FIS1-05): fiscal authorizations (CONFOTUR).
+  PENDING_VERIFICATION: "Pendiente de verificación",
+  SUSPENDED: "Suspendido",
+  EXHAUSTED: "Agotado",
+  EXPIRED: "Vencido",
 };
 
 /** E-VS3-5: the two delivery terms. */
@@ -118,6 +123,7 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   ACCEPTED_EXTERNAL: "done", PAID: "done", CREDITED: "done", APPLIED: "done",
   NOT_FOUND: "error", NOT_ACTIVE: "attention", NAME_DIFFERS: "attention", // E-RNC-7
   IN_PROGRESS: "progress", CURING: "progress", COMPLETED: "done", SETTLED: "done", SCRAPPED: "error", // MFG1-07
+  PENDING_VERIFICATION: "progress", SUSPENDED: "attention", EXHAUSTED: "neutral", EXPIRED: "neutral", // FIS1-05
   REVERSED: "reversed",
 };
 
@@ -139,6 +145,26 @@ export const COMPONENTS: Readonly<Record<string, string>> = {
   "OP-DAY": "Producción del día",
   "COST-SET": "Liquidación de costos",
 };
+
+/** FIS1-05: the reconciliations of FIS1-04 in Spanish (the others show the server's description). */
+export const RECONCILIATIONS: Readonly<Record<string, string>> = {
+  "AUTH-CONSUMPTION": "Consumo de autorizaciones fiscales",
+  "EXEMPT-WITHOUT-AUTH": "Facturas exentas sin autorización",
+  "AUTH-EXPIRY": "Vencimiento de autorizaciones fiscales",
+};
+
+/** FIS1-05: exception classifications in Spanish; the others are shown as the server sends them. */
+export const EXCEPTION_CLASSIFICATIONS: Readonly<Record<string, string>> = {
+  AUTH_LINE_CONSUMPTION_DIFFERENCE: "Consumido de la línea ≠ consumos − devoluciones",
+  INVOICE_CONSUMPTION_DIFFERENCE: "Consumo de la factura ≠ su neto − notas de crédito",
+  EXEMPT_WITHOUT_AUTHORIZATION: "Factura sin ITBIS que no es e-CF 44",
+  AUTHORIZATION_EXPIRING: "Autorización por vencer",
+  PROJECT_TERM_ENDED: "Terminó el plazo del proyecto",
+};
+
+export function classificationLabel(classification: string): string {
+  return EXCEPTION_CLASSIFICATIONS[classification] ?? classification;
+}
 
 export function formatDate(value: string | null | undefined): string {
   if (!value) {

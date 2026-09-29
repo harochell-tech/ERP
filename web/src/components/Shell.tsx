@@ -116,6 +116,7 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/fiscal/fuentes/", label: "Fuentes fiscales", permission: "configuration:read" },
       { href: "/fiscal/reglas/", label: "Reglas fiscales", permission: "configuration:read" },
+      { href: "/fiscal/autorizaciones/", label: "Autorizaciones fiscales", permission: "sales:read" }, // FIS1-05 (E-FIS1-05-1)
     ],
   },
   {
@@ -152,6 +153,7 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/maestros/proveedor/": "/maestros/proveedores/",
   "/ventas/cliente/": "/ventas/clientes/",
   "/ventas/pedido/": "/ventas/pedidos/",
+  "/ventas/proforma/": "/ventas/pedidos/",
   "/despacho/conduce/": "/despacho/tablero/",
   "/despacho/planificar/": "/despacho/tablero/",
   "/contabilidad/apertura-lote/": "/contabilidad/apertura/",
@@ -161,6 +163,7 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/cobros/deposito/": "/cobros/depositos/",
   "/produccion/corrida/": "/produccion/dia/",
   "/produccion/receta/": "/produccion/recetas/",
+  "/fiscal/autorizacion/": "/fiscal/autorizaciones/",
 };
 
 function isActive(pathname: string, href: string): boolean {

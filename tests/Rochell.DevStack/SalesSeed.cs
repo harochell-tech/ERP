@@ -6,6 +6,7 @@ using Rochell.Sales.Fleet;
 using Rochell.Sales.Opening;
 using Rochell.Sales.Pricing;
 using Rochell.Tax;
+using Rochell.Tax.Authorizations;
 using Rochell.TestInfrastructure;
 using Rochell.Treasury.BankAccounts;
 
@@ -96,5 +97,16 @@ internal static class SalesSeed
         await h.RunAsync(new RegisterVehicle(h.CompanyId, dispatch, "dev-truck", "L123456", 12000m), new RegisterVehicleHandler());
         await h.RunAsync(new RegisterDriver(h.CompanyId, dispatch, "dev-driver", "Juan Pérez", "00112345678"), new RegisterDriverHandler());
         await h.RunAsync(new RegisterBankAccount(h.CompanyId, controller, "dev-sales-bank", "TEST_BANK", "5555554321", "1102"), new RegisterBankAccountHandler());
+
+        // FIS1-05 (E-FIS1-05-12): an ACTIVE CONFOTUR authorization of the customer for 500 blocks / 25,000.00 (synthetic certificate).
+        var authorization = (await h.RunAsync(
+            new RegisterFiscalAuthorization(h.CompanyId, credit, "dev-auth", customer, "CERT-DEV-0001", today, today.AddDays(180), "Hotel de prueba (desarrollo)", "CONFOTUR-DEV-001",
+                null, null, [new AuthorizationLineInput(block, "un", 500m, 25000.00m)]),
+            new RegisterFiscalAuthorizationHandler())).ResultRef;
+        await h.RunAsync(
+            new AttachAuthorizationDocument(h.CompanyId, credit, "dev-auth-doc", authorization, "CERTIFICADO_DGII", "certificado-dev.pdf", new string('0', 64)),
+            new AttachAuthorizationDocumentHandler());
+        await h.RunAsync(new SubmitForVerification(h.CompanyId, credit, "dev-auth-sub", authorization, 1), new SubmitForVerificationHandler());
+        await h.RunAsync(new VerifyAuthorization(h.CompanyId, actors.Specialist, "dev-auth-ver", authorization, 2), new VerifyAuthorizationHandler());
     }
 }

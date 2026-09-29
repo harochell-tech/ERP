@@ -67,9 +67,13 @@ public sealed record FiscalAuthorizationDocumentView(Guid DocumentId, string Kin
 
 public sealed record FiscalAuthorizationHistoryView(string? From, string To, DateTime At, string? Reason);
 
+/// <summary>E-FIS1-05-6: a consumption at an invoice's issue, or a release (void, credit note) of one.</summary>
+public sealed record FiscalAuthorizationConsumptionView(Guid ConsumptionId, int LineNo, Guid InvoiceId, string InvoiceNo, decimal Quantity, decimal Net, bool Release, DateTime At);
+
 public sealed record FiscalAuthorizationDetail(
     FiscalAuthorizationSummary Header, string ConfoturResolutionNo, DateOnly? ProjectTermEndsOn, Guid? SalesOrderId, Guid RegisteredBy, Guid? VerifiedBy,
-    IReadOnlyList<FiscalAuthorizationLineView> Lines, IReadOnlyList<FiscalAuthorizationDocumentView> Documents, IReadOnlyList<FiscalAuthorizationHistoryView> History);
+    IReadOnlyList<FiscalAuthorizationLineView> Lines, IReadOnlyList<FiscalAuthorizationDocumentView> Documents, IReadOnlyList<FiscalAuthorizationHistoryView> History,
+    IReadOnlyList<FiscalAuthorizationConsumptionView> Consumptions);
 
 [RequiresPermission("sales:read")]
 public sealed class GetFiscalAuthorizationHandler : IQueryHandler<GetFiscalAuthorization>
@@ -125,7 +129,23 @@ public sealed class GetFiscalAuthorizationHandler : IQueryHandler<GetFiscalAutho
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.AuthorizationId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new FiscalAuthorizationDetail(header, extra.ResolutionNo, extra.TermEndsOn, extra.SalesOrderId, extra.RegisteredBy, extra.VerifiedBy, lines, documents, history));
+        var consumptions = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT c.consumption_id, c.line_no, i.invoice_id, i.invoice_no, c.qty, c.net, c.reverses_consumption_id IS NOT NULL, e.occurred_at
+            FROM tax.fiscal_authorization_consumption c
+            JOIN sal.invoice_line il ON il.invoice_line_id = c.invoice_line_id
+            JOIN sal.invoice i ON i.invoice_id = il.invoice_id
+            JOIN core.domain_event e ON e.event_id = c.event_id
+            WHERE c.company_id = @c AND c.authorization_id = @id ORDER BY e.occurred_at, c.consumption_id
+            """,
+            r => new FiscalAuthorizationConsumptionView(r.GetGuid(0), r.GetInt32(1), r.GetGuid(2), r.GetString(3), r.GetDecimal(4), r.GetDecimal(5), r.GetBoolean(6), r.GetFieldValue<DateTime>(7)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("id", query.AuthorizationId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new FiscalAuthorizationDetail(
+            header, extra.ResolutionNo, extra.TermEndsOn, extra.SalesOrderId, extra.RegisteredBy, extra.VerifiedBy, lines, documents, history, consumptions));
     }
 }
 
