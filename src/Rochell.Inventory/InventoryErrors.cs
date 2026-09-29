@@ -24,4 +24,10 @@ public static class MovementTypes
 
     /// <summary>E-VS3-04-2: a move between two locations of a plant (patio ⇄ TRANSITO).</summary>
     public const string Transfer = "TRANSFER";
+
+    /// <summary>E-MFG1-01-8, E-MFG1-03-9: production consumption and receipt, and their exact reversals.</summary>
+    public const string ProductionIssue = "PRODUCTION_ISSUE";
+    public const string ProductionReceipt = "PRODUCTION_RECEIPT";
+    public const string ProductionIssueReversal = "PRODUCTION_ISSUE_REVERSAL";
+    public const string ProductionReceiptReversal = "PRODUCTION_RECEIPT_REVERSAL";
 }

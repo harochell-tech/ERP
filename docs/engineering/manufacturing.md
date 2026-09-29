@@ -35,3 +35,23 @@ Queries (`production:read`): `GET /manufacturing/machines`, `/shifts`, `/recipes
 Worked example (test `The_standard_cost_from_the_recipe_breaks_down_materials_and_conversion`): recipe 150 units per batch with
 180 kg cement, 1.8 t sand, 1.5 l admixture; prices 8.00, 1,000.00, 50.00 → 1.2 × 8 + 0.012 × 1,000 + 0.01 × 50 = 22.10 + conversion
 5.90 = 28.00. Revaluation test: 100.5 units at 28.00 (2,814.00) → new standard 30.1234 → 3,027.40, REVAL +213.40.
+
+## MFG1-03 — runs, shift summaries, consumption and the lot into curing (migration 0050, E-MFG1-03-1…12)
+
+| Command | Permission | Effect |
+| --- | --- | --- |
+| `StartProductionRun` | `production_run:manage` | Run `PR-000001…` IN_PROGRESS with the ACTIVE recipe and standard (with breakdown); creates the month's cost collector |
+| `CancelProductionRun` | `production_run:manage` | Only without a shift summary; reason required |
+| `RecordShiftSummary` | `shift_summary:record` | DRAFT (replaced while DRAFT); consumption of every recipe material, converted to the base unit; theoretical stored |
+| `PostShiftSummary` | `shift_summary:post` | Four eyes; FIFO lots by code per location; PRODUCTION_ISSUE + P-08; lot `PT-…` into CURADO (PRODUCTION_RECEIPT at standard) + P-10; `mfg.fg_lot` CURING; racks |
+| `ReverseShiftSummary` | `shift_summary:post` + step-up | Exact reversals while the lot is CURING and unmoved; new DRAFT for the run |
+
+P-08: Dr WIP [plant, product; subledger WIP = collector] / Cr RAW_MATERIAL [plant, material; INV = value entry], one pair per lot
+issued. P-10: Dr FINISHED_GOODS at round(units × standard, 2) / Cr WIP round(units × material standard, 2) / Cr CONVERSION_ABSORPTION
+the difference. The WIP balance of a collector (consumption − material standard) is settled in MFG1-05.
+
+Worked example (`ProductionRunTests`): 10 batches, 1,480 good units; cement 1,850 kg (15,170.00), sand 12.5 m³ × 1.47 = 18.375 t
+FIFO 10 t + 8.375 t (9,990.91 + 8,367.39), admixture 15 l (750.00) → P-08 34,278.30; P-10 41,440.00 = 32,708.00 + 8,732.00; WIP
+1,570.30; racks 600 + 600 + 280; curing from 19:00 of the business date, releasable 24 hours later.
+
+Queries (`production:read`): `GET /manufacturing/runs`, `/runs/{id}`.

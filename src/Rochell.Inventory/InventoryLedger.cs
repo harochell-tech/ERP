@@ -55,13 +55,13 @@ public sealed class InventoryLedger
 
     /// <summary>
     /// Writes a receipt: quantity entry, value entry and both balances. Returns the quantity entry id. <paramref name="movementType"/>
-    /// is RECEIPT or OPENING (an opening balance, E-VS3-02b-7).
+    /// is RECEIPT, OPENING (an opening balance, E-VS3-02b-7) or PRODUCTION_RECEIPT (E-MFG1-03-5).
     /// </summary>
     public async Task<Guid> ReceiveAsync(CommandContext context, ReceiptMovement movement, MovementSource source, MovementDates dates, CancellationToken cancellationToken, string movementType = MovementTypes.Receipt)
     {
-        if (movementType is not (MovementTypes.Receipt or MovementTypes.Opening))
+        if (movementType is not (MovementTypes.Receipt or MovementTypes.Opening or MovementTypes.ProductionReceipt))
         {
-            throw new InvalidOperationException($"A receipt is RECEIPT or OPENING, not {movementType}.");
+            throw new InvalidOperationException($"A receipt is RECEIPT, OPENING or PRODUCTION_RECEIPT, not {movementType}.");
         }
 
         ArgumentNullException.ThrowIfNull(context);
@@ -178,8 +178,14 @@ public sealed class InventoryLedger
     }
 
     /// <summary>Writes a reserved issue: negative quantity entry, negative value entry (if the value is not zero) and the valuation balance.</summary>
-    public async Task<Guid> WriteIssueAsync(CommandContext context, IssueReservation reservation, Guid? valueEntryId, MovementSource source, MovementDates dates, CancellationToken cancellationToken)
+    public async Task<Guid> WriteIssueAsync(
+        CommandContext context, IssueReservation reservation, Guid? valueEntryId, MovementSource source, MovementDates dates, CancellationToken cancellationToken, string movementType = MovementTypes.Issue)
     {
+        if (movementType is not (MovementTypes.Issue or MovementTypes.ProductionIssue))
+        {
+            throw new InvalidOperationException($"An issue is ISSUE or PRODUCTION_ISSUE, not {movementType}.");
+        }
+
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(reservation);
         ArgumentNullException.ThrowIfNull(source);
@@ -191,7 +197,7 @@ public sealed class InventoryLedger
 
         var recordedAt = context.Clock.UtcNow;
         var quantityEntry = new QuantityEntryRow(
-            context.Ids.NewId(), context.CompanyId, MovementTypes.Issue, reservation.PlantId, reservation.LocationId, reservation.ItemId, reservation.LotId, -reservation.Quantity,
+            context.Ids.NewId(), context.CompanyId, movementType, reservation.PlantId, reservation.LocationId, reservation.ItemId, reservation.LotId, -reservation.Quantity,
             source.EventId, source.DocumentType, source.DocumentId, source.LineId, null, Precision.ToMicroseconds(dates.OccurredAt), recordedAt, dates.BusinessDate, dates.PostingDate);
         await InsertQuantityAsync(context, quantityEntry, cancellationToken).ConfigureAwait(false);
         if (valueEntryId is not null)
@@ -199,7 +205,7 @@ public sealed class InventoryLedger
             await InsertValueAsync(
                 context,
                 new ValueEntryRow(
-                    valueEntryId.Value, context.CompanyId, MovementTypes.Issue, reservation.ValuationAreaId, reservation.PlantId, reservation.ItemId, quantityEntry.QuantityEntryId,
+                    valueEntryId.Value, context.CompanyId, movementType, reservation.ValuationAreaId, reservation.PlantId, reservation.ItemId, quantityEntry.QuantityEntryId,
                     -reservation.Value, source.EventId, null, quantityEntry.OccurredAt, recordedAt, dates.BusinessDate, dates.PostingDate),
                 cancellationToken).ConfigureAwait(false);
         }

@@ -48,7 +48,7 @@ public static class QueryEndpoints
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
-        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
+        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
@@ -125,6 +125,12 @@ public static class QueryEndpoints
         manufacturing.MapGet("/recipes/{recipeVersionId:guid}", (HttpContext http, Guid companyId, Guid recipeVersionId, GetRecipeHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetRecipe(companyId, s, recipeVersionId), handler, ct))
             .Describe<RecipeDetail>(nameof(GetRecipe), notFound: true);
+        manufacturing.MapGet("/runs", (HttpContext http, Guid companyId, Guid? plantId, DateOnly? businessDate, string? status, int? limit, int? offset, ListProductionRunsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListProductionRuns(companyId, s, plantId, businessDate, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<ProductionRunList>(nameof(ListProductionRuns));
+        manufacturing.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetProductionRunHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetProductionRun(companyId, s, runId), handler, ct))
+            .Describe<ProductionRunDetail>(nameof(GetProductionRun), notFound: true);
 
         // E-VS3-02-11: VS#3 master data (sales:read).
         var sales = company.MapGroup("/sales").WithTags("Sales");

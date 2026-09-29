@@ -163,3 +163,135 @@ public sealed class GetRecipeHandler : IQueryHandler<GetRecipe>
         return ApiJson.Serialize(new RecipeDetail(recipe, lines));
     }
 }
+
+// E-MFG1-03-11: production runs with their summary, consumption (real vs theoretical), lot and racks.
+
+public sealed record ListProductionRuns(Guid CompanyId, Guid SessionId, Guid? PlantId = null, DateOnly? BusinessDate = null, string? Status = null, int Limit = 50, int Offset = 0) : IQuery;
+
+public sealed record ProductionRunSummary(
+    Guid RunId, string RunNo, Guid PlantId, string PlantCode, string MachineCode, string ShiftCode, DateOnly BusinessDate, Guid ItemId, string ItemCode, string Status,
+    string? SummaryStatus, decimal? GoodUnits, string? LotCode, long Version);
+
+public sealed record ProductionRunList(IReadOnlyList<ProductionRunSummary> Items, int Limit, int Offset);
+
+[RequiresPermission("production:read")]
+public sealed class ListProductionRunsHandler : IQueryHandler<ListProductionRuns>
+{
+    public string QueryType => "Manufacturing.ListProductionRuns";
+
+    public async Task<string> HandleAsync(ListProductionRuns query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        QueryErrors.EnsurePaging(query.Limit, query.Offset);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT r.run_id, r.run_no, r.plant_id, p.code, m.code, s.code, r.business_date, r.item_id, i.code, r.status,
+                   ss.status, ss.good_units, l.lot_code, r.version
+            FROM mfg.production_run r
+            JOIN md.plant p ON p.plant_id = r.plant_id
+            JOIN md.machine m ON m.machine_id = r.machine_id
+            JOIN mfg.shift s ON s.shift_id = r.shift_id
+            JOIN md.item i ON i.item_id = r.item_id
+            LEFT JOIN mfg.shift_summary ss ON ss.run_id = r.run_id AND ss.status IN ('DRAFT', 'POSTED')
+            LEFT JOIN mfg.fg_lot f ON f.summary_id = ss.summary_id
+            LEFT JOIN inv.lot l ON l.lot_id = f.lot_id
+            WHERE r.company_id = @c AND (CAST(@p AS uuid) IS NULL OR r.plant_id = CAST(@p AS uuid))
+              AND (CAST(@d AS date) IS NULL OR r.business_date = CAST(@d AS date)) AND (CAST(@s AS text) IS NULL OR r.status = CAST(@s AS text))
+            ORDER BY r.business_date DESC, r.run_no DESC
+            LIMIT @limit OFFSET @offset
+            """,
+            r => new ProductionRunSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetString(5), r.Date(6), r.GetGuid(7), r.GetString(8), r.GetString(9),
+                r.NullableString(10), r.IsDBNull(11) ? null : r.GetDecimal(11), r.NullableString(12), r.GetInt64(13)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("p", query.PlantId),
+            ("d", query.BusinessDate),
+            ("s", query.Status),
+            ("limit", query.Limit),
+            ("offset", query.Offset)).ConfigureAwait(false);
+        return ApiJson.Serialize(new ProductionRunList(items, query.Limit, query.Offset));
+    }
+}
+
+public sealed record GetProductionRun(Guid CompanyId, Guid SessionId, Guid RunId) : IQuery;
+
+public sealed record ShiftSummaryView(Guid SummaryId, int Batches, decimal GoodUnits, decimal MixScrapUnits, decimal FreshScrapUnits, string Status, Guid RecordedBy, Guid? PostedBy, long Version);
+
+public sealed record ConsumptionView(Guid MaterialItemId, string MaterialCode, string BaseUom, string LocationCode, decimal EnteredQty, string EnteredUom, decimal Qty, decimal TheoreticalQty, decimal Difference);
+
+public sealed record FgLotView(Guid LotId, string LotCode, string Status, DateTime CuringFrom, DateTime ReleasableAt, int Racks);
+
+public sealed record ProductionRunDetail(ProductionRunSummary Run, ShiftSummaryView? Summary, IReadOnlyList<ConsumptionView> Consumption, FgLotView? Lot);
+
+[RequiresPermission("production:read")]
+public sealed class GetProductionRunHandler : IQueryHandler<GetProductionRun>
+{
+    public string QueryType => "Manufacturing.GetProductionRun";
+
+    public async Task<string> HandleAsync(GetProductionRun query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var run = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT r.run_id, r.run_no, r.plant_id, p.code, m.code, s.code, r.business_date, r.item_id, i.code, r.status,
+                   ss.status, ss.good_units, l.lot_code, r.version
+            FROM mfg.production_run r
+            JOIN md.plant p ON p.plant_id = r.plant_id
+            JOIN md.machine m ON m.machine_id = r.machine_id
+            JOIN mfg.shift s ON s.shift_id = r.shift_id
+            JOIN md.item i ON i.item_id = r.item_id
+            LEFT JOIN mfg.shift_summary ss ON ss.run_id = r.run_id AND ss.status IN ('DRAFT', 'POSTED')
+            LEFT JOIN mfg.fg_lot f ON f.summary_id = ss.summary_id
+            LEFT JOIN inv.lot l ON l.lot_id = f.lot_id
+            WHERE r.company_id = @c AND r.run_id = @r
+            """,
+            r => new ProductionRunSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetString(5), r.Date(6), r.GetGuid(7), r.GetString(8), r.GetString(9),
+                r.NullableString(10), r.IsDBNull(11) ? null : r.GetDecimal(11), r.NullableString(12), r.GetInt64(13)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("r", query.RunId)).ConfigureAwait(false)
+            ?? throw new DomainException(QueryErrors.NotFound, "The production run does not exist.");
+        var summary = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT summary_id, batches, good_units, mix_scrap_units, fresh_scrap_units, status, recorded_by, posted_by, version
+            FROM mfg.shift_summary WHERE run_id = @r AND status IN ('DRAFT', 'POSTED')
+            """,
+            r => new ShiftSummaryView(r.GetGuid(0), r.GetInt32(1), r.GetDecimal(2), r.GetDecimal(3), r.GetDecimal(4), r.GetString(5), r.GetGuid(6), r.IsDBNull(7) ? null : r.GetGuid(7), r.GetInt64(8)),
+            cancellationToken,
+            ("r", query.RunId)).ConfigureAwait(false);
+        var consumption = summary is null
+            ? []
+            : await Reading.ListAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                SELECT c.material_item_id, i.code, i.base_uom, l.code, c.entered_qty, c.entered_uom, c.qty, c.theoretical_qty, c.qty - c.theoretical_qty
+                FROM mfg.material_consumption c JOIN md.item i ON i.item_id = c.material_item_id JOIN md.location l ON l.location_id = c.location_id
+                WHERE c.summary_id = @s ORDER BY i.code
+                """,
+                r => new ConsumptionView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetDecimal(4), r.GetString(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8)),
+                cancellationToken,
+                ("s", summary.SummaryId)).ConfigureAwait(false);
+        var lot = summary is null
+            ? null
+            : await Reading.SingleOrDefaultAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                SELECT f.lot_id, l.lot_code, f.status, f.curing_from, f.releasable_at, (SELECT count(*)::int FROM mfg.rack k WHERE k.lot_id = f.lot_id)
+                FROM mfg.fg_lot f JOIN inv.lot l ON l.lot_id = f.lot_id WHERE f.summary_id = @s
+                """,
+                r => new FgLotView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetFieldValue<DateTime>(3), r.GetFieldValue<DateTime>(4), r.GetInt32(5)),
+                cancellationToken,
+                ("s", summary.SummaryId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new ProductionRunDetail(run, summary, consumption, lot));
+    }
+}

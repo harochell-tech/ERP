@@ -10,6 +10,7 @@ using Rochell.MasterData.BankAccounts;
 using Rochell.MasterData.Items;
 using Rochell.Manufacturing.Machines;
 using Rochell.Manufacturing.Recipes;
+using Rochell.Manufacturing.Runs;
 using Rochell.Manufacturing.Shifts;
 using Rochell.MasterData.Suppliers;
 using Rochell.Platform.Commands;
@@ -206,6 +207,11 @@ public static class CommandEndpoints
         manufacturing.MapCommand<SetShiftStatus, SetShiftStatusHandler>();
         manufacturing.MapCommand<PrepareRecipe, PrepareRecipeHandler>();
         manufacturing.MapCommand<ApproveRecipe, ApproveRecipeHandler>();
+        manufacturing.MapCommand<StartProductionRun, StartProductionRunHandler>();
+        manufacturing.MapCommand<CancelProductionRun, CancelProductionRunHandler>();
+        manufacturing.MapCommand<RecordShiftSummary, RecordShiftSummaryHandler>();
+        manufacturing.MapCommand<PostShiftSummary, PostShiftSummaryHandler>();
+        manufacturing.MapCommand<ReverseShiftSummary, ReverseShiftSummaryHandler>();
 
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
@@ -249,6 +255,7 @@ public static class CommandEndpoints
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),
+        typeof(StartProductionRunHandler), typeof(CancelProductionRunHandler), typeof(RecordShiftSummaryHandler), typeof(PostShiftSummaryHandler), typeof(ReverseShiftSummaryHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 
