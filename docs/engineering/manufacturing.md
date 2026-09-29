@@ -55,3 +55,17 @@ FIFO 10 t + 8.375 t (9,990.91 + 8,367.39), admixture 15 l (750.00) → P-08 34,2
 1,570.30; racks 600 + 600 + 280; curing from 19:00 of the business date, releasable 24 hours later.
 
 Queries (`production:read`): `GET /manufacturing/runs`, `/runs/{id}`.
+
+## MFG1-04 — curing release, block, scrap and CURADO out of dispatch (migration 0051, E-MFG1-04-1…7)
+
+| Command | Permission | Effect |
+| --- | --- | --- |
+| `ReleaseLot` | `fg_lot:release` (Calidad) | CURING lot after its minimum curing → RELEASED; whole quantity CURADO → the chosen stock location (TRANSFER, quantity only, no journal); racks RELEASED |
+| `BlockLot` / `UnblockLot` | `fg_lot:release` | CURING ⇄ BLOCKED with a reason; a blocked lot is not released |
+| `ScrapLot` | `fg_lot:scrap` (Gerente de planta) + step-up | Quantity from a location of the lot at the area's valuation cost: ISSUE + P-12 (Dr PRODUCTION_SCRAP / Cr FINISHED_GOODS); point CURING / YARD; no stock left → SCRAPPED |
+
+Lot lifecycle (database guard): CURING → RELEASED | BLOCKED | SCRAPPED | VOIDED (summary reversed); BLOCKED → CURING | SCRAPPED;
+RELEASED → SCRAPPED. Dispatch and `/sales/plants` never offer CURADO. Query `GET /manufacturing/lots`.
+
+Example (`CuringTests`): 1,480 units for 41,440.00; scrap 100 in curing → 2,800.00; release; scrap the remaining 1,380 in the yard →
+38,640.00 (the last units take the remaining value); lot SCRAPPED, FINISHED_GOODS 0.00.

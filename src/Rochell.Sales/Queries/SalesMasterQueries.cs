@@ -329,7 +329,7 @@ public sealed class ListSalesPlantsHandler : IQueryHandler<ListSalesPlants>
         var locations = (await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT plant_id, location_id, code FROM md.location WHERE company_id = @c AND NOT is_transit ORDER BY code",
+            "SELECT plant_id, location_id, code FROM md.location WHERE company_id = @c AND NOT is_transit AND NOT is_curing ORDER BY code", // E-MFG1-04-5
             r => (PlantId: r.GetGuid(0), View: new SalesLocationView(r.GetGuid(1), r.GetString(2))),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false))

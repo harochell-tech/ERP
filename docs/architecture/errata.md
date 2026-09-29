@@ -546,6 +546,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-03-10 | MFG1-03 | Events `MaterialConsumed` (P-08) and `ProductionReceived` (P-10), two journals in the same transaction; rules DRAFT until A-01. |
 | E-MFG1-03-11 | MFG1-03 | Queries `ListProductionRuns` (plant, date, status, paging) and `GetProductionRun` (summary, real vs theoretical consumption, lot and racks), `production:read`. |
 | E-MFG1-03-12 | MFG1-03 | Migration 0050; lots in `mfg.fg_lot` (schema mfg, E-MFG1-01-1). |
+| E-MFG1-04-1 | MFG1-04 | `ReleaseLot` (Calidad, `fg_lot:release`): a CURING lot whose minimum curing has passed (`CURING_NOT_DONE`) moves whole from CURADO to a stock location of the plant chosen by Calidad; lot and racks RELEASED; who, when and where are kept on the lot. |
+| E-MFG1-04-2 | MFG1-04 | The release is a TRANSFER pair of quantity only (no value entry): the area's value does not change and there is no journal (E-MFG1-8). |
+| E-MFG1-04-3 | MFG1-04 | `BlockLot` (CURING → BLOCKED) and `UnblockLot` (BLOCKED → CURING), Calidad, reason required; a blocked lot is never released. Lot lifecycle guarded in the database. |
+| E-MFG1-04-4 | MFG1-04 | `ScrapLot` (plant manager, `fg_lot:scrap`, step-up, reason): a quantity from one location of the lot (point CURING from CURADO, YARD otherwise) at the area's valuation cost: ISSUE + P-12 (Dr PRODUCTION_SCRAP / Cr FINISHED_GOODS); a lot left without stock becomes SCRAPPED with its racks. |
+| E-MFG1-04-5 | MFG1-04 | The delivery's source location and `/sales/plants` exclude CURADO, as TRANSITO: nothing unreleased is dispatched (MFG-04). |
+| E-MFG1-04-6 | MFG1-04 | Query `ListFgLots` (plant, status, paging): curing window and whether it is done, locations and quantity, racks, block reason; `production:read`. |
+| E-MFG1-04-7 | MFG1-04 | Migration 0051: release data and block reason on `mfg.fg_lot`, its lifecycle guard, `mfg.lot_scrap`, P-12 (DRAFT). |
 
 Implementation rules derived from the above (no architectural change):
 

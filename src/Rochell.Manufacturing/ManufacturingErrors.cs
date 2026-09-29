@@ -28,4 +28,5 @@ public static class ManufacturingErrors
     public const string PeriodClosed = "PERIOD_CLOSED";
     public const string CollectorSettled = "COLLECTOR_SETTLED";
     public const string LotMoved = "LOT_MOVED";
+    public const string CuringNotDone = "CURING_NOT_DONE";
 }
