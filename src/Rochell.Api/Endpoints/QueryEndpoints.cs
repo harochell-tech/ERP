@@ -50,7 +50,7 @@ public static class QueryEndpoints
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
-        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
+        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
@@ -186,6 +186,15 @@ public static class QueryEndpoints
         sales.MapGet("/orders/{salesOrderId:guid}", (HttpContext http, Guid companyId, Guid salesOrderId, GetSalesOrderHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetSalesOrder(companyId, s, salesOrderId), handler, ct))
             .Describe<SalesOrderDetail>(nameof(GetSalesOrder), notFound: true);
+        sales.MapGet("/quotes", (HttpContext http, Guid companyId, string? status, Guid? partyId, bool? expiredOnly, int? limit, int? offset, ListQuotesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListQuotes(companyId, s, status, partyId, expiredOnly ?? false, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<QuoteList>(nameof(ListQuotes));
+        sales.MapGet("/quotes/{quoteId:guid}", (HttpContext http, Guid companyId, Guid quoteId, GetQuoteHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetQuote(companyId, s, quoteId), handler, ct))
+            .Describe<QuoteDetail>(nameof(GetQuote), notFound: true);
+        sales.MapGet("/quotes/{quoteId:guid}/print", (HttpContext http, Guid companyId, Guid quoteId, GetQuotePrintHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetQuotePrint(companyId, s, quoteId), handler, ct))
+            .Describe<QuotePrint>(nameof(GetQuotePrint), notFound: true);
         sales.MapGet("/customers/{partyId:guid}/exposure", (HttpContext http, Guid companyId, Guid partyId, GetCustomerExposureHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetCustomerExposure(companyId, s, partyId), handler, ct))
             .Describe<CustomerExposure>(nameof(GetCustomerExposure), notFound: true);

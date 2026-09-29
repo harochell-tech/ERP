@@ -22,3 +22,21 @@ Guards (`sal.quote_guard`, `sal.quote_line_guard`):
 
 Permissions: `quote:manage` (VENDEDOR), `quote:approve_price` (APROBADOR_POLITICAS), reading with `sales:read`; SoD pair
 (`quote:approve_price`, `quote:manage`). Tests: `QuoteSchemaTests`.
+
+## QUO1-02 — commands, queries and print (E-QUO1-02-1…12)
+
+| Command | Permission | Does |
+| --- | --- | --- |
+| `CreateQuote` | `quote:manage` | DRAFT `COT-…` for a DRAFT or ACTIVE customer; each line at its given price or the list's (list in force, `PRICE_MISSING` otherwise); validity from today |
+| `UpdateDraftQuote` | `quote:manage` | New header and a new lines version (an earlier approval no longer covers them) |
+| `SubmitQuoteForApproval` | `quote:manage` | DRAFT → PENDING_APPROVAL when a line is below its list price without approval |
+| `ApproveQuotePrices` | `quote:approve_price`, step-up | PENDING_APPROVAL → DRAFT with the current lines approved; never the author |
+| `ReturnQuoteToDraft` | `quote:approve_price` | PENDING_APPROVAL → DRAFT with a reason, nothing approved |
+| `SendQuote` | `quote:manage` | DRAFT → SENT (frozen) if not expired and special prices are approved |
+| `MarkQuoteLost` / `CancelQuote` | `quote:manage` | SENT → LOST / DRAFT or SENT → CANCELLED, with a reason |
+| `CopyQuote` | `quote:manage` | A new DRAFT from any quote with its quoted prices, list prices in force and a new validity |
+
+Queries (`sales:read`): `GET /sales/quotes` (status, customer, `expiredOnly`), `/sales/quotes/{id}` (lines with list and quoted
+prices, the approval and whether it covers the current lines, history, order, copies), `/sales/quotes/{id}/print` (informative
+ITBIS with the SALES_ITBIS rule in force at the quote date; nothing is stored). "Expired" = SENT with `valid_until` before today,
+computed on read. Tests: `QuoteTests` (QUO-01, QUO-02, QUO-03, QUO-07).
