@@ -1,7 +1,7 @@
 # Manufactura #1 — Producción, curado, liberación y costo estándar (Plan-to-Produce P0)
 
-**Estado: PROPUESTA — pendiente de aprobación de Alexander Rochell** (redactada el 2026-09-28). Al aprobarse, las decisiones
-D-01…D-18 pasan a errata E-MFG1-1…18 y este documento queda CONGELADO con la misma regla que VS#1…VS#3.
+**Estado: CONGELADO — aprobado por Alexander Rochell el 2026-09-29**, con las decisiones D-01…D-18 tal como se recomiendan
+(errata E-MFG1-1…18). Es la especificación; cualquier cambio sigue la regla de congelamiento.
 
 Fuentes: Architecture v1 Parte IV §16–23 (orden, batch, rack, lote PT, recetas, máquinas); v2 C-01/C-03, H-25/H-28/H-29, §6
 (modelo de costos: cost collector, variaciones, scrap), §7 (Production Ledger, modos de salida, agregados en tonelada seca), §8
