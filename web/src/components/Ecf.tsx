@@ -58,7 +58,7 @@ export function RecordEcfForm({
   error,
   onSubmit,
 }: {
-  prefix: "E31" | "E32" | "E34";
+  prefix: "E31" | "E32" | "E34" | "E44";
   busy: boolean;
   error: unknown;
   onSubmit: (values: EcfValues) => Promise<unknown>;

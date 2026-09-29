@@ -166,6 +166,22 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   COLLECTOR_SETTLED: "El colector de costos ya está liquidado.",
   MONTH_NOT_ENDED: "El mes del colector todavía no ha terminado.",
   RUNS_OPEN: "El colector tiene corridas en proceso.",
+  // FIS-1: fiscal authorizations (CONFOTUR).
+  AUTHORIZATION_NOT_FOUND: "La autorización fiscal no existe.",
+  AUTHORIZATION_INVALID_STATE: "La autorización fiscal no está en un estado que permita esta acción.",
+  AUTHORIZATION_VERSION_CONFLICT: "La autorización cambió mientras la veía; recargue la página y vuelva a intentarlo.",
+  AUTHORIZATION_EXPIRED: "El certificado está vencido (pasó su fecha de vigencia).",
+  AUTHORIZATION_FIELD_INVALID:
+    "Revise los datos: textos obligatorios, vigencia igual o posterior a la emisión, pedido del mismo cliente, cada producto y unidad una vez, cantidad (6 decimales) y neto (2 decimales) mayores que cero; un documento con tipo, referencia y SHA-256.",
+  AUTHORIZATION_LINES_REQUIRED: "La autorización debe cubrir al menos un producto.",
+  AUTHORIZATION_CERTIFICATE_REQUIRED: "Adjunte el certificado de exención de la DGII antes de enviar a verificación.",
+  AUTHORIZATION_CERTIFICATE_DUPLICATE: "Ese número de certificado ya está registrado.",
+  AUTHORIZATION_CUSTOMER_INVALID: "La autorización es de un cliente activo con RNC.",
+  AUTHORIZATION_ITEM_INVALID: "El producto no es un producto terminado activo o la unidad no es la base ni tiene conversión vigente.",
+  AUTHORIZATION_SAME_PERSON: "Quien registró la autorización no puede verificarla.",
+  AUTHORIZATION_REASON_REQUIRED: "Indique el motivo (hasta 500 caracteres).",
+  AUTHORIZATION_NOT_COVERED: "La autorización no cubre esas líneas (otro cliente, u otro producto o unidad); facture esas líneas aparte, con ITBIS.",
+  AUTHORIZATION_EXCEEDED: "La cantidad o el neto superan lo disponible en la autorización para ese producto.",
 };
 
 export interface DescribedError {

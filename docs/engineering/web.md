@@ -174,3 +174,30 @@ The other flows are covered at the API level (`tests/Rochell.Api.Tests`, includi
 
 Menu group **Producción**; see `docs/engineering/manufacturing.md` (MFG1-07). Every select inside a `Field` carries an `aria-label`,
 so `getByLabel(…, { exact: true })` finds it whatever option is selected.
+
+## FIS1-05 — fiscal authorization screens (E-FIS1-05-1…12)
+
+Menu **Fiscal** adds Autorizaciones fiscales (`sales:read`, so Crédito, Facturación and the Especialista fiscal see it); see
+`docs/engineering/fiscal-authorizations.md`. `lib/authorizations.ts` holds the pure helpers (actions by status and permission, the
+e-NCF prefix, the expiry count), unit-tested.
+
+| Page | What it does |
+| --- | --- |
+| `/fiscal/autorizaciones/` | Filters by status and customer (`?estado=&cliente=`); certificate, customer, project, valid until, status, net authorized and consumed (the server's); "Registrar autorización" (`fiscal_authorization:register`); "Vencer autorizaciones vencidas" runs `expire-fiscal-authorizations` and says how many expired (`fiscal_authorization:suspend`) |
+| `/fiscal/autorizaciones/nueva/[?id=]` | Register, or edit a DRAFT: customer (active, with RNC), certificate, issued on, valid until, project, CONFOTUR resolution, project term end, optional origin order of the customer; scope lines product × unit (the price list in force, `sales:read`) with quantity and net as text, validated by the server |
+| `/fiscal/autorizacion/?id=` | Header, scope (authorized, consumed, available), documents (any of the 4 kinds; the SHA-256 is computed in the browser, the file is not uploaded), "Facturas que la consumen" (consumptions and releases), history; edit / submit (DRAFT), verify (step-up, hidden for the registrar), return to draft / reject with a reason (PENDING_VERIFICATION), suspend (ACTIVE) and reactivate (SUSPENDED) with a reason |
+| `/ventas/proforma/?id=` | From the order's "Proforma" button: issuer, customer, lines with the ITBIS of the rules in force today, totals and a blank signature and stamp area; "Imprimir" calls `window.print()` and the print CSS hides the menu, header and buttons (no PDF) |
+
+`/facturacion/por-facturar/` shows "Autorización fiscal (e-CF 44)" when the customer has ACTIVE authorizations (default "Ninguna —
+con ITBIS"; each option names the certificate and what each scope line has available) and sends `fiscalAuthorizationId`. The invoice
+of an e-CF 44 offers no 31/32 choice at issue; once issued it reads "Exenta — CONFOTUR, certificado …" and its fiscal package adds
+regime, certificate, project and billing indicator 4; the e-CF form expects `E44` + 10 digits. Inicio counts "Autorizaciones por
+verificar" for `fiscal_authorization:verify` (list query with PENDING_VERIFICATION, E-UI01-7). The reconciliation screens name
+AUTH-CONSUMPTION, EXEMPT-WITHOUT-AUTH and AUTH-EXPIRY and their classifications in Spanish (`RECONCILIATIONS`,
+`EXCEPTION_CLASSIFICATIONS` in `labels.ts`).
+
+`web/e2e/fiscal-journey.spec.ts`: Facturación registers an authorization with a unique certificate (BLOQUE-6, 100 / 5,000.00),
+attaches the DGII certificate and submits; the Especialista fiscal verifies it; the Vendedor's order (40 blocks) and its proforma
+(ITBIS 360.00); Despacho delivers it at the gate; Facturación invoices it under the authorization (e-CF 44, total 2,000.00), issues it
+and records an `E44` e-NCF; the authorization shows 2,000.00 consumed and the invoice's consumption. It opens its own order and
+delivery by URL and leaves nothing open for the other journeys.

@@ -3,20 +3,46 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Loading, Money, NoPermission } from "@/components/ui";
-import { formatQuantity } from "@/lib/decimal";
+import { ErrorBox, Field, Loading, Money, NoPermission } from "@/components/ui";
+import { formatDecimal, formatQuantity } from "@/lib/decimal";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 
 // VS3-10b (E-VS3-10-6, E-VS3-05-3): delivered lines not yet invoiced, by customer; Facturación picks the lines of one customer and
-// creates a DRAFT invoice (invoice:create). The amounts shown are the server's.
+// creates a DRAFT invoice (invoice:create). The amounts shown are the server's. FIS1-05 (E-FIS1-05-8): when the customer has ACTIVE
+// CONFOTUR authorizations, one may be chosen and the invoice is an e-CF 44 without ITBIS; the server checks that it covers every line.
+
+/** The customer's ACTIVE authorizations, each with what its scope still has available (the server's amounts). */
+function AuthorizationChoice({ partyId, value, onChange }: { partyId: string; value: string; onChange: (authorizationId: string) => void }) {
+  const { companyId } = useSession();
+  const { data } = useLoad(async () => {
+    const list = await query("/api/v1/companies/{companyId}/tax/fiscal-authorizations", { path: { companyId }, query: { partyId, status: "ACTIVE" } });
+    return Promise.all(list.items.map((a) => query("/api/v1/companies/{companyId}/tax/fiscal-authorizations/{authorizationId}", { path: { companyId, authorizationId: a.authorizationId } })));
+  }, [companyId, partyId]);
+  if (data === null || data.length === 0) {
+    return null;
+  }
+  return (
+    <Field label="Autorización fiscal (e-CF 44)">
+      <select aria-label="Autorización fiscal (e-CF 44)" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Ninguna — con ITBIS</option>
+        {data.map((a) => (
+          <option key={a.header.authorizationId} value={a.header.authorizationId}>
+            {a.header.certificateNo} · disponible {a.lines.map((l) => `${l.itemCode} ${formatQuantity(l.qtyAvailable)} ${l.uom} / ${formatDecimal(l.netAvailable)}`).join(" · ")}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
 
 export default function Page() {
   const { companyId, can } = useSession();
   const router = useRouter();
   const create = useCommand("create-invoice", "/api/v1/companies/{companyId}/sales/create-invoice-from-deliveries");
   const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const [authorizations, setAuthorizations] = useState<Record<string, string>>({});
   const { data, error } = useLoad(can("sales:read") ? () => query("/api/v1/companies/{companyId}/sales/billable-deliveries", { path: { companyId } }) : null, [companyId]);
   if (!can("sales:read")) {
     return <NoPermission />;
@@ -74,13 +100,14 @@ export default function Page() {
                 ))}
               </tbody>
             </table>
+            {can("invoice:create") ? <AuthorizationChoice partyId={partyId} value={authorizations[partyId] ?? ""} onChange={(id) => setAuthorizations({ ...authorizations, [partyId]: id })} /> : null}
             {can("invoice:create") ? (
               <button
                 type="button"
                 className="primary"
                 disabled={create.busy || chosen.length === 0}
                 onClick={async () => {
-                  const response = await create.run({ partyId, deliveryLineIds: chosen });
+                  const response = await create.run({ partyId, deliveryLineIds: chosen, fiscalAuthorizationId: authorizations[partyId] || null });
                   if (response) {
                     router.push(`/facturacion/factura/?id=${response.resultRef}`);
                   }

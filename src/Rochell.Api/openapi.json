@@ -30284,6 +30284,54 @@
         },
         "additionalProperties": false
       },
+      "FiscalAuthorizationConsumptionView": {
+        "required": [
+          "consumptionId",
+          "lineNo",
+          "invoiceId",
+          "invoiceNo",
+          "quantity",
+          "net",
+          "release",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "consumptionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lineNo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceNo": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "net": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "release": {
+            "type": "boolean"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "FiscalAuthorizationDetail": {
         "required": [
           "header",
@@ -30294,7 +30342,8 @@
           "verifiedBy",
           "lines",
           "documents",
-          "history"
+          "history",
+          "consumptions"
         ],
         "type": "object",
         "properties": {
@@ -30345,6 +30394,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FiscalAuthorizationHistoryView"
+            }
+          },
+          "consumptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FiscalAuthorizationConsumptionView"
             }
           }
         },

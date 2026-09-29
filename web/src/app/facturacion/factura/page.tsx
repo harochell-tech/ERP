@@ -7,6 +7,7 @@ import { query, type Schemas } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
 import { History } from "@/components/History";
 import { AccountingStatus, ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { invoiceEncfPrefix } from "@/lib/authorizations";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime, statusLabel, todayInDominicanRepublic } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
@@ -16,6 +17,8 @@ import { useLoad } from "@/lib/useQuery";
 
 type Invoice = Schemas["InvoiceDetail"];
 
+const EXEMPT_ECF_TYPE = "44";
+
 // VS3-10b (E-VS3-10-6/7): an invoice — issue (step-up), the fiscal package for the provider's portal, the e-CF record, void while
 // never fiscalized (Controller), credit notes per line, and the customer's withholdings (recorded by Cobros, reversed by the
 // Controller).
@@ -23,25 +26,47 @@ type Invoice = Schemas["InvoiceDetail"];
 function Issue({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) {
   const issue = useCommand(`issue-invoice:${invoice.header.invoiceId}`, "/api/v1/companies/{companyId}/sales/issue-invoice");
   const [ecfType, setEcfType] = useState("");
+  // FIS1-05 (E-FIS1-05-9): an invoice under a fiscal authorization is always an e-CF 44; there is nothing to choose.
+  const exempt = invoice.header.ecfType === EXEMPT_ECF_TYPE;
   return (
     <div className="inline-form">
-      <Field label="Tipo de e-CF">
-        <select value={ecfType} onChange={(e) => setEcfType(e.target.value)}>
-          <option value="">Automático (31 con RNC, 32 con cédula)</option>
-          <option value="31">31 · Crédito fiscal</option>
-          <option value="32">32 · Consumo</option>
-        </select>
-      </Field>
+      {exempt ? (
+        <p data-testid="invoice-exemption">Exenta — CONFOTUR (e-CF 44, sin ITBIS). El certificado se valida al emitir.</p>
+      ) : (
+        <Field label="Tipo de e-CF">
+          <select value={ecfType} onChange={(e) => setEcfType(e.target.value)}>
+            <option value="">Automático (31 con RNC, 32 con cédula)</option>
+            <option value="31">31 · Crédito fiscal</option>
+            <option value="32">32 · Consumo</option>
+          </select>
+        </Field>
+      )}
       <button
         type="button"
         className="primary"
         disabled={issue.busy}
-        onClick={async () => (await issue.run({ invoiceId: invoice.header.invoiceId, expectedVersion: invoice.header.version, ecfType: ecfType === "" ? null : ecfType })) && onDone()}
+        onClick={async () =>
+          (await issue.run({ invoiceId: invoice.header.invoiceId, expectedVersion: invoice.header.version, ecfType: exempt || ecfType === "" ? null : ecfType })) && onDone()
+        }
       >
         Emitir factura
       </button>
       <ErrorBox error={issue.error} />
     </div>
+  );
+}
+
+/** FIS1-05 (E-FIS1-05-9): an issued e-CF 44 names its exemption (from the fiscal package, which exists once issued). */
+function Exemption({ invoiceId }: { invoiceId: string }) {
+  const { companyId } = useSession();
+  const { data } = useLoad(() => query("/api/v1/companies/{companyId}/sales/invoices/{invoiceId}/fiscal-package", { path: { companyId, invoiceId } }), [companyId, invoiceId]);
+  if (!data?.exemption) {
+    return null;
+  }
+  return (
+    <p data-testid="invoice-exemption">
+      Exenta — {data.exemption.regime}, certificado <span className="mono">{data.exemption.certificateNo}</span> · proyecto {data.exemption.projectName}
+    </p>
   );
 }
 
@@ -65,6 +90,14 @@ function FiscalPackage({ invoiceId }: { invoiceId: string }) {
           <CopyField label="Neto" value={data.netTotal} />
           <CopyField label="ITBIS" value={data.taxTotal} />
           <CopyField label="Total" value={data.total} />
+          {data.exemption ? (
+            <>
+              <CopyField label="Régimen de exención" value={data.exemption.regime} />
+              <CopyField label="Certificado de exención" value={data.exemption.certificateNo} />
+              <CopyField label="Proyecto" value={data.exemption.projectName} />
+              <CopyField label="Indicador de facturación" value={data.exemption.billingIndicator} />
+            </>
+          ) : null}
         </tbody>
       </table>
     </>
@@ -283,6 +316,7 @@ function InvoiceDetail() {
         <AccountingStatus status={h.accountingStatus} eventId={data.postingEventId} />
       </p>
       {data.voidReason ? <p className="muted">Anulada: {data.voidReason}</p> : null}
+      {issued && h.ecfType === EXEMPT_ECF_TYPE ? <Exemption invoiceId={h.invoiceId} /> : null}
       {h.commercialStatus === "DRAFT" && can("invoice:issue") ? <Issue invoice={data} onDone={reload} /> : null}
 
       <table>
@@ -342,7 +376,7 @@ function InvoiceDetail() {
         <>
           <h2>Registrar el e-CF emitido en el portal</h2>
           <RecordEcfForm
-            prefix={h.ecfType === "32" ? "E32" : "E31"}
+            prefix={invoiceEncfPrefix(h.ecfType)}
             busy={record.busy}
             error={record.error}
             onSubmit={async (v) => (await record.run({ invoiceId: h.invoiceId, expectedVersion: h.version, ...v })) && reload()}

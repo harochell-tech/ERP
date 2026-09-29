@@ -101,3 +101,16 @@ pre { background: #f5f5f7; padding: 0.5rem; overflow-x: auto; }
   .page { padding: 16px; }
   .topbar { padding: 8px 16px; }
 }
+
+/* FIS1-05 (E-FIS1-05-7): the proforma's signature area and printing without the shell. */
+.proforma .signature { display: flex; gap: 48px; margin-top: 64px; font-size: 13px; color: var(--muted); }
+.proforma .signature > div { flex: 1; }
+.proforma .signature-line { border-bottom: 1px solid var(--fg); height: 64px; margin-bottom: 6px; }
+.proforma .signature-box { border: 1px dashed var(--muted); height: 110px; margin-bottom: 6px; border-radius: 6px; }
+@media print {
+  body { background: #fff; }
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .app { display: block; }
+  .page { padding: 0; max-width: none; }
+  table { background: #fff; }
+}

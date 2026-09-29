@@ -63,6 +63,12 @@ public sealed class FiscalAuthorizationReconciliationTests(PostgresFixture postg
         var period = await h.ScalarAsync<Guid>("SELECT period_id FROM fin.period WHERE company_id = @c AND @d BETWEEN starts_on AND ends_on", ("c", h.CompanyId), ("d", month));
         await h.RunAsync(new CloseComponent(h.CompanyId, await h.SessionWithRolesAsync("CONTROLLER"), "close", period, "AR-REC"), new CloseComponentHandler());
 
+        // E-FIS1-05-6: the detail lists what consumed it — 600 blocks, the credit note's 1,000.00, 100 blocks and the void returning them.
+        var detail = System.Text.Json.JsonDocument.Parse(await h.QueryAsync(
+            new Tax.Authorizations.GetFiscalAuthorization(h.CompanyId, await h.SessionWithRolesAsync("VENDEDOR"), w.Authorization), new Tax.Authorizations.GetFiscalAuthorizationHandler())).RootElement;
+        Assert.Equal("False:600.000000:30000.0000|True:0.000000:1000.0000|False:100.000000:5000.0000|True:100.000000:5000.0000", string.Join('|',
+            detail.GetProperty("consumptions").EnumerateArray().Select(c => $"{c.GetProperty("release").GetBoolean()}:{c.GetProperty("quantity").GetString()}:{c.GetProperty("net").GetString()}")));
+
         // Without the alert threshold AUTH-EXPIRY cannot run once authorizations exist (E-FIS1-04-4); it is a warning and blocks nothing.
         Assert.Equal("AUTH-CONSUMPTION:MATCHED,AUTH-EXPIRY:FAILED,EXEMPT-WITHOUT-AUTH:MATCHED", Statuses(run));
         Assert.Equal("ACTIVE:600.000000:29000.0000", await h.ScalarAsync<string>(

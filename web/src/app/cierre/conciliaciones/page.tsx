@@ -4,7 +4,7 @@ import Link from "next/link";
 import { query } from "@/api/client";
 import { ErrorBox, Loading, NoPermission } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
-import { formatDateTime, statusLabel } from "@/lib/labels";
+import { formatDateTime, RECONCILIATIONS, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -60,7 +60,7 @@ export default function Reconciliations() {
             {data.items.map((r) => (
               <tr key={r.runId}>
                 <td>
-                  <Link href={`/cierre/conciliacion/?id=${r.runId}`}>{r.reconCode}</Link> <span className="muted">{r.description}</span>
+                  <Link href={`/cierre/conciliacion/?id=${r.runId}`}>{r.reconCode}</Link> <span className="muted">{RECONCILIATIONS[r.reconCode] ?? r.description}</span>
                 </td>
                 <td>{formatDateTime(r.asOf)}</td>
                 <td className="num">{formatDecimal(r.totalA)}</td>
