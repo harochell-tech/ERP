@@ -1,0 +1,6 @@
+code,name,is_control
+1340,Producción en proceso,true
+5106,Variación de precio de materiales en producción,false
+5150,Absorción de costos de conversión,false
+5160,Scrap de producto terminado,false
+5190,Revaluación de costo estándar,false

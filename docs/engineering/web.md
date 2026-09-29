@@ -169,3 +169,8 @@ does not keep Secure cookies on `http://localhost`.
 | `npx playwright test` | Journeys in Chromium against the dev stack: the buyer creates and submits a PO, the approver approves it, the storekeeper receives it and sees it POSTED; the configuration journey; the security journey (UI-01: request → second approval → the new employee's menu; read-only audit and master screens); the treasury journey (VS#2 E2E-01 by UI): proposal → prepare (Tesorero) → release (Controller) → import CSV → suggested match → bank charge → BANK-GL difference 0.00 → payment Compensado; and the ledger journey (FIN1-04): adjustment prepared and submitted (Contador) → approved (Controller) → trial balance "Cuadra", CSV download, account ledger, statements |
 
 The other flows are covered at the API level (`tests/Rochell.Api.Tests`, including AT-01 and AT-02 over HTTP).
+
+## MFG1-07 — production screens (E-MFG1-07-1…11)
+
+Menu group **Producción**; see `docs/engineering/manufacturing.md` (MFG1-07). Every select inside a `Field` carries an `aria-label`,
+so `getByLabel(…, { exact: true })` finds it whatever option is selected.

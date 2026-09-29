@@ -13,7 +13,7 @@ internal sealed record DevAccount(Guid UserId, string Label);
 /// 0123456789 on GL 1101, the supplier's account verified 73 h ago, R-09 and R-10 approved, BANK_CHARGES mapped, the TREASURY
 /// aging buckets 30 / 60 / 90 and a treasurer. UI-01: the two security roles and a new employee without roles. FIN1-04: every
 /// account classed by its first digit (1 asset … 6 expense), capital, accrued expenses and energy accounts, approved balance
-/// sheet and income statement structures, and a Contador. VS3-10b: the VS#3 data of <see cref="SalesSeed"/>.
+/// sheet and income statement structures, and a Contador. VS3-10b: the VS#3 data of <see cref="SalesSeed"/>. MFG1-07: the MFG-1 data of <see cref="MfgSeed"/>.
 /// </summary>
 internal static class DevSeed
 {
@@ -38,6 +38,7 @@ internal static class DevSeed
         await h.SessionWithRolesAsync("SEGUNDO_APROBADOR_SEGURIDAD"); // UI-01: decides them
         await h.SessionWithRolesAsync("CONTADOR"); // FIN1-04: prepares adjustments
         await SalesSeed.RunAsync(h, receiving.Purchasing.PlantId, payments.Controller, approver); // VS3-10b, before the accounts are classed
+        await MfgSeed.RunAsync(h, receiving.Purchasing.PlantId); // MFG1-07
         await SeedLedgerAsync(h);
         var newcomer = await h.CreateUserAsync(); // UI-01: a user created with the CLI, no role yet
         var plantStorekeeper = await h.CreateUserAsync();

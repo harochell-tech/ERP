@@ -148,11 +148,24 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   TRANSPORT_REQUIRED: "Indique el vehículo y el chofer (o la placa y el chofer del cliente si retira en planta).",
   VEHICLE_OVER_CAPACITY: "La carga supera la capacidad del vehículo.",
   WEIGHING_INVALID: "La pesada no es válida: el bruto debe ser mayor que la tara.",
-  LOCATION_INVALID: "La ubicación no pertenece a la planta del conduce.",
+  LOCATION_INVALID: "La ubicación no es válida: debe ser una ubicación de existencias de la planta del documento.",
   INSUFFICIENT_STOCK: "No hay existencias suficientes en esa ubicación.",
   EVIDENCE_INVALID: "Indique la evidencia: referencia del archivo y su SHA-256 (64 caracteres hexadecimales).",
   POD_QUANTITIES_INVALID: "Lo recibido más lo devuelto no puede superar lo despachado.",
   EXCEPTION_REASON_REQUIRED: "Indique el motivo de la excepción (faltante o devolución).",
+  // MFG-1: machines, shifts, recipes, runs, lots and cost collectors.
+  NOT_RAW_MATERIAL: "Ese artículo no es una materia prima.",
+  CODE_DUPLICATE: "Ya existe uno con ese código en la planta.",
+  MACHINE_NOT_ACTIVE: "La máquina no está activa.",
+  SHIFT_NOT_ACTIVE: "El turno no está activo.",
+  RUN_EXISTS: "Ya hay una corrida para esa máquina, turno y fecha.",
+  SUMMARY_EXISTS: "La corrida ya tiene un resumen de turno; no se puede cancelar.",
+  MATERIALS_MISMATCH: "Registre el consumo real de cada material de la receta, una vez cada uno.",
+  CURING_NOT_DONE: "El lote todavía no cumple su curado mínimo.",
+  LOT_MOVED: "El lote ya se movió (liberado, bloqueado o desechado); el resumen no se puede revertir.",
+  COLLECTOR_SETTLED: "El colector de costos ya está liquidado.",
+  MONTH_NOT_ENDED: "El mes del colector todavía no ha terminado.",
+  RUNS_OPEN: "El colector tiene corridas en proceso.",
 };
 
 export interface DescribedError {

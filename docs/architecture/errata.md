@@ -566,6 +566,17 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-06-3 | MFG1-06 | New acceptance tests MFG-01 (run without an ACTIVE recipe → `RECIPE_NOT_ACTIVE`) and MFG-04 over the API (confirm-loaded from CURADO → `LOCATION_INVALID`); MFG-10 and INV-M arrive with MFG1-08. |
 | E-MFG1-06-4 | MFG1-06 | `[Trait("AcceptanceMfg1", "<ID>")]`, `docs/acceptance/mfg1.md` and `AcceptanceMfg1TraceabilityTests` (pending IDs listed in the test and the matrix; a tagged pending ID fails). |
 | E-MFG1-06-5 | MFG1-06 | No migration. |
+| E-MFG1-07-1 | MFG1-07 | Menu group Producción: Producción del día, Curado y liberación, Recetas, Máquinas y turnos, Costos de producción (`production:read`; each action with its write permission). |
+| E-MFG1-07-2 | MFG1-07 | Producción del día (plant + date: runs, real vs theoretical); the supervisor starts runs and records the shift summary on the run page (units convertible, e.g. m³); the plant manager posts or reverses (reason, step-up). |
+| E-MFG1-07-3 | MFG1-07 | Curado y liberación: lots with curing window, location, quantity, racks; Calidad releases (destination), blocks, unblocks; the plant manager scraps (step-up). |
+| E-MFG1-07-4 | MFG1-07 | Recetas (list, detail): the supervisor prepares, the plant manager approves; «Preparar desde receta» in Maestros › Costos estándar for the Controller. |
+| E-MFG1-07-5 | MFG1-07 | Máquinas y turnos (create, rename, activate / deactivate); Costos de producción (collectors, WIP, variances; the Controller settles with step-up). |
+| E-MFG1-07-6 | MFG1-07 | Playwright `production-journey.spec.ts` (E2E-M1 UI): run of yesterday with a recipe of 0 minimum curing hours so the lot can be released; the settlement stays covered by the API test. |
+| E-MFG1-07-7 | MFG1-07 | Dev stack `MfgSeed` and `deploy/staging/seed-mfg.sh` (test identities for the three production roles; accounts WIP 1340, CONVERSION_ABSORPTION 5150, PRODUCTION_SCRAP 5160, STANDARD_REVALUATION 5190, MATERIAL_PRICE_VARIANCE 5103 in dev / 5106 on staging, where 5103 is taken); synthetic only. |
+| E-MFG1-07-8 | MFG1-07 | Superseded by E-MFG1-07-11. |
+| E-MFG1-07-9 | MFG1-07 | `master_data:read` for SUPERVISOR_PRODUCCION, GERENTE_PLANTA and CALIDAD (plants, locations and items on the production screens). |
+| E-MFG1-07-10 | MFG1-07 | `sales:read` for APROBADOR_POLITICAS (the Costos estándar screen, to approve standard costs from the UI). |
+| E-MFG1-07-11 | MFG1-07 | Migration 0053 with those four grants; seed matrices updated. |
 
 Implementation rules derived from the above (no architectural change):
 

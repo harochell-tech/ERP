@@ -18,7 +18,8 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   await buyer.goto("/compras/ordenes/nueva/");
   await buyer.getByLabel("Planta de la orden").selectOption({ index: 1 });
   await buyer.getByLabel("Proveedor").selectOption({ index: 1 });
-  await buyer.getByLabel("Artículo 1").selectOption({ index: 1 });
+  // By code: the MFG-1 dev seed adds ADITIVO-P, which sorts first (MFG1-07).
+  await buyer.getByLabel("Artículo 1").selectOption({ label: "ARENA-LAVADA — ARENA-LAVADA" });
   await buyer.getByLabel("Cantidad 1").fill("40");
   await buyer.getByLabel("Precio 1").fill("1,000.00");
   await buyer.getByRole("button", { name: "Crear orden" }).click();

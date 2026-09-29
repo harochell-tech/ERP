@@ -70,6 +70,17 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
   {
+    // MFG1-07 (E-MFG1-07-1)
+    title: "Producción",
+    items: [
+      { href: "/produccion/dia/", label: "Producción del día", permission: "production:read" },
+      { href: "/produccion/lotes/", label: "Curado y liberación", permission: "production:read" },
+      { href: "/produccion/recetas/", label: "Recetas", permission: "production:read" },
+      { href: "/produccion/maquinas/", label: "Máquinas y turnos", permission: "production:read" },
+      { href: "/produccion/costos/", label: "Costos de producción", permission: "production:read" },
+    ],
+  },
+  {
     title: "Cuentas por pagar",
     items: [
       { href: "/cxp/facturas/", label: "Facturas de proveedor", permission: "supplier_invoice:read" },
@@ -148,6 +159,8 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/facturacion/nota/": "/facturacion/notas/",
   "/cobros/recibo/": "/cobros/recibos/",
   "/cobros/deposito/": "/cobros/depositos/",
+  "/produccion/corrida/": "/produccion/dia/",
+  "/produccion/receta/": "/produccion/recetas/",
 };
 
 function isActive(pathname: string, href: string): boolean {

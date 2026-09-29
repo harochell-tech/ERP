@@ -19,7 +19,7 @@ an ID has no tagged test (except the ones marked pending below) or is missing fr
 | MFG-09 | Reversal of a posted summary: exact reversals, stock and WIP as before | `ProductionRunTests.Production_needs_a_standard_with_breakdown_enough_stock_and_is_reversed_exactly_while_the_lot_is_in_curing` |
 | MFG-10 | Two simultaneous postings of one summary: one receipt | **Pending — MFG1-08** |
 | MFG-11 | Period with production: SHIFT-OPEN, WIP-OPEN, WIP-GL; OP-DAY → COST-SET → INV-MOV | `SettlementTests.MFG11_production_reconciliations_report_open_runs_usage_out_of_tolerance_and_the_close_order`; API: `ManufacturingAcceptanceTests` (INV-MOV refused first, then the three close in order) |
-| E2E-M1 | Recipe → standard → run → summary → curing → release → delivery → invoice → settlement, over the API and the UI | API: `Rochell.Api.Tests` · `ManufacturingAcceptanceTests.E2EM1_recipe_standard_run_summary_curing_release_sale_settlement_and_close_over_HTTP` (E-MFG1-06-2). UI: **pending — MFG1-07** |
+| E2E-M1 | Recipe → standard → run → summary → curing → release → delivery → invoice → settlement, over the API and the UI | API: `Rochell.Api.Tests` · `ManufacturingAcceptanceTests.E2EM1_recipe_standard_run_summary_curing_release_sale_settlement_and_close_over_HTTP` (E-MFG1-06-2). UI: `web/e2e/production-journey.spec.ts` (Playwright, MFG1-07; the settlement needs the month to end, so it stays in the API test) |
 | INV-M | Random sequences keep P-1, P-3, WIP-GL, released ⇔ in the yard, nothing dispatched from CURADO | **Pending — MFG1-08** |
 
 Tests without a project name are in `Rochell.Manufacturing.Tests`.
