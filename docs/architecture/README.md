@@ -12,6 +12,7 @@ editable originals; these Markdown copies are what the code is built against. If
 | 1c | [`vs3/frozen-baseline-vs3.md`](vs3/frozen-baseline-vs3.md) | **Frozen Baseline of Vertical Slice #3** (sales, dispatch, collections), approved 2026-09-27 with E-VS3-1…16. |
 | 1d | [`fin1/frozen-baseline-fin1.md`](fin1/frozen-baseline-fin1.md) | **Frozen Baseline of FIN-1** (adjustment journal, trial balance, financial statements), approved 2026-09-27 with E-FIN1-1…10. |
 | 1e | [`mfg1/frozen-baseline-mfg1.md`](mfg1/frozen-baseline-mfg1.md) | **Baseline of Manufacturing #1** (production, curing, release, standard cost), approved 2026-09-29 with E-MFG1-1…18. |
+| 1f | [`fis1/frozen-baseline-fis1.md`](fis1/frozen-baseline-fis1.md) | **Baseline of Fiscal #1** (CONFOTUR fiscal authorizations, e-CF 44 exempt sales), approved 2026-09-29 with E-FIS1-1…16. |
 | 2 | [`baseline/06-frozen-baseline-patch-1.1.md`](baseline/06-frozen-baseline-patch-1.1.md) | Patch 1.1: prices > 0, STOCK_COVERAGE naming, deployment environment. |
 | 3 | [`baseline/05-frozen-baseline-patch-1.md`](baseline/05-frozen-baseline-patch-1.md) | Patch 1 (P-1 … P-8): posting prerequisites roll back, exact reversals (R-02/R-07 A/B), schema and tests replaced. |
 | 4 | [`baseline/04-architecture-v2.1.1-frozen-baseline.md`](baseline/04-architecture-v2.1.1-frozen-baseline.md) | **Frozen Baseline of Vertical Slice #1** (§8 schema … §17 PR plan) and errata E-1 … E-12. |
