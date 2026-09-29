@@ -1,7 +1,7 @@
 # Fiscal #1 — Autorizaciones fiscales: ventas exentas a proyectos CONFOTUR
 
-**Estado: PROPUESTA — pendiente de aprobación de Alexander Rochell** (redactada el 2026-09-29). Al aprobarse, las decisiones
-D-01…D-16 pasan a errata E-FIS1-1…16 y este documento queda CONGELADO con la misma regla que los slices anteriores.
+**Estado: CONGELADO — aprobado por Alexander Rochell el 2026-09-29**, con las decisiones D-01…D-16 tal como se recomiendan
+(errata E-FIS1-1…16). Es la especificación; cualquier cambio sigue la regla de congelamiento.
 
 Fuentes: Architecture v2 Decisión 2 (autorización fiscal como submodelo, "nunca una bandera de cliente") y ADR-020; v2.1 §16 P-20 y
 §18 (máquina de la autorización fiscal); v1 §139 y §439; VS#3 D-13 / E-VS3-13 (slice fiscal propio); E-VS3-05-1/2/8/9 (ITBIS de

@@ -585,6 +585,22 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-08-6 | MFG1-08 | `mfg1.md` records the open conditions: B-02, A-01, no real data until B-02 or a zero-difference parallel run. |
 | E-MFG1-08-7 | MFG1-08 | Defects the new tests find are fixed in the PR when no approved rule changes, and reported. |
 | E-MFG1-08-8 | MFG1-08 | No migration. |
+| E-FIS1-1 | FIS-1 | ¿Qué habilita vender sin ITBIS? → Solo una **autorización fiscal ACTIVE** que registra la **certificación de exención de la DGII**; la resolución CONFOTUR sola no basta (DGII). Nunca una marca del cliente (v2 Decisión 2, ADR-020) |
+| E-FIS1-2 | FIS-1 | Granularidad → **Una autorización por certificación** (por proforma), con alcance por **artículo, cantidad y monto neto**; los artículos no listados se facturan con ITBIS (la DGII no confirmó sustitutos) |
+| E-FIS1-3 | FIS-1 | Quién registra y verifica → Registra Crédito o Facturación con los documentos (certificado, resolución, lista, proforma: referencia + SHA-256); **verifica el Especialista fiscal** (cuatro ojos, step-up) antes de ACTIVE |
+| E-FIS1-4 | FIS-1 | Proforma → Vista imprimible del **pedido de venta** con ITBIS, RNC y firma / sello del suplidor, para que el cliente la presente; la autorización guarda el pedido de origen (opcional) |
+| E-FIS1-5 | FIS-1 | Tipo de comprobante → **e-CF 44** con todas las líneas exentas; una factura es **toda exenta o toda gravada**: si un conduce mezcla artículos cubiertos y no cubiertos, se hacen dos facturas |
+| E-FIS1-6 | FIS-1 | Determinación fiscal → El Tax Engine recibe la autorización: sin línea de ITBIS para lo cubierto y la autorización (número, id) guardada en los insumos de la determinación, para Explicar el asiento |
+| E-FIS1-7 | FIS-1 | Asiento → Se reutiliza **P-18** (su línea de ITBIS queda en cero y no se escribe); no se crea P-20 (queda reservada) |
+| E-FIS1-8 | FIS-1 | Consumo → Se descuenta al **emitir** la factura, en la misma transacción; la anulación antes del e-CF y la nota de crédito lo devuelven |
+| E-FIS1-9 | FIS-1 | Vencimiento → `valid_until` de la certificación (si la trae) y `project_term_ends_on` (15 años de la Ley 195-13) informativo; una autorización vencida no se usa y avisa 15 días antes |
+| E-FIS1-10 | FIS-1 | Entregas antes de la certificación → El hecho imponible sigue en la fecha de factura (E-VS3-10): el conduce puede esperar sin facturar (aviso de 30 días de VS#3); **no hay conversión** de facturas ya emitidas con ITBIS |
+| E-FIS1-11 | FIS-1 | Nota de crédito de una factura exenta → e-CF 34 sin ITBIS (la tasa de la línea es 0); devuelve consumo |
+| E-FIS1-12 | FIS-1 | Número de certificación en el e-CF → Va en el paquete fiscal y como `InformacionAdicionalComprador` sugerido; el formato no tiene campo propio (pendiente de confirmar, X-1) |
+| E-FIS1-13 | FIS-1 | Roles y permisos → Permisos nuevos de la sección 2; sin roles nuevos |
+| E-FIS1-14 | FIS-1 | Conciliaciones → AUTH-CONSUMPTION y EXEMPT-WITHOUT-AUTH bloquean AR-REC; AUTH-EXPIRY solo avisa |
+| E-FIS1-15 | FIS-1 | Reportes y proporcionalidad → Fuera: los datos quedan listos para el 607 (NCF E44, ITBIS 0) y la proporcionalidad (ventas exentas por destino) del slice de reportes |
+| E-FIS1-16 | FIS-1 | Datos reales → Igual que siempre: ninguno hasta B-02 o paralelo conciliado |
 
 Implementation rules derived from the above (no architectural change):
 
