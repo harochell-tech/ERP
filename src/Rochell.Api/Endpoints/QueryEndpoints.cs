@@ -48,7 +48,7 @@ public static class QueryEndpoints
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
-        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
+        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
@@ -137,6 +137,9 @@ public static class QueryEndpoints
         manufacturing.MapGet("/cost-collectors", (HttpContext http, Guid companyId, Guid? plantId, DateOnly? month, string? status, ListCostCollectorsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListCostCollectors(companyId, s, plantId, month, status), handler, ct))
             .Describe<CostCollectorList>(nameof(ListCostCollectors));
+        manufacturing.MapGet("/production-day", (HttpContext http, Guid companyId, Guid plantId, DateOnly businessDate, GetProductionDayHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetProductionDay(companyId, s, plantId, businessDate), handler, ct))
+            .Describe<ProductionDay>(nameof(GetProductionDay));
 
         // E-VS3-02-11: VS#3 master data (sales:read).
         var sales = company.MapGroup("/sales").WithTags("Sales");

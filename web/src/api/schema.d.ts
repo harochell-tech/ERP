@@ -2779,6 +2779,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/manufacturing/production-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetProductionDay"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/plants": {
         parameters: {
             query?: never;
@@ -5966,6 +5982,46 @@ export interface components {
             status?: null | number;
             detail?: null | string;
             instance?: null | string;
+        };
+        ProductionDay: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: date */
+            businessDate: string;
+            runs: components["schemas"]["ProductionDayRun"][];
+            /** Format: decimal */
+            goodUnits: string;
+            materials: components["schemas"]["ProductionDayMaterial"][];
+        };
+        ProductionDayMaterial: {
+            /** Format: uuid */
+            materialItemId: string;
+            materialCode: string;
+            baseUom: string;
+            /** Format: decimal */
+            qty: string;
+            /** Format: decimal */
+            theoreticalQty: string;
+            /** Format: decimal */
+            difference: string;
+        };
+        ProductionDayRun: {
+            /** Format: uuid */
+            runId: string;
+            runNo: string;
+            machineCode: string;
+            shiftCode: string;
+            itemCode: string;
+            status: string;
+            summaryStatus: null | string;
+            /** Format: decimal */
+            goodUnits: null | string;
+            /** Format: decimal */
+            mixScrapUnits: null | string;
+            /** Format: decimal */
+            freshScrapUnits: null | string;
+            lotCode: null | string;
+            lotStatus: null | string;
         };
         ProductionRunDetail: {
             run: components["schemas"]["ProductionRunSummary"];
@@ -19809,6 +19865,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CostCollectorList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetProductionDay: {
+        parameters: {
+            query: {
+                plantId: string;
+                businessDate: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductionDay"];
                 };
             };
             /** @description Bad Request */

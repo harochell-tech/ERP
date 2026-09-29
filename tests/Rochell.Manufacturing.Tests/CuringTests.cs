@@ -28,6 +28,8 @@ public sealed class CuringTests(PostgresFixture postgres)
         return (s, run, posted.GetProperty("lotId").GetGuid(), curing, scrap);
     }
 
+    [Trait("AcceptanceMfg1", "MFG-04")]
+    [Trait("AcceptanceMfg1", "MFG-05")]
     [Fact]
     public async Task Calidad_releases_a_cured_lot_to_the_yard_without_a_journal_and_nothing_in_curing_is_offered_for_dispatch()
     {
@@ -60,6 +62,7 @@ public sealed class CuringTests(PostgresFixture postgres)
             $"{l.GetProperty("status").GetString()}:{l.GetProperty("curingDone").GetBoolean()}:{l.GetProperty("locationCode").GetString()}:{l.GetProperty("quantity").GetString()}:{l.GetProperty("racks").GetInt32()}")));
     }
 
+    [Trait("AcceptanceMfg1", "MFG-06")]
     [Fact]
     public async Task A_blocked_lot_is_not_released_and_scrap_is_posted_at_valuation_cost_until_the_lot_is_scrapped()
     {

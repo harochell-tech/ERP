@@ -85,6 +85,7 @@ public sealed class ProductionRunTests(PostgresFixture postgres)
 
     internal static string Balance(Guid account) => $"(SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE account_id = '{account}')::numeric(19,2)::text";
 
+    [Trait("AcceptanceMfg1", "MFG-02")]
     [Fact]
     public async Task A_posted_shift_summary_consumes_at_moving_average_and_receives_the_lot_into_curing_at_standard()
     {
@@ -120,6 +121,8 @@ public sealed class ProductionRunTests(PostgresFixture postgres)
             .Replace(":|", ":", StringComparison.Ordinal));
     }
 
+    [Trait("AcceptanceMfg1", "MFG-03")]
+    [Trait("AcceptanceMfg1", "MFG-09")]
     [Fact]
     public async Task Production_needs_a_standard_with_breakdown_enough_stock_and_is_reversed_exactly_while_the_lot_is_in_curing()
     {
@@ -150,5 +153,21 @@ public sealed class ProductionRunTests(PostgresFixture postgres)
         await h2.RunAsync(new PostShiftSummary(h2.CompanyId, s.Manager, "repost", s.Plant, run, draft.GetProperty("version").GetInt64()), new PostShiftSummaryHandler());
         Assert.Equal($"PT-BLOQUE-6-{s.Today:yyyyMMdd}-DIA,PT-BLOQUE-6-{s.Today:yyyyMMdd}-DIA-2", await h2.ScalarAsync<string>(
             $"SELECT string_agg(lot_code, ',' ORDER BY lot_code) FROM inv.lot WHERE item_id = '{s.Block}'"));
+    }
+
+    [Trait("AcceptanceMfg1", "MFG-01")]
+    [Fact]
+    public async Task MFG01_a_run_needs_the_products_active_recipe_on_the_machine()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await SetupAsync(h);
+        var paver = Guid.CreateVersion7();
+        await h.AdminRequireAsync($"INSERT INTO md.item VALUES ('{paver}', '{h.CompanyId}', 'ADOQUIN-H', 'Adoquín holandés', 'FINISHED_GOOD', 'un', 'ADOQUIN', 'ACTIVE', 1)");
+
+        var noRecipe = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
+            new StartProductionRun(h.CompanyId, s.Supervisor, "paver", s.Plant, s.Machine, s.Day, s.Today, paver), new StartProductionRunHandler()));
+
+        Assert.Equal(ManufacturingErrors.RecipeNotActive, noRecipe.Code);
+        Assert.Equal(0L, await h.ScalarAsync<long>("SELECT count(*) FROM mfg.production_run"));
     }
 }
