@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Rochell.Platform.Commands;
+using Rochell.Sales.Customers;
 using Rochell.Sales.Orders;
 using Rochell.Sales.Queries;
 using Rochell.Sales.Quotes;
@@ -166,5 +167,101 @@ public sealed class QuoteTests(PostgresFixture postgres)
         Assert.Equal("COT-000003:DRAFT:False|COT-000002:SENT:True|COT-000001:LOST:False", string.Join('|', all.GetProperty("items").EnumerateArray()
             .Select(q => $"{q.GetProperty("quoteNo").GetString()}:{q.GetProperty("status").GetString()}:{q.GetProperty("expired").GetBoolean()}")));
         Assert.Equal("El cliente compró a otro suplidor", await h.ScalarAsync<string>("SELECT closing_reason FROM sal.quote WHERE quote_id = @q", ("q", lost)));
+    }
+
+    private static async Task<Guid> SentAsync(TestHarness h, World w, string key, decimal? price = null, DateOnly? validUntil = null, Guid? party = null)
+    {
+        var quote = (await h.RunAsync(Create(h, w, key, price, validUntil, party), new CreateQuoteHandler())).ResultRef;
+        var version = 1L;
+        if (price < 50.00m)
+        {
+            await h.RunAsync(new SubmitQuoteForApproval(h.CompanyId, w.S.Seller, key + "-sub", quote, 1), new SubmitQuoteForApprovalHandler());
+            await h.RunAsync(new ApproveQuotePrices(h.CompanyId, w.Approver, key + "-apr", quote, 2), new ApproveQuotePricesHandler());
+            version = 3;
+        }
+
+        await h.RunAsync(new SendQuote(h.CompanyId, w.S.Seller, key + "-send", quote, version), new SendQuoteHandler());
+        return quote;
+    }
+
+    [Trait("AcceptanceQuo1", "QUO-04")]
+    [Fact]
+    public async Task QUO04_a_sent_quote_becomes_a_draft_order_at_its_quoted_prices_that_keeps_them_and_goes_through_credit()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        var quote = await SentAsync(h, w, "q", 45.00m);
+
+        var converted = await h.RunAsync(new ConvertQuote(h.CompanyId, w.S.Seller, "convert", quote, 4), new ConvertQuoteHandler());
+        var order = converted.ResultRef;
+        var draft = JsonDocument.Parse(await h.QueryAsync(new GetSalesOrder(h.CompanyId, w.S.Seller, order), new GetSalesOrderHandler())).RootElement;
+        var quoteDetail = await DetailAsync(h, w, quote);
+
+        // E-QUO1-03-4: 800 instead of 1,000 keeps the quoted 45.00 (the list says 50.00): 800 × 45.00 = 36,000.00; then credit confirms it.
+        await h.RunAsync(
+            new UpdateSalesOrderDraft(h.CompanyId, w.S.Seller, "upd", order, 1, w.S.Plant, DeliveryTerms.PickupAtPlant, null, null, "OC-77", [new SalesOrderLineInput(w.S.Block, "un", 800m)]),
+            new UpdateSalesOrderDraftHandler());
+        await h.RunAsync(new SubmitForCredit(h.CompanyId, w.S.Seller, "credit", order, 2), new SubmitForCreditHandler());
+        var confirmed = JsonDocument.Parse(await h.QueryAsync(new GetSalesOrder(h.CompanyId, w.S.Seller, order), new GetSalesOrderHandler())).RootElement;
+
+        Assert.Equal("PV-000001|DRAFT|45000.00|COT-000001|OC-77", $"{draft.GetProperty("header").GetProperty("orderNo").GetString()}|{draft.GetProperty("header").GetProperty("status").GetString()}|" +
+            $"{draft.GetProperty("header").GetProperty("totalNet").GetString()}|{draft.GetProperty("header").GetProperty("quoteNo").GetString()}|{draft.GetProperty("customerPoRef").GetString()}");
+        Assert.Equal("1000.000000:45.0000", string.Join('|', draft.GetProperty("lines").EnumerateArray().Select(l => $"{l.GetProperty("qtyOrdered").GetString()}:{l.GetProperty("unitPrice").GetString()}")));
+        Assert.Equal($"CONVERTED|PV-000001|{order}", $"{quoteDetail.GetProperty("header").GetProperty("status").GetString()}|{quoteDetail.GetProperty("orderNo").GetString()}|" +
+            $"{quoteDetail.GetProperty("salesOrderId").GetString()}");
+        Assert.Equal("CONFIRMED|36000.00|800.000000:45.0000", $"{confirmed.GetProperty("header").GetProperty("status").GetString()}|{confirmed.GetProperty("header").GetProperty("totalNet").GetString()}|" +
+            string.Join('|', confirmed.GetProperty("lines").EnumerateArray().Select(l => $"{l.GetProperty("qtyOrdered").GetString()}:{l.GetProperty("unitPrice").GetString()}")));
+        Assert.Equal("SalesOrderCreated:" + quote, await h.ScalarAsync<string>(
+            "SELECT event_type || ':' || (payload ->> 'quoteId') FROM core.domain_event WHERE aggregate_id = @o AND event_type = 'SalesOrderCreated'", ("o", order)));
+    }
+
+    [Trait("AcceptanceQuo1", "QUO-05")]
+    [Fact]
+    public async Task QUO05_an_expired_quote_or_one_of_a_customer_not_yet_active_is_not_converted()
+    {
+        var clock = new FakeClock();
+        await using var h = await TestHarness.CreateAsync(postgres, clock);
+        var w = await WorldAsync(h);
+        var prospect = (await h.RunAsync(new CreateCustomer(h.CompanyId, w.S.Seller, "prospect", "101000001", "Hotel en proyecto"), new CreateCustomerHandler())).ResultRef;
+        var ofProspect = await SentAsync(h, w, "q-prospect", party: prospect);
+        var expiring = await SentAsync(h, w, "q-expiring", validUntil: Today(h).AddDays(1));
+        var draft = await CreateAsync(h, w, "q-draft");
+
+        var notActive = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new ConvertQuote(h.CompanyId, w.S.Seller, "c-prospect", ofProspect, 2), new ConvertQuoteHandler()));
+        var notSent = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new ConvertQuote(h.CompanyId, w.S.Seller, "c-draft", draft, 1), new ConvertQuoteHandler()));
+        clock.Advance(TimeSpan.FromDays(3));
+        var seller = await h.SessionWithRolesAsync("VENDEDOR");
+        var expired = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new ConvertQuote(h.CompanyId, seller, "c-expired", expiring, 2), new ConvertQuoteHandler()));
+
+        Assert.Equal((OrderErrors.CustomerNotActive, QuoteErrors.InvalidState, QuoteErrors.Expired), (notActive.Code, notSent.Code, expired.Code));
+        Assert.Equal(0L, await h.ScalarAsync<long>("SELECT count(*) FROM sal.sales_order WHERE quote_id IS NOT NULL"));
+    }
+
+    [Trait("AcceptanceQuo1", "QUO-06")]
+    [Fact]
+    public async Task QUO06_two_conversions_at_once_create_one_order()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        var quote = await SentAsync(h, w, "q");
+        var seller2 = await h.SessionWithRolesAsync("VENDEDOR");
+
+        var outcomes = await Task.WhenAll(new[] { (w.S.Seller, "a"), (seller2, "b") }.Select(x => Task.Run(async () =>
+        {
+            try
+            {
+                await h.RunAsync(new ConvertQuote(h.CompanyId, x.Item1, "convert-" + x.Item2, quote, 2), new ConvertQuoteHandler());
+                return (string?)null;
+            }
+            catch (DomainException ex)
+            {
+                return ex.Code;
+            }
+        })));
+
+        Assert.Equal(1, outcomes.Count(o => o is null));
+        Assert.Equal(QuoteErrors.VersionConflict, Assert.Single(outcomes, o => o is not null));
+        Assert.Equal("1:CONVERTED", await h.ScalarAsync<string>(
+            "SELECT (SELECT count(*) FROM sal.sales_order WHERE quote_id = @q)::text || ':' || status FROM sal.quote WHERE quote_id = @q", ("q", quote)));
     }
 }
