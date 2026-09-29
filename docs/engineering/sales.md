@@ -222,3 +222,12 @@ Migration `0046__ar_aging.sql`: CREDIT parameters `ar_aging_bucket_1_days`, `ar_
 The order detail gives `salesOrderLineId` per line. CSV files share the ledger reports' writer (`LedgerCsv.Writer`).
 Tests: `ArQueryTests` (buckets, advance apart, missing policy, statement and CSV, filters);
 `Rochell.Api.Tests` · `SalesAcceptanceTests.E2ES1_…` (E2E-S1 over HTTP, E-VS3-09-7).
+
+## Properties, concurrency and acceptance (VS3-11)
+
+`SalesPropertyTests` (INV-S, E-VS3-11-1/2/5) runs seeded random sequences of the whole order-to-cash flow and re-sums the
+invariants after every step, with AR-GL, CONTRACT-ASSET, RECEIPT-APPL, ACC-EVIDENCE and the inventory reconciliations every 25
+steps (`ROCHELL_INVS_SEEDS`, `ROCHELL_INVS_STEPS`; workflow `inv-s`). `SalesConcurrencyTests` (E-VS3-11-3) races gate-outs over
+the stock, credit notes over one line, an application against a bounce, and a receipt against the AR-REC close. The first runs
+found a spurious version conflict between two gate-outs of the same order; `Orders.LockCurrentAsync` now locks and reads the order
+in one step (E-VS3-11-7). The acceptance matrix is `docs/acceptance/vs3.md`, enforced by `AcceptanceVs3TraceabilityTests`.

@@ -121,28 +121,27 @@ internal static class Orders
 
     public static async Task<Row> LockAsync(CommandContext context, Guid orderId, long expectedVersion, CancellationToken cancellationToken)
     {
-        var row = await Reading.SingleOrDefaultAsync(
-            context.Connection,
-            context.Transaction,
-            "SELECT party_id, status, total_net, lines_version, created_by, version, order_no FROM sal.sales_order WHERE company_id = @c AND sales_order_id = @o FOR UPDATE",
-            r => new Row(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetInt32(3), r.GetGuid(4), r.GetInt64(5), r.GetString(6)),
-            cancellationToken,
-            ("c", context.CompanyId),
-            ("o", orderId)).ConfigureAwait(false)
-            ?? throw new DomainException(SalesErrors.NotFound, "The sales order does not exist.");
+        var row = await LockCurrentAsync(context, orderId, cancellationToken).ConfigureAwait(false);
         return row.Version == expectedVersion
             ? row
             : throw new DomainException(SalesErrors.VersionConflict, $"The order changed (version {row.Version}, expected {expectedVersion}); reload and retry.");
     }
 
-    /// <summary>Locks an order without a version check (deliveries move it; lock order: sales order → delivery → lines).</summary>
+    /// <summary>
+    /// Locks an order and returns it as it stands once locked, without a version check (deliveries move it; lock order: sales order →
+    /// delivery → lines). VS3-11 (INV-S): reading the version first and then comparing it under the lock refused a second gate-out
+    /// of the same order that had only waited for the first.
+    /// </summary>
     public static async Task<Row> LockCurrentAsync(CommandContext context, Guid orderId, CancellationToken cancellationToken)
-    {
-        var version = await SalesSql.ScalarAsync<long?>(
-            context, "SELECT version FROM sal.sales_order WHERE company_id = @c AND sales_order_id = @o", cancellationToken, ("c", context.CompanyId), ("o", orderId)).ConfigureAwait(false)
-            ?? throw new DomainException(SalesErrors.NotFound, "The sales order does not exist.");
-        return await LockAsync(context, orderId, version, cancellationToken).ConfigureAwait(false);
-    }
+        => await Reading.SingleOrDefaultAsync(
+               context.Connection,
+               context.Transaction,
+               "SELECT party_id, status, total_net, lines_version, created_by, version, order_no FROM sal.sales_order WHERE company_id = @c AND sales_order_id = @o FOR UPDATE",
+               r => new Row(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetInt32(3), r.GetGuid(4), r.GetInt64(5), r.GetString(6)),
+               cancellationToken,
+               ("c", context.CompanyId),
+               ("o", orderId)).ConfigureAwait(false)
+           ?? throw new DomainException(SalesErrors.NotFound, "The sales order does not exist.");
 
     /// <summary>E-VS3-04-13: adds delivered quantities to the order's current lines and moves it to PARTIALLY_DELIVERED / DELIVERED.</summary>
     public static async Task AddDeliveredAsync(CommandContext context, Row order, Guid orderId, IReadOnlyDictionary<Guid, decimal> delivered, string commandType, CancellationToken cancellationToken)

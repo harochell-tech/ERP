@@ -1,0 +1,49 @@
+name: inv-s
+
+# E-VS3-11-5: INV-S (VS#3 property test) at other seeds and lengths than the CI run (3 seeds × 150 steps). Manual only; not part
+# of the required check. A failure prints the seed and the steps that led to it.
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Comma-separated seeds
+        default: "1,2,3,4,5,6,7,8"
+      steps:
+        description: Steps per seed
+        default: "600"
+
+permissions:
+  contents: read
+
+jobs:
+  inv-s:
+    name: inv-s
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+      DOTNET_ENVIRONMENT: Test
+      SEEDS: ${{ github.event.inputs.seeds }}
+      STEPS: ${{ github.event.inputs.steps }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          [[ "${SEEDS}" =~ ^[0-9]{1,9}(,[0-9]{1,9}){0,49}$ ]] || { echo "seeds: up to 50 comma-separated integers" >&2; exit 1; }
+          [[ "${STEPS}" =~ ^[1-9][0-9]{0,4}$ ]] || { echo "steps must be 1..99999" >&2; exit 1; }
+
+      - name: Build
+        run: dotnet build tests/Rochell.Sales.Tests -c Release
+
+      - name: INV-S
+        run: >
+          ROCHELL_INVS_SEEDS="${SEEDS}" ROCHELL_INVS_STEPS="${STEPS}"
+          dotnet test tests/Rochell.Sales.Tests -c Release --no-build --filter SalesPropertyTests
+          --logger "console;verbosity=detailed"
