@@ -664,6 +664,18 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-QUO1-12 | QUO-1 | Impresión → Vista imprimible con emisor, cliente, líneas, ITBIS, total, validez y condiciones; el formato final lo da Alexander (X-Q1). Puede servir de proforma para la DGII antes del pedido |
 | E-QUO1-13 | QUO-1 | Asientos y fiscal → Ninguno: la cotización no postea, no mueve inventario ni emite e-CF |
 | E-QUO1-14 | QUO-1 | Pantallas → Ventas › Cotizaciones: lista (estado, cliente, vencidas), formulario, detalle con acciones, impresión y «Convertir en pedido»; contador en Inicio de precios por aprobar |
+| E-QUO1-01-1 | QUO1-01 | Lines per `lines_version`, rewritten while DRAFT, frozen afterwards (as the sales order). |
+| E-QUO1-01-2 | QUO1-01 | The header keeps `price_approved_by`, `price_approved_at` and `approved_lines_version`; editing the lines voids the approval; the database refuses SENT with a line below the list unless the current lines are approved. |
+| E-QUO1-01-3 | QUO1-01 | Transitions DRAFT → PENDING_APPROVAL / SENT / CANCELLED; PENDING_APPROVAL → DRAFT; SENT → CONVERTED / LOST / CANCELLED; each with its state history (ADR-027). |
+| E-QUO1-01-4 | QUO1-01 | One `closing_reason` (1–500 characters) exactly for LOST and CANCELLED. |
+| E-QUO1-01-5 | QUO1-01 | `valid_until` required, CHECK `valid_until >= quote_date`. |
+| E-QUO1-01-6 | QUO1-01 | `list_price` required (only finished goods on the price list in force); `unit_price > 0`; `net_amount` rounded to 2 decimals. |
+| E-QUO1-01-7 | QUO1-01 | `copied_from_quote_id` traces a copy (E-QUO1-8). |
+| E-QUO1-01-8 | QUO1-01 | `customer_ref` (≤ 60) and `notes` (≤ 1,000, printed as particular conditions). |
+| E-QUO1-01-9 | QUO1-01 | `sal.sales_order.quote_id` optional, unique, FK; the order guard is replaced so it is immutable; `sal.quote.sales_order_id` exactly when CONVERTED. |
+| E-QUO1-01-10 | QUO1-01 | The schema only has the party FK; the commands check a DRAFT or ACTIVE customer (QUO1-02). |
+| E-QUO1-01-11 | QUO1-01 | `quote:manage` (VENDEDOR), `quote:approve_price` (APROBADOR_POLITICAS); SoD pair; 113 permissions, 42 SoD rules. |
+| E-QUO1-01-12 | QUO1-01 | Migration 0057 (tables, guards, state history, RLS, column grants, the order column) and the table inventory. |
 
 Implementation rules derived from the above (no architectural change):
 
