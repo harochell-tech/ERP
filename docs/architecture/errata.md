@@ -577,6 +577,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-07-9 | MFG1-07 | `master_data:read` for SUPERVISOR_PRODUCCION, GERENTE_PLANTA and CALIDAD (plants, locations and items on the production screens). |
 | E-MFG1-07-10 | MFG1-07 | `sales:read` for APROBADOR_POLITICAS (the Costos estándar screen, to approve standard costs from the UI). |
 | E-MFG1-07-11 | MFG1-07 | Migration 0053 with those four grants; seed matrices updated. |
+| E-MFG1-08-1 | MFG1-08 | INV-M: a seeded, reproducible property test over one plant, two products on one machine (two recipes) and three materials with stock: runs, summaries (some above the stock), postings, reversals, releases before and after curing, blocks and unblocks, scrap in curing and in the yard, new standards (revaluation), pickups (sometimes from CURADO), restocks, clock advances (hours or weeks) and settlements. |
+| E-MFG1-08-2 | MFG1-08 | After every step, by SQL: journals balanced; stock ≥ 0, valuation = value entries = inventory GL (P-3); a settled collector has no WIP; released lots out of CURADO, curing and blocked lots only in CURADO; nothing dispatched from CURADO; a lot's racks add up to its good units; a posted summary has its lot and a reversed one's lot is voided. Every 25 steps and at the end INV-VALUE-GL, INV-QTY-BALANCE, VALUE-GL-LINK and WIP-GL have no ERROR. |
+| E-MFG1-08-3 | MFG1-08 | Races (throttled like CC-04): two postings of one summary (MFG-10) → one lot, one receipt, two journals; two releases of one lot → one move; postings exhausting a material never leave it negative; a settlement racing a reversal lets exactly one through. |
+| E-MFG1-08-4 | MFG1-08 | MFG-10 and INV-M tagged; no pending IDs in `AcceptanceMfg1TraceabilityTests`; `docs/acceptance/mfg1.md` complete. |
+| E-MFG1-08-5 | MFG1-08 | CI runs 3 seeds × 150 steps; the manual workflow `inv-m` runs any seeds and length. |
+| E-MFG1-08-6 | MFG1-08 | `mfg1.md` records the open conditions: B-02, A-01, no real data until B-02 or a zero-difference parallel run. |
+| E-MFG1-08-7 | MFG1-08 | Defects the new tests find are fixed in the PR when no approved rule changes, and reported. |
+| E-MFG1-08-8 | MFG1-08 | No migration. |
 
 Implementation rules derived from the above (no architectural change):
 

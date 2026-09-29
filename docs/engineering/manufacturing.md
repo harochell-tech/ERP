@@ -106,3 +106,8 @@ Migration 0053 gives `master_data:read` to the three production roles and `sales
 Dev data: `tests/Rochell.DevStack/MfgSeed.cs` (ADOQUIN-H without recipe, materials with stock, production rules approved, one user
 per production role). Journey: `web/e2e/production-journey.spec.ts` (machine, shift, recipe of 0 minimum curing hours, standard from
 the recipe 22.34 + 5.90 = 28.24, run of yesterday, summary, posting, release). Staging: `deploy/staging/seed-mfg.sh` (`staging.md`).
+
+## MFG1-08 — properties, concurrency and the acceptance matrix (E-MFG1-08-1…8)
+
+`ProductionPropertyTests` (INV-M) and `ProductionConcurrencyTests` (MFG-10 and the other races) in `Rochell.Manufacturing.Tests`;
+workflow `inv-m` for long runs; the acceptance matrix `docs/acceptance/mfg1.md` is complete. MFG-1 is code-complete.
