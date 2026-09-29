@@ -492,7 +492,7 @@ public sealed class ConfirmLoadedHandler : ICommandHandler<ConfirmLoaded>
         {
             var location = input.Single(i => i.DeliveryLineId == line.Id).SourceLocationId;
             if (await SalesSql.ScalarAsync<Guid?>(
-                    context, "SELECT location_id FROM md.location WHERE company_id = @c AND location_id = @l AND plant_id = @p AND NOT is_transit", cancellationToken,
+                    context, "SELECT location_id FROM md.location WHERE company_id = @c AND location_id = @l AND plant_id = @p AND NOT is_transit AND NOT is_curing", cancellationToken,
                     ("c", context.CompanyId), ("l", location), ("p", row.PlantId)).ConfigureAwait(false) is null)
             {
                 throw new DomainException(DeliveryErrors.LocationInvalid, "The source location is a (non-transit) location of the delivery's plant.");

@@ -20,10 +20,10 @@ public sealed class ProductionRunTests(PostgresFixture postgres)
     private const string P08 = "0192f001-0000-7000-8000-000000000024";
     private const string P10 = "0192f001-0000-7000-8000-000000000025";
 
-    private sealed record Setup(
+    internal sealed record Setup(
         Guid Plant, Guid Patio, Guid Machine, Guid Day, Guid Block, Guid Cement, Guid Sand, Guid Additive, Guid Supervisor, Guid Manager, DateOnly Today, Guid Wip, Guid Fg, Guid Conversion, Guid Raw);
 
-    private static async Task<Setup> SetupAsync(TestHarness h, bool withCost = true)
+    internal static async Task<Setup> SetupAsync(TestHarness h, bool withCost = true)
     {
         var stock = await h.CreateStockSetupAsync();
         var today = BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
@@ -74,16 +74,16 @@ public sealed class ProductionRunTests(PostgresFixture postgres)
         return new Setup(stock.PlantId, stock.LocationA, machine, day, block, cement, sand, additive, supervisor, manager, today, wip, fg, conversion, stock.RawMaterialAccount);
     }
 
-    private static Task<CommandResult> Start(TestHarness h, Setup s, string key)
+    internal static Task<CommandResult> Start(TestHarness h, Setup s, string key)
         => h.RunAsync(new StartProductionRun(h.CompanyId, s.Supervisor, key, s.Plant, s.Machine, s.Day, s.Today, s.Block), new StartProductionRunHandler());
 
-    private static Task<CommandResult> Record(TestHarness h, Setup s, Guid run, string key, decimal cement = 1850m, decimal sandM3 = 12.5m)
+    internal static Task<CommandResult> Record(TestHarness h, Setup s, Guid run, string key, decimal cement = 1850m, decimal sandM3 = 12.5m)
         => h.RunAsync(
             new RecordShiftSummary(h.CompanyId, s.Supervisor, key, s.Plant, run, 10, 1480m, 20m, 0m,
                 [new ConsumptionInput(s.Cement, s.Patio, cement, "kg"), new ConsumptionInput(s.Sand, s.Patio, sandM3, "m3"), new ConsumptionInput(s.Additive, s.Patio, 15m, "l")]),
             new RecordShiftSummaryHandler());
 
-    private static string Balance(Guid account) => $"(SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE account_id = '{account}')::numeric(19,2)::text";
+    internal static string Balance(Guid account) => $"(SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE account_id = '{account}')::numeric(19,2)::text";
 
     [Fact]
     public async Task A_posted_shift_summary_consumes_at_moving_average_and_receives_the_lot_into_curing_at_standard()

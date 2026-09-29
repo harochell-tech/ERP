@@ -295,3 +295,56 @@ public sealed class GetProductionRunHandler : IQueryHandler<GetProductionRun>
         return ApiJson.Serialize(new ProductionRunDetail(run, summary, consumption, lot));
     }
 }
+
+// E-MFG1-04-6: finished-goods lots with their curing window, location and quantity.
+
+public sealed record ListFgLots(Guid CompanyId, Guid SessionId, Guid? PlantId = null, string? Status = null, int Limit = 50, int Offset = 0) : IQuery;
+
+/// <summary><c>CuringDone</c>: the minimum curing hours have passed (at the query's time).</summary>
+public sealed record FgLotSummary(
+    Guid LotId, string LotCode, Guid PlantId, string PlantCode, Guid ItemId, string ItemCode, string RunNo, DateOnly BusinessDate, string Status, DateTime CuringFrom, DateTime ReleasableAt,
+    bool CuringDone, string? LocationCode, decimal Quantity, int Racks, string? BlockReason, long Version);
+
+public sealed record FgLotList(IReadOnlyList<FgLotSummary> Items, int Limit, int Offset);
+
+[RequiresPermission("production:read")]
+public sealed class ListFgLotsHandler : IQueryHandler<ListFgLots>
+{
+    public string QueryType => "Manufacturing.ListFgLots";
+
+    public async Task<string> HandleAsync(ListFgLots query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        QueryErrors.EnsurePaging(query.Limit, query.Offset);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT f.lot_id, l.lot_code, r.plant_id, p.code, r.item_id, i.code, r.run_no, r.business_date, f.status, f.curing_from, f.releasable_at,
+                   f.releasable_at <= @now,
+                   (SELECT string_agg(loc.code, ', ' ORDER BY loc.code) FROM inv.inv_stock_balance b JOIN md.location loc ON loc.location_id = b.location_id
+                     WHERE b.lot_id = f.lot_id AND b.quantity > 0),
+                   (SELECT coalesce(sum(b.quantity), 0) FROM inv.inv_stock_balance b WHERE b.lot_id = f.lot_id),
+                   (SELECT count(*)::int FROM mfg.rack k WHERE k.lot_id = f.lot_id), f.block_reason, f.version
+            FROM mfg.fg_lot f
+            JOIN inv.lot l ON l.lot_id = f.lot_id
+            JOIN mfg.production_run r ON r.run_id = f.run_id
+            JOIN md.plant p ON p.plant_id = r.plant_id
+            JOIN md.item i ON i.item_id = r.item_id
+            WHERE f.company_id = @c AND (CAST(@p AS uuid) IS NULL OR r.plant_id = CAST(@p AS uuid)) AND (CAST(@s AS text) IS NULL OR f.status = CAST(@s AS text))
+            ORDER BY f.releasable_at DESC, l.lot_code
+            LIMIT @limit OFFSET @offset
+            """,
+            r => new FgLotSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.GetString(6), r.Date(7), r.GetString(8),
+                r.GetFieldValue<DateTime>(9), r.GetFieldValue<DateTime>(10), r.GetBoolean(11), r.NullableString(12), r.GetDecimal(13), r.GetInt32(14), r.NullableString(15), r.GetInt64(16)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("now", context.Clock.UtcNow),
+            ("p", query.PlantId),
+            ("s", query.Status),
+            ("limit", query.Limit),
+            ("offset", query.Offset)).ConfigureAwait(false);
+        return ApiJson.Serialize(new FgLotList(items, query.Limit, query.Offset));
+    }
+}
