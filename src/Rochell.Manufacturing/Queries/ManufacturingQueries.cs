@@ -348,3 +348,47 @@ public sealed class ListFgLotsHandler : IQueryHandler<ListFgLots>
         return ApiJson.Serialize(new FgLotList(items, query.Limit, query.Offset));
     }
 }
+
+// E-MFG1-05-7: cost collectors with their WIP balance and settled variances.
+
+public sealed record ListCostCollectors(Guid CompanyId, Guid SessionId, Guid? PlantId = null, DateOnly? Month = null, string? Status = null) : IQuery;
+
+public sealed record CostCollectorView(
+    Guid CollectorId, Guid PlantId, string PlantCode, Guid ItemId, string ItemCode, DateOnly PeriodMonth, string Status, int Runs, decimal WipBalance, decimal? UsageVariance,
+    decimal? PriceVariance, long Version);
+
+public sealed record CostCollectorList(IReadOnlyList<CostCollectorView> Items);
+
+[RequiresPermission("production:read")]
+public sealed class ListCostCollectorsHandler : IQueryHandler<ListCostCollectors>
+{
+    public string QueryType => "Manufacturing.ListCostCollectors";
+
+    public async Task<string> HandleAsync(ListCostCollectors query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var month = query.Month is { } m ? new DateOnly(m.Year, m.Month, 1) : (DateOnly?)null;
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT k.collector_id, k.plant_id, p.code, k.item_id, i.code, k.period_month, k.status,
+                   (SELECT count(*)::int FROM mfg.production_run r WHERE r.collector_id = k.collector_id AND r.status <> 'CANCELLED'),
+                   (SELECT coalesce(sum(e.debit - e.credit), 0) FROM fin.gl_entry e WHERE e.company_id = k.company_id AND e.account_role = 'WIP' AND e.subledger_ref = k.collector_id),
+                   k.usage_variance, k.price_variance, k.version
+            FROM mfg.cost_collector k JOIN md.plant p ON p.plant_id = k.plant_id JOIN md.item i ON i.item_id = k.item_id
+            WHERE k.company_id = @c AND (CAST(@p AS uuid) IS NULL OR k.plant_id = CAST(@p AS uuid)) AND (CAST(@m AS date) IS NULL OR k.period_month = CAST(@m AS date))
+              AND (CAST(@s AS text) IS NULL OR k.status = CAST(@s AS text))
+            ORDER BY k.period_month DESC, p.code, i.code
+            """,
+            r => new CostCollectorView(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.Date(5), r.GetString(6), r.GetInt32(7), r.GetDecimal(8),
+                r.IsDBNull(9) ? null : r.GetDecimal(9), r.IsDBNull(10) ? null : r.GetDecimal(10), r.GetInt64(11)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("p", query.PlantId),
+            ("m", month),
+            ("s", query.Status)).ConfigureAwait(false);
+        return ApiJson.Serialize(new CostCollectorList(items));
+    }
+}

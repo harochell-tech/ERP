@@ -553,6 +553,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-04-5 | MFG1-04 | The delivery's source location and `/sales/plants` exclude CURADO, as TRANSITO: nothing unreleased is dispatched (MFG-04). |
 | E-MFG1-04-6 | MFG1-04 | Query `ListFgLots` (plant, status, paging): curing window and whether it is done, locations and quantity, racks, block reason; `production:read`. |
 | E-MFG1-04-7 | MFG1-04 | Migration 0051: release data and block reason on `mfg.fg_lot`, its lifecycle guard, `mfg.lot_scrap`, P-12 (DRAFT). |
+| E-MFG1-05-1 | MFG1-05 | `SettleCostCollector` (Controller, `cost_collector:settle`, step-up, plant-scoped): an OPEN collector after its month ended (`MONTH_NOT_ENDED`) with no run IN_PROGRESS (`RUNS_OPEN`); it locks the collector's runs, becomes SETTLED and never reopens (database guard). |
+| E-MFG1-05-2 | MFG1-05 | Usage = Σ per posted summary and material of round((real − standard per unit × good units) × standard price, 2), with the standard of each run's cost version; price = the collector's WIP balance − usage, so WIP ends at exactly zero. Example: 1,217.00 + 353.30 = 1,570.30. |
+| E-MFG1-05-3 | MFG1-05 | P-13: unfavourable Dr MATERIAL_USAGE_VARIANCE / MATERIAL_PRICE_VARIANCE / Cr WIP [collector]; favourable the reversed pairs; posting date the month's last day, refused (`PERIOD_CLOSED`) if COST-SET is closed for it; no journal when both are zero. DRAFT until A-01. |
+| E-MFG1-05-4 | MFG1-05 | Reconciliations WIP-GL (blocks COST-SET), WIP-OPEN (collectors of months ended by the cutoff, blocks COST-SET), SHIFT-OPEN (runs up to the cutoff IN_PROGRESS, blocks OP-DAY and COST-SET), USAGE-TOLERANCE and CURING-OVERDUE (warnings). |
+| E-MFG1-05-5 | MFG1-05 | Components OP-DAY and COST-SET, OPEN in every existing and new period. The order is enforced by the reconciliation PRODUCTION-CLOSE-ORDER, only for a period with production: OP-DAY not closed blocks COST-SET, COST-SET not closed blocks INV-MOV (a period without production closes INV-MOV as before). P-13 belongs to COST-SET. |
+| E-MFG1-05-6 | MFG1-05 | Policy PRODUCTION, parameter `usage_tolerance_pct` as a fraction 0–1 like the other tolerances (e.g. 0.025 = 2.5 %); without an ACTIVE version USAGE-TOLERANCE reports FAILED once there is posted production (MATCHED when there is none). |
+| E-MFG1-05-7 | MFG1-05 | Query `ListCostCollectors` (plant, month, status): runs, WIP balance, usage and price variances; `production:read`. |
+| E-MFG1-05-8 | MFG1-05 | Migration 0052. |
 
 Implementation rules derived from the above (no architectural change):
 

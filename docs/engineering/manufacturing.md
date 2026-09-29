@@ -69,3 +69,21 @@ RELEASED → SCRAPPED. Dispatch and `/sales/plants` never offer CURADO. Query `G
 
 Example (`CuringTests`): 1,480 units for 41,440.00; scrap 100 in curing → 2,800.00; release; scrap the remaining 1,380 in the yard →
 38,640.00 (the last units take the remaining value); lot SCRAPPED, FINISHED_GOODS 0.00.
+
+## MFG1-05 — collector settlement, production reconciliations and close (migration 0052, E-MFG1-05-1…8)
+
+`SettleCostCollector` (`cost_collector:settle` + step-up) after the collector's month, with no run IN_PROGRESS: usage variance per
+summary and material at standard price, price variance = WIP − usage; P-13 on the month's last day (component COST-SET); the collector
+is SETTLED for good and its runs can no longer be reversed.
+
+| Reconciliation | Checks | Blocks |
+| --- | --- | --- |
+| WIP-GL | GL WIP per collector = consumption − material standard − settled variances | COST-SET |
+| WIP-OPEN | Collectors of months ended by the cutoff still OPEN | COST-SET |
+| SHIFT-OPEN | Runs up to the cutoff still IN_PROGRESS | OP-DAY, COST-SET |
+| USAGE-TOLERANCE | Real vs theoretical beyond PRODUCTION.usage_tolerance_pct | — (warning) |
+| CURING-OVERDUE | Lots CURING beyond the recipe's maximum hours | — (warning) |
+| PRODUCTION-CLOSE-ORDER | In a period with production: OP-DAY closed before COST-SET, COST-SET before INV-MOV | COST-SET, INV-MOV |
+
+Close snapshots: OP-DAY records the runs by status; COST-SET the collectors and the WIP balance by collector. `rochell-migrate
+open-periods` opens OP-DAY and COST-SET with the other components. Query `GET /manufacturing/cost-collectors`.

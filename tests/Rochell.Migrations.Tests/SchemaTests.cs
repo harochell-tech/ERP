@@ -141,7 +141,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
 
         await Db.Runner(cs).MigrateAsync(scratch.Source);
 
-        Assert.Equal("ACR-NTX:OPEN,ACR-TAX:OPEN,AP-REC:OPEN,AR-REC:OPEN,BANK-REC:OPEN,INV-MOV:OPEN", await Db.ScalarAsync<string>(cs, // ACR-*: FIN1-01
+        Assert.Equal("ACR-NTX:OPEN,ACR-TAX:OPEN,AP-REC:OPEN,AR-REC:OPEN,BANK-REC:OPEN,COST-SET:OPEN,INV-MOV:OPEN,OP-DAY:OPEN", await Db.ScalarAsync<string>(cs, // ACR-*: FIN1-01; OP-DAY, COST-SET: MFG1-05
             "SELECT string_agg(component || ':' || status, ',' ORDER BY component) FROM fin.close_component_state"));
     }
 }

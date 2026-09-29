@@ -129,6 +129,8 @@ export const COMPONENTS: Readonly<Record<string, string>> = {
   "ACR-NTX": "Ajustes contables",
   "ACR-TAX": "Ajustes con efecto fiscal",
   "AR-REC": "Cuentas por cobrar",
+  "OP-DAY": "Producción del día",
+  "COST-SET": "Liquidación de costos",
 };
 
 export function formatDate(value: string | null | undefined): string {
