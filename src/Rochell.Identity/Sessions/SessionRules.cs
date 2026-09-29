@@ -8,13 +8,14 @@ internal sealed record ParentSession(DateTime LoginAt, DateTime? LogoutAt, strin
 /// <summary>
 /// When a session can still act (E-PR03-6): open, of an active human user, within the absolute lifetime and the idle timeout.
 /// An acting session (E-B03-14) is of a synthetic user and lives only while the signed-in session behind it is open, of an
-/// active person, and within that session's absolute lifetime.
+/// active person, and within that session's absolute lifetime. A SERVICE session (E-FIS1-04-7) is of a service identity and is
+/// accepted only where the caller says so: the command authorizer, never the cookie path.
 /// </summary>
 internal static class SessionRules
 {
-    public static void EnsureUsable(IdentityOptions options, DateTime now, DateTime loginAt, DateTime lastActivityAt, DateTime? logoutAt, string userStatus, string userKind, ParentSession? parent = null)
+    public static void EnsureUsable(IdentityOptions options, DateTime now, DateTime loginAt, DateTime lastActivityAt, DateTime? logoutAt, string userStatus, string userKind, ParentSession? parent = null, bool service = false)
     {
-        var kindAllowed = parent is null ? userKind == "HUMAN" : userKind == "SYNTHETIC";
+        var kindAllowed = service ? parent is null && userKind == "SERVICE" : parent is null ? userKind == "HUMAN" : userKind == "SYNTHETIC";
         if (logoutAt is not null || userStatus != "ACTIVE" || !kindAllowed)
         {
             throw new DomainException(AuthorizationErrors.SessionInvalid, "The session is closed or its user is not active.");

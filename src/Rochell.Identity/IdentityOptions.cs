@@ -24,5 +24,10 @@ public static class IdentityConstants
     /// <summary>Service identity used as granted_by for bootstrap grants made by the deployment role (E-PR03-5).</summary>
     public static readonly Guid DeploymentUserId = Guid.Parse("00000000-0000-7000-8000-00000000d001");
 
+    /// <summary>E-FIS1-04-7: the daily process of the API (role PROCESO_DIARIO), acting through SERVICE sessions.</summary>
+    public static readonly Guid DailyProcessUserId = Guid.Parse("00000000-0000-7000-8000-00000000d002");
+
     public const string AuthMethodOidcGoogle = "OIDC_GOOGLE";
+
+    public const string AuthMethodService = "SERVICE";
 }

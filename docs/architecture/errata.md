@@ -631,6 +631,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS1-03-8 | FIS1-03 | The fiscal package of an e-CF 44 carries `exemption` (regime, certificate number, project, billing indicator 4). |
 | E-FIS1-03-9 | FIS1-03 | Two issues on one balance are serialized by the authorization lock (FIS-07). |
 | E-FIS1-03-10 | FIS1-03 | Migration 0055 (partial releases); an exempt invoice's ITBIS reads "0.00". |
+| E-FIS1-04-1 | FIS1-04 | AUTH-CONSUMPTION (ERROR, blocks AR-REC): each scope line's consumed quantity and net = consumptions − releases; each issued e-CF 44 line's live consumption = its net − what issued credit notes credited (0 once voided). |
+| E-FIS1-04-2 | FIS1-04 | EXEMPT-WITHOUT-AUTH (ERROR, blocks AR-REC): issued invoices with ITBIS 0 that are not e-CF 44 and carry an item the applied SALES_ITBIS rule (the determination's) taxes. |
+| E-FIS1-04-3 | FIS1-04 | AUTH-EXPIRY (WARNING): ACTIVE, EXHAUSTED or SUSPENDED authorizations that expire within N days, or whose project term (Law 195-13) has ended. |
+| E-FIS1-04-4 | FIS1-04 | N = `authorization_expiry_alert_days` in REVENUE_ACCOUNTING (approved by the Controller, A-01; example 15). Without it AUTH-EXPIRY is FAILED only when authorizations exist. |
+| E-FIS1-04-5 | FIS1-04 | `ExpireFiscalAuthorizations` (`fiscal_authorization:suspend`, no step-up) moves authorizations past `valid_until` to EXPIRED; run by a daily API process and by hand. An expired authorization is already refused at use (FIS1-03). |
+| E-FIS1-04-6 | FIS1-04 | Migration 0056: the 3 reconciliations, their blocking and the policy parameter; 28 reconciliations, REVENUE_ACCOUNTING has 4 parameters. |
+| E-FIS1-04-7 | FIS1-04 | (a) The daily run acts as a new service identity "Proceso diario" (not the deployment identity) with system role `PROCESO_DIARIO` granting only `fiscal_authorization:suspend`, assigned per company (migration 0056 for existing ones, `create-company` for new ones), on SERVICE sessions that only the API opens internally: no Google, no cookie, no screens. The audit shows the daily process as the actor. |
 
 Implementation rules derived from the above (no architectural change):
 

@@ -31,6 +31,8 @@ public sealed class ApiOptions
 
     public DigestSettings Digest { get; set; } = new();
 
+    public FiscalExpirySettings FiscalExpiry { get; set; } = new();
+
     public AuditSettings Audit { get; set; } = new();
 
     public ReverseProxySettings ReverseProxy { get; set; } = new();
@@ -74,6 +76,14 @@ public sealed class SealerSettings
     public bool Enabled { get; set; }
 
     public TimeSpan Interval { get; set; } = TimeSpan.FromSeconds(5);
+}
+
+/// <summary>E-FIS1-04-5 / E-FIS1-04-7: the daily expiry of fiscal authorizations at <see cref="RunAt"/> local time.</summary>
+public sealed class FiscalExpirySettings
+{
+    public bool Enabled { get; set; }
+
+    public TimeOnly RunAt { get; set; } = new(0, 30);
 }
 
 /// <summary>E-PR18-5: the daily digest at <see cref="RunAt"/> local time (E-PR15-5). Needs WORM storage and the signing key.</summary>

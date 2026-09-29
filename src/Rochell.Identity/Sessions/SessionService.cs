@@ -91,6 +91,37 @@ public sealed class SessionService
     }
 
     /// <summary>
+    /// E-FIS1-04-7: opens a SERVICE session for an active service identity — only the API's daily process calls this; the session
+    /// never reaches a cookie and <see cref="DescribeAsync"/> rejects it. The caller ends it with <see cref="EndSessionAsync"/>.
+    /// </summary>
+    public async Task<Guid> StartServiceSessionAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using (var user = Sql.Command(connection, null, "SELECT kind = 'SERVICE' AND status = 'ACTIVE' FROM iam.user WHERE user_id = @id", ("id", userId)))
+        {
+            if (await user.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
+            {
+                throw new DomainException(AuthorizationErrors.SessionInvalid, "Not an active service identity.");
+            }
+        }
+
+        var sessionId = _ids.NewId();
+        await Sql.ExecuteAsync(
+            connection,
+            null,
+            """
+            INSERT INTO iam.session (session_id, user_id, auth_method, login_at, last_activity_at)
+            VALUES (@session_id, @user_id, @auth_method, @now, @now)
+            """,
+            cancellationToken,
+            ("session_id", sessionId),
+            ("user_id", userId),
+            ("auth_method", IdentityConstants.AuthMethodService),
+            ("now", _clock.UtcNow)).ConfigureAwait(false);
+        return sessionId;
+    }
+
+    /// <summary>
     /// Records a re-authentication (step-up) by the same Google identity that owns the session — for an acting session, the
     /// person signed in behind it (E-B03-14).
     /// </summary>
