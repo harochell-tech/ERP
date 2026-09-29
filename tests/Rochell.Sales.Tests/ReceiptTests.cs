@@ -186,6 +186,41 @@ public sealed class ReceiptTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Cobros_reads_the_active_bank_accounts_with_the_number_masked()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+
+        var accounts = JsonDocument.Parse(await h.QueryAsync(new Queries.ListSalesBankAccounts(h.CompanyId, w.Cobros), new Queries.ListSalesBankAccountsHandler())).RootElement.GetProperty("items");
+
+        var only = Assert.Single(accounts.EnumerateArray());
+        Assert.Equal($"{w.Bank}|TEST_BANK|••••6789", $"{only.GetProperty("bankAccountId").GetGuid()}|{only.GetProperty("bankCode").GetString()}|{only.GetProperty("accountNumber").GetString()}");
+    }
+
+    [Fact]
+    public async Task The_treasurer_sees_the_receipts_a_statement_line_can_be_matched_to()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        await Transfer(h, w, "t", 59000.00m);
+        var cheque = (await h.RunAsync(
+            new RecordReceipt(h.CompanyId, w.Cobros, "chq", w.S.Customer, "CHEQUE", 59000.00m, ChequeBank: "Banco Popular", ChequeNo: "000123", ChequeDate: Today(h)),
+            new RecordReceiptHandler())).ResultRef;
+        await h.RunAsync(new DepositReceipts(h.CompanyId, w.Cobros, "dep", w.Bank, [cheque]), new DepositReceiptsHandler());
+        await Import(h, w, "st", "IN-1,Entrada,,59000.00", "OUT-1,Cheque devuelto,59000.00,");
+
+        async Task<string> Candidates(string description)
+        {
+            var result = JsonDocument.Parse(await h.Queries.ExecuteAsync(
+                new ListReceiptCandidates(h.CompanyId, w.Treasurer, await LineAsync(h, description)), new ListReceiptCandidatesHandler())).RootElement;
+            return string.Join('|', result.GetProperty("candidates").EnumerateArray().Select(c => $"{c.GetProperty("kind").GetString()}:{c.GetProperty("number").GetString()}"));
+        }
+
+        Assert.Equal("DEPOSIT:DEP-000001|TRANSFER:REC-000001", await Candidates("Entrada"));
+        Assert.Equal("CHEQUE_TO_BOUNCE:REC-000002", await Candidates("Cheque devuelto"));
+    }
+
+    [Fact]
     public async Task Two_applications_of_the_same_receipt_at_once_never_apply_more_than_it_has()
     {
         await using var h = await TestHarness.CreateAsync(postgres);

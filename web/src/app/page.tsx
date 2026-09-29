@@ -65,6 +65,39 @@ const TASKS: readonly Task[] = [
     count: async (companyId) =>
       (await query("/api/v1/companies/{companyId}/treasury/bank-statement-lines", { path: { companyId }, query: { status: "UNMATCHED", limit: COUNT_LIMIT } })).items.length,
   },
+  // VS3-10b (E-VS3-10-9): sales work.
+  { href: "/ventas/pedidos/nuevo/", label: "Crear un pedido de venta", permission: "sales_order:create" },
+  {
+    href: "/ventas/pedidos/?estado=PENDING_CREDIT",
+    label: "Aprobar crédito de pedidos",
+    permission: "credit:approve",
+    countPermission: "sales:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "PENDING_CREDIT", limit: COUNT_LIMIT } })).items.length,
+  },
+  {
+    href: "/despacho/tablero/",
+    label: "Despachar (conduces en tránsito)",
+    permission: "delivery:manage",
+    countPermission: "sales:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/sales/deliveries", { path: { companyId }, query: { status: "IN_TRANSIT", limit: COUNT_LIMIT } })).items.length,
+  },
+  { href: "/facturacion/por-facturar/", label: "Facturar entregas", permission: "invoice:create" },
+  {
+    href: "/facturacion/facturas/?filtro=ecf",
+    label: "Registrar e-CF pendientes",
+    permission: "fiscal_document:record",
+    countPermission: "sales:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/sales/invoices", { path: { companyId }, query: { fiscalStatus: "PENDING_EXTERNAL", limit: COUNT_LIMIT } })).items.filter((i) => i.commercialStatus !== "VOIDED").length,
+  },
+  {
+    href: "/cobros/recibos/?filtro=sin-aplicar",
+    label: "Aplicar cobros sin aplicar",
+    permission: "receipt:apply",
+    countPermission: "sales:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/sales/receipts", { path: { companyId }, query: { status: "RECORDED", applicationStatus: "UNAPPLIED", limit: COUNT_LIMIT } })).items.length,
+  },
   { href: "/cierre/conciliaciones/", label: "Ejecutar conciliaciones", permission: "reconciliation:run" },
   { href: "/cierre/periodos/", label: "Cerrar o reabrir períodos", permission: "period:read" },
   { href: "/seguridad/usuarios/", label: "Solicitar cambios de rol", permission: "role:assign" },

@@ -21,7 +21,82 @@ const ITEM_KINDS: Readonly<Record<string, string>> = {
   OUTSTANDING_CHARGE: "Cargo sin línea",
   UNRECORDED_DEBIT: "Débito del banco sin asiento",
   UNRECORDED_CREDIT: "Crédito del banco sin asiento",
+  OUTSTANDING_RECEIPT: "Cobro por transferencia sin crédito en el extracto",
+  OUTSTANDING_RECEIPT_REVERSAL: "Cobro anulado sin línea",
+  OUTSTANDING_DEPOSIT: "Depósito sin crédito en el extracto",
+  OUTSTANDING_BOUNCE: "Cheque devuelto sin débito en el extracto",
 };
+
+const RECEIPT_KINDS: Readonly<Record<string, string>> = {
+  TRANSFER: "cobro por transferencia",
+  DEPOSIT: "depósito",
+  BOUNCED_CHEQUE: "cheque devuelto",
+  CHEQUE_TO_BOUNCE: "cheque depositado",
+};
+
+// VS3-10b (E-VS3-10-8): an UNMATCHED line against the customer receipts, read with bank:read. A CREDIT line matches a transfer or a
+// deposit slip; a DEBIT line matches a bounced cheque, or marks a deposited cheque bounced (receipt:bounce, step-up) and then
+// matches it.
+function ReceiptActions({ line, onDone }: { line: Line; onDone: () => void }) {
+  const { companyId, can } = useSession();
+  const [open, setOpen] = useState(false);
+  const candidates = useLoad(
+    open ? () => query("/api/v1/companies/{companyId}/treasury/bank-statement-lines/{lineId}/receipt-candidates", { path: { companyId, lineId: line.lineId } }) : null,
+    [companyId, line.lineId, open],
+  );
+  const match = useCommand(`match-receipt-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/match-bank-line-to-receipt");
+  const bounce = useCommand(`bounce-from-line:${line.lineId}`, "/api/v1/companies/{companyId}/sales/mark-receipt-bounced");
+  const busy = match.busy || bounce.busy;
+  if (!can("bank_line:match")) {
+    return null;
+  }
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}>
+        Buscar cobros
+      </button>
+    );
+  }
+  if (candidates.data === null) {
+    return <Loading error={candidates.error} />;
+  }
+  const matchTo = (c: Schemas["ReceiptCandidate"]) =>
+    match.run({ lineId: line.lineId, expectedLineVersion: line.version, expectedVersion: c.version, receiptId: c.receiptId ?? null, depositId: c.depositId ?? null });
+  return (
+    <>
+      {candidates.data.candidates.length === 0 ? <span className="muted">Sin cobros con la misma cuenta y monto.</span> : null}
+      {candidates.data.candidates.map((c) =>
+        c.kind === "CHEQUE_TO_BOUNCE" ? (
+          can("receipt:bounce") ? (
+            <ReasonAction
+              key={c.number}
+              label={`Cheque devuelto ${c.number}`}
+              busy={busy}
+              onConfirm={async (reason) => {
+                if (!(await bounce.run({ receiptId: c.receiptId!, expectedVersion: c.version, reason }))) {
+                  return;
+                }
+                const after = await query("/api/v1/companies/{companyId}/treasury/bank-statement-lines/{lineId}/receipt-candidates", { path: { companyId, lineId: line.lineId } });
+                const bounced = after.candidates.find((x) => x.kind === "BOUNCED_CHEQUE" && x.receiptId === c.receiptId);
+                if (bounced && (await matchTo(bounced))) {
+                  onDone();
+                } else {
+                  candidates.reload();
+                }
+              }}
+            />
+          ) : null
+        ) : (
+          <button key={c.number} type="button" className="primary" disabled={busy} onClick={async () => (await matchTo(c)) && onDone()}>
+            Conciliar con {RECEIPT_KINDS[c.kind] ?? c.kind} {c.number}
+            {c.customerName ? ` · ${c.customerName}` : ""}
+          </button>
+        ),
+      )}
+      <ErrorBox error={match.error ?? bounce.error} />
+    </>
+  );
+}
 
 // VS2-08: BANK-GL of the account at the date (read-only, E-VS2-07-5) and the statement's lines. A match is always confirmed by a
 // person (E-VS2-05-6): the suggestion, or a payment picked by hand; a CREDIT line only as the return of a reversed payment
@@ -92,6 +167,7 @@ function LineActions({
           Registrar como cargo
         </button>
       ) : null}
+      {line.status === "UNMATCHED" ? <ReceiptActions line={line} onDone={onDone} /> : null}
       {line.status === "MATCHED" && can("bank_line:unmatch") ? (
         <ReasonAction label="Desconciliar" busy={busy} onConfirm={async (reason) => after(await unmatch.run({ lineId: line.lineId, expectedVersion: line.version, reason }))} />
       ) : null}

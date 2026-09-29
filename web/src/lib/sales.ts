@@ -50,3 +50,21 @@ export function orderCancellable(status: string): boolean {
 export function orderDispatchable(status: string): boolean {
   return status === "CONFIRMED" || status === "PARTIALLY_DELIVERED";
 }
+
+/** E-VS3-11: how the customer paid. */
+export const METHODS: Readonly<Record<string, string>> = {
+  TRANSFER: "Transferencia",
+  CHEQUE: "Cheque",
+  CASH: "Efectivo",
+};
+
+/** The live applications of a receipt grouped by the command that made them (an unapply undoes one whole group, E-VS3-07-6). */
+export function applicationGroups<T extends { eventId: string; live: boolean; reversesApplicationId?: string | null }>(applications: readonly T[]): { eventId: string; items: T[] }[] {
+  const groups = new Map<string, T[]>();
+  for (const a of applications) {
+    if (a.live && !a.reversesApplicationId) {
+      groups.set(a.eventId, [...(groups.get(a.eventId) ?? []), a]);
+    }
+  }
+  return [...groups.entries()].map(([eventId, items]) => ({ eventId, items }));
+}

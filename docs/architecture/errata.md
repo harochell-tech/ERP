@@ -474,6 +474,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-10-11 | VS3-10 | Synthetic test identities for the five VS#3 roles on staging (E-B03-14); still no real data (E-VS1-2). |
 | E-VS3-10-12 | VS3-10 | No migration in VS3-10a; VS3-10b adds the candidates query (and a migration only if the staging identities need one). |
 | E-VS3-10-13 | VS3-10a | `GET /sales/plants` (`sales:read`): plants and their stock locations without the transit one, so the Vendedor and Despacho pick a plant and a source location without `master_data:read`. |
+| E-VS3-10-14 | VS3-10b | `GET /sales/bank-accounts` (`sales:read`): the company's ACTIVE bank accounts, number masked, for the receipt and deposit forms, so Cobros needs no `bank:read`. |
 
 Implementation rules derived from the above (no architectural change):
 

@@ -57,6 +57,18 @@ const STATUS: Readonly<Record<string, string>> = {
   NEEDS_APPROVAL: "Requiere aprobación",
   TRANSFERRED: "Control transferido",
   RETAINED: "Control retenido",
+  // VS#3 (VS3-10b): invoices, credit notes, receipts and deposits.
+  PENDING_EXTERNAL: "e-CF pendiente",
+  ACCEPTED_EXTERNAL: "e-CF aceptado",
+  PARTIALLY_PAID: "Cobrada parcialmente",
+  PAID: "Cobrada",
+  CREDITED: "Acreditada",
+  UNAPPLIED: "Sin aplicar",
+  PARTIALLY_APPLIED: "Aplicado parcialmente",
+  APPLIED: "Aplicado",
+  DEPOSITED: "Depositado",
+  BOUNCED: "Cheque devuelto",
+  RECORDED: "Registrado",
 };
 
 /** E-VS3-5: the two delivery terms. */
@@ -92,6 +104,9 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   PENDING_CREDIT: "progress", PARTIALLY_DELIVERED: "progress", LOADING: "progress", LOADED: "progress", IN_TRANSIT: "progress", NEEDS_APPROVAL: "progress",
   CONFIRMED: "done", DELIVERED: "done", AUTO_APPROVED: "done", TRANSFERRED: "done",
   BLOCKED: "attention", DELIVERED_WITH_EXCEPTIONS: "attention", RETURNED: "attention",
+  PENDING_EXTERNAL: "attention", UNAPPLIED: "attention", BOUNCED: "error",
+  PARTIALLY_PAID: "progress", PARTIALLY_APPLIED: "progress", DEPOSITED: "progress", RECORDED: "progress",
+  ACCEPTED_EXTERNAL: "done", PAID: "done", CREDITED: "done", APPLIED: "done",
   REVERSED: "reversed",
 };
 

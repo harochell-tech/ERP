@@ -337,3 +337,33 @@ public sealed class ListSalesPlantsHandler : IQueryHandler<ListSalesPlants>
         return ApiJson.Serialize(new SalesPlantList(plants.Select(p => p with { Locations = locations[p.PlantId].ToList() }).ToList()));
     }
 }
+
+public sealed record ListSalesBankAccounts(Guid CompanyId, Guid SessionId) : IQuery;
+
+public sealed record SalesBankAccountView(Guid BankAccountId, string BankCode, string AccountNumber);
+
+public sealed record SalesBankAccountList(IReadOnlyList<SalesBankAccountView> Items);
+
+/// <summary>
+/// E-VS3-10-14: the company's ACTIVE bank accounts, number masked, for the receipt and deposit forms, read with sales:read so Cobros
+/// needs no bank:read (statements, supplier payments and full numbers stay with Treasury).
+/// </summary>
+[RequiresPermission("sales:read")]
+public sealed class ListSalesBankAccountsHandler : IQueryHandler<ListSalesBankAccounts>
+{
+    public string QueryType => "Sales.ListSalesBankAccounts";
+
+    public async Task<string> HandleAsync(ListSalesBankAccounts query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT bank_account_id, bank_code, account_number FROM fin.bank_account WHERE company_id = @c AND status = 'ACTIVE' ORDER BY bank_code, account_number",
+            r => new SalesBankAccountView(r.GetGuid(0), r.GetString(1), AccountNumbers.Show(r.GetString(2), full: false)),
+            cancellationToken,
+            ("c", context.CompanyId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new SalesBankAccountList(items));
+    }
+}

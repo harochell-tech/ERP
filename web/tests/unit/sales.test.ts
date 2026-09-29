@@ -26,3 +26,16 @@ describe("sales and dispatch helpers (VS3-10a)", () => {
     expect(["CONFIRMED", "PARTIALLY_DELIVERED", "DELIVERED"].map(orderDispatchable)).toEqual([true, true, false]);
   });
 });
+
+describe("receipt helpers (VS3-10b)", () => {
+  it("groups the live applications by the command that made them", async () => {
+    const { applicationGroups } = await import("@/lib/sales");
+    const groups = applicationGroups([
+      { eventId: "e1", live: true, reversesApplicationId: null, invoiceNo: "FA-1" },
+      { eventId: "e1", live: true, reversesApplicationId: null, invoiceNo: "FA-2" },
+      { eventId: "e2", live: false, reversesApplicationId: null, invoiceNo: "FA-3" },
+      { eventId: "e3", live: false, reversesApplicationId: "x", invoiceNo: "FA-3" },
+    ]);
+    expect(groups.map((g) => `${g.eventId}:${g.items.map((i) => i.invoiceNo).join(",")}`)).toEqual(["e1:FA-1,FA-2"]);
+  });
+});
