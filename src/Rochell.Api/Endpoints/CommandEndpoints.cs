@@ -32,6 +32,7 @@ using Rochell.Sales.Orders;
 using Rochell.Sales.Pricing;
 using Rochell.Sales.Receipts;
 using Rochell.Tax;
+using Rochell.Tax.Authorizations;
 using Rochell.Treasury.BankAccounts;
 using Rochell.Treasury.Payments;
 using Rochell.Treasury.Statements;
@@ -131,6 +132,15 @@ public static class CommandEndpoints
         tax.MapCommand<LinkFiscalSource, LinkFiscalSourceHandler>();
         tax.MapCommand<RunFiscalRuleTests, RunFiscalRuleTestsHandler>();
         tax.MapCommand<ActivateFiscalRuleVersion, ActivateFiscalRuleVersionHandler>();
+        tax.MapCommand<RegisterFiscalAuthorization, RegisterFiscalAuthorizationHandler>();
+        tax.MapCommand<UpdateDraftAuthorization, UpdateDraftAuthorizationHandler>();
+        tax.MapCommand<AttachAuthorizationDocument, AttachAuthorizationDocumentHandler>();
+        tax.MapCommand<SubmitForVerification, SubmitForVerificationHandler>();
+        tax.MapCommand<VerifyAuthorization, VerifyAuthorizationHandler>();
+        tax.MapCommand<ReturnAuthorizationToDraft, ReturnAuthorizationToDraftHandler>();
+        tax.MapCommand<RejectAuthorization, RejectAuthorizationHandler>();
+        tax.MapCommand<SuspendAuthorization, SuspendAuthorizationHandler>();
+        tax.MapCommand<ReactivateAuthorization, ReactivateAuthorizationHandler>();
 
         var reconciliation = company.MapGroup("/reconciliation").WithTags("Reconciliation");
         reconciliation.MapCommand<RunReconciliation, RunReconciliationHandler>();
@@ -250,6 +260,7 @@ public static class CommandEndpoints
         typeof(PrepareReportStructureHandler), typeof(ApproveReportStructureHandler),
         typeof(RegisterFiscalSourceHandler), typeof(ConfigureFiscalRuleVersionHandler), typeof(LinkFiscalSourceHandler), typeof(RunFiscalRuleTestsHandler),
         typeof(ActivateFiscalRuleVersionHandler),
+        typeof(RegisterFiscalAuthorizationHandler), typeof(UpdateDraftAuthorizationHandler), typeof(AttachAuthorizationDocumentHandler), typeof(SubmitForVerificationHandler), typeof(VerifyAuthorizationHandler), typeof(ReturnAuthorizationToDraftHandler), typeof(RejectAuthorizationHandler), typeof(SuspendAuthorizationHandler), typeof(ReactivateAuthorizationHandler),
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),
         typeof(CreateCustomerHandler), typeof(UpdateCustomerHandler), typeof(ActivateCustomerHandler), typeof(PrepareCustomerTermsHandler), typeof(ApproveCustomerTermsHandler), typeof(PrepareStandardCostHandler), typeof(PrepareStandardCostFromRecipeHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler),
         typeof(RegisterVehicleHandler), typeof(UpdateVehicleHandler), typeof(DeactivateVehicleHandler), typeof(ActivateVehicleHandler), typeof(RegisterDriverHandler), typeof(UpdateDriverHandler), typeof(DeactivateDriverHandler), typeof(ActivateDriverHandler),

@@ -13,6 +13,7 @@ using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Queries;
 using Rochell.Tax;
+using Rochell.Tax.Authorizations;
 using Rochell.Treasury.Queries;
 using Rochell.Treasury.Statements;
 
@@ -44,7 +45,7 @@ public static class QueryEndpoints
         typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
-        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
+        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
@@ -288,6 +289,16 @@ public static class QueryEndpoints
         tax.MapGet("/fiscal-rules", (HttpContext http, Guid companyId, ListFiscalRulesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListFiscalRules(companyId, s), handler, ct))
             .Describe<FiscalRuleList>(nameof(ListFiscalRules));
+        // E-FIS1-02-7/8: fiscal authorizations and the order's proforma (sales:read).
+        tax.MapGet("/fiscal-authorizations", (HttpContext http, Guid companyId, Guid? partyId, string? status, ListFiscalAuthorizationsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListFiscalAuthorizations(companyId, s, partyId, status), handler, ct))
+            .Describe<FiscalAuthorizationList>(nameof(ListFiscalAuthorizations));
+        tax.MapGet("/fiscal-authorizations/{authorizationId:guid}", (HttpContext http, Guid companyId, Guid authorizationId, GetFiscalAuthorizationHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetFiscalAuthorization(companyId, s, authorizationId), handler, ct))
+            .Describe<FiscalAuthorizationDetail>(nameof(GetFiscalAuthorization), notFound: true);
+        tax.MapGet("/proformas/{salesOrderId:guid}", (HttpContext http, Guid companyId, Guid salesOrderId, GetSalesOrderProformaHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetSalesOrderProforma(companyId, s, salesOrderId), handler, ct))
+            .Describe<SalesOrderProforma>(nameof(GetSalesOrderProforma), notFound: true);
 
         // E-VS2-05-6 / E-VS2-07-1: treasury read side.
         var treasury = company.MapGroup("/treasury").WithTags("Treasury");

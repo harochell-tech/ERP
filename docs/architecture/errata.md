@@ -611,6 +611,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS1-01-8 | FIS1-01 | States DRAFT, PENDING_VERIFICATION, ACTIVE, SUSPENDED, EXHAUSTED, EXPIRED, REJECTED with a database transition guard and `core.state_history`; verifier ≠ registrar (CHECK); data frozen once submitted. |
 | E-FIS1-01-9 | FIS1-01 | `fiscal_authorization:register` (CREDITO, FACTURACION), `:verify` and `:suspend` (ESPECIALISTA_FISCAL, who also gets `sales:read`); SoD register ≠ verify; 111 permissions, 41 SoD rules. |
 | E-FIS1-01-10 | FIS1-01 | Migration 0054. |
+| E-FIS1-02-1 | FIS1-02 | Authorization commands and queries in `Rochell.Tax` (namespace `Rochell.Tax.Authorizations`), reading customers and orders by SQL; routes under `/tax/…`. |
+| E-FIS1-02-2 | FIS1-02 | `RegisterFiscalAuthorization` (DRAFT) and `UpdateDraftAuthorization` (replaces data and scope while DRAFT): ACTIVE customer with an RNC, certificate number unique (`AUTHORIZATION_CERTIFICATE_DUPLICATE`), order of the customer, lines of ACTIVE finished goods in their base unit or one with a conversion in force, quantity > 0 (6 dec.) and net > 0 (2 dec.); `fiscal_authorization:register`. |
+| E-FIS1-02-3 | FIS1-02 | `AttachAuthorizationDocument` in any non-terminal state (kind, reference, SHA-256). |
+| E-FIS1-02-4 | FIS1-02 | `SubmitForVerification` needs a scope line and a CERTIFICADO_DGII document (`AUTHORIZATION_CERTIFICATE_REQUIRED`). |
+| E-FIS1-02-5 | FIS1-02 | `VerifyAuthorization` (ESPECIALISTA_FISCAL, step-up, ≠ registrar, not expired) → ACTIVE; `ReturnAuthorizationToDraft` and `RejectAuthorization` with a reason. |
+| E-FIS1-02-6 | FIS1-02 | `SuspendAuthorization` / `ReactivateAuthorization` (reason, step-up, `:suspend`); reactivating an expired certificate is refused. |
+| E-FIS1-02-7 | FIS1-02 | `ListFiscalAuthorizations`, `GetFiscalAuthorization` (lines with consumed and available, documents, history), `sales:read`. |
+| E-FIS1-02-8 | FIS1-02 | `GetSalesOrderProforma` (`GET /tax/proformas/{orderId}`): issuer, customer, the order's current lines with ITBIS from the rules in force today, computed by `TaxEngine.PreviewSalesItbisAsync` and never stored; a closed gate is `FISCAL_GATE_CLOSED`. |
+| E-FIS1-02-9 | FIS1-02 | Verifying or reactivating a certificate past `valid_until` → `AUTHORIZATION_EXPIRED`; the EXPIRED status itself arrives with FIS1-03/04. |
+| E-FIS1-02-10 | FIS1-02 | No migration. Events are numbered from the event log (documents add events without changing the row's version). |
 
 Implementation rules derived from the above (no architectural change):
 

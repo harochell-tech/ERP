@@ -16,6 +16,20 @@ public static class TaxErrors
     public const string CasesRequired = "TEST_CASES_REQUIRED";
     public const string FiscalGateClosed = "FISCAL_GATE_CLOSED";
     public const string SubjectInvalid = "TAX_SUBJECT_INVALID";
+
+    // E-FIS1-02: fiscal authorizations (CONFOTUR).
+    public const string AuthorizationNotFound = "AUTHORIZATION_NOT_FOUND";
+    public const string AuthorizationInvalidState = "AUTHORIZATION_INVALID_STATE";
+    public const string AuthorizationVersionConflict = "AUTHORIZATION_VERSION_CONFLICT";
+    public const string AuthorizationExpired = "AUTHORIZATION_EXPIRED";
+    public const string AuthorizationFieldInvalid = "AUTHORIZATION_FIELD_INVALID";
+    public const string AuthorizationLinesRequired = "AUTHORIZATION_LINES_REQUIRED";
+    public const string AuthorizationCertificateRequired = "AUTHORIZATION_CERTIFICATE_REQUIRED";
+    public const string AuthorizationCertificateDuplicate = "AUTHORIZATION_CERTIFICATE_DUPLICATE";
+    public const string AuthorizationCustomerInvalid = "AUTHORIZATION_CUSTOMER_INVALID";
+    public const string AuthorizationItemInvalid = "AUTHORIZATION_ITEM_INVALID";
+    public const string AuthorizationSamePerson = "AUTHORIZATION_SAME_PERSON";
+    public const string AuthorizationReasonRequired = "AUTHORIZATION_REASON_REQUIRED";
 }
 
 public static class FiscalRuleKinds
