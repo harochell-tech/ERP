@@ -492,6 +492,25 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-RNC-6 | RNC registry | A number that is suspended, deregistered or missing only warns, never blocks (the registry can be a week old; 39 % of RNCs are SUSPENDIDO). |
 | E-RNC-7 | RNC registry | Maestros › Padrón RNC (`GET /master-data/rnc-registry`, `rnc:read`): the registry in force and the company's customers and suppliers whose RNC is missing from it (NOT_FOUND), not ACTIVO (NOT_ACTIVE) or registered under another name (NAME_DIFFERS; names compared in upper case without punctuation or spaces). |
 | E-RNC-8 | RNC registry | The registry may be loaded on staging: it is public DGII data, not company data, so E-VS1-2 still holds. Migration 0047. |
+| E-MFG1-1 | MFG-1 | ¿Qué es la "orden" de producción en P0? → Una **corrida operativa sin costo** por producto × máquina × turno (v2 §6). El costo vive en el cost collector |
+| E-MFG1-2 | MFG-1 | Modo de salida de materiales → **Resumen de turno para todos los materiales** (cemento, agregados, aditivo): el sistema propone el consumo teórico (receta × batches) y el supervisor registra el real. Un solo modo por material y planta (criterio B5). El backflush del aditivo (ADR-019) queda como propuesta teórica, no como salida automática |
+| E-MFG1-3 | MFG-1 | Unidad de los agregados → Tonelada seca como UdM base (v2 §7); el supervisor puede registrar en m³ con la conversión vigente del ítem (VS#1). La corrección por humedad llega con laboratorio (MFG-2) |
+| E-MFG1-4 | MFG-1 | Máquinas por planta → Hoy se asume **una línea por planta** (v1: tres plantas con Besser V3-12), así que estándar de planta = estándar de línea y la Corrección 6 no aplica aún. Si una planta tiene dos líneas, se agrega en MFG-2 |
+| E-MFG1-5 | MFG-1 | ¿Quién crea máquinas, turnos y configuración? → Pantallas con permiso de GERENTE\_PLANTA (no CLI), versionadas; las plantas y ubicaciones siguen por CLI |
+| E-MFG1-6 | MFG-1 | Racks → Propuestos por el sistema: ⌈unidades buenas ÷ unidades por rack⌉; el supervisor puede ajustar la cantidad de racks, no las unidades. Sin etiqueta de rack física en P0 |
+| E-MFG1-7 | MFG-1 | Lote de PT → **Un lote por corrida** (planta + máquina + producto + turno + fecha), código `PT-<producto>-<yyyyMMdd>-<turno>`; el despacho sigue tomando lotes FIFO (E-VS3-04-5) |
+| E-MFG1-8 | MFG-1 | Curado y liberación → El PT entra a la ubicación **CURADO** (no despachable). Calidad libera (preliminar) después de las horas mínimas de curado del producto, con inspección visual, transfiriendo a PATIO; o bloquea con motivo. Resistencia y liberación final: MFG-2 |
+| E-MFG1-9 | MFG-1 | Costo estándar → Se extiende el estándar de VS#3 con desglose: **materiales** (receta ÷ unidades por batch × precio estándar de cada material) + **conversión** (monto por unidad que fija el Controller). Precio estándar de materia prima: lo fija el Controller al preparar el estándar |
+| E-MFG1-10 | MFG-1 | Cambiar el estándar con existencias → Se permite (hoy E-VS3-02-7 lo prohíbe): al aprobar, **revaluación** de las existencias del área por (nuevo − anterior) × cantidad contra STANDARD\_REVALUATION, en la misma TX. Reemplaza E-VS3-02-7 |
+| E-MFG1-11 | MFG-1 | Cost collector y WIP al fin de mes → Collector por **producto × planta × mes**. Los bloques se mezclan y moldean en el mismo turno, así que **no hay WIP que pase de mes**: la liquidación deja el WIP del collector en cero |
+| E-MFG1-12 | MFG-1 | Variaciones en P0 → **Precio** (costo promedio real vs precio estándar, por cantidad real) y **uso** (cantidad real vs estándar por unidades buenas, a precio estándar). Capacidad ociosa, pools de conversión y prorrateo a inventario: MFG-2 (política PRODUCTION con umbral, ADR-039) |
+| E-MFG1-13 | MFG-1 | Scrap → Cuatro puntos (mezcla, fresco, curado, patio). Mezcla y fresco: solo cantidad; su costo queda en la variación de uso. Curado y patio: P-12 a estándar contra PRODUCTION\_SCRAP, con step-up. Normal vs anormal: MFG-2 |
+| E-MFG1-14 | MFG-1 | Roles de producción → Tres nuevos (Supervisor de producción, Gerente de planta, Calidad) con los SoD de la sección 7 |
+| E-MFG1-15 | MFG-1 | Fecha operativa y turno de noche → La fecha operativa es la del **inicio** del turno; un turno de noche nunca se parte en dos fechas (v1 §12) |
+| E-MFG1-16 | MFG-1 | Cierre → OP-DAY (resúmenes del período contabilizados) y COST-SET (collectors liquidados) bloquean en ese orden antes de INV-MOV |
+| E-MFG1-17 | MFG-1 | HMI / PLC → Fuera de MFG-1: el resumen de turno es manual. El conteo de ciclos del HMI (Planta 3) se usa como referencia en MFG-2 (criterio B6: racks vs HMI ≤ 1 %) |
+| E-MFG1-18 | MFG-1 | Datos reales → Igual que E-VS1-2: ninguno hasta B-02 o un paralelo conciliado |
+| E-A02-2 | A-02 | The owner confirmed on 2026-09-29: Block Rochell is **Mediano** in the DGII classification and **already an authorised electronic issuer**. Hence e-CF only from 2026-11-01 (B-series valid to 2026-10-31), and under NG 02-2026 company customers no longer withhold 30 % ITBIS from our e-CF invoices. |
 
 Implementation rules derived from the above (no architectural change):
 

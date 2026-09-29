@@ -66,7 +66,7 @@ These are findings, not decisions: each becomes a numbered errata when its slice
 
 ## 5. Open questions for the accountant
 
-1. Block Rochell's DGII size class, and whether it is already an authorised electronic issuer (sets 2026-10-31 or 2026-11-15).
+1. ~~Block Rochell's DGII size class and electronic-issuer status~~ — **answered 2026-09-29 (E-A02-2): Mediano, already an authorised electronic issuer** → e-CF only from 2026-11-01.
 2. Are sand and gravel *bienes industrializados* (taxed)?
 3. Does the *conduce* count as the "document covering the transfer" (art. 338.1)?
 4. The art. 309 rates after Ley 30-26 that apply to our suppliers, and their IR-17 boxes.
