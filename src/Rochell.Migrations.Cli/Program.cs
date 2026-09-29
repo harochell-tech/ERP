@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using Rochell.MasterData.Rnc;
 using Rochell.Migrations;
 using Rochell.Platform.Hosting;
 
@@ -13,6 +14,7 @@ using Rochell.Platform.Hosting;
 //        rochell-migrate import-accounts <company-rnc> <accounts.csv>                     (E-PR05-1; code,name,is_control[,class] — E-FIN1-01-1)
 //        rochell-migrate import-account-map <company-rnc> <map.csv>                       (DRAFT maps; role,category,account_code,effective_from)
 //        rochell-migrate open-periods <company-rnc> <year>                                (E-PR05-3)
+//        rochell-migrate import-rnc-registry <DGII_RNC.zip|.txt> [source-date yyyy-MM-dd]  (E-RNC-1/2; replaces the DGII registry)
 // Environment: DOTNET_ENVIRONMENT = Development | Test | Staging
 // Connection:  ConnectionStrings:Rochell (appsettings.Development.json or env var ConnectionStrings__Rochell).
 //              Must use the deployment role (schema owner), never the application role.
@@ -425,8 +427,31 @@ try
                 return 0;
             }
 
+        case "import-rnc-registry":
+            {
+                // E-RNC-1/2: the DGII's weekly "Listado de todos los RNC", replacing the whole registry in one transaction.
+                DateOnly? sourceDate = null;
+                if (args.Length is < 2 or > 3 || !File.Exists(args[1])
+                    || (args.Length == 3 && !DateOnly.TryParseExact(args[2], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var given)))
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate import-rnc-registry <DGII_RNC.zip|DGII_RNC.TXT> [source-date yyyy-MM-dd]");
+                    return 1;
+                }
+
+                if (args.Length == 3)
+                {
+                    sourceDate = DateOnly.ParseExact(args[2], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                }
+
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                var result = await RncRegistryFile.ImportAsync(connection, args[1], $"rochell-migrate ({Environment.UserName})", sourceDate, DateTime.UtcNow, CancellationToken.None);
+                Console.WriteLine($"RNC registry of {result.SourceDate:yyyy-MM-dd}: {result.Rows} taxpayer(s) imported, {result.Skipped} row(s) skipped (sha256 {result.Sha256}).");
+                return 0;
+            }
+
         default:
-            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|create-synthetic-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods>");
+            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|create-synthetic-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods|import-rnc-registry>");
             return 1;
     }
 }

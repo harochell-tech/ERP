@@ -167,3 +167,11 @@ After deploying VS#3 (the deploy uploads it), run `/opt/rochell-staging/seed-vs3
 (two, for the credit note's four eyes) and Cobros, and the sales accounts with DRAFT maps (`seed/accounts-vs3.csv`,
 `seed/account-map-vs3.csv`). Then, as the Controller in the UI: approve the maps and the sales posting rules, prepare CREDIT and
 REVENUE_ACCOUNTING (approved by the Aprobador de políticas) and register the receipts' bank account (GL 1102). Synthetic data only.
+
+## DGII RNC registry (E-RNC-2, E-RNC-8)
+
+The deploy uploads `rnc-weekly.sh`. It downloads `DGII_RNC.zip` from the DGII and imports it with
+`rochell-migrate import-rnc-registry` (the ZIP is mounted read-only into the `migrate` container). Schedule it with
+`/etc/cron.d/rochell-rnc` (Mondays 05:00, the line is in the script). The DGII may answer HTTP 403 to automated downloads; the script
+then stops and prints the instructions: download the ZIP in a browser, copy it to the VPS and run
+`/opt/rochell-staging/rnc-weekly.sh /path/to/DGII_RNC.zip`. The registry is public data, so it is allowed on staging (E-RNC-8).

@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Rochell.Migrations\Rochell.Migrations.csproj" />
     <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+    <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" />
