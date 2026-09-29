@@ -5,6 +5,7 @@ using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Sales.Deliveries;
 using Rochell.Sales.Invoices;
+using Rochell.Tax.Authorizations;
 
 namespace Rochell.Sales.CreditNotes;
 
@@ -282,6 +283,12 @@ public sealed class IssueCreditNoteHandler : ICommandHandler<IssueCreditNote>
             ("n", command.CreditNoteId)).ConfigureAwait(false);
         await context.AppendStateAsync(Crediting.Aggregate, command.CreditNoteId, "DOCUMENT", "DRAFT", "CONFIRMED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(Crediting.Aggregate, command.CreditNoteId, "ACCOUNTING", "NOT_POSTED", "POSTED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+
+        if (await SalesSql.ScalarAsync<Guid?>(context, "SELECT fiscal_authorization_id FROM sal.invoice WHERE invoice_id = @i", cancellationToken, ("i", invoiceId)).ConfigureAwait(false) is { } authorization)
+        {
+            // E-FIS1-03-7 (D-11): a credit note of an exempt invoice returns the net it credits (a price credit has no quantity).
+            await AuthorizationUsage.ReleaseAsync(context, authorization, [.. lines.Select(l => new ReleasedLine(l.Item1, 0m, l.Item2))], eventId, CommandType, cancellationToken).ConfigureAwait(false);
+        }
 
         // E-VS3-06-4 / E-VS3-07-11: fully credited → CREDITED; a partly paid invoice the note closes → PAID.
         var invoiceStatus = await InvoiceStanding.RefreshAsync(context, invoiceId, CommandType, eventId, cancellationToken).ConfigureAwait(false);

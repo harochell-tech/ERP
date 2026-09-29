@@ -30,6 +30,8 @@ public static class TaxErrors
     public const string AuthorizationItemInvalid = "AUTHORIZATION_ITEM_INVALID";
     public const string AuthorizationSamePerson = "AUTHORIZATION_SAME_PERSON";
     public const string AuthorizationReasonRequired = "AUTHORIZATION_REASON_REQUIRED";
+    public const string AuthorizationNotCovered = "AUTHORIZATION_NOT_COVERED";
+    public const string AuthorizationExceeded = "AUTHORIZATION_EXCEEDED";
 }
 
 public static class FiscalRuleKinds

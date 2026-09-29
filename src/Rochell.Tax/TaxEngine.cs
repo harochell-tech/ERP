@@ -13,7 +13,11 @@ public sealed record TaxLineInput(Guid SubjectLineId, Guid ItemId, decimal NetAm
 /// What to determine taxes for: the subject document, its supplier or customer and the determination date. A SALE applies only
 /// SALES_ITBIS rules and a PURCHASE only the purchase rules (E-VS3-05-1).
 /// </summary>
-public sealed record TaxRequest(string SubjectType, Guid SubjectId, DateOnly Date, Guid PartyId, IReadOnlyList<TaxLineInput> Lines, string Direction = TaxDirections.Purchase);
+public sealed record TaxRequest(
+    string SubjectType, Guid SubjectId, DateOnly Date, Guid PartyId, IReadOnlyList<TaxLineInput> Lines, string Direction = TaxDirections.Purchase, TaxExemption? Exemption = null);
+
+/// <summary>E-FIS1-03-3: a sale covered by an ACTIVE fiscal authorization carries no ITBIS; the determination records why.</summary>
+public sealed record TaxExemption(Guid AuthorizationId, string Regime, string CertificateNo);
 
 public static class TaxDirections
 {
@@ -55,15 +59,22 @@ public sealed class TaxEngine
             lines.Add(new TaxableLine(line.SubjectLineId, await ItemCategoryAsync(context, line.ItemId, cancellationToken).ConfigureAwait(false), line.NetAmount));
         }
 
-        var taxes = TaxCalculator.Determine(partyType, lines, rules);
+        // E-FIS1-03-3: an exempt sale keeps the gate (the rules in force are still required and recorded) and determines no ITBIS.
+        var taxes = request.Exemption is null ? TaxCalculator.Determine(partyType, lines, rules) : [];
         var determinationId = context.Ids.NewId();
-        var inputs = JsonCanonicalizer.Canonicalize(JsonSerializer.Serialize(new
+        var recorded = new Dictionary<string, object>
         {
-            date = request.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            partyId = request.PartyId,
-            partyTaxType = partyType,
-            lines = lines.Select(l => new { lineId = l.LineId, itemCategory = l.ItemCategory, netAmount = l.NetAmount.ToString(CultureInfo.InvariantCulture) }),
-        }));
+            ["date"] = request.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["partyId"] = request.PartyId,
+            ["partyTaxType"] = partyType,
+            ["lines"] = lines.Select(l => new { lineId = l.LineId, itemCategory = l.ItemCategory, netAmount = l.NetAmount.ToString(CultureInfo.InvariantCulture) }).ToList(),
+        };
+        if (request.Exemption is { } exemption)
+        {
+            recorded["exemption"] = new { authorizationId = exemption.AuthorizationId, regime = exemption.Regime, certificateNo = exemption.CertificateNo };
+        }
+
+        var inputs = JsonCanonicalizer.Canonicalize(JsonSerializer.Serialize(recorded));
         await Sql.ExecuteAsync(
             context.Connection,
             context.Transaction,
