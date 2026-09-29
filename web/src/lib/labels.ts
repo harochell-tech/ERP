@@ -72,6 +72,12 @@ const STATUS: Readonly<Record<string, string>> = {
   DEPOSITED: "Depositado",
   BOUNCED: "Cheque devuelto",
   RECORDED: "Registrado",
+  // MFG-1 (MFG1-07): production runs, finished-goods lots and cost collectors.
+  IN_PROGRESS: "En proceso",
+  COMPLETED: "Completada",
+  CURING: "En curado",
+  SCRAPPED: "Desechado",
+  SETTLED: "Liquidado",
 };
 
 /** E-VS3-5: the two delivery terms. */
@@ -111,6 +117,7 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   PARTIALLY_PAID: "progress", PARTIALLY_APPLIED: "progress", DEPOSITED: "progress", RECORDED: "progress",
   ACCEPTED_EXTERNAL: "done", PAID: "done", CREDITED: "done", APPLIED: "done",
   NOT_FOUND: "error", NOT_ACTIVE: "attention", NAME_DIFFERS: "attention", // E-RNC-7
+  IN_PROGRESS: "progress", CURING: "progress", COMPLETED: "done", SETTLED: "done", SCRAPPED: "error", // MFG1-07
   REVERSED: "reversed",
 };
 
@@ -177,6 +184,10 @@ export const ROLES: Readonly<Record<string, string>> = {
   DESPACHO: "Despacho",
   FACTURACION: "Facturación",
   COBROS: "Cobros",
+  // MFG-1 (E-MFG1-14)
+  SUPERVISOR_PRODUCCION: "Supervisor de producción",
+  GERENTE_PLANTA: "Gerente de planta",
+  CALIDAD: "Calidad",
 };
 
 /** A yyyy-MM-dd date plus whole days (calendar arithmetic, no time zone involved). */

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { query } from "@/api/client";
 import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
-import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
+import { isDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -48,7 +48,7 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
       }}
     >
       <Field label="Producto">
-        <select value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
+        <select aria-label="Producto" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
           <option value="">—</option>
           {data.goods.map((g) => (
             <option key={g.itemId} value={g.itemId}>
@@ -58,7 +58,7 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
         </select>
       </Field>
       <Field label="Área (planta)">
-        <select value={form.valuationAreaId} onChange={(e) => setForm({ ...form, valuationAreaId: e.target.value })}>
+        <select aria-label="Área (planta)" value={form.valuationAreaId} onChange={(e) => setForm({ ...form, valuationAreaId: e.target.value })}>
           <option value="">—</option>
           {data.plants.map((p) => (
             <option key={p.plantId} value={p.valuationAreaId}>
@@ -75,6 +75,104 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
       </button>
       {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={prepare.error} />
+    </form>
+  );
+}
+
+interface FromRecipeResult {
+  unitCost: string;
+  materialCost: string;
+  conversionCost: string;
+}
+
+/** MFG1-07 (E-MFG1-07-4): the standard of a product from its ACTIVE recipe — a standard price per material plus the conversion cost; the
+ * API computes the unit cost (materials per unit × price + conversion). */
+function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
+  const { companyId, plantFor } = useSession();
+  const prepare = useCommand("prepare-standard-cost-from-recipe", "/api/v1/companies/{companyId}/sales/prepare-standard-cost-from-recipe");
+  const recipes = useLoad(
+    () => query("/api/v1/companies/{companyId}/manufacturing/recipes", { path: { companyId }, query: { plantId: plantFor("production:read"), status: "ACTIVE" } }),
+    [companyId],
+  );
+  const [recipeVersionId, setRecipeVersionId] = useState("");
+  const recipe = useLoad(
+    recipeVersionId
+      ? () => query("/api/v1/companies/{companyId}/manufacturing/recipes/{recipeVersionId}", { path: { companyId, recipeVersionId } })
+      : null,
+    [companyId, recipeVersionId],
+  );
+  const [prices, setPrices] = useState<Record<string, string>>({});
+  const [conversionCost, setConversionCost] = useState("");
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const [result, setResult] = useState<FromRecipeResult | null>(null);
+  if (recipes.data === null) {
+    return <Loading error={recipes.error} />;
+  }
+  const lines = recipe.data && recipe.data.recipe.recipeVersionId === recipeVersionId ? recipe.data.lines : [];
+  return (
+    <form
+      className="card"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const materialPrices = lines.map((l) => ({ materialItemId: l.materialItemId, stdPrice: normalizeInput(prices[l.materialItemId] ?? "") }));
+        const conversion = normalizeInput(conversionCost);
+        if (!recipeVersionId || lines.length === 0) {
+          setInvalid("Elija una receta activa.");
+          return;
+        }
+        if (materialPrices.some((p) => !isPositiveDecimal(p.stdPrice, 4)) || !isDecimal(conversion, 4) || conversion.startsWith("-")) {
+          setInvalid("Cada material necesita un precio estándar mayor que cero y el costo de conversión es cero o más (hasta 4 decimales).");
+          return;
+        }
+        setInvalid(null);
+        const response = await prepare.run({ recipeVersionId, materialPrices, conversionCost: conversion });
+        if (response) {
+          setResult(response.result as FromRecipeResult);
+          setPrices({});
+          setConversionCost("");
+          onDone();
+        }
+      }}
+    >
+      <h2>Preparar desde receta</h2>
+      <Field label="Receta activa">
+        <select
+          aria-label="Receta activa"
+          value={recipeVersionId}
+          onChange={(e) => {
+            setRecipeVersionId(e.target.value);
+            setPrices({});
+            setResult(null);
+          }}
+        >
+          <option value="">—</option>
+          {recipes.data.items.map((r) => (
+            <option key={r.recipeVersionId} value={r.recipeVersionId}>
+              {r.itemCode} en {r.machineCode} (v{r.version})
+            </option>
+          ))}
+        </select>
+      </Field>
+      {recipeVersionId && recipe.data === null ? <Loading error={recipe.error} /> : null}
+      {lines.map((l) => (
+        <Field key={l.materialItemId} label={`Precio estándar ${l.materialCode} (por ${l.baseUom})`}>
+          <input inputMode="decimal" value={prices[l.materialItemId] ?? ""} onChange={(e) => setPrices({ ...prices, [l.materialItemId]: e.target.value })} />
+        </Field>
+      ))}
+      <Field label="Costo de conversión por unidad">
+        <input inputMode="decimal" value={conversionCost} onChange={(e) => setConversionCost(e.target.value)} />
+      </Field>
+      <button type="submit" disabled={prepare.busy}>
+        Preparar desde receta
+      </button>
+      {invalid ? <div className="error">{invalid}</div> : null}
+      <ErrorBox error={prepare.error} />
+      {result ? (
+        <p className="notice" data-testid="recipe-cost-result">
+          Costo unitario <Money value={result.unitCost} testId="recipe-unit-cost" /> = materiales <Money value={result.materialCost} /> + conversión{" "}
+          <Money value={result.conversionCost} />
+        </p>
+      ) : null}
     </form>
   );
 }
@@ -104,6 +202,7 @@ export default function Page() {
     <>
       <h1>Costos estándar</h1>
       {can("standard_cost:prepare") ? <PrepareCost onDone={reload} /> : null}
+      {can("standard_cost:prepare") && can("production:read") ? <PrepareFromRecipe onDone={reload} /> : null}
       {data === null ? (
         <Loading error={error} />
       ) : data.items.length === 0 ? (

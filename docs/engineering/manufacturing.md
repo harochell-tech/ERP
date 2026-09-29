@@ -94,3 +94,15 @@ open-periods` opens OP-DAY and COST-SET with the other components. Query `GET /m
 consumption per material (real, theoretical, difference). E2E-M1 runs over HTTP in `Rochell.Api.Tests`
 (`ManufacturingAcceptanceTests`); the acceptance matrix is `docs/acceptance/mfg1.md` (MFG-10 and INV-M pending for MFG1-08, the UI
 half of E2E-M1 for MFG1-07).
+
+## MFG1-07 — production screens and the Playwright journey (migration 0053, E-MFG1-07-1…11)
+
+Menu **Producción** (`web/src/app/produccion/`): *Producción del día* (`dia`, start runs), the run page (`corrida`: record,
+post, reverse the shift summary, cancel the run), *Curado y liberación* (`lotes`: release, block, unblock, scrap), *Recetas*
+(`recetas`, `receta`: prepare, approve), *Máquinas y turnos* (`maquinas`), *Costos de producción* (`costos`: settle). *Maestros ›
+Costos estándar* prepares a standard from a recipe. Shared code: `web/src/components/Production.tsx`, `web/src/lib/production.ts`.
+Migration 0053 gives `master_data:read` to the three production roles and `sales:read` to the Aprobador de políticas.
+
+Dev data: `tests/Rochell.DevStack/MfgSeed.cs` (ADOQUIN-H without recipe, materials with stock, production rules approved, one user
+per production role). Journey: `web/e2e/production-journey.spec.ts` (machine, shift, recipe of 0 minimum curing hours, standard from
+the recipe 22.34 + 5.90 = 28.24, run of yesterday, summary, posting, release). Staging: `deploy/staging/seed-mfg.sh` (`staging.md`).

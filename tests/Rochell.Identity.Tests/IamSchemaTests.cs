@@ -15,7 +15,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["ADMIN_SEGURIDAD"] = "iam:read,role:assign,role:revoke",
         ["ALMACENISTA"] = "goods_receipt:post,goods_receipt:read,item:create,master_data:read,purchase_order:read,receipt_correction:create",
         ["ANALISTA_FISCAL"] = "configuration:read,fiscal_rule:configure,fiscal_rule_source:register",
-        ["APROBADOR_POLITICAS"] = "accounting_policy:approve,configuration:read,opening_inventory:post,price_list:approve,report_structure:approve,standard_cost:approve", // E-PR06-4, E-FIN1-01-5, E-VS3-01-11, E-VS3-02b-2
+        ["APROBADOR_POLITICAS"] = "accounting_policy:approve,configuration:read,opening_inventory:post,price_list:approve,report_structure:approve,sales:read,standard_cost:approve", // E-PR06-4, E-FIN1-01-5, E-VS3-01-11, E-VS3-02b-2
         ["APROBADOR_COMPRAS"] = "master_data:read,purchase_order:approve,purchase_order:approve_over_receipt,purchase_order:read",
         ["AUDITOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,ledger:read,master_data:read,payment:read,period:read,"
             + "production:read,purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read",
@@ -40,9 +40,9 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["DESPACHO"] = "delivery:manage,fleet:manage,sales:read",
         ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_document:record,invoice:create,invoice:issue,sales:read",
         ["COBROS"] = "customer_withholding:record,receipt:apply,receipt:deposit,receipt:record,sales:read",
-        ["SUPERVISOR_PRODUCCION"] = "production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
-        ["GERENTE_PLANTA"] = "fg_lot:scrap,production:read,production_master:manage,recipe:approve,shift_summary:post",
-        ["CALIDAD"] = "fg_lot:release,production:read",
+        ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
+        ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,production:read,production_master:manage,recipe:approve,shift_summary:post",
+        ["CALIDAD"] = "fg_lot:release,master_data:read,production:read",
         ["TESORERO"] = "bank:read,bank_line:match,bank_statement:import,party_bank_account:request,payment:prepare,payment:read,payment:void,receipt:bounce", // VS#2 §7
     };
 

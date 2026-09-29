@@ -175,3 +175,11 @@ The deploy uploads `rnc-weekly.sh`. It downloads `DGII_RNC.zip` from the DGII an
 `/etc/cron.d/rochell-rnc` (Mondays 05:00, the line is in the script). The DGII may answer HTTP 403 to automated downloads; the script
 then stops and prints the instructions: download the ZIP in a browser, copy it to the VPS and run
 `/opt/rochell-staging/rnc-weekly.sh /path/to/DGII_RNC.zip`. The registry is public data, so it is allowed on staging (E-RNC-8).
+
+## MFG-1 on staging (E-MFG1-07-7)
+
+After deploying MFG1-01…07 (the deploy uploads the script), run `/opt/rochell-staging/seed-mfg.sh` on the VPS: test identities for
+Supervisor de producción, Gerente de planta and Calidad, and the production accounts with DRAFT maps (`seed/accounts-mfg.csv`,
+`seed/account-map-mfg.csv`: WIP 1340, MATERIAL_PRICE_VARIANCE 5106, CONVERSION_ABSORPTION 5150, PRODUCTION_SCRAP 5160,
+STANDARD_REVALUATION 5190; MATERIAL_USAGE_VARIANCE keeps 5102). Then, as the Controller in the UI: approve the maps and P-08, P-10,
+P-12, P-13 and REVAL, and prepare the PRODUCTION policy (approved by the Aprobador de políticas). Synthetic data only.

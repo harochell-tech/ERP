@@ -181,7 +181,7 @@ public sealed class AccountingPolicyTests(PostgresFixture postgres)
 
         Assert.Equal("CREDIT:4,INVENTORY:4,POSTING:2,PRODUCTION:1,PURCHASING:6,REVENUE_ACCOUNTING:3,TREASURY:3", await h.ScalarAsync<string>(
             "SELECT string_agg(policy_code || ':' || n, ',' ORDER BY policy_code) FROM (SELECT policy_code, count(*) n FROM acc.policy_parameter_definition GROUP BY policy_code) x"));
-        Assert.Equal("accounting_policy:approve,configuration:read,opening_inventory:post,price_list:approve,report_structure:approve,standard_cost:approve", await h.ScalarAsync<string>( // configuration:read: E-B03-15-1; report_structure:approve: E-FIN1-01-5; price list and standard cost: E-VS3-01-11
+        Assert.Equal("accounting_policy:approve,configuration:read,opening_inventory:post,price_list:approve,report_structure:approve,sales:read,standard_cost:approve", await h.ScalarAsync<string>( // configuration:read: E-B03-15-1; report_structure:approve: E-FIN1-01-5; price list and standard cost: E-VS3-01-11
             "SELECT string_agg(permission_code, ',' ORDER BY permission_code) FROM iam.role r JOIN iam.role_permission USING (role_id) WHERE r.code = 'APROBADOR_POLITICAS'"));
     }
 
