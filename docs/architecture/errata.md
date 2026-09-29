@@ -534,6 +534,18 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-02-8 | MFG1-02 | REVAL arrives DRAFT; while it is not ACTIVE, approving a standard that needs a revaluation fails with `POSTING_PREREQUISITE_MISSING`. |
 | E-MFG1-02-9 | MFG1-02 | Queries `ListMachines`, `ListShifts`, `ListRecipes`, `GetRecipe` (`production:read`) under `/manufacturing/…`; commands under `/manufacturing/…` and `/sales/prepare-standard-cost-from-recipe`; OpenAPI and web types regenerated. Screens arrive in MFG1-07. |
 | E-MFG1-02-10 | MFG1-02 | Migration 0049 (REVAL, DRAFT). |
+| E-MFG1-03-1 | MFG1-03 | `StartProductionRun` (supervisor, plant-scoped): ACTIVE machine and shift of the plant, business date, product; needs the ACTIVE recipe (product × machine) and the ACTIVE standard with breakdown in the area (`RECIPE_NOT_ACTIVE`, `STANDARD_COST_MISSING`); the run keeps both versions; one live run per machine × shift × date × product (`RUN_EXISTS`); starts IN_PROGRESS. `CancelProductionRun` only without any shift summary (`SUMMARY_EXISTS`). |
+| E-MFG1-03-2 | MFG1-03 | `RecordShiftSummary` (supervisor) creates or replaces the DRAFT: batches, good units, mix and fresh scrap (quantities only), real consumption of every recipe material once (`MATERIALS_MISMATCH`); theoretical = recipe quantity × batches is stored. |
+| E-MFG1-03-3 | MFG1-03 | Consumption in the base unit or one with a conversion in force at the business date (e.g. m³ → t), stored in the base unit (6 decimals). |
+| E-MFG1-03-4 | MFG1-03 | The supervisor names the location of each material (a stock location of the plant, not TRANSITO or CURADO); lots are taken FIFO by lot code; a shortfall refuses everything with the ledger's existing code `INSUFFICIENT_STOCK`. |
+| E-MFG1-03-5 | MFG1-03 | `PostShiftSummary` (plant manager, four eyes against the recorder, no step-up), one transaction: PRODUCTION_ISSUE per lot at moving average + P-08 (Dr WIP [collector] / Cr RAW_MATERIAL); lot + PRODUCTION_RECEIPT into CURADO at round(units × standard, 2) + P-10 (Dr FINISHED_GOODS; Cr WIP round(units × material standard, 2); Cr CONVERSION_ABSORPTION the rest); racks ⌈units ÷ units per rack⌉. |
+| E-MFG1-03-6 | MFG1-03 | The cost collector (plant × product × month of the business date) is created OPEN by the first run; WIP lines carry it as subledger. |
+| E-MFG1-03-7 | MFG1-03 | Lot `PT-<product>-<yyyyMMdd>-<shift>` (`-2`, `-3`… after a reversal); curing from the shift's end (the next day for a night shift, Dominican time), releasable after the recipe's minimum hours; lot CURING. |
+| E-MFG1-03-8 | MFG1-03 | Posting date = the run's business date; refused with `PERIOD_CLOSED` when INV-MOV is closed for it. |
+| E-MFG1-03-9 | MFG1-03 | `ReverseShiftSummary` (plant manager, step-up, reason) while the lot is CURING without later movements and the collector is OPEN (`LOT_MOVED`, `COLLECTOR_SETTLED`): exact reversals of P-08 / P-10 and PRODUCTION_ISSUE_REVERSAL / PRODUCTION_RECEIPT_REVERSAL; lot and racks VOIDED; the run back to IN_PROGRESS with a new DRAFT (same figures, same recorder). |
+| E-MFG1-03-10 | MFG1-03 | Events `MaterialConsumed` (P-08) and `ProductionReceived` (P-10), two journals in the same transaction; rules DRAFT until A-01. |
+| E-MFG1-03-11 | MFG1-03 | Queries `ListProductionRuns` (plant, date, status, paging) and `GetProductionRun` (summary, real vs theoretical consumption, lot and racks), `production:read`. |
+| E-MFG1-03-12 | MFG1-03 | Migration 0050; lots in `mfg.fg_lot` (schema mfg, E-MFG1-01-1). |
 
 Implementation rules derived from the above (no architectural change):
 
