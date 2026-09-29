@@ -477,3 +477,42 @@ public sealed class ReactivateAuthorizationHandler : ICommandHandler<ReactivateA
         return await AuthorizationStore.TransitionAsync(context, row, "ACTIVE", "FiscalAuthorizationReactivated", CommandType, cancellationToken, reason).ConfigureAwait(false);
     }
 }
+
+/// <summary>
+/// E-FIS1-04-5: expiry is a date rule without judgement, so it takes no step-up (the daily run has nobody to confirm it). Rows are
+/// locked in id order so a manual run and the daily run never deadlock; the second one finds nothing left to expire.
+/// </summary>
+[RequiresPermission("fiscal_authorization:suspend")]
+public sealed class ExpireFiscalAuthorizationsHandler : ICommandHandler<ExpireFiscalAuthorizations>
+{
+    public string CommandType => "Tax.ExpireFiscalAuthorizations";
+
+    public async Task<string> HandleAsync(ExpireFiscalAuthorizations command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var ids = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT authorization_id FROM tax.fiscal_authorization
+            WHERE company_id = @c AND status IN ('ACTIVE', 'SUSPENDED', 'EXHAUSTED') AND valid_until < @today ORDER BY authorization_id
+            """,
+            r => r.GetGuid(0),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("today", AuthorizationStore.Today(context))).ConfigureAwait(false);
+        var expired = new List<Guid>();
+        foreach (var id in ids)
+        {
+            var row = await AuthorizationStore.LockAsync(context, id, null, cancellationToken).ConfigureAwait(false);
+            if (row.Status is "ACTIVE" or "SUSPENDED" or "EXHAUSTED" && row.ValidUntil < AuthorizationStore.Today(context))
+            {
+                await AuthorizationStore.TransitionAsync(context, row, "EXPIRED", "FiscalAuthorizationExpired", CommandType, cancellationToken).ConfigureAwait(false);
+                expired.Add(id);
+            }
+        }
+
+        return JsonSerializer.Serialize(new { expired });
+    }
+}

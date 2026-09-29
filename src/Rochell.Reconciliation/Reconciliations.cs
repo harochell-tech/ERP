@@ -28,7 +28,8 @@ public static class Reconciliations
     public static IReadOnlyList<string> All { get; } =
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
          "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
-         "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER"];
+         "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER",
+         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -481,6 +482,55 @@ public static class Reconciliations
               AND EXISTS (SELECT 1 FROM mfg.production_run r WHERE r.company_id = @c AND r.status <> 'CANCELLED' AND r.business_date BETWEEN p.starts_on AND p.ends_on)) f
             """,
             null),
+        ["AUTH-CONSUMPTION"] = (
+            Findings + """
+            -- E-FIS1-04-1: each scope line's consumed totals = consumptions − releases; each e-CF 44 line's live consumption = its net −
+            -- what confirmed credit notes took (0 once the invoice is voided).
+            WITH c AS (SELECT authorization_id, line_no,
+                              sum(CASE WHEN reverses_consumption_id IS NULL THEN qty ELSE -qty END) AS qty,
+                              sum(CASE WHEN reverses_consumption_id IS NULL THEN net ELSE -net END) AS net
+                       FROM tax.fiscal_authorization_consumption WHERE company_id = @c GROUP BY 1, 2),
+                 il AS (SELECT il.invoice_line_id,
+                               CASE WHEN i.commercial_status = 'VOIDED' THEN 0
+                                    ELSE il.net_amount - coalesce((SELECT sum(nl.net_amount) FROM sal.credit_note_line nl JOIN sal.credit_note n ON n.credit_note_id = nl.credit_note_id
+                                                                   WHERE nl.invoice_line_id = il.invoice_line_id AND n.commercial_status NOT IN ('DRAFT', 'VOIDED')), 0) END AS expected,
+                               coalesce((SELECT sum(CASE WHEN x.reverses_consumption_id IS NULL THEN x.net ELSE -x.net END) FROM tax.fiscal_authorization_consumption x
+                                         WHERE x.invoice_line_id = il.invoice_line_id), 0) AS consumed
+                        FROM sal.invoice_line il JOIN sal.invoice i ON i.invoice_id = il.invoice_id
+                        WHERE i.company_id = @c AND i.ecf_type = '44' AND i.commercial_status <> 'DRAFT')
+            SELECT 'auth-line:' || l.authorization_id::text || '/' || l.line_no AS match_key, l.net_consumed AS value_a, coalesce(c.net, 0) AS value_b,
+                   'AUTH_LINE_CONSUMPTION_DIFFERENCE' AS classification, 'ERROR' AS severity, 'AR-REC' AS component
+            FROM tax.fiscal_authorization_line l LEFT JOIN c ON c.authorization_id = l.authorization_id AND c.line_no = l.line_no
+            WHERE l.company_id = @c AND (l.net_consumed <> coalesce(c.net, 0) OR l.qty_consumed <> coalesce(c.qty, 0))
+            UNION ALL
+            SELECT 'invoice-line:' || invoice_line_id::text, expected, consumed, 'INVOICE_CONSUMPTION_DIFFERENCE', 'ERROR', 'AR-REC' FROM il WHERE expected <> consumed) f
+            """,
+            null),
+        ["EXEMPT-WITHOUT-AUTH"] = (
+            Findings + """
+            -- E-FIS1-04-2: an issued invoice without ITBIS that is not an e-CF 44, with an item the applied SALES_ITBIS rule taxes.
+            SELECT 'invoice:' || i.invoice_no AS match_key, i.net_total AS value_a, i.tax_total AS value_b,
+                   'EXEMPT_WITHOUT_AUTHORIZATION' AS classification, 'ERROR' AS severity, 'AR-REC' AS component
+            FROM sal.invoice i JOIN tax.tax_determination d ON d.determination_id = i.tax_determination_id
+            WHERE i.company_id = @c AND i.commercial_status NOT IN ('DRAFT', 'VOIDED') AND i.ecf_type <> '44' AND i.tax_total = 0
+              AND EXISTS (SELECT 1 FROM sal.invoice_line il JOIN md.item it ON it.item_id = il.item_id
+                          WHERE il.invoice_id = i.invoice_id
+                            AND NOT EXISTS (SELECT 1 FROM tax.fiscal_rule_version v JOIN tax.fiscal_rule r ON r.rule_id = v.rule_id
+                                            WHERE v.rule_version_id = ANY (d.rule_version_ids) AND r.rule_kind = 'SALES_ITBIS'
+                                              AND v.definition -> 'exempt_item_categories' ? it.item_category))) f
+            """,
+            null),
+        ["AUTH-EXPIRY"] = (
+            Findings + """
+            -- E-FIS1-04-3: authorizations in use that expire within authorization_expiry_alert_days, or whose project term ended (a warning).
+            SELECT 'auth:' || certificate_no AS match_key, NULL::numeric AS value_a, (valid_until - @cutoff)::numeric AS value_b,
+                   CASE WHEN project_term_ends_on < @cutoff THEN 'PROJECT_TERM_ENDED' ELSE 'AUTHORIZATION_EXPIRING' END AS classification,
+                   'WARNING' AS severity, NULL::text AS component
+            FROM tax.fiscal_authorization
+            WHERE company_id = @c AND status IN ('ACTIVE', 'EXHAUSTED', 'SUSPENDED')
+              AND ((valid_until IS NOT NULL AND valid_until <= @cutoff + @adays) OR (project_term_ends_on IS NOT NULL AND project_term_ends_on < @cutoff))) f
+            """,
+            null),
         ["GRNI-AGING"] = (
             Findings + """
             SELECT l.po_line_id::text AS match_key, l.qty_received - l.qty_invoiced AS value_a,
@@ -551,6 +601,21 @@ public static class Reconciliations
                 }
             }
 
+            int? alertDays = null;
+            if (code == "AUTH-EXPIRY")
+            {
+                alertDays = await PolicyIntegerAsync(context, asOf, "REVENUE_ACCOUNTING", "authorization_expiry_alert_days", cancellationToken).ConfigureAwait(false);
+
+                // E-FIS1-04-4: without authorizations there is nothing to warn about, so the missing policy only fails a run that has some.
+                await using var any = Sql.Command(
+                    context.Connection, context.Transaction, "SELECT EXISTS (SELECT 1 FROM tax.fiscal_authorization WHERE company_id = @c)", ("c", context.CompanyId));
+                if (alertDays is null && await any.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
+                {
+                    runs.Add(await StoreAsync(context, runId, code, asOf, cutoff, "FAILED", null, null, [], cancellationToken).ConfigureAwait(false));
+                    continue;
+                }
+            }
+
             var unbilledDays = code == "CONTRACT-ASSET"
                 ? await PolicyIntegerAsync(context, asOf, "REVENUE_ACCOUNTING", "unbilled_aging_alert_days", cancellationToken).ConfigureAwait(false)
                 : null;
@@ -565,6 +630,7 @@ public static class Reconciliations
                 ("hours", openHours ?? 0),
                 ("udays", unbilledDays),
                 ("tol", tolerance ?? 0m),
+                ("adays", alertDays ?? 0),
                 ("cutoff", cutoff ?? Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(asOf))))
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {

@@ -1,7 +1,12 @@
 using System.Security.Cryptography;
 using Rochell.Audit;
+using Rochell.Identity;
+using Rochell.Identity.Sessions;
+using Rochell.Platform.Commands;
+using Rochell.Platform.Data;
 using Rochell.Platform.Observability;
 using Rochell.Platform.Time;
+using Rochell.Tax.Authorizations;
 
 namespace Rochell.Api.Hosting;
 
@@ -98,6 +103,85 @@ public sealed class DigestService(DigestSettings settings, SealerDatabase databa
             {
                 await Task.Delay(dueToday - now, stoppingToken).ConfigureAwait(false);
             }
+        }
+    }
+}
+
+/// <summary>
+/// E-FIS1-04-5 / E-FIS1-04-7: at <see cref="FiscalExpirySettings.RunAt"/> local time runs <see cref="ExpireFiscalAuthorizations"/> in
+/// every company through the command pipeline, as the daily process (role PROCESO_DIARIO) on a SERVICE session that it ends
+/// afterwards. The idempotency key is the day, so a restart the same day replays instead of running twice. On start it also runs
+/// today's pass if it is due.
+/// </summary>
+public sealed class FiscalExpiryService(FiscalExpirySettings settings, AppDatabase database, SessionService sessions, CommandPipeline pipeline, IClock clock, ILogger<FiscalExpiryService> logger) : BackgroundService
+{
+    private static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(1);
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (!settings.Enabled)
+        {
+            logger.LogInformation("Daily expiry of fiscal authorizations disabled by configuration.");
+            return;
+        }
+
+        var runAt = settings.RunAt.ToTimeSpan();
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var now = clock.UtcNow;
+            var today = BusinessCalendar.DefaultBusinessDate(now);
+            var dueToday = BusinessCalendar.DayUtcRange(today).StartUtc + runAt;
+            if (now < dueToday)
+            {
+                await Task.Delay(dueToday - now, stoppingToken).ConfigureAwait(false);
+                continue;
+            }
+
+            try
+            {
+                await RunAsync(today, stoppingToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "Daily expiry of fiscal authorizations for {Day} failed; retrying.", today);
+                await Task.Delay(RetryAfter, stoppingToken).ConfigureAwait(false);
+                continue;
+            }
+
+            var next = BusinessCalendar.DayUtcRange(today.AddDays(1)).StartUtc + runAt;
+            await Task.Delay(next - clock.UtcNow, stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>One pass over every company. A company without the daily process's role is skipped with a warning.</summary>
+    public async Task RunAsync(DateOnly day, CancellationToken cancellationToken)
+    {
+        List<Guid> companies;
+        await using (var connection = await database.DataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        {
+            companies = await Reading.ListAsync(connection, null, "SELECT company_id FROM md.company ORDER BY company_id", r => r.GetGuid(0), cancellationToken).ConfigureAwait(false);
+        }
+
+        var session = await sessions.StartServiceSessionAsync(IdentityConstants.DailyProcessUserId, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            foreach (var company in companies)
+            {
+                try
+                {
+                    var result = await pipeline.ExecuteAsync(
+                        new ExpireFiscalAuthorizations(company, session, $"daily-expiry:{day:yyyy-MM-dd}"), new ExpireFiscalAuthorizationsHandler(), Guid.CreateVersion7(), cancellationToken).ConfigureAwait(false);
+                    logger.LogInformation("Fiscal authorizations expired in company {Company} for {Day}: {Result}.", company, day, result.ResultPayload);
+                }
+                catch (DomainException ex) when (ex.Code == AuthorizationErrors.NotAuthorized)
+                {
+                    logger.LogWarning("Company {Company} has no PROCESO_DIARIO assignment; its fiscal authorizations were not expired.", company);
+                }
+            }
+        }
+        finally
+        {
+            await sessions.EndSessionAsync(session, CancellationToken.None).ConfigureAwait(false);
         }
     }
 }

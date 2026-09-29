@@ -40,6 +40,16 @@ releaser, requester ≠ verifier, creator ≠ approver…) stay. In staging the 
 identities for all roles, `deploy/staging/seed.sh`). In production the Director role is granted like any other: `rochell-migrate
 grant-role` at bootstrap, then role requests with a second approver.
 
+## Daily process (E-FIS1-04-7)
+
+Service identity `…d002` ("Proceso diario", `IdentityConstants.DailyProcessUserId`; the deployment identity `…d001` stays a
+`granted_by` only). Role `PROCESO_DIARIO` grants only `fiscal_authorization:suspend`; database triggers keep it for service
+identities and give them no other role. Migration 0056 assigns it in every existing company and `rochell-migrate create-company`
+in each new one. Only the API opens its sessions (`SessionService.StartServiceSessionAsync`, `auth_method = 'SERVICE'`, no step-up)
+and ends them after each run; a trigger allows SERVICE sessions only for service identities and no other kind for them.
+`SqlCommandAuthorizer` accepts them like any session (permission, company, lifetimes); `DescribeAsync` — the cookie path —
+rejects them, so they never reach HTTP. The API's fiscal expiry service (`api.md`) is its only user.
+
 ## Screens and queries (UI-01)
 
 `iam:read` (migration `0032__ui01_identity_audit.sql`, E-UI01-4) reads `identity/users` (the company's users with their active

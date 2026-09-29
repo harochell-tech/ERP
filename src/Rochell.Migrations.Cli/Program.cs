@@ -108,9 +108,11 @@ try
 
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync();
+                await using var transaction = await connection.BeginTransactionAsync();
                 await using var insert = new NpgsqlCommand(
                     "INSERT INTO md.company (company_id, rnc, legal_name) VALUES (@id, @rnc, @name) ON CONFLICT (rnc) DO NOTHING",
-                    connection);
+                    connection,
+                    transaction);
                 var companyId = Guid.CreateVersion7();
                 insert.Parameters.AddWithValue("id", companyId);
                 insert.Parameters.AddWithValue("rnc", args[1]);
@@ -120,6 +122,20 @@ try
                     await Console.Error.WriteLineAsync($"Company {args[1]} already exists.");
                     return 2;
                 }
+
+                // E-FIS1-04-7: the API's daily process acts in every company.
+                await using var daily = new NpgsqlCommand(
+                    """
+                    INSERT INTO iam.role_assignment (assignment_id, company_id, user_id, role_id, plant_id, valid_from, granted_by)
+                    SELECT @id, @company, '00000000-0000-7000-8000-00000000d002', role_id, NULL, now(), '00000000-0000-7000-8000-00000000d001'
+                    FROM iam.role WHERE code = 'PROCESO_DIARIO'
+                    """,
+                    connection,
+                    transaction);
+                daily.Parameters.AddWithValue("id", Guid.CreateVersion7());
+                daily.Parameters.AddWithValue("company", companyId);
+                await daily.ExecuteNonQueryAsync();
+                await transaction.CommitAsync();
 
                 Console.WriteLine($"Company {args[1]} created: {companyId}.");
                 return 0;

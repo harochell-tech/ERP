@@ -10,7 +10,8 @@ namespace Rochell.Identity.Authorization;
 /// Authorization inside the command transaction: open session of an active human user, not expired
 /// (absolute and idle, E-PR03-6), a role assignment valid now in the command's company (and plant, for plant-scoped
 /// commands) granting the permission, and a recent re-authentication when the handler requires it (E-PR03-2).
-/// Commands that are not plant-scoped require a company-wide assignment (plant_id IS NULL).
+/// Commands that are not plant-scoped require a company-wide assignment (plant_id IS NULL). SERVICE sessions of the daily
+/// process (E-FIS1-04-7) are authorized here like any other; they have no step-up.
 /// </summary>
 public sealed class SqlCommandAuthorizer : ICommandAuthorizer
 {
@@ -36,7 +37,7 @@ public sealed class SqlCommandAuthorizer : ICommandAuthorizer
         var session = await ReadSessionAsync(connection, transaction, command.SessionId, cancellationToken).ConfigureAwait(false)
             ?? throw new DomainException(AuthorizationErrors.SessionInvalid, "The session does not exist.");
 
-        SessionRules.EnsureUsable(_options, now, session.LoginAt, session.LastActivityAt, session.LogoutAt, session.Status, session.Kind, session.Parent);
+        SessionRules.EnsureUsable(_options, now, session.LoginAt, session.LastActivityAt, session.LogoutAt, session.Status, session.Kind, session.Parent, session.Service);
 
         Guid? plantId = command is IPlantScopedCommand scoped ? scoped.PlantId : null;
         await using (var permission = Sql.Command(
@@ -100,7 +101,7 @@ public sealed class SqlCommandAuthorizer : ICommandAuthorizer
             transaction,
             """
             SELECT s.user_id, s.login_at, s.last_activity_at, s.last_step_up_at, s.logout_at, u.status, u.kind,
-                   p.login_at, p.logout_at, pu.status, pu.kind
+                   p.login_at, p.logout_at, pu.status, pu.kind, s.auth_method = 'SERVICE'
             FROM iam.session s
             JOIN iam.user u ON u.user_id = s.user_id
             LEFT JOIN iam.session p ON p.session_id = s.authenticated_session_id
@@ -128,8 +129,9 @@ public sealed class SqlCommandAuthorizer : ICommandAuthorizer
                     reader.GetFieldValue<DateTime>(7),
                     reader.IsDBNull(8) ? null : reader.GetFieldValue<DateTime>(8),
                     reader.GetString(9),
-                    reader.GetString(10)));
+                    reader.GetString(10)),
+            reader.GetBoolean(11));
     }
 
-    private sealed record SessionRow(Guid UserId, DateTime LoginAt, DateTime LastActivityAt, DateTime? LastStepUpAt, DateTime? LogoutAt, string Status, string Kind, ParentSession? Parent);
+    private sealed record SessionRow(Guid UserId, DateTime LoginAt, DateTime LastActivityAt, DateTime? LastStepUpAt, DateTime? LogoutAt, string Status, string Kind, ParentSession? Parent, bool Service);
 }

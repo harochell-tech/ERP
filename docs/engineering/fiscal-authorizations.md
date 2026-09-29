@@ -36,3 +36,18 @@ authorization, determines taxes with `TaxRequest.Exemption` (no ITBIS; inputs re
 line, and consumes the scope (EXHAUSTED when used up). `VoidUnfiscalizedInvoice` returns the consumption; a credit note of an e-CF 44
 (e-CF 34, ITBIS 0) returns the net it credits (never units). The fiscal package carries the exemption (regime, certificate, project,
 billing indicator 4). Shared code: `Rochell.Tax.Authorizations.AuthorizationUsage` (`CoverAsync`, `ConsumeAsync`, `ReleaseAsync`).
+
+## FIS1-04 — reconciliations and expiry (migration 0056, E-FIS1-04-1…6)
+
+| Reconciliation | Severity | Finds |
+| --- | --- | --- |
+| AUTH-CONSUMPTION | ERROR, blocks AR-REC | `AUTH_LINE_CONSUMPTION_DIFFERENCE`: a scope line's consumed totals ≠ consumptions − releases. `INVOICE_CONSUMPTION_DIFFERENCE`: an issued e-CF 44 line's live consumption ≠ its net − issued credit notes (0 once voided). |
+| EXEMPT-WITHOUT-AUTH | ERROR, blocks AR-REC | `EXEMPT_WITHOUT_AUTHORIZATION`: an issued invoice with ITBIS 0 that is not an e-CF 44 and has an item its SALES_ITBIS rule taxes. |
+| AUTH-EXPIRY | WARNING | `AUTHORIZATION_EXPIRING` (ACTIVE / EXHAUSTED / SUSPENDED, `valid_until` within `authorization_expiry_alert_days` of the cutoff) and `PROJECT_TERM_ENDED`. |
+
+The threshold is the REVENUE_ACCOUNTING parameter `authorization_expiry_alert_days`; without it AUTH-EXPIRY is FAILED only when the
+company has authorizations. `ExpireFiscalAuthorizations` (`POST /tax/expire-fiscal-authorizations`, `fiscal_authorization:suspend`,
+no step-up) moves every ACTIVE, SUSPENDED or EXHAUSTED authorization past `valid_until` to EXPIRED (event
+`FiscalAuthorizationExpired`), locking rows in id order; a second run finds nothing. The API runs it daily at 00:30 as the daily process
+(E-FIS1-04-7, `identity.md`, `api.md`; on in Staging). Tests: `FiscalAuthorizationReconciliationTests`
+(FIS-09), `ServiceSessionTests`, `BackgroundServiceTests` (the daily run).

@@ -60,3 +60,6 @@ public sealed record SuspendAuthorization(Guid CompanyId, Guid SessionId, string
 
 /// <summary>E-FIS1-02-6: SUSPENDED → ACTIVE (reason, step-up), unless expired.</summary>
 public sealed record ReactivateAuthorization(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid AuthorizationId, long ExpectedVersion, string Reason) : ICommand;
+
+/// <summary>E-FIS1-04-5: moves every ACTIVE, SUSPENDED or EXHAUSTED authorization whose <c>valid_until</c> has passed to EXPIRED.</summary>
+public sealed record ExpireFiscalAuthorizations(Guid CompanyId, Guid SessionId, string IdempotencyKey) : ICommand;

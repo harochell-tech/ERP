@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using Rochell.Api.Http;
+using Rochell.Identity;
 using Rochell.Platform.Time;
 using Rochell.TestInfrastructure;
 using Xunit;
@@ -30,6 +31,47 @@ public sealed class BackgroundServiceTests(PostgresFixture postgres) : IDisposab
         }
 
         Assert.Equal("DOMAIN_EVENT:SEALED", await h.ScalarAsync<string>("SELECT string_agg(DISTINCT ledger || ':' || integrity_status, ',') FROM audit.integrity_state"));
+    }
+
+    [Fact]
+    public async Task The_daily_process_expires_lapsed_fiscal_authorizations_in_each_company_on_a_SERVICE_session()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        await h.GrantAsync(h.CompanyId, IdentityConstants.DailyProcessUserId, "PROCESO_DIARIO");
+        var withoutRole = await h.CreateCompanyAsync();
+        var verifier = await h.CreateUserAsync();
+        var today = BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
+        string Row(string certificate, DateOnly validUntil)
+            => $"('{Guid.CreateVersion7()}', '{h.CompanyId}', '{Guid.CreateVersion7()}', 'CONFOTUR', '{certificate}', '{today.AddYears(-1):yyyy-MM-dd}', '{validUntil:yyyy-MM-dd}', " +
+               $"'Hotel Playa Bávaro', 'CONFOTUR-0456-2025', 'ACTIVE', '{h.UserId}', '{verifier}', 3)";
+
+        // Fixture: two ACTIVE authorizations without their customer or history (the expiry reads only status and valid_until).
+        await h.AdminRequireAsync(
+            $"""
+            BEGIN; SET LOCAL session_replication_role = replica;
+            INSERT INTO tax.fiscal_authorization (authorization_id, company_id, party_id, regime, certificate_no, issued_on, valid_until, project_name,
+              confotur_resolution_no, status, registered_by, verified_by, version)
+            VALUES {Row("CERT-VENCIDO", today.AddDays(-1))}, {Row("CERT-VIGENTE", today.AddDays(30))};
+            COMMIT;
+            """);
+
+        using var api = new ApiHost(h, settings: new Dictionary<string, string?> { ["Rochell:FiscalExpiry:Enabled"] = "true", ["Rochell:FiscalExpiry:RunAt"] = "00:00" });
+        _ = api.CreateClient();
+        for (var i = 0; i < 100 && await h.ScalarAsync<long>("SELECT count(*) FROM iam.session WHERE auth_method = 'SERVICE' AND logout_at IS NOT NULL") == 0; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        Assert.Equal("CERT-VENCIDO:EXPIRED:4,CERT-VIGENTE:ACTIVE:3", await h.ScalarAsync<string>(
+            "SELECT string_agg(certificate_no || ':' || status || ':' || version, ',' ORDER BY certificate_no) FROM tax.fiscal_authorization"));
+        Assert.Equal($"daily-expiry:{today:yyyy-MM-dd}:SERVICE:true", await h.ScalarAsync<string>(
+            """
+            SELECT l.idempotency_key || ':' || s.auth_method || ':' || (s.logout_at IS NOT NULL)::text
+            FROM core.command_log l JOIN iam.session s USING (session_id) WHERE l.command_type = 'Tax.ExpireFiscalAuthorizations'
+            """));
+        Assert.Equal("ACTIVE>EXPIRED:Tax.ExpireFiscalAuthorizations", await h.ScalarAsync<string>(
+            "SELECT from_state || '>' || to_state || ':' || command FROM core.state_history WHERE aggregate_type = 'FiscalAuthorization'"));
+        Assert.Contains(api.Logs, l => l.Level == LogLevel.Warning && l.Message.Contains(withoutRole.ToString(), StringComparison.Ordinal));
     }
 
     [Trait("Acceptance", "INT-02")]

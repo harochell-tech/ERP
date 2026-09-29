@@ -31,6 +31,7 @@ Required(settings.Oidc.ClientSecret, "Oidc:ClientSecret");
 var services = builder.Services;
 services.AddSingleton(settings.Sealer);
 services.AddSingleton(settings.Digest);
+services.AddSingleton(settings.FiscalExpiry);
 services.AddSingleton(settings.Audit);
 services.AddSingleton<IClock>(SystemClock.Instance);
 services.AddSingleton(new AppDatabase(NpgsqlDataSource.Create(appConnection)));
@@ -60,6 +61,8 @@ services.AddSingleton<HashVerification>();
 services.AddCommandHandlers();
 services.AddQueryHandlers();
 services.AddHostedService<RequestLogFlusher>();
+services.AddSingleton<FiscalExpiryService>();
+services.AddHostedService(sp => sp.GetRequiredService<FiscalExpiryService>());
 
 // E-PR18-5: the sealer and the digest connect as rochell_sealer and are switched on by configuration.
 if (settings.Sealer.Enabled || settings.Digest.Enabled)

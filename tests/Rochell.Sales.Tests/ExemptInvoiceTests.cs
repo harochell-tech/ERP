@@ -17,10 +17,10 @@ public sealed class ExemptInvoiceTests(PostgresFixture postgres)
 {
     private const string SalesItbis = """{"tax_code":"ITBIS","rate":"0.18","effect":"OUTPUT","exempt_item_categories":[]}""";
 
-    private sealed record World(DeliveryTests.Setup S, Guid Billing, Guid Specialist, Guid Order, Guid OrderLine, Guid Authorization);
+    internal sealed record World(DeliveryTests.Setup S, Guid Billing, Guid Specialist, Guid Order, Guid OrderLine, Guid Authorization);
 
     /// <summary>An order of 2,000 blocks at 50.00 and an ACTIVE authorization for 1,000 blocks / 50,000.00.</summary>
-    private static async Task<World> WorldAsync(TestHarness h, DateOnly? validUntil = null)
+    internal static async Task<World> WorldAsync(TestHarness h, DateOnly? validUntil = null)
     {
         var s = await DeliveryTests.SetupAsync(h);
         var actors = await h.FiscalActorsAsync();
@@ -38,13 +38,13 @@ public sealed class ExemptInvoiceTests(PostgresFixture postgres)
         return new World(s, billing, specialist, order, orderLine, authorization);
     }
 
-    private static async Task<Guid> DeliveredAsync(TestHarness h, World w, decimal quantity, string key)
+    internal static async Task<Guid> DeliveredAsync(TestHarness h, World w, decimal quantity, string key)
         => (await DeliveryTests.DispatchAsync(h, w.S, w.Order, w.OrderLine, quantity, own: false, key)).Line;
 
-    private static Task<CommandResult> Create(TestHarness h, World w, Guid deliveryLine, string key, bool exempt = true)
+    internal static Task<CommandResult> Create(TestHarness h, World w, Guid deliveryLine, string key, bool exempt = true)
         => h.RunAsync(new CreateInvoiceFromDeliveries(h.CompanyId, w.Billing, key, w.S.Customer, [deliveryLine], exempt ? w.Authorization : null), new CreateInvoiceFromDeliveriesHandler());
 
-    private static Task<CommandResult> Issue(TestHarness h, World w, Guid invoice, string key, Guid? session = null)
+    internal static Task<CommandResult> Issue(TestHarness h, World w, Guid invoice, string key, Guid? session = null)
         => h.RunAsync(new IssueInvoice(h.CompanyId, session ?? w.Billing, key, invoice, 1), new IssueInvoiceHandler());
 
     private static Task<string?> Consumed(TestHarness h, World w)
