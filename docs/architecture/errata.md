@@ -511,6 +511,19 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-17 | MFG-1 | HMI / PLC → Fuera de MFG-1: el resumen de turno es manual. El conteo de ciclos del HMI (Planta 3) se usa como referencia en MFG-2 (criterio B6: racks vs HMI ≤ 1 %) |
 | E-MFG1-18 | MFG-1 | Datos reales → Igual que E-VS1-2: ninguno hasta B-02 o un paralelo conciliado |
 | E-A02-2 | A-02 | The owner confirmed on 2026-09-29: Block Rochell is **Mediano** in the DGII classification and **already an authorised electronic issuer**. Hence e-CF only from 2026-11-01 (B-series valid to 2026-10-31), and under NG 02-2026 company customers no longer withhold 30 % ITBIS from our e-CF invoices. |
+| E-MFG1-01-1 | MFG1-01 | Like VS3-01: master data (machines, shifts, recipes, standard cost breakdown), roles, permissions, account roles, the CURADO location and the movement types; the documents (runs, shift summaries, racks, lots, collectors) arrive with their PRs. New schema `mfg`. |
+| E-MFG1-01-2 | MFG1-01 | The product × machine configuration lives in the recipe version (per product × machine): units per batch, per cycle and per rack, and the minimum and maximum curing hours; one approval flow (prepare ≠ approve). |
+| E-MFG1-01-3 | MFG1-01 | `md.machine`: plant, code, name, ACTIVE ⇄ INACTIVE, version + 1, never deleted; registered by the Gerente de planta on a screen. |
+| E-MFG1-01-4 | MFG1-01 | `mfg.shift`: plant, code, start and end time (may cross midnight), ACTIVE ⇄ INACTIVE; the business date is the start date (E-MFG1-15). |
+| E-MFG1-01-5 | MFG1-01 | Recipe lines: only on a DRAFT recipe, raw materials only, no repeated material, quantity > 0 in the material's base UoM; one ACTIVE recipe per product × machine. |
+| E-MFG1-01-6 | MFG1-01 | `md.standard_cost_version` gains `material_cost` and `conversion_cost`: both NULL (VS#3 standards) or material + conversion = unit cost; new `md.standard_cost_material` (material, standard quantity per unit, standard price), filled only while DRAFT. |
+| E-MFG1-01-7 | MFG1-01 | `md.location.is_curing`: one per plant, code CURADO, created by the first production (like TRANSITO); dispatch and the sales location list exclude it from MFG1-04. |
+| E-MFG1-01-8 | MFG1-01 | Movement types `PRODUCTION_ISSUE` (negative quantity and value) and `PRODUCTION_RECEIPT` (positive); the CHECKs compare text. |
+| E-MFG1-01-9 | MFG1-01 | Account roles WIP (control, new subledger `WIP` per cost collector), CONVERSION_ABSORPTION, MATERIAL_PRICE_VARIANCE, PRODUCTION_SCRAP, STANDARD_REVALUATION; seeded unmapped (A-01). |
+| E-MFG1-01-10 | MFG1-01 | Ten permissions (108 in total): `production_master:manage`, `recipe:approve`, `shift_summary:post`, `fg_lot:scrap` → GERENTE_PLANTA; `recipe:prepare`, `production_run:manage`, `shift_summary:record` → SUPERVISOR_PRODUCCION; `fg_lot:release` → CALIDAD; `cost_collector:settle` → CONTROLLER; `production:read` → the three new roles, Controller, Auditor, Director. |
+| E-MFG1-01-11 | MFG1-01 | Four SoD rules (40 in total): recipe prepare ≠ approve; shift summary record ≠ post; shift summary record ≠ lot release; collector settle ≠ standard cost approve. |
+| E-MFG1-01-12 | MFG1-01 | Posting rules, the PRODUCTION policy, OP-DAY and COST-SET arrive with their PRs (MFG1-03…05). |
+| E-MFG1-01-13 | MFG1-01 | Migration 0048. |
 
 Implementation rules derived from the above (no architectural change):
 
