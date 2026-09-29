@@ -688,6 +688,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-QUO1-02-10 | QUO1-02 | Queries with `sales:read`: list (status, customer, expired only), detail (lines with list and quoted price and the special flag, approval, history, order, copies), print (issuer, customer, lines with informative ITBIS at the quote date's rule, totals, validity, notes); "expired" is derived. |
 | E-QUO1-02-11 | QUO1-02 | 9 commands under `/sales/`, 3 queries under `/sales/quotes`; 162 command endpoints. |
 | E-QUO1-02-12 | QUO1-02 | Error codes `QUOTE_NOT_FOUND`, `QUOTE_INVALID_STATE`, `QUOTE_VERSION_CONFLICT`, `QUOTE_VALIDITY_INVALID`, `QUOTE_NOTHING_TO_APPROVE`, `QUOTE_PRICE_APPROVAL_REQUIRED`, `QUOTE_SAME_PERSON`, `QUOTE_REASON_REQUIRED`, `QUOTE_EXPIRED`. |
+| E-QUO1-03-1 | QUO1-03 | `ConvertQuote` with `quote:manage`, no step-up; returns the order created. |
+| E-QUO1-03-2 | QUO1-03 | A SENT quote, not expired (`QUOTE_EXPIRED`), of an ACTIVE customer (`CUSTOMER_NOT_ACTIVE`, E-QUO1-1). |
+| E-QUO1-03-3 | QUO1-03 | A DRAFT `PV-…` with the quote's plant, term, site and customer reference (as the customer PO), its quantities and quoted prices, its price list version and `quote_id`; the quote becomes CONVERTED with the order in the same transaction. |
+| E-QUO1-03-4 | QUO1-03 | Editing an order that came from a quote keeps the quoted price of each quoted (item, unit), whatever the quantity; only new items take the list in force; orders without a quote are unchanged. |
+| E-QUO1-03-5 | QUO1-03 | The order follows its own flow (`SubmitForCredit`). |
+| E-QUO1-03-6 | QUO1-03 | A cancelled order leaves the quote CONVERTED; to quote again, copy it. |
+| E-QUO1-03-7 | QUO1-03 | The quote is locked before the order is numbered; the unique `quote_id` keeps one order (QUO-06). |
+| E-QUO1-03-8 | QUO1-03 | Order list and detail carry `quoteId` and `quoteNo`; the quote detail shows the order. |
+| E-QUO1-03-9 | QUO1-03 | Events `QuoteConverted` and `SalesOrderCreated` (now with `quoteId`). |
+| E-QUO1-03-10 | QUO1-03 | No migration; tests QUO-04, QUO-05, QUO-06 and the kept quoted price. |
 
 Implementation rules derived from the above (no architectural change):
 

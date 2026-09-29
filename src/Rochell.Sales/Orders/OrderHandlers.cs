@@ -43,9 +43,13 @@ internal static class Orders
         return new Header(plantId, t, s, requested, SalesSql.Optional(poRef, 60, "The customer's PO reference"));
     }
 
-    /// <summary>E-VS3-03-5: prices from the list in force for (item, unit); a missing price refuses the order.</summary>
+    /// <summary>
+    /// E-VS3-03-5: prices from the list in force for (item, unit); a missing price refuses the order. E-QUO1-03-4: an (item, unit) of
+    /// the quote an order came from keeps its quoted price in <paramref name="quoted"/>.
+    /// </summary>
     public static async Task<(Guid PriceListVersionId, List<PricedLine> Lines, decimal Total)> PriceAsync(
-        CommandContext context, Guid plantId, IReadOnlyList<SalesOrderLineInput>? input, CancellationToken cancellationToken)
+        CommandContext context, Guid plantId, IReadOnlyList<SalesOrderLineInput>? input, CancellationToken cancellationToken,
+        IReadOnlyDictionary<(Guid ItemId, string Uom), decimal>? quoted = null)
     {
         var lines = input ?? [];
         if (lines.Count == 0)
@@ -76,10 +80,12 @@ internal static class Orders
                 throw new DomainException(SalesErrors.AmountInvalid, "Quantities are positive with at most 6 decimals.");
             }
 
-            var price = await SalesSql.ScalarAsync<decimal?>(
-                context, "SELECT unit_price FROM sal.price_list_line WHERE price_list_version_id = @l AND item_id = @i AND uom = @u", cancellationToken,
-                ("l", list), ("i", line.ItemId), ("u", uom)).ConfigureAwait(false)
-                ?? throw new DomainException(OrderErrors.PriceMissing, $"The price list in force has no price for item {line.ItemId} in {uom}.");
+            var price = quoted is not null && quoted.TryGetValue((line.ItemId, uom), out var quotedPrice)
+                ? quotedPrice
+                : await SalesSql.ScalarAsync<decimal?>(
+                    context, "SELECT unit_price FROM sal.price_list_line WHERE price_list_version_id = @l AND item_id = @i AND uom = @u", cancellationToken,
+                    ("l", list), ("i", line.ItemId), ("u", uom)).ConfigureAwait(false)
+                  ?? throw new DomainException(OrderErrors.PriceMissing, $"The price list in force has no price for item {line.ItemId} in {uom}.");
             var net = decimal.Round(line.Quantity * price, 2, MidpointRounding.AwayFromZero);
             if (net <= 0m)
             {
@@ -90,6 +96,83 @@ internal static class Orders
         }
 
         return (list, priced, priced.Sum(l => l.Net));
+    }
+
+    /// <summary>E-QUO1-03-4: the quoted price of each (item, unit) of the quote the order came from (empty for an order without one).</summary>
+    public static async Task<Dictionary<(Guid ItemId, string Uom), decimal>> QuotedPricesAsync(CommandContext context, Guid orderId, CancellationToken cancellationToken)
+    {
+        var rows = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT l.item_id, l.uom, l.unit_price
+            FROM sal.sales_order o JOIN sal.quote q ON q.quote_id = o.quote_id JOIN sal.quote_line l ON l.quote_id = q.quote_id AND l.lines_version = q.lines_version
+            WHERE o.sales_order_id = @o
+            """,
+            r => (Key: (r.GetGuid(0), r.GetString(1)), Price: r.GetDecimal(2)),
+            cancellationToken,
+            ("o", orderId)).ConfigureAwait(false);
+        return rows.ToDictionary(r => r.Key, r => r.Price);
+    }
+
+    /// <summary>Creates a DRAFT order PV-… (numbered under a lock) with its lines, event and state history; <paramref name="quoteId"/> links a converted quote.</summary>
+    public static async Task<string> InsertAsync(
+        CommandContext context, Guid orderId, Guid partyId, Header header, Guid priceList, List<PricedLine> lines, decimal total, Guid? quoteId, string commandType,
+        CancellationToken cancellationToken)
+    {
+        var creator = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
+        await SalesSql.LockAsync(context, "sales-order-no", cancellationToken).ConfigureAwait(false);
+        var last = await SalesSql.ScalarAsync<int?>(
+            context, "SELECT max(substring(order_no from 4)::int) FROM sal.sales_order WHERE company_id = @c", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false) ?? 0;
+        var orderNo = "PV-" + (last + 1).ToString("D6", CultureInfo.InvariantCulture);
+        var today = SalesSql.Today(context);
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(
+                "SalesOrderCreated",
+                1,
+                Aggregate,
+                orderId,
+                1,
+                JsonSerializer.Serialize(new
+                {
+                    salesOrderId = orderId,
+                    orderNo,
+                    partyId,
+                    plantId = header.PlantId,
+                    deliveryTermCode = header.Term,
+                    priceListVersionId = priceList,
+                    quoteId,
+                    totalNet = M(total),
+                    lines = lines.Select(l => new { itemId = l.ItemId, uom = l.Uom, quantity = M(l.Quantity), unitPrice = M(l.UnitPrice), net = M(l.Net) }),
+                }),
+                Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO sal.sales_order (sales_order_id, company_id, order_no, party_id, plant_id, order_date, delivery_term_code, site_address, requested_date, customer_po_ref,
+              price_list_version_id, status, total_net, lines_version, created_by, version, quote_id)
+            VALUES (@id, @c, @no, @p, @plant, @date, @term, @site, @req, @po, @list, 'DRAFT', @total, 1, @by, 1, @quote)
+            """,
+            cancellationToken,
+            ("id", orderId),
+            ("c", context.CompanyId),
+            ("no", orderNo),
+            ("p", partyId),
+            ("plant", header.PlantId),
+            ("date", today),
+            ("term", header.Term),
+            ("site", header.Site),
+            ("req", header.Requested),
+            ("po", header.PoRef),
+            ("list", priceList),
+            ("total", total),
+            ("by", creator),
+            ("quote", quoteId)).ConfigureAwait(false);
+        await WriteLinesAsync(context, orderId, 1, lines, cancellationToken).ConfigureAwait(false);
+        await context.AppendStateAsync(Aggregate, orderId, "DOCUMENT", null, "DRAFT", commandType, eventId, cancellationToken).ConfigureAwait(false);
+        return orderNo;
     }
 
     public static async Task WriteLinesAsync(CommandContext context, Guid orderId, int linesVersion, IEnumerable<PricedLine> lines, CancellationToken cancellationToken)
@@ -218,56 +301,7 @@ public sealed class CreateSalesOrderHandler : ICommandHandler<CreateSalesOrder>
         }
 
         var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken).ConfigureAwait(false);
-        var creator = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        await SalesSql.LockAsync(context, "sales-order-no", cancellationToken).ConfigureAwait(false);
-        var last = await SalesSql.ScalarAsync<int?>(
-            context, "SELECT max(substring(order_no from 4)::int) FROM sal.sales_order WHERE company_id = @c", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false) ?? 0;
-        var orderNo = "PV-" + (last + 1).ToString("D6", CultureInfo.InvariantCulture);
-        var today = SalesSql.Today(context);
-        var eventId = await context.AppendEventAsync(
-            new EventDraft(
-                "SalesOrderCreated",
-                1,
-                Orders.Aggregate,
-                context.ResultRef,
-                1,
-                JsonSerializer.Serialize(new
-                {
-                    salesOrderId = context.ResultRef,
-                    orderNo,
-                    partyId = command.PartyId,
-                    plantId = header.PlantId,
-                    deliveryTermCode = header.Term,
-                    priceListVersionId = list,
-                    totalNet = Orders.M(total),
-                    lines = lines.Select(l => new { itemId = l.ItemId, uom = l.Uom, quantity = Orders.M(l.Quantity), unitPrice = Orders.M(l.UnitPrice), net = Orders.M(l.Net) }),
-                }),
-                Publish: true),
-            cancellationToken).ConfigureAwait(false);
-        await Sql.ExecuteAsync(
-            context.Connection,
-            context.Transaction,
-            """
-            INSERT INTO sal.sales_order (sales_order_id, company_id, order_no, party_id, plant_id, order_date, delivery_term_code, site_address, requested_date, customer_po_ref,
-              price_list_version_id, status, total_net, lines_version, created_by, version)
-            VALUES (@id, @c, @no, @p, @plant, @date, @term, @site, @req, @po, @list, 'DRAFT', @total, 1, @by, 1)
-            """,
-            cancellationToken,
-            ("id", context.ResultRef),
-            ("c", context.CompanyId),
-            ("no", orderNo),
-            ("p", command.PartyId),
-            ("plant", header.PlantId),
-            ("date", today),
-            ("term", header.Term),
-            ("site", header.Site),
-            ("req", header.Requested),
-            ("po", header.PoRef),
-            ("list", list),
-            ("total", total),
-            ("by", creator)).ConfigureAwait(false);
-        await Orders.WriteLinesAsync(context, context.ResultRef, 1, lines, cancellationToken).ConfigureAwait(false);
-        await context.AppendStateAsync(Orders.Aggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        var orderNo = await Orders.InsertAsync(context, context.ResultRef, command.PartyId, header, list, lines, total, null, CommandType, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.M(total), version = 1 });
     }
 }
@@ -288,7 +322,8 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
             throw new DomainException(SalesErrors.InvalidState, $"The order is {row.Status}; only a DRAFT changes.");
         }
 
-        var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken).ConfigureAwait(false);
+        var quoted = await Orders.QuotedPricesAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
+        var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
         var version = row.Version + 1;
         var linesVersion = row.LinesVersion + 1;
         await context.AppendEventAsync(

@@ -38,3 +38,6 @@ public sealed record CancelQuote(Guid CompanyId, Guid SessionId, string Idempote
 
 /// <summary>E-QUO1-02-9: a new DRAFT from any quote — same customer, header and quoted prices, list prices in force, a new validity.</summary>
 public sealed record CopyQuote(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid QuoteId, DateOnly ValidUntil) : ICommand;
+
+/// <summary>E-QUO1-03-1…3: a SENT, unexpired quote of an ACTIVE customer becomes one DRAFT order at its quoted prices (QUOTED_AS).</summary>
+public sealed record ConvertQuote(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid QuoteId, long ExpectedVersion) : ICommand;

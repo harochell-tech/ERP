@@ -12,24 +12,28 @@ namespace Rochell.Sales.Queries;
 public sealed record ListSalesOrders(
     Guid CompanyId, Guid SessionId, string? Status = null, Guid? PartyId = null, int Limit = 50, int Offset = 0, DateOnly? From = null, DateOnly? To = null) : IQuery;
 
+/// <param name="QuoteId">E-QUO1-03-8: the quote the order came from (QUOTED_AS), if any.</param>
 public sealed record SalesOrderSummary(
     Guid SalesOrderId, string OrderNo, DateOnly OrderDate, Guid PartyId, string CustomerName, string PlantCode, string DeliveryTermCode, decimal TotalNet, string Status,
-    string? CreatedBy, long Version);
+    string? CreatedBy, long Version, Guid? QuoteId, string? QuoteNo);
 
 public sealed record SalesOrderList(IReadOnlyList<SalesOrderSummary> Items, int Limit, int Offset);
 
 internal static class OrderReading
 {
     public const string Select = """
-        SELECT o.sales_order_id, o.order_no, o.order_date, o.party_id, p.legal_name, pl.code, o.delivery_term_code, o.total_net::numeric(19,2), o.status, u.email, o.version
+        SELECT o.sales_order_id, o.order_no, o.order_date, o.party_id, p.legal_name, pl.code, o.delivery_term_code, o.total_net::numeric(19,2), o.status, u.email, o.version,
+               o.quote_id, q.quote_no
         FROM sal.sales_order o
         JOIN md.party p ON p.party_id = o.party_id
         JOIN md.plant pl ON pl.plant_id = o.plant_id
         JOIN iam.user u ON u.user_id = o.created_by
+        LEFT JOIN sal.quote q ON q.quote_id = o.quote_id
         """;
 
     public static SalesOrderSummary Map(System.Data.Common.DbDataReader r)
-        => new(r.GetGuid(0), r.GetString(1), r.Date(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetDecimal(7), r.GetString(8), r.NullableString(9), r.GetInt64(10));
+        => new(r.GetGuid(0), r.GetString(1), r.Date(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetDecimal(7), r.GetString(8), r.NullableString(9), r.GetInt64(10),
+            r.IsDBNull(11) ? null : r.GetGuid(11), r.NullableString(12));
 }
 
 [RequiresPermission("sales:read")]

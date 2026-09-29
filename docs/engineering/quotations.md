@@ -40,3 +40,13 @@ Queries (`sales:read`): `GET /sales/quotes` (status, customer, `expiredOnly`), `
 prices, the approval and whether it covers the current lines, history, order, copies), `/sales/quotes/{id}/print` (informative
 ITBIS with the SALES_ITBIS rule in force at the quote date; nothing is stored). "Expired" = SENT with `valid_until` before today,
 computed on read. Tests: `QuoteTests` (QUO-01, QUO-02, QUO-03, QUO-07).
+
+## QUO1-03 — conversion into a sales order (E-QUO1-03-1…10)
+
+`ConvertQuote` (`quote:manage`) locks a SENT, unexpired quote of an ACTIVE customer, creates the DRAFT order `PV-…` through the same
+insert as `CreateSalesOrder` (`Orders.InsertAsync`) with the quote's plant, term, site, customer reference (as the customer PO),
+price list version, quantities and quoted prices and `quote_id`, and marks the quote CONVERTED with `sales_order_id` in the same
+transaction. The command's result reference is the order. `UpdateSalesOrderDraft` keeps the quoted price of every (item, unit) of
+the order's quote (`Orders.QuotedPricesAsync`); new items take the list in force. A cancelled order leaves the quote CONVERTED.
+Order list and detail return `quoteId` / `quoteNo`. Two conversions at once: the second waits on the quote lock and fails with
+`QUOTE_VERSION_CONFLICT` (QUO-06). Tests: `QuoteTests` (QUO-04, QUO-05, QUO-06).

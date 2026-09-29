@@ -474,3 +474,56 @@ public sealed class CopyQuoteHandler : ICommandHandler<CopyQuote>
         return await Quotes.InsertAsync(context, source.PartyId, header, list, lines, total, command.QuoteId, CommandType, cancellationToken).ConfigureAwait(false);
     }
 }
+
+/// <summary>
+/// E-QUO1-03-1…9: locks the quote, creates the DRAFT order PV-… with its plant, term, site, customer reference (the order's customer PO)
+/// and the quoted quantities and prices, and marks the quote CONVERTED in the same transaction; the order's unique quote_id keeps it
+/// to one order even when two conversions race (QUO-06). The order then follows its own flow (SubmitForCredit).
+/// </summary>
+[RequiresPermission("quote:manage")]
+public sealed class ConvertQuoteHandler : ICommandHandler<ConvertQuote>
+{
+    public string CommandType => "Sales.ConvertQuote";
+
+    private sealed record Source(Guid PlantId, string Term, string? Site, string? CustomerRef, Guid PriceList, decimal Total);
+
+    public async Task<string> HandleAsync(ConvertQuote command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var row = await Quotes.LockAsync(context, command.QuoteId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
+        Quotes.RequireStatus(row, "SENT");
+        if (row.ValidUntil < SalesSql.Today(context))
+        {
+            throw new DomainException(QuoteErrors.Expired, $"The quote was valid until {row.ValidUntil:yyyy-MM-dd}; copy it with a new validity.");
+        }
+
+        var customer = await Orders.Orders.CustomerStatusAsync(context, row.PartyId, cancellationToken).ConfigureAwait(false);
+        if (customer != "ACTIVE")
+        {
+            throw new DomainException(OrderErrors.CustomerNotActive, $"The customer is {customer ?? "not a customer"}; activate it before converting (E-QUO1-1).");
+        }
+
+        var source = (await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT plant_id, delivery_term_code, site_address, customer_ref, price_list_version_id, total_net FROM sal.quote WHERE quote_id = @q",
+            r => new Source(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.NullableString(3), r.GetGuid(4), r.GetDecimal(5)),
+            cancellationToken,
+            ("q", row.QuoteId)).ConfigureAwait(false))!;
+        var lines = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT line_no, item_id, uom, quantity, unit_price, net_amount FROM sal.quote_line WHERE quote_id = @q AND lines_version = @v ORDER BY line_no",
+            r => new Orders.Orders.PricedLine(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5)),
+            cancellationToken,
+            ("q", row.QuoteId),
+            ("v", row.LinesVersion)).ConfigureAwait(false);
+        var header = new Orders.Orders.Header(source.PlantId, source.Term, source.Site, null, source.CustomerRef);
+        var orderId = context.ResultRef;
+        var orderNo = await Orders.Orders.InsertAsync(context, orderId, row.PartyId, header, source.PriceList, lines, source.Total, row.QuoteId, CommandType, cancellationToken)
+            .ConfigureAwait(false);
+        await Quotes.TransitionAsync(context, row, "CONVERTED", "QuoteConverted", CommandType, cancellationToken, null, ", sales_order_id = @o", ("o", orderId)).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { salesOrderId = orderId, orderNo, quoteId = row.QuoteId, quoteNo = row.QuoteNo, status = "CONVERTED", totalNet = Quotes.M(source.Total) });
+    }
+}
