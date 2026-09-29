@@ -1,0 +1,16 @@
+code,name,is_control
+1102,Banco de cobros (STAGING),true
+1105,Efectivo y cheques en tránsito,true
+1210,Cuentas por cobrar a clientes,true
+1240,Activo de contrato,true
+1245,Cuentas por cobrar no facturadas,true
+1260,Retenciones de clientes por cobrar,false
+1350,Inventario de producto terminado,true
+1351,Producto terminado en tránsito,true
+2120,Cobros no aplicados,true
+2150,ITBIS por pagar,false
+3990,Contrapartida de migración,false
+4105,Ventas de producto terminado,false
+4190,Descuentos en ventas,false
+5105,Costo de ventas,false
+6900,Pérdidas en tránsito,false

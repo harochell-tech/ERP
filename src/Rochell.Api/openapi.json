@@ -16318,6 +16318,72 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/sales/bank-accounts": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "operationId": "ListSalesBankAccounts",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesBankAccountList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/sales/customers": {
       "get": {
         "tags": [
@@ -20168,6 +20234,91 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MatchSuggestions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/treasury/bank-statement-lines/{lineId}/receipt-candidates": {
+      "get": {
+        "tags": [
+          "Treasury"
+        ],
+        "operationId": "ListReceiptCandidates",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "lineId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptCandidates"
                 }
               }
             }
@@ -25760,7 +25911,8 @@
           "fiscalRecord",
           "history",
           "creditNotes",
-          "creditable"
+          "creditable",
+          "withholdings"
         ],
         "type": "object",
         "properties": {
@@ -25818,6 +25970,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CreditableLine"
+            }
+          },
+          "withholdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceWithholdingView"
             }
           }
         },
@@ -26077,6 +26235,54 @@
               "string"
             ],
             "format": "decimal"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvoiceWithholdingView": {
+        "required": [
+          "withholdingId",
+          "kind",
+          "amount",
+          "withholdingDate",
+          "certificateNo",
+          "status",
+          "reversalReason",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "withholdingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "withholdingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "certificateNo": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reversalReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "version": {
             "type": "integer",
@@ -28994,6 +29200,97 @@
         },
         "additionalProperties": false
       },
+      "ReceiptCandidate": {
+        "required": [
+          "kind",
+          "receiptId",
+          "depositId",
+          "number",
+          "customerName",
+          "date",
+          "amount",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "receiptId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "depositId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReceiptCandidates": {
+        "required": [
+          "lineId",
+          "lineVersion",
+          "direction",
+          "valueDate",
+          "amount",
+          "candidates"
+        ],
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lineVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "valueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptCandidate"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "ReceiptCorrectionList": {
         "required": [
           "items",
@@ -30811,6 +31108,42 @@
               "string"
             ],
             "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesBankAccountList": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesBankAccountView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesBankAccountView": {
+        "required": [
+          "bankAccountId",
+          "bankCode",
+          "accountNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "bankAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bankCode": {
+            "type": "string"
+          },
+          "accountNumber": {
+            "type": "string"
           }
         },
         "additionalProperties": false

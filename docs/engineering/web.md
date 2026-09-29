@@ -110,6 +110,32 @@ Lista de precios, Vehículos y choferes; **Contabilidad** adds Apertura de inven
 The screens never add or multiply amounts or quantities: ordered and delivered are shown side by side and the server refuses
 what exceeds the open quantity. `lib/sales.ts` holds the pure helpers (base64 of the opening file, the next dispatch step).
 
+## Billing, receipts and the sales journey (VS3-10b, E-VS3-10-6…14)
+
+Menu **Facturación** (Por facturar, Facturas, Notas de crédito), **Cobros** (Recibos, Depósitos); **Ventas** adds Antigüedad de
+CxC and Estado de cuenta. Receipts and deposits pick the company account from `GET /sales/bank-accounts` (masked, `sales:read`,
+E-VS3-10-14); the treasurer matches receipts from the reconciliation screen with `GET /treasury/bank-statement-lines/{id}/receipt-candidates`
+(`bank:read`, E-VS3-10-8).
+
+| Page | What it does |
+| --- | --- |
+| `/facturacion/por-facturar/` | Delivered lines not invoiced, by customer; pick lines and create a DRAFT invoice (`invoice:create`) |
+| `/facturacion/facturas/`, `/facturacion/factura/?id=` | Filters by status; issue with the e-CF type (step-up); fiscal package with copy buttons; record the e-CF (`fiscal_document:record`, totals typed from the portal, XML hashed); void a never-fiscalized invoice (`invoice:void`); credit note per line with what remains (`credit_note:create`); customer withholdings recorded (`customer_withholding:record`) and reversed (`customer_withholding:reverse`) |
+| `/facturacion/notas/`, `/facturacion/nota/?id=` | Issue (`credit_note:issue`, step-up, not the invoice's issuer); fiscal package with the modified e-NCF; record the e-CF 34 |
+| `/cobros/recibos/`, `/cobros/recibos/nuevo/`, `/cobros/recibo/?id=` | Filters; record by method (`receipt:record`); apply one amount per open invoice of the customer (`receipt:apply`); unapply a whole application with a reason; reverse (`receipt:reverse`, step-up) |
+| `/cobros/depositos/`, `/cobros/deposito/?id=` | Pick cheques and cash in transit and the account, deposit (`receipt:deposit`); slip detail |
+| `/ventas/antiguedad/`, `/ventas/estado-de-cuenta/?cliente=` | AR aging by the CREDIT buckets and the statement of account, each with its CSV |
+| `/tesoreria/conciliacion/` | "Buscar cobros" on an unmatched line: match a transfer or a deposit (CREDIT) or a bounced cheque (DEBIT); "Cheque devuelto" marks a deposited cheque bounced (`receipt:bounce`, step-up) and matches the line |
+
+Inicio counts orders pending credit, deliveries in transit, invoices with a pending e-CF and unapplied receipts (E-VS3-10-9). The
+invoice detail lists its withholdings (`withholdings`) so they can be reversed. `components/Ecf.tsx` holds the copy field and the
+e-CF form shared by invoices and credit notes.
+
+The dev stack seeds VS#3 (`tests/Rochell.DevStack/SalesSeed.cs`): sales maps, rules and policies, SALES_ITBIS, BLOQUE-6 with cost,
+opening stock and price, the customer Constructora Uno, a truck and a driver, a second account TEST_BANK ••••4321 for receipts
+and one user per VS#3 role. `web/e2e/sales-journey.spec.ts` is E2E-S1 through the UI: order → delivery on our truck (gate and
+POD) → invoice → e-CF → transfer receipt → application → statement → match, BANK-GL 0.00.
+
 ## Local development (E-PR18b-9)
 
 `tests/Rochell.DevStack` starts PostgreSQL 17 in Docker, applies every migration, seeds a company from the test fixtures

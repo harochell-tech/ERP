@@ -75,9 +75,12 @@ public sealed record ExternalFiscalRecordView(string Encf, DateTime IssuedAt, st
 /// <summary>E-VS3-06-10: what each invoice line can still credit (net of CONFIRMED credit notes).</summary>
 public sealed record CreditableLine(Guid InvoiceLineId, int LineNo, string ItemCode, decimal NetAmount, decimal Rate, decimal CreditedNet, decimal RemainingNet);
 
+/// <summary>E-VS3-07-7: a withholding the customer made on the invoice (the Controller reverses it from the invoice's page, VS3-10b).</summary>
+public sealed record InvoiceWithholdingView(Guid WithholdingId, string Kind, decimal Amount, DateOnly WithholdingDate, string CertificateNo, string Status, string? ReversalReason, long Version);
+
 public sealed record InvoiceDetail(
     InvoiceSummary Header, string? VoidReason, string? IssuedBy, Guid? PostingEventId, IReadOnlyList<InvoiceLineView> Lines, ExternalFiscalRecordView? FiscalRecord, IReadOnlyList<StateChange> History,
-    IReadOnlyList<CreditNoteSummary> CreditNotes, IReadOnlyList<CreditableLine> Creditable);
+    IReadOnlyList<CreditNoteSummary> CreditNotes, IReadOnlyList<CreditableLine> Creditable, IReadOnlyList<InvoiceWithholdingView> Withholdings);
 
 internal static class InvoiceLines
 {
@@ -148,7 +151,17 @@ public sealed class GetInvoiceHandler : IQueryHandler<GetInvoice>
             r => new CreditableLine(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), r.GetDecimal(6)),
             cancellationToken,
             ("i", query.InvoiceId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new InvoiceDetail(header, extra.VoidReason, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, notes, creditable));
+        var withholdings = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT withholding_id, kind, amount::numeric(19,2), withholding_date, certificate_no, status, reversal_reason, version
+            FROM fin.customer_withholding WHERE invoice_id = @i ORDER BY withholding_date, certificate_no
+            """,
+            r => new InvoiceWithholdingView(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.Date(3), r.GetString(4), r.GetString(5), r.NullableString(6), r.GetInt64(7)),
+            cancellationToken,
+            ("i", query.InvoiceId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new InvoiceDetail(header, extra.VoidReason, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, notes, creditable, withholdings));
     }
 }
 

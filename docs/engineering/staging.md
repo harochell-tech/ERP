@@ -160,3 +160,10 @@ a copy of `compose.yaml` and a dummy `.env`.
 The stack was rehearsed locally with the built image: migrations, `init-environment TEST`, logins, `create-company`, API behind
 Caddy (local certificate for `localhost`; the OIDC redirect came out `https://…/api/v1/auth/callback`), digest service started
 against RustFS standing in for B2, and the backup encryption round trip (`openssl cms` encrypt/decrypt, identical dump).
+
+## VS#3 on staging (E-VS3-10-11)
+
+After deploying VS#3, run `deploy/staging/seed-vs3.sh` on the VPS: test identities for Vendedor, Crédito, Despacho, Facturación
+(two, for the credit note's four eyes) and Cobros, and the sales accounts with DRAFT maps (`seed/accounts-vs3.csv`,
+`seed/account-map-vs3.csv`). Then, as the Controller in the UI: approve the maps and the sales posting rules, prepare CREDIT and
+REVENUE_ACCOUNTING (approved by the Aprobador de políticas) and register the receipts' bank account (GL 1102). Synthetic data only.

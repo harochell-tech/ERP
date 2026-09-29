@@ -2331,6 +2331,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/bank-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListSalesBankAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/customers": {
         parameters: {
             query?: never;
@@ -3043,6 +3059,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["SuggestBankMatches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/bank-statement-lines/{lineId}/receipt-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListReceiptCandidates"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4524,6 +4556,7 @@ export interface components {
             history: components["schemas"]["StateChange"][];
             creditNotes: components["schemas"]["CreditNoteSummary"][];
             creditable: components["schemas"]["CreditableLine"][];
+            withholdings: components["schemas"]["InvoiceWithholdingView"][];
         };
         InvoiceFiscalPackage: {
             invoiceNo: string;
@@ -4596,6 +4629,20 @@ export interface components {
             total: null | string;
             /** Format: decimal */
             openAmount: null | string;
+            /** Format: int64 */
+            version: number;
+        };
+        InvoiceWithholdingView: {
+            /** Format: uuid */
+            withholdingId: string;
+            kind: string;
+            /** Format: decimal */
+            amount: string;
+            /** Format: date */
+            withholdingDate: string;
+            certificateNo: string;
+            status: string;
+            reversalReason: null | string;
             /** Format: int64 */
             version: number;
         };
@@ -5410,6 +5457,31 @@ export interface components {
             reversesApplicationId: null | string;
             live: boolean;
         };
+        ReceiptCandidate: {
+            kind: string;
+            /** Format: uuid */
+            receiptId: null | string;
+            /** Format: uuid */
+            depositId: null | string;
+            number: string;
+            customerName: null | string;
+            /** Format: date */
+            date: string;
+            amount: string;
+            /** Format: int64 */
+            version: number;
+        };
+        ReceiptCandidates: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: int64 */
+            lineVersion: number;
+            direction: string;
+            /** Format: date */
+            valueDate: string;
+            amount: string;
+            candidates: components["schemas"]["ReceiptCandidate"][];
+        };
         ReceiptCorrectionList: {
             items: components["schemas"]["ReceiptCorrectionView"][];
             /** Format: int32 */
@@ -5908,6 +5980,15 @@ export interface components {
             reconCodes?: null | string[];
             /** Format: date */
             cutoffDate?: null | string;
+        };
+        SalesBankAccountList: {
+            items: components["schemas"]["SalesBankAccountView"][];
+        };
+        SalesBankAccountView: {
+            /** Format: uuid */
+            bankAccountId: string;
+            bankCode: string;
+            accountNumber: string;
         };
         SalesLocationView: {
             /** Format: uuid */
@@ -16894,6 +16975,55 @@ export interface operations {
             };
         };
     };
+    ListSalesBankAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesBankAccountList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListCustomers: {
         parameters: {
             query?: {
@@ -19339,6 +19469,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchSuggestions"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListReceiptCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                lineId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptCandidates"];
                 };
             };
             /** @description Bad Request */

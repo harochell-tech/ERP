@@ -40,9 +40,26 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/ventas/pedidos/", label: "Pedidos", permission: "sales:read" },
       { href: "/ventas/clientes/", label: "Clientes", permission: "sales:read" },
+      { href: "/ventas/antiguedad/", label: "Antigüedad de CxC", permission: "sales:read" },
+      { href: "/ventas/estado-de-cuenta/", label: "Estado de cuenta", permission: "sales:read" },
     ],
   },
   { title: "Despacho", items: [{ href: "/despacho/tablero/", label: "Tablero de despacho", permission: "sales:read" }] },
+  {
+    title: "Facturación",
+    items: [
+      { href: "/facturacion/por-facturar/", label: "Por facturar", permission: "sales:read" },
+      { href: "/facturacion/facturas/", label: "Facturas", permission: "sales:read" },
+      { href: "/facturacion/notas/", label: "Notas de crédito", permission: "sales:read" },
+    ],
+  },
+  {
+    title: "Cobros",
+    items: [
+      { href: "/cobros/recibos/", label: "Recibos", permission: "sales:read" },
+      { href: "/cobros/depositos/", label: "Depósitos", permission: "sales:read" },
+    ],
+  },
   { title: "Compras", items: [{ href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" }] },
   {
     title: "Almacén",
@@ -126,6 +143,10 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/despacho/conduce/": "/despacho/tablero/",
   "/despacho/planificar/": "/despacho/tablero/",
   "/contabilidad/apertura-lote/": "/contabilidad/apertura/",
+  "/facturacion/factura/": "/facturacion/facturas/",
+  "/facturacion/nota/": "/facturacion/notas/",
+  "/cobros/recibo/": "/cobros/recibos/",
+  "/cobros/deposito/": "/cobros/depositos/",
 };
 
 function isActive(pathname: string, href: string): boolean {

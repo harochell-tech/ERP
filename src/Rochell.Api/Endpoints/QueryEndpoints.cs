@@ -43,7 +43,7 @@ public static class QueryEndpoints
         typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
-        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler),
+        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
@@ -51,7 +51,7 @@ public static class QueryEndpoints
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
-        typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler),
+        typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
         typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
@@ -108,6 +108,9 @@ public static class QueryEndpoints
         sales.MapGet("/plants", (HttpContext http, Guid companyId, ListSalesPlantsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListSalesPlants(companyId, s), handler, ct))
             .Describe<SalesPlantList>(nameof(ListSalesPlants));
+        sales.MapGet("/bank-accounts", (HttpContext http, Guid companyId, ListSalesBankAccountsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListSalesBankAccounts(companyId, s), handler, ct))
+            .Describe<SalesBankAccountList>(nameof(ListSalesBankAccounts));
         sales.MapGet("/customers", (HttpContext http, Guid companyId, string? status, string? search, int? limit, int? offset, ListCustomersHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListCustomers(companyId, s, status, search, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<CustomerList>(nameof(ListCustomers));
@@ -253,6 +256,9 @@ public static class QueryEndpoints
         treasury.MapGet("/bank-statements/{statementId:guid}/match-suggestions", (HttpContext http, Guid companyId, Guid statementId, SuggestBankMatchesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new SuggestBankMatches(companyId, s, statementId), handler, ct))
             .Describe<MatchSuggestions>(nameof(SuggestBankMatches), notFound: true);
+        treasury.MapGet("/bank-statement-lines/{lineId:guid}/receipt-candidates", (HttpContext http, Guid companyId, Guid lineId, ListReceiptCandidatesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListReceiptCandidates(companyId, s, lineId), handler, ct))
+            .Describe<ReceiptCandidates>(nameof(ListReceiptCandidates), notFound: true);
         treasury.MapGet("/ap-aging", (HttpContext http, Guid companyId, DateOnly? asOf, GetApAgingHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetApAging(companyId, s, asOf), handler, ct))
             .Describe<ApAging>(nameof(GetApAging));
