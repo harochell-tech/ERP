@@ -16,7 +16,7 @@ public static class ReconciliationErrors
     public const string ReasonRequired = "REASON_REQUIRED";
 }
 
-/// <summary>Close components of VS#1 (Frozen Baseline §11.7) and BANK-REC of VS#2 (E-VS2-06-7).</summary>
+/// <summary>Close components of VS#1 (Frozen Baseline §11.7), BANK-REC of VS#2 (E-VS2-06-7), the FIN-1 and VS#3 ones and OP-DAY / COST-SET of MFG-1.</summary>
 public static class Components
 {
     public const string InventoryMovements = "INV-MOV";
@@ -26,5 +26,10 @@ public static class Components
     public const string TaxAccruals = "ACR-TAX";
     public const string AccountsReceivable = "AR-REC";
 
-    public static bool IsKnown(string component) => component is InventoryMovements or AccountsPayable or BankReconciliation or Accruals or TaxAccruals or AccountsReceivable;
+    /// <summary>E-MFG1-16: the production day (all shift summaries posted) and the cost settlement (collectors settled).</summary>
+    public const string ProductionDay = "OP-DAY";
+    public const string CostSettlement = "COST-SET";
+
+    public static bool IsKnown(string component)
+        => component is InventoryMovements or AccountsPayable or BankReconciliation or Accruals or TaxAccruals or AccountsReceivable or ProductionDay or CostSettlement;
 }

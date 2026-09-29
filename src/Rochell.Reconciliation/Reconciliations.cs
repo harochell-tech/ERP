@@ -27,7 +27,8 @@ public static class Reconciliations
 {
     public static IReadOnlyList<string> All { get; } =
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
-         "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN"];
+         "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
+         "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -406,6 +407,80 @@ public static class Reconciliations
             FROM log.delivery WHERE company_id = @c AND status = 'IN_TRANSIT' AND gate_out_at < @asOf - make_interval(hours => @hours)) f
             """,
             null),
+        ["WIP-GL"] = (
+            Findings + """
+            -- E-MFG1-05-4: WIP by collector in the GL = consumption of posted summaries − their material standard − settled variances.
+            WITH g AS (SELECT subledger_ref AS col, sum(debit - credit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_role = 'WIP' GROUP BY 1),
+                 s AS (SELECT r.collector_id AS col, sum(ci.value) AS cons
+                       FROM mfg.consumption_issue ci JOIN mfg.shift_summary ss ON ss.summary_id = ci.summary_id JOIN mfg.production_run r ON r.run_id = ss.run_id
+                       WHERE ss.company_id = @c AND ss.status = 'POSTED' GROUP BY 1),
+                 m AS (SELECT r.collector_id AS col, sum(round(ss.good_units * c.material_cost, 2)) AS std
+                       FROM mfg.shift_summary ss JOIN mfg.production_run r ON r.run_id = ss.run_id JOIN md.standard_cost_version c ON c.cost_version_id = r.cost_version_id
+                       WHERE ss.company_id = @c AND ss.status = 'POSTED' GROUP BY 1),
+                 k AS (SELECT collector_id AS col, coalesce(usage_variance, 0) + coalesce(price_variance, 0) AS settled FROM mfg.cost_collector WHERE company_id = @c),
+                 a AS (SELECT k.col, coalesce(s.cons, 0) - coalesce(m.std, 0) - k.settled AS a FROM k LEFT JOIN s ON s.col = k.col LEFT JOIN m ON m.col = k.col)
+            SELECT 'collector:' || coalesce(a.col, g.col)::text AS match_key, coalesce(a.a, 0) AS value_a, coalesce(g.b, 0) AS value_b,
+                   'WIP_GL_DIFFERENCE' AS classification, 'ERROR' AS severity, 'COST-SET' AS component
+            FROM a FULL JOIN g ON g.col = a.col WHERE coalesce(a.a, 0) <> coalesce(g.b, 0)) f
+            """,
+            """
+            SELECT (SELECT coalesce(sum(ci.value), 0) FROM mfg.consumption_issue ci JOIN mfg.shift_summary ss ON ss.summary_id = ci.summary_id WHERE ss.company_id = @c AND ss.status = 'POSTED')
+                   - (SELECT coalesce(sum(round(ss.good_units * c.material_cost, 2)), 0) FROM mfg.shift_summary ss JOIN mfg.production_run r ON r.run_id = ss.run_id
+                      JOIN md.standard_cost_version c ON c.cost_version_id = r.cost_version_id WHERE ss.company_id = @c AND ss.status = 'POSTED')
+                   - (SELECT coalesce(sum(coalesce(usage_variance, 0) + coalesce(price_variance, 0)), 0) FROM mfg.cost_collector WHERE company_id = @c),
+                   (SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role = 'WIP')
+            """),
+        ["WIP-OPEN"] = (
+            Findings + """
+            -- E-MFG1-05-4: collectors of months ended by the cutoff that are not settled.
+            SELECT 'collector:' || collector_id::text AS match_key, NULL::numeric AS value_a, NULL::numeric AS value_b,
+                   'COLLECTOR_NOT_SETTLED' AS classification, 'ERROR' AS severity, 'COST-SET' AS component
+            FROM mfg.cost_collector WHERE company_id = @c AND status = 'OPEN' AND (period_month + interval '1 month')::date <= @cutoff) f
+            """,
+            null),
+        ["SHIFT-OPEN"] = (
+            Findings + """
+            -- E-MFG1-05-4: runs up to the cutoff still IN_PROGRESS (blocks OP-DAY and COST-SET through rec.recon_blocking).
+            SELECT 'run:' || run_no AS match_key, NULL::numeric AS value_a, NULL::numeric AS value_b,
+                   'RUN_NOT_POSTED' AS classification, 'ERROR' AS severity, NULL::text AS component
+            FROM mfg.production_run WHERE company_id = @c AND status = 'IN_PROGRESS' AND business_date <= @cutoff) f
+            """,
+            null),
+        ["USAGE-TOLERANCE"] = (
+            Findings + """
+            -- E-MFG1-05-4/6: real consumption beyond usage_tolerance_pct of the theoretical (a warning).
+            SELECT 'run:' || r.run_no || '/' || i.code AS match_key, c.theoretical_qty AS value_a, c.qty AS value_b,
+                   'USAGE_OUT_OF_TOLERANCE' AS classification, 'WARNING' AS severity, NULL::text AS component
+            FROM mfg.material_consumption c
+            JOIN mfg.shift_summary ss ON ss.summary_id = c.summary_id AND ss.status = 'POSTED'
+            JOIN mfg.production_run r ON r.run_id = ss.run_id
+            JOIN md.item i ON i.item_id = c.material_item_id
+            WHERE c.company_id = @c AND c.theoretical_qty > 0 AND abs(c.qty - c.theoretical_qty) > @tol * c.theoretical_qty) f
+            """,
+            null),
+        ["CURING-OVERDUE"] = (
+            Findings + """
+            -- E-MFG1-05-4: lots still CURING after the maximum curing hours of their recipe (a warning).
+            SELECT 'lot:' || l.lot_code AS match_key, v.max_curing_hours::numeric AS value_a, round(extract(epoch FROM @asOf - f.curing_from) / 3600)::numeric AS value_b,
+                   'CURING_OVERDUE' AS classification, 'WARNING' AS severity, NULL::text AS component
+            FROM mfg.fg_lot f
+            JOIN inv.lot l ON l.lot_id = f.lot_id
+            JOIN mfg.production_run r ON r.run_id = f.run_id
+            JOIN mfg.recipe_version v ON v.recipe_version_id = r.recipe_version_id
+            WHERE f.company_id = @c AND f.status = 'CURING' AND f.curing_from + make_interval(hours => v.max_curing_hours) < @asOf) f
+            """,
+            null),
+        ["PRODUCTION-CLOSE-ORDER"] = (
+            Findings + """
+            -- E-MFG1-05-5: in a period with production, OP-DAY closes before COST-SET and COST-SET before INV-MOV.
+            SELECT s.component || ':' || p.period_id::text AS match_key, NULL::numeric AS value_a, NULL::numeric AS value_b,
+                   'CLOSE_ORDER' AS classification, 'ERROR' AS severity, CASE s.component WHEN 'OP-DAY' THEN 'COST-SET' ELSE 'INV-MOV' END AS component
+            FROM fin.period p
+            JOIN fin.close_component_state s ON s.period_id = p.period_id AND s.component IN ('OP-DAY', 'COST-SET') AND s.status <> 'CLOSED'
+            WHERE p.company_id = @c AND @cutoff BETWEEN p.starts_on AND p.ends_on
+              AND EXISTS (SELECT 1 FROM mfg.production_run r WHERE r.company_id = @c AND r.status <> 'CANCELLED' AND r.business_date BETWEEN p.starts_on AND p.ends_on)) f
+            """,
+            null),
         ["GRNI-AGING"] = (
             Findings + """
             SELECT l.po_line_id::text AS match_key, l.qty_received - l.qty_invoiced AS value_a,
@@ -461,6 +536,21 @@ public static class Reconciliations
                 }
             }
 
+            decimal? tolerance = null;
+            if (code == "USAGE-TOLERANCE")
+            {
+                tolerance = await PolicyDecimalAsync(context, asOf, "PRODUCTION", "usage_tolerance_pct", cancellationToken).ConfigureAwait(false);
+
+                // Without production there is nothing to compare, so the missing policy only fails a run that has posted consumption.
+                await using var posted = Sql.Command(
+                    context.Connection, context.Transaction, "SELECT EXISTS (SELECT 1 FROM mfg.shift_summary WHERE company_id = @c AND status = 'POSTED')", ("c", context.CompanyId));
+                if (tolerance is null && await posted.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
+                {
+                    runs.Add(await StoreAsync(context, runId, code, asOf, cutoff, "FAILED", null, null, [], cancellationToken).ConfigureAwait(false));
+                    continue;
+                }
+            }
+
             var unbilledDays = code == "CONTRACT-ASSET"
                 ? await PolicyIntegerAsync(context, asOf, "REVENUE_ACCOUNTING", "unbilled_aging_alert_days", cancellationToken).ConfigureAwait(false)
                 : null;
@@ -474,6 +564,7 @@ public static class Reconciliations
                 ("days", agingDays ?? 0),
                 ("hours", openHours ?? 0),
                 ("udays", unbilledDays),
+                ("tol", tolerance ?? 0m),
                 ("cutoff", cutoff ?? Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(asOf))))
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
@@ -548,6 +639,27 @@ public static class Reconciliations
         }
 
         return new ReconRun(runId, code, status, totalA, totalB, findings);
+    }
+
+    /// <summary>A DECIMAL_PERCENT parameter of a policy in force (a fraction); null without it.</summary>
+    private static async Task<decimal?> PolicyDecimalAsync(CommandContext context, DateTime asOf, string policy, string parameter, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT p.value #>> '{}' FROM acc.accounting_policy_version v
+            JOIN acc.accounting_policy_parameter p ON p.policy_version_id = v.policy_version_id
+            WHERE v.company_id = @c AND v.policy_code = @policy AND v.status = 'ACTIVE' AND p.param_code = @param
+              AND v.effective_from <= @d AND (v.effective_to IS NULL OR v.effective_to > @d)
+            """,
+            ("c", context.CompanyId),
+            ("policy", policy),
+            ("param", parameter),
+            ("d", Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(asOf)));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string value
+            ? decimal.Parse(value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture)
+            : null;
     }
 
     /// <summary>An INTEGER parameter of a policy in force (read directly: Reconciliation depends on Platform only); null without it.</summary>

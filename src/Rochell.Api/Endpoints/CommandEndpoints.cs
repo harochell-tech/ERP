@@ -8,6 +8,7 @@ using Rochell.Finance.Policies;
 using Rochell.Identity.RoleChanges;
 using Rochell.MasterData.BankAccounts;
 using Rochell.MasterData.Items;
+using Rochell.Manufacturing.Costing;
 using Rochell.Manufacturing.Lots;
 using Rochell.Manufacturing.Machines;
 using Rochell.Manufacturing.Recipes;
@@ -217,6 +218,7 @@ public static class CommandEndpoints
         manufacturing.MapCommand<BlockLot, BlockLotHandler>();
         manufacturing.MapCommand<UnblockLot, UnblockLotHandler>();
         manufacturing.MapCommand<ScrapLot, ScrapLotHandler>();
+        manufacturing.MapCommand<SettleCostCollector, SettleCostCollectorHandler>();
 
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
@@ -261,7 +263,7 @@ public static class CommandEndpoints
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),
         typeof(StartProductionRunHandler), typeof(CancelProductionRunHandler), typeof(RecordShiftSummaryHandler), typeof(PostShiftSummaryHandler), typeof(ReverseShiftSummaryHandler),
-        typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler),
+        typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler), typeof(SettleCostCollectorHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 

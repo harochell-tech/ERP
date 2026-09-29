@@ -331,6 +331,19 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
               WHERE e.company_id = @c AND e.account_role IN ('RAW_MATERIAL', 'FINISHED_GOODS', 'FINISHED_GOODS_IN_TRANSIT') GROUP BY a.code
               ORDER BY 1, 2
               """
+            : component == Components.ProductionDay
+            ? """
+              SELECT 'runs' AS kind, status AS key, NULL AS a, count(*)::text AS b FROM mfg.production_run WHERE company_id = @c GROUP BY status
+              ORDER BY 1, 2
+              """
+            : component == Components.CostSettlement
+            ? """
+              SELECT 'collector' AS kind, collector_id::text AS key, status AS a, (coalesce(usage_variance, 0) + coalesce(price_variance, 0))::text AS b
+              FROM mfg.cost_collector WHERE company_id = @c
+              UNION ALL
+              SELECT 'wip', subledger_ref::text, NULL, sum(debit - credit)::text FROM fin.gl_entry WHERE company_id = @c AND account_role = 'WIP' GROUP BY subledger_ref
+              ORDER BY 1, 2
+              """
             : component == Components.AccountsReceivable
             ? """
               SELECT 'ar_open' AS kind, party_id::text AS key, NULL AS a, sum(open_amount)::text AS b FROM fin.ar_document WHERE company_id = @c GROUP BY party_id
