@@ -698,6 +698,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-QUO1-03-8 | QUO1-03 | Order list and detail carry `quoteId` and `quoteNo`; the quote detail shows the order. |
 | E-QUO1-03-9 | QUO1-03 | Events `QuoteConverted` and `SalesOrderCreated` (now with `quoteId`). |
 | E-QUO1-03-10 | QUO1-03 | No migration; tests QUO-04, QUO-05, QUO-06 and the kept quoted price. |
+| E-QUO1-04-1 | QUO1-04 | Menu: "Cotizaciones" in the Ventas group with `sales:read`, before "Pedidos". |
+| E-QUO1-04-2 | QUO1-04 | List: filters by status, customer and expired only; number, customer, date, valid until, total, status with the "Vencida" mark and a special-price mark; "Nueva cotización" for `quote:manage`. |
+| E-QUO1-04-3 | QUO1-04 | One form creates and edits the draft (header, lines with an optional price); the list price is shown and a lower price warns "requires approval"; totals come from the server. |
+| E-QUO1-04-4 | QUO1-04 | Detail: header, lines (list vs quoted), approval, history, copies, the order; actions by status and permission, including "Convertir en pedido" that opens the order. |
+| E-QUO1-04-5 | QUO1-04 | Printable view from the print query with a provisional general-conditions footer until X-Q1; browser print. |
+| E-QUO1-04-6 | QUO1-04 | The order detail shows "Desde cotización COT-…" with a link. |
+| E-QUO1-04-7 | QUO1-04 | Inicio counter "Precios de cotización por aprobar" for the policy approver, from the list query. |
+| E-QUO1-04-8 | QUO1-04 | Spanish labels for the 6 statuses and the 9 `QUOTE_*` codes. |
+| E-QUO1-04-9 | QUO1-04 | E2E-Q1 over the API (`QuoteAcceptanceTests`) and Playwright (`quote-journey`); matrix `docs/acceptance/quo1.md` with `AcceptanceQuo1TraceabilityTests`. |
+| E-QUO1-04-10 | QUO1-04 | The dev seed adds a SENT sample quote; no staging seed script. |
 
 Implementation rules derived from the above (no architectural change):
 

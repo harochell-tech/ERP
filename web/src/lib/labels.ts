@@ -83,6 +83,10 @@ const STATUS: Readonly<Record<string, string>> = {
   SUSPENDED: "Suspendido",
   EXHAUSTED: "Agotado",
   EXPIRED: "Vencido",
+  // QUO-1 (QUO1-04): sales quotations (the quote screens use quoteStatusLabel, feminine; these serve any other place).
+  SENT: "Enviada",
+  CONVERTED: "Convertida en pedido",
+  LOST: "Perdida",
 };
 
 /** E-VS3-5: the two delivery terms. */
@@ -124,6 +128,7 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   NOT_FOUND: "error", NOT_ACTIVE: "attention", NAME_DIFFERS: "attention", // E-RNC-7
   IN_PROGRESS: "progress", CURING: "progress", COMPLETED: "done", SETTLED: "done", SCRAPPED: "error", // MFG1-07
   PENDING_VERIFICATION: "progress", SUSPENDED: "attention", EXHAUSTED: "neutral", EXPIRED: "neutral", // FIS1-05
+  SENT: "progress", CONVERTED: "done", LOST: "neutral", // QUO1-04
   REVERSED: "reversed",
 };
 

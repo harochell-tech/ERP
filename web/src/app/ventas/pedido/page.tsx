@@ -110,6 +110,12 @@ function OrderDetail() {
         {order.requestedDate ? ` · solicitado para ${formatDate(order.requestedDate)}` : ""}
         {order.customerPoRef ? ` · OC del cliente ${order.customerPoRef}` : ""}
       </p>
+      {h.quoteId && h.quoteNo ? (
+        <p data-testid="order-quote">
+          {/* QUO1-04 (E-QUO1-04-6): the quote the order came from, at its quoted prices. */}
+          Desde cotización <Link href={`/ventas/cotizacion/?id=${h.quoteId}`}>{h.quoteNo}</Link>
+        </p>
+      ) : null}
       {order.cancelReason ? <p className="muted">Motivo: {order.cancelReason}</p> : null}
       <Actions order={order} onDone={reload} />
       <table>

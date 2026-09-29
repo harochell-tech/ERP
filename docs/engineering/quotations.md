@@ -50,3 +50,9 @@ transaction. The command's result reference is the order. `UpdateSalesOrderDraft
 the order's quote (`Orders.QuotedPricesAsync`); new items take the list in force. A cancelled order leaves the quote CONVERTED.
 Order list and detail return `quoteId` / `quoteNo`. Two conversions at once: the second waits on the quote lock and fails with
 `QUOTE_VERSION_CONFLICT` (QUO-06). Tests: `QuoteTests` (QUO-04, QUO-05, QUO-06).
+
+## QUO1-04 — screens and end to end (E-QUO1-04-1…10)
+
+Screens (Ventas › Cotizaciones: list, form, detail with actions and conversion, print view; the order's "Desde cotización"; the
+Inicio counter): `web.md`. The dev seed adds a SENT sample quote (300 blocks at the list price). E2E-Q1: `QuoteAcceptanceTests` over
+the API and `web/e2e/quote-journey.spec.ts`; acceptance matrix `docs/acceptance/quo1.md` (`AcceptanceQuo1TraceabilityTests`).

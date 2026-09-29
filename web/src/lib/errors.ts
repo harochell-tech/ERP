@@ -182,6 +182,16 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   AUTHORIZATION_REASON_REQUIRED: "Indique el motivo (hasta 500 caracteres).",
   AUTHORIZATION_NOT_COVERED: "La autorización no cubre esas líneas (otro cliente, u otro producto o unidad); facture esas líneas aparte, con ITBIS.",
   AUTHORIZATION_EXCEEDED: "La cantidad o el neto superan lo disponible en la autorización para ese producto.",
+  // QUO-1 (QUO1-04, E-QUO1-04-8): sales quotations.
+  QUOTE_NOT_FOUND: "La cotización no existe.",
+  QUOTE_INVALID_STATE: "La cotización no está en un estado que permita esta acción.",
+  QUOTE_VERSION_CONFLICT: "La cotización cambió mientras la veía (o ya se convirtió en pedido); recargue la página y vuelva a intentarlo.",
+  QUOTE_VALIDITY_INVALID: "La fecha de vigencia debe ser hoy o una fecha posterior.",
+  QUOTE_NOTHING_TO_APPROVE: "Ninguna línea tiene un precio especial pendiente de aprobación; envíe la cotización.",
+  QUOTE_PRICE_APPROVAL_REQUIRED: "Hay precios por debajo de la lista sin aprobar: envíe la cotización a aprobación primero.",
+  QUOTE_SAME_PERSON: "Quien preparó la cotización no puede aprobar sus precios.",
+  QUOTE_REASON_REQUIRED: "Indique el motivo (hasta 500 caracteres).",
+  QUOTE_EXPIRED: "La cotización está vencida; cópiela con una nueva vigencia.",
 };
 
 export interface DescribedError {

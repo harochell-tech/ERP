@@ -201,3 +201,28 @@ attaches the DGII certificate and submits; the Especialista fiscal verifies it; 
 (ITBIS 360.00); Despacho delivers it at the gate; Facturación invoices it under the authorization (e-CF 44, total 2,000.00), issues it
 and records an `E44` e-NCF; the authorization shows 2,000.00 consumed and the invoice's consumption. It opens its own order and
 delivery by URL and leaves nothing open for the other journeys.
+
+## QUO1-04 — sales quotation screens (E-QUO1-04-1…10)
+
+Menu **Ventas** adds Cotizaciones (`sales:read`) before Pedidos; the detail, form and print pages light up it. See
+`docs/engineering/quotations.md`. `lib/quotes.ts` holds the pure helpers, unit-tested (`tests/unit/quotes.test.ts`): the statuses
+in Spanish (feminine, "Vencida" for a SENT quote past its validity — the server's `expired` flag), the actions by status and
+permission, and `compareDecimals` / `isSpecialPrice`, an exact comparison of two decimal strings digit by digit (no JavaScript
+number), used only to warn about a price below the list; nets and totals are always the server's.
+
+| Page | What it does |
+| --- | --- |
+| `/ventas/cotizaciones/` | Filters by status, customer and "Solo vencidas" (`?estado=&cliente=&vencidas=1`); number, customer, date, valid until, net total, status (with "Vencida") and a "Precio especial" mark; "Nueva cotización" (`quote:manage`) |
+| `/ventas/cotizaciones/nueva/[?id=]` | Create, or edit a DRAFT: customer (DRAFT or ACTIVE; a notice says a draft customer must be activated before converting), plant, valid until (15 days proposed), delivery term, site (required for delivered), customer reference, notes; lines of the price list in force with the list price beside each line and an optional quoted price (empty = the list's) — below the list it shows "Precio especial: requiere aprobación" |
+| `/ventas/cotizacion/?id=` | Header, lines (list and quoted price, net, special mark), total, the price approval (who, when, whether it covers the current lines), copied from / copies, the order and the closing reason, history. DRAFT: edit, "Enviar a aprobación de precios" when a special price is not covered, otherwise "Marcar enviada al cliente"; PENDING_APPROVAL: "Aprobar precios" (step-up) and "Devolver a borrador" with a reason (`quote:approve_price`); SENT: "Convertir en pedido" while valid (goes to `/ventas/pedido/?id=<resultRef>`), "Marcar perdida" (reason); cancel (DRAFT / SENT, reason); "Copiar" at any status asks the new validity and opens the copy |
+| `/ventas/cotizacion/imprimir/?id=` | Issuer, customer, reference, delivery, lines with the informative ITBIS (the server's, rules in force at the quote date), totals, validity, notes, the provisional general conditions (pending X-Q1) and signature lines; "Imprimir" calls `window.print()` with the proforma's print CSS |
+
+The sales order detail reads "Desde cotización COT-…" (linked) when `header.quoteNo` is present. Inicio adds "Crear una cotización"
+(`quote:manage`) and counts "Precios de cotización por aprobar" for `quote:approve_price` (list query with PENDING_APPROVAL,
+E-UI01-7). `labels.ts` names SENT, CONVERTED and LOST; `errors.ts` the nine `QUOTE_*` codes.
+
+`web/e2e/quote-journey.spec.ts`: the Vendedor quotes Constructora Uno 37 BLOQUE-6 at 45.00 (list 50.00, special-price warning) and
+submits it; the Aprobador de políticas contables sees the Inicio counter and approves (step-up by the fresh sign-in); the Vendedor
+sends it, the print view shows net 1,665.00, ITBIS 299.70 and total 1,964.70, converts it and lands on the order ("Desde cotización
+COT-…", 45.00, total 1,665.00), which the credit check confirms; the quote then reads "Convertida en pedido" with the order. It opens
+its own quote by URL and does not depend on the seeded sample quote.

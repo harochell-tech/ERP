@@ -67,6 +67,15 @@ const TASKS: readonly Task[] = [
   },
   // VS3-10b (E-VS3-10-9): sales work.
   { href: "/ventas/pedidos/nuevo/", label: "Crear un pedido de venta", permission: "sales_order:create" },
+  // QUO1-04 (E-QUO1-04-7): quotes with special prices waiting for the Aprobador de políticas.
+  { href: "/ventas/cotizaciones/nueva/", label: "Crear una cotización", permission: "quote:manage" },
+  {
+    href: "/ventas/cotizaciones/?estado=PENDING_APPROVAL",
+    label: "Precios de cotización por aprobar",
+    permission: "quote:approve_price",
+    countPermission: "sales:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/sales/quotes", { path: { companyId }, query: { status: "PENDING_APPROVAL", limit: COUNT_LIMIT } })).items.length,
+  },
   {
     href: "/ventas/pedidos/?estado=PENDING_CREDIT",
     label: "Aprobar crédito de pedidos",
