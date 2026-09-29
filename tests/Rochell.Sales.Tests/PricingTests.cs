@@ -35,7 +35,7 @@ public sealed class PricingTests(PostgresFixture postgres)
             .RootElement.GetProperty("costVersionId").GetGuid();
 
     [Fact]
-    public async Task A_standard_cost_is_prepared_by_the_controller_approved_by_the_policy_approver_and_frozen_while_there_is_stock()
+    public async Task A_standard_cost_is_prepared_by_the_controller_approved_by_the_policy_approver_and_revalues_stock_only_with_REVAL_active()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         var s = await SetupAsync(h);
@@ -53,7 +53,7 @@ public sealed class PricingTests(PostgresFixture postgres)
 
         Assert.Equal(first, replaced);
         Assert.Equal(
-            (SalesErrors.NotFinishedGood, SalesErrors.AmountInvalid, AuthorizationErrors.NotAuthorized, SalesErrors.StockExists),
+            (SalesErrors.NotFinishedGood, SalesErrors.AmountInvalid, AuthorizationErrors.NotAuthorized, Finance.FinanceErrors.PostingPrerequisiteMissing), // E-MFG1-02-8: REVAL still DRAFT
             (raw.Code, tooPrecise.Code, self.Code, frozen.Code));
         var costs = JsonDocument.Parse(await h.QueryAsync(new ListStandardCosts(h.CompanyId, s.Controller), new ListStandardCostsHandler())).RootElement.GetProperty("items");
         Assert.Equal("2:DRAFT:35.0000|1:ACTIVE:32.7512", string.Join('|', costs.EnumerateArray().Select(c => $"{c.GetProperty("version").GetInt32()}:{c.GetProperty("status").GetString()}:{c.GetProperty("unitCost").GetString()}")));

@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\src\Rochell.Reconciliation\Rochell.Reconciliation.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Treasury\Rochell.Treasury.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Sales\Rochell.Sales.csproj" />
+    <ProjectReference Include="..\..\src\Rochell.Manufacturing\Rochell.Manufacturing.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Migrations\Rochell.Migrations.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Migrations.Cli\Rochell.Migrations.Cli.csproj" />
     <ProjectReference Include="..\..\src\Rochell.Api\Rochell.Api.csproj" />

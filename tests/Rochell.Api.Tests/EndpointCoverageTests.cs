@@ -18,6 +18,7 @@ public sealed class EndpointCoverageTests(PostgresFixture postgres)
         typeof(Identity.AssemblyMarker).Assembly, typeof(MasterData.AssemblyMarker).Assembly, typeof(Finance.AssemblyMarker).Assembly,
         typeof(Inventory.AssemblyMarker).Assembly, typeof(Procurement.AssemblyMarker).Assembly, typeof(Tax.AssemblyMarker).Assembly,
         typeof(Audit.AssemblyMarker).Assembly, typeof(Reconciliation.AssemblyMarker).Assembly, typeof(Treasury.AssemblyMarker).Assembly, typeof(Sales.AssemblyMarker).Assembly,
+        typeof(Manufacturing.AssemblyMarker).Assembly,
     ];
 
     private static List<Type> Handled(Type handlerInterface)
@@ -40,7 +41,7 @@ public sealed class EndpointCoverageTests(PostgresFixture postgres)
 
         Assert.Equal(Handled(typeof(ICommandHandler<>)), commands);
         Assert.Equal(Handled(typeof(IQueryHandler<>)).Select(t => t.Name), queries);
-        Assert.Equal(124, commands.Count); // 44 of VS#1 + 5 of VS2-02 + 4 of VS2-03 + 1 of VS2-04 + 4 of VS2-05 + 1 of UI-01 + 11 of FIN1-02 + 2 of FIN1-03 + 19 of VS3-02 + 3 of VS3-02b + 6 of VS3-03 + 8 of VS3-04 + 4 of VS3-05 + 3 of VS3-06 + 9 of VS3-07
+        Assert.Equal(133, commands.Count); // 44 of VS#1 + 5 of VS2-02 + 4 of VS2-03 + 1 of VS2-04 + 4 of VS2-05 + 1 of UI-01 + 11 of FIN1-02 + 2 of FIN1-03 + 19 of VS3-02 + 3 of VS3-02b + 6 of VS3-03 + 8 of VS3-04 + 4 of VS3-05 + 3 of VS3-06 + 9 of VS3-07 + 9 of MFG1-02
     }
 
     [Fact]

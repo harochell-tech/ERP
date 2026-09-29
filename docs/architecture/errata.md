@@ -524,6 +524,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-01-11 | MFG1-01 | Four SoD rules (40 in total): recipe prepare ≠ approve; shift summary record ≠ post; shift summary record ≠ lot release; collector settle ≠ standard cost approve. |
 | E-MFG1-01-12 | MFG1-01 | Posting rules, the PRODUCTION policy, OP-DAY and COST-SET arrive with their PRs (MFG1-03…05). |
 | E-MFG1-01-13 | MFG1-01 | Migration 0048. |
+| E-MFG1-02-1 | MFG1-02 | New module `Rochell.Manufacturing` (machines, shifts, recipes); it may use Platform, Finance, Inventory and MasterData (module graph and architecture tests). |
+| E-MFG1-02-2 | MFG1-02 | `CreateMachine`, `RenameMachine`, `SetMachineStatus`, `DefineShift`, `UpdateShiftTimes`, `SetShiftStatus` (`production_master:manage`), plant-scoped: the command names the plant and the row must belong to it (`PLANT_MISMATCH`). |
+| E-MFG1-02-3 | MFG1-02 | `PrepareRecipe` (`recipe:prepare`) and `ApproveRecipe` (`recipe:approve`, four eyes, no step-up); approving supersedes the ACTIVE version in the same transaction; ACTIVE finished good, ACTIVE machine, at least one ACTIVE raw material. Implementation note: recipe lines never change, so each preparation is a new DRAFT version (as the price list); an older DRAFT stays approvable. |
+| E-MFG1-02-4 | MFG1-02 | The standard cost stays in Sales; new `PrepareStandardCostFromRecipe` (ACTIVE recipe; the item and valuation area come from the recipe and its machine's plant); `PrepareStandardCost` remains for products without a recipe and replaces only the latest DRAFT without breakdown. Each preparation from a recipe is a new DRAFT version. |
+| E-MFG1-02-5 | MFG1-02 | Standard quantity per unit = quantity per batch ÷ units per batch (6 decimals); material cost = Σ quantity × price (4 decimals); unit cost = material + conversion; one price for each material of the recipe and only for them (`MATERIAL_PRICES_MISMATCH`). |
+| E-MFG1-02-6 | MFG1-02 | Replaces E-VS3-02-7 (`STOCK_EXISTS`): approving a new standard with stock brings the area's value to round(quantity × new standard, 2): a VALUATION_ADJUSTMENT value entry, event `StandardCostRevalued` and posting rule REVAL, in the same transaction. |
+| E-MFG1-02-7 | MFG1-02 | Refused with `IN_TRANSIT_EXISTS` while units of the item are in the plant's TRANSITO location. |
+| E-MFG1-02-8 | MFG1-02 | REVAL arrives DRAFT; while it is not ACTIVE, approving a standard that needs a revaluation fails with `POSTING_PREREQUISITE_MISSING`. |
+| E-MFG1-02-9 | MFG1-02 | Queries `ListMachines`, `ListShifts`, `ListRecipes`, `GetRecipe` (`production:read`) under `/manufacturing/…`; commands under `/manufacturing/…` and `/sales/prepare-standard-cost-from-recipe`; OpenAPI and web types regenerated. Screens arrive in MFG1-07. |
+| E-MFG1-02-10 | MFG1-02 | Migration 0049 (REVAL, DRAFT). |
 
 Implementation rules derived from the above (no architectural change):
 

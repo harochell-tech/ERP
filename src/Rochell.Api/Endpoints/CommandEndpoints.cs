@@ -8,6 +8,9 @@ using Rochell.Finance.Policies;
 using Rochell.Identity.RoleChanges;
 using Rochell.MasterData.BankAccounts;
 using Rochell.MasterData.Items;
+using Rochell.Manufacturing.Machines;
+using Rochell.Manufacturing.Recipes;
+using Rochell.Manufacturing.Shifts;
 using Rochell.MasterData.Suppliers;
 using Rochell.Platform.Commands;
 using Rochell.Procurement.GoodsReceipts;
@@ -149,6 +152,7 @@ public static class CommandEndpoints
         sales.MapCommand<PrepareCustomerTerms, PrepareCustomerTermsHandler>();
         sales.MapCommand<ApproveCustomerTerms, ApproveCustomerTermsHandler>();
         sales.MapCommand<PrepareStandardCost, PrepareStandardCostHandler>();
+        sales.MapCommand<PrepareStandardCostFromRecipe, PrepareStandardCostFromRecipeHandler>();
         sales.MapCommand<ApproveStandardCost, ApproveStandardCostHandler>();
         sales.MapCommand<PreparePriceList, PreparePriceListHandler>();
         sales.MapCommand<ApprovePriceList, ApprovePriceListHandler>();
@@ -193,6 +197,16 @@ public static class CommandEndpoints
         sales.MapCommand<RecordCustomerWithholding, RecordCustomerWithholdingHandler>();
         sales.MapCommand<ReverseCustomerWithholding, ReverseCustomerWithholdingHandler>();
 
+        var manufacturing = company.MapGroup("/manufacturing").WithTags("Manufacturing");
+        manufacturing.MapCommand<CreateMachine, CreateMachineHandler>();
+        manufacturing.MapCommand<RenameMachine, RenameMachineHandler>();
+        manufacturing.MapCommand<SetMachineStatus, SetMachineStatusHandler>();
+        manufacturing.MapCommand<DefineShift, DefineShiftHandler>();
+        manufacturing.MapCommand<UpdateShiftTimes, UpdateShiftTimesHandler>();
+        manufacturing.MapCommand<SetShiftStatus, SetShiftStatusHandler>();
+        manufacturing.MapCommand<PrepareRecipe, PrepareRecipeHandler>();
+        manufacturing.MapCommand<ApproveRecipe, ApproveRecipeHandler>();
+
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
         identity.MapCommand<RequestRoleRevocation, RequestRoleRevocationHandler>();
@@ -224,7 +238,7 @@ public static class CommandEndpoints
         typeof(RegisterFiscalSourceHandler), typeof(ConfigureFiscalRuleVersionHandler), typeof(LinkFiscalSourceHandler), typeof(RunFiscalRuleTestsHandler),
         typeof(ActivateFiscalRuleVersionHandler),
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),
-        typeof(CreateCustomerHandler), typeof(UpdateCustomerHandler), typeof(ActivateCustomerHandler), typeof(PrepareCustomerTermsHandler), typeof(ApproveCustomerTermsHandler), typeof(PrepareStandardCostHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler),
+        typeof(CreateCustomerHandler), typeof(UpdateCustomerHandler), typeof(ActivateCustomerHandler), typeof(PrepareCustomerTermsHandler), typeof(ApproveCustomerTermsHandler), typeof(PrepareStandardCostHandler), typeof(PrepareStandardCostFromRecipeHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler),
         typeof(RegisterVehicleHandler), typeof(UpdateVehicleHandler), typeof(DeactivateVehicleHandler), typeof(ActivateVehicleHandler), typeof(RegisterDriverHandler), typeof(UpdateDriverHandler), typeof(DeactivateDriverHandler), typeof(ActivateDriverHandler),
         typeof(PrepareOpeningInventoryHandler), typeof(PostOpeningInventoryHandler), typeof(ReverseOpeningInventoryHandler),
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),
@@ -233,6 +247,8 @@ public static class CommandEndpoints
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),
         typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
+        typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
+        typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
     ];
 

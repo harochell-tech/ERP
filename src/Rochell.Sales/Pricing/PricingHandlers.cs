@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
+using Rochell.Finance.Posting;
+using Rochell.Inventory;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 
@@ -56,7 +58,7 @@ public sealed class PrepareStandardCostHandler : ICommandHandler<PrepareStandard
         var preparer = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         var draft = await SalesSql.ScalarAsync<Guid?>(
             context,
-            "SELECT cost_version_id FROM md.standard_cost_version WHERE company_id = @c AND item_id = @i AND valuation_area_id = @a AND status = 'DRAFT'",
+            "SELECT cost_version_id FROM md.standard_cost_version WHERE company_id = @c AND item_id = @i AND valuation_area_id = @a AND status = 'DRAFT' AND material_cost IS NULL ORDER BY version DESC LIMIT 1",
             cancellationToken,
             ("c", context.CompanyId),
             ("i", command.ItemId),
@@ -104,9 +106,148 @@ public sealed class PrepareStandardCostHandler : ICommandHandler<PrepareStandard
     }
 }
 
+[RequiresPermission("standard_cost:prepare")]
+public sealed class PrepareStandardCostFromRecipeHandler : ICommandHandler<PrepareStandardCostFromRecipe>
+{
+    public string CommandType => "Sales.PrepareStandardCostFromRecipe";
+
+    private sealed record RecipeRow(Guid ItemId, Guid AreaId, string Status, decimal UnitsPerBatch);
+
+    private sealed record LineRow(Guid MaterialItemId, decimal QtyPerBatch);
+
+    public async Task<string> HandleAsync(PrepareStandardCostFromRecipe command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var conversion = command.ConversionCost >= 0m && decimal.Round(command.ConversionCost, 4) == command.ConversionCost
+            ? command.ConversionCost
+            : throw new DomainException(SalesErrors.AmountInvalid, "The conversion cost is zero or more with at most 4 decimals.");
+        var recipe = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT v.item_id, p.valuation_area_id, v.status, v.units_per_batch
+            FROM mfg.recipe_version v JOIN md.machine m ON m.machine_id = v.machine_id JOIN md.plant p ON p.plant_id = m.plant_id
+            WHERE v.company_id = @c AND v.recipe_version_id = @r
+            """,
+            r => new RecipeRow(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("r", command.RecipeVersionId)).ConfigureAwait(false)
+            ?? throw new DomainException(SalesErrors.NotFound, "The recipe does not exist.");
+        if (recipe.Status != "ACTIVE")
+        {
+            throw new DomainException(SalesErrors.RecipeNotActive, $"The recipe is {recipe.Status}; a standard cost is prepared from the ACTIVE recipe.");
+        }
+
+        var lines = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT material_item_id, qty_per_batch FROM mfg.recipe_line WHERE recipe_version_id = @r",
+            r => new LineRow(r.GetGuid(0), r.GetDecimal(1)),
+            cancellationToken,
+            ("r", command.RecipeVersionId)).ConfigureAwait(false);
+        var prices = command.MaterialPrices ?? [];
+        if (prices.Select(p => p.MaterialItemId).Distinct().Count() != prices.Count
+            || !prices.Select(p => p.MaterialItemId).ToHashSet().SetEquals(lines.Select(l => l.MaterialItemId)))
+        {
+            throw new DomainException(SalesErrors.MaterialPricesMismatch, "Give one standard price for each material of the recipe, and only for them (E-MFG1-02-5).");
+        }
+
+        var materials = lines.Select(l =>
+        {
+            var price = SalesSql.Positive(prices.Single(p => p.MaterialItemId == l.MaterialItemId).StdPrice, 4, "The standard price");
+            var qty = decimal.Round(l.QtyPerBatch / recipe.UnitsPerBatch, 6, MidpointRounding.AwayFromZero);
+            return (l.MaterialItemId, Qty: qty, Price: price);
+        }).ToList();
+        if (materials.Any(m => m.Qty == 0m))
+        {
+            throw new DomainException(SalesErrors.AmountInvalid, "A material rounds to zero per unit at 6 decimals; review the recipe.");
+        }
+
+        var materialCost = decimal.Round(materials.Sum(m => m.Qty * m.Price), 4, MidpointRounding.AwayFromZero);
+        var unitCost = materialCost + conversion;
+        if (unitCost <= 0m)
+        {
+            throw new DomainException(SalesErrors.AmountInvalid, "The standard cost must be greater than zero.");
+        }
+
+        await SalesSql.LockAsync(context, $"standard-cost:{recipe.ItemId}:{recipe.AreaId}", cancellationToken).ConfigureAwait(false);
+        var preparer = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
+        var version = (await SalesSql.ScalarAsync<int?>(
+            context, "SELECT max(version) FROM md.standard_cost_version WHERE company_id = @c AND item_id = @i AND valuation_area_id = @a", cancellationToken,
+            ("c", context.CompanyId), ("i", recipe.ItemId), ("a", recipe.AreaId)).ConfigureAwait(false) ?? 0) + 1;
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(
+                "StandardCostPrepared",
+                1,
+                Pricing.CostAggregate,
+                context.ResultRef,
+                1,
+                JsonSerializer.Serialize(new
+                {
+                    costVersionId = context.ResultRef,
+                    itemId = recipe.ItemId,
+                    valuationAreaId = recipe.AreaId,
+                    recipeVersionId = command.RecipeVersionId,
+                    unitCost = Pricing.Money4(unitCost),
+                    materialCost = Pricing.Money4(materialCost),
+                    conversionCost = Pricing.Money4(conversion),
+                    materials = materials.Select(m => new { materialItemId = m.MaterialItemId, stdQtyPerUnit = m.Qty.ToString(CultureInfo.InvariantCulture), stdPrice = Pricing.Money4(m.Price) }),
+                }),
+                Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO md.standard_cost_version (cost_version_id, company_id, item_id, valuation_area_id, version, effective_from, unit_cost, status, prepared_by, material_cost, conversion_cost)
+            VALUES (@id, @c, @i, @a, @v, @today, @cost, 'DRAFT', @by, @material, @conversion)
+            """,
+            cancellationToken,
+            ("id", context.ResultRef),
+            ("c", context.CompanyId),
+            ("i", recipe.ItemId),
+            ("a", recipe.AreaId),
+            ("v", version),
+            ("today", SalesSql.Today(context)),
+            ("cost", unitCost),
+            ("by", preparer),
+            ("material", materialCost),
+            ("conversion", conversion)).ConfigureAwait(false);
+        foreach (var (material, qty, price) in materials)
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "INSERT INTO md.standard_cost_material (cost_version_id, company_id, material_item_id, std_qty_per_unit, std_price) VALUES (@id, @c, @m, @q, @p)",
+                cancellationToken,
+                ("id", context.ResultRef),
+                ("c", context.CompanyId),
+                ("m", material),
+                ("q", qty),
+                ("p", price)).ConfigureAwait(false);
+        }
+
+        await context.AppendStateAsync(Pricing.CostAggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new
+        {
+            costVersionId = context.ResultRef,
+            version,
+            status = "DRAFT",
+            unitCost = Pricing.Money4(unitCost),
+            materialCost = Pricing.Money4(materialCost),
+            conversionCost = Pricing.Money4(conversion),
+        });
+    }
+}
+
 [RequiresPermission("standard_cost:approve", StepUp = true)]
 public sealed class ApproveStandardCostHandler : ICommandHandler<ApproveStandardCost>
 {
+    private readonly PostingEngine _engine = new();
+    private readonly InventoryLedger _inventory = new();
+
     public string CommandType => "Sales.ApproveStandardCost";
 
     private sealed record Row(Guid ItemId, Guid AreaId, int Version, string Status, Guid PreparedBy, decimal UnitCost);
@@ -142,12 +283,50 @@ public sealed class ApproveStandardCostHandler : ICommandHandler<ApproveStandard
             ("c", context.CompanyId),
             ("i", row.ItemId),
             ("a", row.AreaId)).ConfigureAwait(false);
-        // E-VS3-02-7: no new cost while the item has stock in the area (revaluation comes later).
-        if (previous is not null && await SalesSql.ScalarAsync<decimal?>(
-                context, "SELECT quantity FROM inv.inv_valuation_balance WHERE valuation_area_id = @a AND item_id = @i", cancellationToken,
-                ("a", row.AreaId), ("i", row.ItemId)).ConfigureAwait(false) is { } quantity && quantity != 0m)
+        // E-MFG1-02-7: the value of units in transit is in FINISHED_GOODS_IN_TRANSIT; revalue only when none is left.
+        var plantId = (await SalesSql.ScalarAsync<Guid?>(
+            context, "SELECT plant_id FROM md.plant WHERE company_id = @c AND valuation_area_id = @a", cancellationToken, ("c", context.CompanyId), ("a", row.AreaId)).ConfigureAwait(false))!.Value;
+        if (await SalesSql.ScalarAsync<decimal?>(
+                context,
+                "SELECT sum(b.quantity) FROM inv.inv_stock_balance b JOIN md.location l ON l.location_id = b.location_id WHERE b.plant_id = @p AND b.item_id = @i AND l.is_transit",
+                cancellationToken,
+                ("p", plantId),
+                ("i", row.ItemId)).ConfigureAwait(false) is { } inTransit && inTransit != 0m)
         {
-            throw new DomainException(SalesErrors.StockExists, "The item has stock in this valuation area; its standard cost cannot change until revaluation exists (E-VS3-02-7).");
+            throw new DomainException(SalesErrors.InTransitExists, "Units of the item are in transit; approve the standard cost once they are delivered or returned (E-MFG1-02-7).");
+        }
+
+        // E-MFG1-10, E-MFG1-02-6: the area's value becomes quantity × new standard (2 decimals) in the same transaction.
+        var (quantity, value) = await _inventory.LockValuationAsync(context, row.AreaId, row.ItemId, cancellationToken).ConfigureAwait(false);
+        var revaluation = quantity == 0m ? 0m : decimal.Round(quantity * row.UnitCost, 2, MidpointRounding.AwayFromZero) - value;
+        var previousCost = previous is { } p0
+            ? await SalesSql.ScalarAsync<decimal>(context, "SELECT unit_cost FROM md.standard_cost_version WHERE cost_version_id = @id", cancellationToken, ("id", p0)).ConfigureAwait(false)
+            : 0m;
+        PostingPlan? plan = null;
+        var valueEntryId = context.Ids.NewId();
+        var occurredAt = context.Clock.UtcNow;
+        if (revaluation != 0m)
+        {
+            var inputs = new Dictionary<string, string>
+            {
+                ["new_unit_cost"] = row.UnitCost.ToString(CultureInfo.InvariantCulture),
+                ["previous_unit_cost"] = previousCost.ToString(CultureInfo.InvariantCulture),
+                ["quantity"] = quantity.ToString(CultureInfo.InvariantCulture),
+                ["previous_value"] = value.ToString(CultureInfo.InvariantCulture),
+            };
+            var amount = Math.Abs(revaluation);
+            var up = revaluation > 0m;
+            plan = await _engine.PrepareAsync(
+                context,
+                new PostingRequest(
+                    "REVAL",
+                    SalesSql.Today(context),
+                    occurredAt,
+                    [
+                        new PostingLineInput(up ? "REVAL-UP-DR-FG" : "REVAL-DN-CR-FG", "revaluation", amount, PlantId: plantId, ItemId: row.ItemId, SubledgerRef: valueEntryId, InvValueEntryId: valueEntryId, Inputs: inputs),
+                        new PostingLineInput(up ? "REVAL-UP-CR-REV" : "REVAL-DN-DR-REV", "revaluation", amount, PlantId: plantId, Inputs: inputs),
+                    ]),
+                cancellationToken).ConfigureAwait(false);
         }
 
         var today = SalesSql.Today(context);
@@ -176,7 +355,44 @@ public sealed class ApproveStandardCostHandler : ICommandHandler<ApproveStandard
             ("today", today),
             ("id", command.CostVersionId)).ConfigureAwait(false);
         await context.AppendStateAsync(Pricing.CostAggregate, command.CostVersionId, "DOCUMENT", "DRAFT", "ACTIVE", CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { costVersionId = command.CostVersionId, status = "ACTIVE", effectiveFrom = today, superseded = previous });
+        Guid? journalId = null;
+        if (plan is not null)
+        {
+            var revalued = await context.AppendEventAsync(
+                new EventDraft(
+                    "StandardCostRevalued",
+                    1,
+                    Pricing.CostAggregate,
+                    command.CostVersionId,
+                    await SalesSql.NextEventVersionAsync(context, Pricing.CostAggregate, command.CostVersionId, cancellationToken).ConfigureAwait(false),
+                    JsonSerializer.Serialize(new
+                    {
+                        costVersionId = command.CostVersionId,
+                        itemId = row.ItemId,
+                        valuationAreaId = row.AreaId,
+                        quantity = quantity.ToString(CultureInfo.InvariantCulture),
+                        previousValue = value.ToString(CultureInfo.InvariantCulture),
+                        revaluation = revaluation.ToString(CultureInfo.InvariantCulture),
+                    }),
+                    Publish: true,
+                    OccurredAt: occurredAt,
+                    BusinessDate: today),
+                cancellationToken).ConfigureAwait(false);
+            await _inventory.PostValueAdjustmentAsync(
+                context, MovementTypes.ValuationAdjustment, row.AreaId, plantId, row.ItemId, revaluation, valueEntryId, null,
+                new MovementSource(revalued, "STANDARD_COST", command.CostVersionId), new MovementDates(occurredAt, today, plan.PostingDate), cancellationToken).ConfigureAwait(false);
+            journalId = (await _engine.WriteAsync(context, plan, revalued, cancellationToken).ConfigureAwait(false)).JournalId;
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            costVersionId = command.CostVersionId,
+            status = "ACTIVE",
+            effectiveFrom = today,
+            superseded = previous,
+            revaluation = revaluation.ToString("0.00", CultureInfo.InvariantCulture),
+            journalId,
+        });
     }
 }
 
