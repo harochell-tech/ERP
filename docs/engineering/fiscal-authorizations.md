@@ -13,3 +13,17 @@ Frozen Baseline `docs/architecture/fis1/frozen-baseline-fis1.md` (E-FIS1-1…16)
 
 `sal.invoice.fiscal_authorization_id`: e-CF 44 exactly when an authorization is set, and then no ITBIS. Permissions
 `fiscal_authorization:register` (Crédito, Facturación), `:verify` and `:suspend` (Especialista fiscal, who also reads sales).
+
+## FIS1-02 — authorization commands, queries and the proforma (E-FIS1-02-1…10)
+
+| Command | Permission | Rules |
+| --- | --- | --- |
+| `RegisterFiscalAuthorization`, `UpdateDraftAuthorization` | `fiscal_authorization:register` (Crédito, Facturación) | DRAFT; ACTIVE customer with RNC; unique certificate; scope of ACTIVE finished goods (base unit or convertible), qty > 0, net > 0 |
+| `AttachAuthorizationDocument` | `:register` | Kind, reference, SHA-256; any non-terminal state |
+| `SubmitForVerification` | `:register` | Needs a scope line and the CERTIFICADO_DGII document |
+| `VerifyAuthorization` | `:verify` + step-up (Especialista fiscal) | ≠ registrar; not past `valid_until` → ACTIVE |
+| `ReturnAuthorizationToDraft`, `RejectAuthorization` | `:verify` | Reason |
+| `SuspendAuthorization`, `ReactivateAuthorization` | `:suspend` + step-up | Reason; reactivation not past `valid_until` |
+
+Queries (`sales:read`): `GET /tax/fiscal-authorizations`, `/fiscal-authorizations/{id}`, `/proformas/{salesOrderId}` (ITBIS at
+the rules in force today through `TaxEngine.PreviewSalesItbisAsync`, never stored).

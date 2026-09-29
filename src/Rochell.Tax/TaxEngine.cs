@@ -107,11 +107,26 @@ public sealed class TaxEngine
         return new TaxDetermination(determinationId, taxes);
     }
 
-    private static async Task<IReadOnlyList<ApplicableRule>> ApplicableRulesAsync(CommandContext context, DateOnly date, bool sale, CancellationToken cancellationToken)
+    private static Task<IReadOnlyList<ApplicableRule>> ApplicableRulesAsync(CommandContext context, DateOnly date, bool sale, CancellationToken cancellationToken)
+        => ApplicableRulesAsync(context.Connection, context.Transaction, context.CompanyId, date, sale, cancellationToken);
+
+    /// <summary>
+    /// E-FIS1-02-8: the sales ITBIS a set of lines would carry on <paramref name="date"/>, computed with the rules in force and never
+    /// written (the proforma a customer takes to the DGII). Closed gate → FISCAL_GATE_CLOSED, as at invoicing.
+    /// </summary>
+    public static async Task<IReadOnlyList<DeterminedTax>> PreviewSalesItbisAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly date, IReadOnlyList<TaxableLine> lines, CancellationToken cancellationToken)
+    {
+        var rules = await ApplicableRulesAsync(connection, transaction, companyId, date, sale: true, cancellationToken).ConfigureAwait(false);
+        return TaxCalculator.Determine(PartyTaxTypes.Company, lines, rules);
+    }
+
+    private static async Task<IReadOnlyList<ApplicableRule>> ApplicableRulesAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly date, bool sale, CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(
-            context.Connection,
-            context.Transaction,
+            connection,
+            transaction,
             """
             SELECT r.code, r.rule_kind,
                    (SELECT v.rule_version_id FROM tax.fiscal_rule_version v
@@ -124,7 +139,7 @@ public sealed class TaxEngine
             WHERE r.company_id = @c
             ORDER BY r.code
             """,
-            ("c", context.CompanyId),
+            ("c", companyId),
             ("d", date));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var rules = new List<ApplicableRule>();
