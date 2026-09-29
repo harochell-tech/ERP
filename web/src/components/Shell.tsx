@@ -33,6 +33,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/maestros/costos-estandar/", label: "Costos estándar", permission: "sales:read" },
       { href: "/maestros/precios/", label: "Lista de precios", permission: "sales:read" },
       { href: "/maestros/flota/", label: "Vehículos y choferes", permission: "sales:read" },
+      { href: "/maestros/padron-rnc/", label: "Padrón RNC (DGII)", permission: "rnc:read" },
     ],
   },
   {

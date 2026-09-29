@@ -15321,6 +15321,146 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/master-data/rnc/{rnc}": {
+      "get": {
+        "tags": [
+          "MasterData"
+        ],
+        "operationId": "GetRnc",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "rnc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RncLookup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/master-data/rnc-registry": {
+      "get": {
+        "tags": [
+          "MasterData"
+        ],
+        "operationId": "GetRncRegistryStatus",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RncRegistryStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/procurement/purchase-orders": {
       "get": {
         "tags": [
@@ -30936,6 +31076,182 @@
           },
           "reason": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RncDiscrepancy": {
+        "required": [
+          "partyId",
+          "rnc",
+          "legalName",
+          "isCustomer",
+          "isSupplier",
+          "issue",
+          "registryName",
+          "registryStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "partyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rnc": {
+            "type": "string"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "isCustomer": {
+            "type": "boolean"
+          },
+          "isSupplier": {
+            "type": "boolean"
+          },
+          "issue": {
+            "type": "string"
+          },
+          "registryName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registryStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RncLookup": {
+        "required": [
+          "rnc",
+          "found",
+          "legalName",
+          "tradeName",
+          "activity",
+          "startedOn",
+          "status",
+          "regime",
+          "registryDate"
+        ],
+        "type": "object",
+        "properties": {
+          "rnc": {
+            "type": "string"
+          },
+          "found": {
+            "type": "boolean"
+          },
+          "legalName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tradeName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "activity": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "regime": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registryDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RncRegistryImportView": {
+        "required": [
+          "sourceDate",
+          "fileName",
+          "rows",
+          "skipped",
+          "importedBy",
+          "importedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "sourceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "importedBy": {
+            "type": "string"
+          },
+          "importedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RncRegistryStatus": {
+        "required": [
+          "lastImport",
+          "discrepancies"
+        ],
+        "type": "object",
+        "properties": {
+          "lastImport": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RncRegistryImportView"
+              }
+            ]
+          },
+          "discrepancies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RncDiscrepancy"
+            }
           }
         },
         "additionalProperties": false

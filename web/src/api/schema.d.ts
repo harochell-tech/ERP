@@ -2155,6 +2155,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/master-data/rnc/{rnc}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetRnc"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/master-data/rnc-registry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetRncRegistryStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/purchase-orders": {
         parameters: {
             query?: never;
@@ -5939,6 +5971,46 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             reason: string;
+        };
+        RncDiscrepancy: {
+            /** Format: uuid */
+            partyId: string;
+            rnc: string;
+            legalName: string;
+            isCustomer: boolean;
+            isSupplier: boolean;
+            issue: string;
+            registryName: null | string;
+            registryStatus: null | string;
+        };
+        RncLookup: {
+            rnc: string;
+            found: boolean;
+            legalName: null | string;
+            tradeName: null | string;
+            activity: null | string;
+            /** Format: date */
+            startedOn: null | string;
+            status: null | string;
+            regime: null | string;
+            /** Format: date */
+            registryDate: null | string;
+        };
+        RncRegistryImportView: {
+            /** Format: date */
+            sourceDate: string;
+            fileName: string;
+            /** Format: int32 */
+            rows: number;
+            /** Format: int32 */
+            skipped: number;
+            importedBy: string;
+            /** Format: date-time */
+            importedAt: string;
+        };
+        RncRegistryStatus: {
+            lastImport: null | components["schemas"]["RncRegistryImportView"];
+            discrepancies: components["schemas"]["RncDiscrepancy"][];
         };
         RoleRequestList: {
             items: components["schemas"]["RoleRequestView"][];
@@ -16332,6 +16404,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlantList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRnc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                rnc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RncLookup"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetRncRegistryStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RncRegistryStatus"];
                 };
             };
             /** @description Bad Request */

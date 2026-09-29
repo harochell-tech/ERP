@@ -35,7 +35,7 @@ public static class QueryEndpoints
 
     public static IReadOnlyList<Type> Handlers { get; } =
     [
-        typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler),
+        typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler), typeof(GetRncHandler), typeof(GetRncRegistryStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
         typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
@@ -68,6 +68,13 @@ public static class QueryEndpoints
         masterData.MapGet("/plants", (HttpContext http, Guid companyId, Guid? plantId, ListPlantsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPlants(companyId, s, plantId), handler, ct))
             .Describe<PlantList>(nameof(ListPlants));
+        // E-RNC-4/7: the DGII registry.
+        masterData.MapGet("/rnc/{rnc}", (HttpContext http, Guid companyId, string rnc, GetRncHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetRnc(companyId, s, rnc), handler, ct))
+            .Describe<RncLookup>(nameof(GetRnc));
+        masterData.MapGet("/rnc-registry", (HttpContext http, Guid companyId, GetRncRegistryStatusHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetRncRegistryStatus(companyId, s), handler, ct))
+            .Describe<RncRegistryStatus>(nameof(GetRncRegistryStatus));
 
         var procurement = company.MapGroup("/procurement").WithTags("Procurement");
         procurement.MapGet("/purchase-orders", (HttpContext http, Guid companyId, Guid? plantId, string? status, Guid? supplierId, int? limit, int? offset, ListPurchaseOrdersHandler handler, QueryRunner runner, CancellationToken ct)

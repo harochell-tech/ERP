@@ -483,6 +483,15 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS3-11-6 | VS3-11 | `vs3.md` records the open conditions: B-02, A-01, A-02, X-1, the real banks' formats, and no real data until B-02 or a zero-difference parallel run (E-VS1-2, E-VS2-10). |
 | E-VS3-11-7 | VS3-11 | Defects the new tests find are fixed in the PR when no approved rule changes, and reported: `Orders.LockCurrentAsync` now locks the order and takes it as it stands (a second gate-out of the same order was refused as a version conflict after waiting for the first). A fix that needs a decision stops for errata. |
 | E-VS3-11-8 | VS3-11 | No migration. |
+| E-A02-1 | A-02 | Approved by the owner on 2026-09-28 on the DGII's published official sources; errors are fixed during testing. The gate before real data stays B-02 or a zero-difference parallel run (E-VS1-2); a sources dossier backs it. |
+| E-RNC-1 | RNC registry | Source: the DGII's weekly "Listado de todos los RNC" (DGII_RNC.zip). Each import replaces the whole registry in one transaction and records the file's date, its SHA-256, the row count, the skipped rows and who imported it (`md.rnc_registry_import`, append-only). |
+| E-RNC-2 | RNC registry | (a) `rochell-migrate import-rnc-registry <zip|txt> [yyyy-MM-dd]` and a weekly server script (`deploy/staging/rnc-weekly.sh`) that downloads and imports it; when the DGII refuses the download (HTTP 403) the ZIP is downloaded in a browser and imported with the same script. The script never disguises itself as a browser. |
+| E-RNC-3 | RNC registry | `md.rnc_registry` (RNC, legal name, trade name, activity, start date, status, regime): public reference data shared by every company, without `company_id` or RLS; the application only reads it. |
+| E-RNC-4 | RNC registry | New READ permission `rnc:read` for Vendedor, Crédito, Comprador, Cuentas por pagar, Controller, Auditor and Director; `GET /master-data/rnc/{rnc}` (a 9- or 11-digit number, separators ignored). |
+| E-RNC-5 | RNC registry | The customer and supplier forms look up the RNC when the field is left and propose the registry's legal name (when the name is empty; always editable) with its status. The commands do not change: the registry helps, it does not replace what the user confirms. |
+| E-RNC-6 | RNC registry | A number that is suspended, deregistered or missing only warns, never blocks (the registry can be a week old; 39 % of RNCs are SUSPENDIDO). |
+| E-RNC-7 | RNC registry | Maestros › Padrón RNC (`GET /master-data/rnc-registry`, `rnc:read`): the registry in force and the company's customers and suppliers whose RNC is missing from it (NOT_FOUND), not ACTIVO (NOT_ACTIVE) or registered under another name (NAME_DIFFERS; names compared in upper case without punctuation or spaces). |
+| E-RNC-8 | RNC registry | The registry may be loaded on staging: it is public DGII data, not company data, so E-VS1-2 still holds. Migration 0047. |
 
 Implementation rules derived from the above (no architectural change):
 

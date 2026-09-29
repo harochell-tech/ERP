@@ -18,25 +18,25 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["APROBADOR_POLITICAS"] = "accounting_policy:approve,configuration:read,opening_inventory:post,price_list:approve,report_structure:approve,standard_cost:approve", // E-PR06-4, E-FIN1-01-5, E-VS3-01-11, E-VS3-02b-2
         ["APROBADOR_COMPRAS"] = "master_data:read,purchase_order:approve,purchase_order:approve_over_receipt,purchase_order:read",
         ["AUDITOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,ledger:read,master_data:read,payment:read,period:read,"
-            + "purchase_order:read,reconciliation:read,sales:read,supplier_invoice:read",
-        ["COMPRADOR"] = "master_data:read,purchase_order:cancel,purchase_order:create,purchase_order:read,purchase_order:submit,supplier:create,supplier:update",
+            + "purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read",
+        ["COMPRADOR"] = "master_data:read,purchase_order:cancel,purchase_order:create,purchase_order:read,purchase_order:submit,rnc:read,supplier:create,supplier:update",
         ["CONTROLLER"] = "account:manage,account_role_map:approve,accounting_policy:approve,accounting_policy:prepare,audit:read,bank:read,bank_account:manage,"
             + "bank_account_number:read,bank_charge:recognize,bank_line:unmatch,configuration:read,customer_terms:approve,customer_withholding:reverse,goods_receipt:read,goods_receipt:reverse,hash:verify,invoice:void,item:activate,"
             + "journal:repost,ledger:read,manual_journal:approve,master_data:read,match_exception:approve,opening_inventory:prepare,party_bank_account:verify,payment:read,payment:release,payment:reverse,"
             + "period:read,period_component:close,period_component:reopen,posting_rule:approve,price_list:prepare,purchase_order:approve,purchase_order:read,"
-            + "receipt:reverse,receipt_correction:approve,reconciliation:read,reconciliation:run,sales:read,standard_cost:prepare,supplier:activate,supplier_invoice:read,supplier_invoice:reverse,"
+            + "receipt:reverse,receipt_correction:approve,reconciliation:read,reconciliation:run,rnc:read,sales:read,standard_cost:prepare,supplier:activate,supplier_invoice:read,supplier_invoice:reverse,"
             + "valuation_residual:approve",
         ["DIRECTOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,ledger:read,master_data:read,payment:read,"
-            + "period:read,purchase_order:read,reconciliation:read,sales:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission
+            + "period:read,purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission
         ["CONTADOR"] = "configuration:read,ledger:read,manual_journal:prepare", // E-FIN1-01-5, E-FIN1-04-2
-        ["CUENTAS_POR_PAGAR"] = "bank:read,goods_receipt:read,master_data:read,payment:read,purchase_order:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
+        ["CUENTAS_POR_PAGAR"] = "bank:read,goods_receipt:read,master_data:read,payment:read,purchase_order:read,rnc:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_rule:activate",
         ["PROBADOR"] = "identity:act_as", // E-B03-14, TEST databases only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
-        ["VENDEDOR"] = "customer:create,customer:update,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8
-        ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,sales:read,sales_order:close",
+        ["VENDEDOR"] = "customer:create,customer:update,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8
+        ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,rnc:read,sales:read,sales_order:close",
         ["DESPACHO"] = "delivery:manage,fleet:manage,sales:read",
         ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_document:record,invoice:create,invoice:issue,sales:read",
         ["COBROS"] = "customer_withholding:record,receipt:apply,receipt:deposit,receipt:record,sales:read",
@@ -48,7 +48,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(97L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
+        Assert.Equal(98L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
         Assert.Equal(36L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
         foreach (var (role, permissions) in ExpectedRoles)
         {

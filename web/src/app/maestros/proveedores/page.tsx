@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
+import { RncHint, useRncLookup } from "@/components/RncLookup";
 import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -16,6 +17,7 @@ function CreateSupplier({ onDone }: { onDone: () => void }) {
   const create = useCommand("create-supplier", "/api/v1/companies/{companyId}/master-data/create-supplier");
   const [rnc, setRnc] = useState("");
   const [legalName, setLegalName] = useState("");
+  const registry = useRncLookup((name) => setLegalName((current) => (current.trim() ? current : name)));
   return (
     <form
       className="inline-form"
@@ -24,12 +26,13 @@ function CreateSupplier({ onDone }: { onDone: () => void }) {
         if (await create.run({ rnc: rnc.trim(), legalName: legalName.trim() })) {
           setRnc("");
           setLegalName("");
+          registry.clear();
           onDone();
         }
       }}
     >
       <Field label="RNC o cédula">
-        <input value={rnc} onChange={(e) => setRnc(e.target.value)} required />
+        <input value={rnc} onChange={(e) => setRnc(e.target.value)} onBlur={() => registry.lookUp(rnc)} required />
       </Field>
       <Field label="Razón social">
         <input value={legalName} onChange={(e) => setLegalName(e.target.value)} required />
@@ -37,6 +40,7 @@ function CreateSupplier({ onDone }: { onDone: () => void }) {
       <button type="submit" disabled={create.busy}>
         Crear proveedor
       </button>
+      <RncHint result={registry.result} />
       <ErrorBox error={create.error} />
     </form>
   );

@@ -59,6 +59,9 @@ const STATUS: Readonly<Record<string, string>> = {
   RETAINED: "Control retenido",
   // VS#3 (VS3-10b): invoices, credit notes, receipts and deposits.
   PENDING_EXTERNAL: "e-CF pendiente",
+  NOT_FOUND: "No aparece en el padrón",
+  NOT_ACTIVE: "No está activo",
+  NAME_DIFFERS: "Nombre distinto",
   ACCEPTED_EXTERNAL: "e-CF aceptado",
   PARTIALLY_PAID: "Cobrada parcialmente",
   PAID: "Cobrada",
@@ -107,6 +110,7 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   PENDING_EXTERNAL: "attention", UNAPPLIED: "attention", BOUNCED: "error",
   PARTIALLY_PAID: "progress", PARTIALLY_APPLIED: "progress", DEPOSITED: "progress", RECORDED: "progress",
   ACCEPTED_EXTERNAL: "done", PAID: "done", CREDITED: "done", APPLIED: "done",
+  NOT_FOUND: "error", NOT_ACTIVE: "attention", NAME_DIFFERS: "attention", // E-RNC-7
   REVERSED: "reversed",
 };
 
