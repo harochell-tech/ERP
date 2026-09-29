@@ -15,7 +15,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["ADMIN_SEGURIDAD"] = "iam:read,role:assign,role:revoke",
         ["ALMACENISTA"] = "goods_receipt:post,goods_receipt:read,item:create,master_data:read,purchase_order:read,receipt_correction:create",
         ["ANALISTA_FISCAL"] = "configuration:read,fiscal_rule:configure,fiscal_rule_source:register",
-        ["APROBADOR_POLITICAS"] = "accounting_policy:approve,configuration:read,opening_inventory:post,price_list:approve,report_structure:approve,sales:read,standard_cost:approve", // E-PR06-4, E-FIN1-01-5, E-VS3-01-11, E-VS3-02b-2
+        ["APROBADOR_POLITICAS"] = "accounting_policy:approve,configuration:read,opening_inventory:post,price_list:approve,quote:approve_price,report_structure:approve,sales:read,standard_cost:approve", // E-PR06-4, E-FIN1-01-5, E-VS3-01-11, E-VS3-02b-2, E-QUO1-11
         ["APROBADOR_COMPRAS"] = "master_data:read,purchase_order:approve,purchase_order:approve_over_receipt,purchase_order:read",
         ["AUDITOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,goods_receipt:read,hash:verify,iam:read,ledger:read,master_data:read,payment:read,period:read,"
             + "production:read,purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read",
@@ -36,7 +36,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["PROCESO_DIARIO"] = "fiscal_authorization:suspend", // E-FIS1-04-7, the API's daily process only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
-        ["VENDEDOR"] = "customer:create,customer:update,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8
+        ["VENDEDOR"] = "customer:create,customer:update,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11
         ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,fiscal_authorization:register,rnc:read,sales:read,sales_order:close",
         ["DESPACHO"] = "delivery:manage,fleet:manage,sales:read",
         ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,sales:read",
@@ -52,8 +52,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(111L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
-        Assert.Equal(41L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
+        Assert.Equal(113L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
+        Assert.Equal(42L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
         foreach (var (role, permissions) in ExpectedRoles)
         {
             Assert.Equal(permissions, await h.ScalarAsync<string>(
