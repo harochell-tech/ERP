@@ -5,13 +5,13 @@ namespace Rochell.ArchitectureTests;
 
 /// <summary>
 /// E-MFG1-06-4: every acceptance test of the MFG-1 baseline (§9) has at least one test tagged
-/// <c>[Trait("AcceptanceMfg1", "&lt;ID&gt;")]</c> — except the ones planned for MFG1-08, listed as pending —, every tag names a
+/// <c>[Trait("AcceptanceMfg1", "&lt;ID&gt;")]</c> (E-MFG1-08-4: none pending any more), every tag names a
 /// baseline ID, and docs/acceptance/mfg1.md lists them all.
 /// </summary>
 public sealed partial class AcceptanceMfg1TraceabilityTests
 {
-    /// <summary>MFG-10 (concurrency) and INV-M (properties) arrive with MFG1-08; remove them from here when they are tagged.</summary>
-    private static readonly IReadOnlySet<string> Pending = new HashSet<string>(StringComparer.Ordinal) { "MFG-10", "INV-M" };
+    /// <summary>IDs whose test is still to come (none since MFG1-08); a tagged ID listed here fails.</summary>
+    private static readonly IReadOnlySet<string> Pending = new HashSet<string>(StringComparer.Ordinal);
 
     private static IReadOnlySet<string> BaselineIds()
         => File.ReadLines(Path.Combine(Repo.Root, "docs", "architecture", "mfg1", "frozen-baseline-mfg1.md"))
