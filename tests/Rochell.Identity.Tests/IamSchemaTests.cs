@@ -31,14 +31,14 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["CONTADOR"] = "configuration:read,ledger:read,manual_journal:prepare", // E-FIN1-01-5, E-FIN1-04-2
         ["CUENTAS_POR_PAGAR"] = "bank:read,goods_receipt:read,master_data:read,payment:read,purchase_order:read,rnc:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
-        ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_rule:activate",
+        ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_authorization:suspend,fiscal_authorization:verify,fiscal_rule:activate,sales:read", // + E-FIS1-01-9
         ["PROBADOR"] = "identity:act_as", // E-B03-14, TEST databases only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
         ["VENDEDOR"] = "customer:create,customer:update,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8
-        ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,rnc:read,sales:read,sales_order:close",
+        ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,fiscal_authorization:register,rnc:read,sales:read,sales_order:close",
         ["DESPACHO"] = "delivery:manage,fleet:manage,sales:read",
-        ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_document:record,invoice:create,invoice:issue,sales:read",
+        ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,sales:read",
         ["COBROS"] = "customer_withholding:record,receipt:apply,receipt:deposit,receipt:record,sales:read",
         ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
         ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,production:read,production_master:manage,recipe:approve,shift_summary:post",
@@ -51,8 +51,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(108L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
-        Assert.Equal(40L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
+        Assert.Equal(111L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'"));
+        Assert.Equal(41L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule"));
         foreach (var (role, permissions) in ExpectedRoles)
         {
             Assert.Equal(permissions, await h.ScalarAsync<string>(
