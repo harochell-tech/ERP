@@ -66,7 +66,7 @@ jobs:
           BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_SECRET_ACCESS_KEY }}
         run: |
           scp deploy/staging/compose.yaml deploy/staging/Caddyfile deploy/staging/init-roles.sql \
-              deploy/staging/deploy.sh deploy/staging/backup.sh deploy/staging/seed.sh "${TARGET}:/opt/rochell-staging/"
+              deploy/staging/deploy.sh deploy/staging/backup.sh deploy/staging/seed.sh deploy/staging/seed-vs3.sh "${TARGET}:/opt/rochell-staging/"
           scp -r deploy/staging/seed "${TARGET}:/opt/rochell-staging/"
           # Values travel as environment variables (never interpolated into the script); the file is mode 600 on the server.
           vars="ROCHELL_IMAGE STAGING_HOST WORKSPACE_DOMAIN DEPLOY_DB_PASSWORD APP_DB_PASSWORD SEALER_DB_PASSWORD OIDC_CLIENT_ID

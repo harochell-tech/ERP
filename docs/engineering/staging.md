@@ -163,7 +163,7 @@ against RustFS standing in for B2, and the backup encryption round trip (`openss
 
 ## VS#3 on staging (E-VS3-10-11)
 
-After deploying VS#3, run `deploy/staging/seed-vs3.sh` on the VPS: test identities for Vendedor, Crédito, Despacho, Facturación
+After deploying VS#3 (the deploy uploads it), run `/opt/rochell-staging/seed-vs3.sh` on the VPS: test identities for Vendedor, Crédito, Despacho, Facturación
 (two, for the credit note's four eyes) and Cobros, and the sales accounts with DRAFT maps (`seed/accounts-vs3.csv`,
 `seed/account-map-vs3.csv`). Then, as the Controller in the UI: approve the maps and the sales posting rules, prepare CREDIT and
 REVENUE_ACCOUNTING (approved by the Aprobador de políticas) and register the receipts' bank account (GL 1102). Synthetic data only.
