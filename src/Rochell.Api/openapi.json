@@ -28232,6 +28232,13 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "fiscalAuthorizationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -30434,6 +30441,30 @@
         },
         "additionalProperties": false
       },
+      "FiscalPackageExemption": {
+        "required": [
+          "regime",
+          "certificateNo",
+          "projectName",
+          "billingIndicator"
+        ],
+        "type": "object",
+        "properties": {
+          "regime": {
+            "type": "string"
+          },
+          "certificateNo": {
+            "type": "string"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "billingIndicator": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "FiscalRuleList": {
         "required": [
           "items"
@@ -31344,6 +31375,16 @@
           },
           "fiscalStatus": {
             "type": "string"
+          },
+          "exemption": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FiscalPackageExemption"
+              }
+            ]
           }
         },
         "additionalProperties": false

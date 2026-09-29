@@ -4634,6 +4634,8 @@ export interface components {
             /** Format: uuid */
             partyId: string;
             deliveryLineIds: string[];
+            /** Format: uuid */
+            fiscalAuthorizationId?: null | string;
         };
         CreateMachine: {
             /** Format: uuid */
@@ -5234,6 +5236,12 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        FiscalPackageExemption: {
+            regime: string;
+            certificateNo: string;
+            projectName: string;
+            billingIndicator: string;
+        };
         FiscalRuleList: {
             items: components["schemas"]["FiscalRuleView"][];
         };
@@ -5479,6 +5487,7 @@ export interface components {
             /** Format: decimal */
             total: string;
             fiscalStatus: string;
+            exemption?: null | components["schemas"]["FiscalPackageExemption"];
         };
         InvoiceLineView: {
             /** Format: int32 */

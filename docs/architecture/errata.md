@@ -621,6 +621,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS1-02-8 | FIS1-02 | `GetSalesOrderProforma` (`GET /tax/proformas/{orderId}`): issuer, customer, the order's current lines with ITBIS from the rules in force today, computed by `TaxEngine.PreviewSalesItbisAsync` and never stored; a closed gate is `FISCAL_GATE_CLOSED`. |
 | E-FIS1-02-9 | FIS1-02 | Verifying or reactivating a certificate past `valid_until` → `AUTHORIZATION_EXPIRED`; the EXPIRED status itself arrives with FIS1-03/04. |
 | E-FIS1-02-10 | FIS1-02 | No migration. Events are numbered from the event log (documents add events without changing the row's version). |
+| E-FIS1-03-1 | FIS1-03 | `CreateInvoiceFromDeliveries` takes an optional `fiscalAuthorizationId`: the invoice is born e-CF 44; the authorization must be ACTIVE, in force and of the customer, and every line's product and unit in its scope with enough available (`AUTHORIZATION_NOT_COVERED`, `AUTHORIZATION_EXCEEDED`). |
+| E-FIS1-03-2 | FIS1-03 | `IssueInvoice` locks the authorization (after the invoice, before the delivery lines) and checks it again (`AUTHORIZATION_EXPIRED`, `AUTHORIZATION_INVALID_STATE`, `AUTHORIZATION_EXCEEDED`). |
+| E-FIS1-03-3 | FIS1-03 | `TaxRequest.Exemption`: the gate still applies and the rules in force are recorded; no ITBIS line; the determination's inputs carry the authorization, its regime and certificate number; the P-18 inputs name them too. |
+| E-FIS1-03-4 | FIS1-03 | Consumption rows and the scope's consumed totals in the issue's transaction; a line consumed in quantity or net for every scope line → EXHAUSTED (event `FiscalAuthorizationExhausted`). |
+| E-FIS1-03-5 | FIS1-03 | An e-CF 44 invoice cannot be issued as 31/32 and 44 needs an authorization (`ECF_TYPE_INVALID`). |
+| E-FIS1-03-6 | FIS1-03 | `RecordExternalFiscalDocument` takes `E44…` for an e-CF 44 (pattern from the invoice's type) with ITBIS 0. |
+| E-FIS1-03-7 | FIS1-03 | A void returns everything the invoice still consumes; a credit note of an exempt invoice returns the net it credits (no quantity: a price credit restores amount, not units); an EXHAUSTED authorization becomes ACTIVE (event `FiscalAuthorizationReopened`). Migration 0055 lets a consumption have several release rows and a release carry quantity 0. |
+| E-FIS1-03-8 | FIS1-03 | The fiscal package of an e-CF 44 carries `exemption` (regime, certificate number, project, billing indicator 4). |
+| E-FIS1-03-9 | FIS1-03 | Two issues on one balance are serialized by the authorization lock (FIS-07). |
+| E-FIS1-03-10 | FIS1-03 | Migration 0055 (partial releases); an exempt invoice's ITBIS reads "0.00". |
 
 Implementation rules derived from the above (no architectural change):
 

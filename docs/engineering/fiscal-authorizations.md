@@ -27,3 +27,12 @@ Frozen Baseline `docs/architecture/fis1/frozen-baseline-fis1.md` (E-FIS1-1…16)
 
 Queries (`sales:read`): `GET /tax/fiscal-authorizations`, `/fiscal-authorizations/{id}`, `/proformas/{salesOrderId}` (ITBIS at
 the rules in force today through `TaxEngine.PreviewSalesItbisAsync`, never stored).
+
+## FIS1-03 — exempt e-CF 44 invoices (migration 0055, E-FIS1-03-1…10)
+
+`CreateInvoiceFromDeliveries` with `fiscalAuthorizationId` → e-CF 44, every line covered (product × unit, quantity and net
+available) by an ACTIVE, in-force authorization of the customer; otherwise invoice apart with ITBIS. `IssueInvoice` locks the
+authorization, determines taxes with `TaxRequest.Exemption` (no ITBIS; inputs record the certificate), posts P-18 without its ITBIS
+line, and consumes the scope (EXHAUSTED when used up). `VoidUnfiscalizedInvoice` returns the consumption; a credit note of an e-CF 44
+(e-CF 34, ITBIS 0) returns the net it credits (never units). The fiscal package carries the exemption (regime, certificate, project,
+billing indicator 4). Shared code: `Rochell.Tax.Authorizations.AuthorizationUsage` (`CoverAsync`, `ConsumeAsync`, `ReleaseAsync`).

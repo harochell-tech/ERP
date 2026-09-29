@@ -5,6 +5,7 @@ using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Sales.Deliveries;
 using Rochell.Tax;
+using Rochell.Tax.Authorizations;
 
 namespace Rochell.Sales.Invoices;
 
@@ -50,22 +51,30 @@ internal static class Invoicing
             : throw new DomainException(SalesErrors.VersionConflict, $"The invoice changed (version {row.Version}, expected {expectedVersion}); reload and retry.");
     }
 
-    public sealed record Line(Guid InvoiceLineId, Guid DeliveryLineId, Guid OrderLineId, Guid ItemId, decimal Quantity, decimal Net, string DeliveryNo);
+    public sealed record Line(Guid InvoiceLineId, Guid DeliveryLineId, Guid OrderLineId, Guid ItemId, decimal Quantity, decimal Net, string DeliveryNo, string Uom);
 
     public static Task<List<Line>> LinesAsync(CommandContext context, Guid invoiceId, CancellationToken cancellationToken)
         => Reading.ListAsync(
             context.Connection,
             context.Transaction,
             """
-            SELECT il.invoice_line_id, il.delivery_line_id, dl.sales_order_line_id, il.item_id, il.quantity, il.net_amount::numeric(19,2), d.delivery_no
+            SELECT il.invoice_line_id, il.delivery_line_id, dl.sales_order_line_id, il.item_id, il.quantity, il.net_amount::numeric(19,2), d.delivery_no, il.uom
             FROM sal.invoice_line il JOIN log.delivery_line dl ON dl.delivery_line_id = il.delivery_line_id JOIN log.delivery d ON d.delivery_id = dl.delivery_id
             WHERE il.invoice_id = @i ORDER BY il.delivery_line_id
             """,
-            r => new Line(r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetGuid(3), r.GetDecimal(4), r.GetDecimal(5), r.GetString(6)),
+            r => new Line(r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetGuid(3), r.GetDecimal(4), r.GetDecimal(5), r.GetString(6), r.GetString(7)),
             cancellationToken,
             ("i", invoiceId));
 
     public static string DefaultEcfType(string? rnc) => rnc?.Length == 9 ? "31" : "32";
+
+    /// <summary>E-FIS1-01-7: the e-CF type of an invoice under a fiscal authorization (Regímenes Especiales).</summary>
+    public const string ExemptEcfType = "44";
+
+    public static Task<Guid?> AuthorizationAsync(CommandContext context, Guid invoiceId, CancellationToken cancellationToken)
+        => SalesSql.ScalarAsync<Guid?>(context, "SELECT fiscal_authorization_id FROM sal.invoice WHERE invoice_id = @i", cancellationToken, ("i", invoiceId));
+
+    public static List<CoveredLine> Covered(IEnumerable<Line> lines) => [.. lines.Select(l => new CoveredLine(l.InvoiceLineId, l.ItemId, l.Uom, l.Quantity, l.Net))];
 
     public static string M(decimal value) => value.ToString(CultureInfo.InvariantCulture);
 }
@@ -112,14 +121,21 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
         }
 
         var lines = billable.OrderBy(b => ids.ToList().IndexOf(b.DeliveryLineId))
-            .Select(b => (b, Net: decimal.Round(b.Remaining * b.UnitPrice, 2, MidpointRounding.AwayFromZero))).ToList();
+            .Select(b => (b, Net: decimal.Round(b.Remaining * b.UnitPrice, 2, MidpointRounding.AwayFromZero), LineId: context.Ids.NewId())).ToList();
         var net = lines.Sum(l => l.Net);
+        if (command.FiscalAuthorizationId is { } authorization)
+        {
+            // E-FIS1-03-1 (D-05): an exempt invoice is exempt as a whole; a line out of the scope is invoiced apart with ITBIS.
+            await AuthorizationUsage.CoverAsync(
+                context, authorization, command.PartyId, [.. lines.Select(l => new CoveredLine(l.LineId, l.b.ItemId, l.b.Uom, l.b.Remaining, l.Net))], cancellationToken).ConfigureAwait(false);
+        }
+
         var creator = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         await SalesSql.LockAsync(context, "invoice-no", cancellationToken).ConfigureAwait(false);
         var last = await SalesSql.ScalarAsync<int?>(
             context, "SELECT max(substring(invoice_no from 4)::int) FROM sal.invoice WHERE company_id = @c", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false) ?? 0;
         var invoiceNo = "FA-" + (last + 1).ToString("D6", CultureInfo.InvariantCulture);
-        var ecfType = Invoicing.DefaultEcfType(rnc);
+        var ecfType = command.FiscalAuthorizationId is null ? Invoicing.DefaultEcfType(rnc) : Invoicing.ExemptEcfType;
         var eventId = await context.AppendEventAsync(
             new EventDraft(
                 "InvoiceCreated",
@@ -127,15 +143,16 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
                 Invoicing.Aggregate,
                 context.ResultRef,
                 1,
-                JsonSerializer.Serialize(new { invoiceId = context.ResultRef, invoiceNo, partyId = command.PartyId, ecfType, netTotal = Invoicing.M(net), lines = lines.Select(l => new { deliveryLineId = l.b.DeliveryLineId, quantity = Invoicing.M(l.b.Remaining), net = Invoicing.M(l.Net) }) }),
+                JsonSerializer.Serialize(new { invoiceId = context.ResultRef, invoiceNo, partyId = command.PartyId, ecfType, fiscalAuthorizationId = command.FiscalAuthorizationId, netTotal = Invoicing.M(net), lines = lines.Select(l => new { deliveryLineId = l.b.DeliveryLineId, quantity = Invoicing.M(l.b.Remaining), net = Invoicing.M(l.Net) }) }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO sal.invoice (invoice_id, company_id, invoice_no, party_id, ecf_type, commercial_status, accounting_status, fiscal_status, net_total, created_by, version)
-            VALUES (@id, @c, @no, @p, @ecf, 'DRAFT', 'NOT_POSTED', 'PENDING', @net, @by, 1)
+            INSERT INTO sal.invoice (invoice_id, company_id, invoice_no, party_id, ecf_type, commercial_status, accounting_status, fiscal_status, net_total, created_by, version,
+                                     fiscal_authorization_id)
+            VALUES (@id, @c, @no, @p, @ecf, 'DRAFT', 'NOT_POSTED', 'PENDING', @net, @by, 1, @auth)
             """,
             cancellationToken,
             ("id", context.ResultRef),
@@ -144,9 +161,10 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
             ("p", command.PartyId),
             ("ecf", ecfType),
             ("net", net),
-            ("by", creator)).ConfigureAwait(false);
+            ("by", creator),
+            ("auth", command.FiscalAuthorizationId)).ConfigureAwait(false);
         var no = 0;
-        foreach (var (b, lineNet) in lines)
+        foreach (var (b, lineNet, lineId) in lines)
         {
             await Sql.ExecuteAsync(
                 context.Connection,
@@ -156,7 +174,7 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
                 VALUES (@id, @c, @i, @no, @dl, @item, @u, @q, @p, @n)
                 """,
                 cancellationToken,
-                ("id", context.Ids.NewId()),
+                ("id", lineId),
                 ("c", context.CompanyId),
                 ("i", context.ResultRef),
                 ("no", ++no),
@@ -192,13 +210,19 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
         }
 
         var ecfType = (command.EcfType ?? row.EcfType).Trim();
-        if (ecfType is not ("31" or "32"))
+        var authorization = await Invoicing.AuthorizationAsync(context, command.InvoiceId, cancellationToken).ConfigureAwait(false);
+        if (authorization is null ? ecfType is not ("31" or "32") : ecfType != Invoicing.ExemptEcfType)
         {
-            throw new DomainException(InvoiceErrors.EcfTypeInvalid, "The e-CF type is 31 (crédito fiscal) or 32 (consumo) (E-VS3-05-8).");
+            throw new DomainException(InvoiceErrors.EcfTypeInvalid, authorization is null
+                ? "The e-CF type is 31 (crédito fiscal) or 32 (consumo) (E-VS3-05-8); 44 needs a fiscal authorization."
+                : "An invoice under a fiscal authorization is an e-CF 44; invoice it anew without the authorization to charge ITBIS (E-FIS1-03-5).");
         }
 
-        // SAL-09: the delivery lines in id order; the invoiced quantity never passes the delivered one.
+        // SAL-09: the delivery lines in id order; the invoiced quantity never passes the delivered one. E-FIS1-03-2: the authorization first.
         var lines = await Invoicing.LinesAsync(context, command.InvoiceId, cancellationToken).ConfigureAwait(false);
+        var exemption = authorization is { } auth
+            ? await AuthorizationUsage.CoverAsync(context, auth, row.PartyId, Invoicing.Covered(lines), cancellationToken).ConfigureAwait(false)
+            : null;
         foreach (var line in lines)
         {
             var remaining = await SalesSql.ScalarAsync<decimal?>(
@@ -216,13 +240,18 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
             ?? throw new DomainException(InvoiceErrors.TermsMissing, "The customer has no approved payment terms.");
         var determination = await _tax.DetermineAsync(
             context,
-            new TaxRequest("SalesInvoice", command.InvoiceId, today, row.PartyId, lines.Select(l => new TaxLineInput(l.InvoiceLineId, l.ItemId, l.Net)).ToList(), TaxDirections.Sale),
+            new TaxRequest("SalesInvoice", command.InvoiceId, today, row.PartyId, lines.Select(l => new TaxLineInput(l.InvoiceLineId, l.ItemId, l.Net)).ToList(), TaxDirections.Sale, exemption),
             cancellationToken).ConfigureAwait(false);
-        var itbis = determination.Taxes.Where(t => t.Effect == TaxEffects.Output).Sum(t => t.Amount);
+        var itbis = determination.Taxes.Where(t => t.Effect == TaxEffects.Output).Sum(t => t.Amount) + SalesSql.Zero; // "0.00" for an exempt invoice
         var total = row.Net + itbis;
         var arDocId = context.Ids.NewId();
 
         var inputs = new Dictionary<string, string> { ["invoice_no"] = row.InvoiceNo, ["tax_determination_id"] = determination.DeterminationId.ToString() };
+        if (exemption is not null)
+        {
+            inputs["fiscal_authorization"] = $"{exemption.Regime} {exemption.CertificateNo}";
+        }
+
         var postingLines = new List<PostingLineInput> { new("P18-DR-AR", "invoice_total", total, PartyId: row.PartyId, SubledgerRef: arDocId, Inputs: inputs) };
         foreach (var line in lines)
         {
@@ -320,6 +349,12 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
                 ("q", line.Quantity),
                 ("n", line.Net),
                 ("e", eventId)).ConfigureAwait(false);
+        }
+
+        if (exemption is not null)
+        {
+            // E-FIS1-03-4: the consumption of the authorization, in the issue's transaction.
+            await AuthorizationUsage.ConsumeAsync(context, exemption.AuthorizationId, Invoicing.Covered(lines), eventId, CommandType, cancellationToken).ConfigureAwait(false);
         }
 
         await context.AppendStateAsync(Invoicing.Aggregate, command.InvoiceId, "DOCUMENT", "DRAFT", "CONFIRMED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
@@ -516,6 +551,13 @@ public sealed class VoidUnfiscalizedInvoiceHandler : ICommandHandler<VoidUnfisca
         {
             await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE log.delivery_line SET qty_invoiced = qty_invoiced - @q WHERE delivery_line_id = @l", cancellationToken, ("q", line.Quantity), ("l", line.DeliveryLineId)).ConfigureAwait(false);
             await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE sal.sales_order_line SET qty_invoiced = qty_invoiced - @q WHERE line_id = @l", cancellationToken, ("q", line.Quantity), ("l", line.OrderLineId)).ConfigureAwait(false);
+        }
+
+        if (await Invoicing.AuthorizationAsync(context, command.InvoiceId, cancellationToken).ConfigureAwait(false) is { } authorization)
+        {
+            // E-FIS1-03-7: the void returns everything the invoice still consumes.
+            await AuthorizationUsage.ReleaseAsync(
+                context, authorization, [.. lines.Select(l => new ReleasedLine(l.InvoiceLineId, l.Quantity, l.Net))], eventId, CommandType, cancellationToken).ConfigureAwait(false);
         }
 
         await context.AppendStateAsync(Invoicing.Aggregate, command.InvoiceId, "DOCUMENT", "CONFIRMED", "VOIDED", CommandType, eventId, cancellationToken, reason).ConfigureAwait(false);

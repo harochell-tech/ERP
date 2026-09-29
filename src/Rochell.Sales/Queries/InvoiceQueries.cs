@@ -168,9 +168,12 @@ public sealed class GetInvoiceHandler : IQueryHandler<GetInvoice>
 public sealed record GetInvoiceFiscalPackage(Guid CompanyId, Guid SessionId, Guid InvoiceId) : IQuery;
 
 /// <summary>E-VS3-05-9 / v2.1 §4.1: everything the user types into the provider's portal, taken from the issued invoice.</summary>
+/// <summary>E-FIS1-03-8: an e-CF 44 carries its exemption (every line IndicadorFacturacion 4 = exento; the certificate for InformacionAdicionalComprador).</summary>
+public sealed record FiscalPackageExemption(string Regime, string CertificateNo, string ProjectName, string BillingIndicator);
+
 public sealed record InvoiceFiscalPackage(
     string InvoiceNo, string EcfType, DateOnly InvoiceDate, DateOnly DueDate, string IssuerRnc, string IssuerName, string ReceiverRnc, string ReceiverName,
-    IReadOnlyList<InvoiceLineView> Lines, decimal NetTotal, decimal TaxTotal, decimal Total, string FiscalStatus);
+    IReadOnlyList<InvoiceLineView> Lines, decimal NetTotal, decimal TaxTotal, decimal Total, string FiscalStatus, FiscalPackageExemption? Exemption = null);
 
 [RequiresPermission("sales:read")]
 public sealed class GetInvoiceFiscalPackageHandler : IQueryHandler<GetInvoiceFiscalPackage>
@@ -204,7 +207,19 @@ public sealed class GetInvoiceFiscalPackageHandler : IQueryHandler<GetInvoiceFis
         }
 
         var lines = await InvoiceLines.ReadAsync(context, query.InvoiceId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new InvoiceFiscalPackage(h.No, h.Type, h.Date.Value, h.Due.Value, h.IssuerRnc, h.IssuerName, h.ReceiverRnc, h.ReceiverName, lines, h.Net, h.Tax.Value, h.Total.Value, h.Fiscal));
+        var exemption = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT a.regime, a.certificate_no, a.project_name
+            FROM sal.invoice i JOIN tax.fiscal_authorization a ON a.authorization_id = i.fiscal_authorization_id
+            WHERE i.invoice_id = @i
+            """,
+            r => new FiscalPackageExemption(r.GetString(0), r.GetString(1), r.GetString(2), "4"),
+            cancellationToken,
+            ("i", query.InvoiceId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new InvoiceFiscalPackage(
+            h.No, h.Type, h.Date.Value, h.Due.Value, h.IssuerRnc, h.IssuerName, h.ReceiverRnc, h.ReceiverName, lines, h.Net, h.Tax.Value, h.Total.Value, h.Fiscal, exemption));
     }
 }
 

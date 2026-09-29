@@ -4,9 +4,11 @@ namespace Rochell.Sales.Invoices;
 
 /// <summary>
 /// E-VS3-05-3: a DRAFT invoice FA-… of one customer from delivered, not yet invoiced delivery lines (each for all it still owes,
-/// at the order price, net of ITBIS).
+/// at the order price, net of ITBIS). E-FIS1-03-1: with <paramref name="FiscalAuthorizationId"/> it is an exempt e-CF 44, every line
+/// covered by that ACTIVE authorization of the customer.
 /// </summary>
-public sealed record CreateInvoiceFromDeliveries(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, IReadOnlyList<Guid> DeliveryLineIds) : ICommand;
+public sealed record CreateInvoiceFromDeliveries(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, IReadOnlyList<Guid> DeliveryLineIds, Guid? FiscalAuthorizationId = null)
+    : ICommand;
 
 /// <summary>
 /// E-VS3-05-2/4/5/8: C-11 — commercial CONFIRMED, accounting POSTED (P-18) and fiscal PENDING_EXTERNAL in one transaction, with
