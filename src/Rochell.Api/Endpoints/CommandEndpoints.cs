@@ -29,6 +29,7 @@ using Rochell.Sales.Fleet;
 using Rochell.Sales.Invoices;
 using Rochell.Sales.Opening;
 using Rochell.Sales.Orders;
+using Rochell.Sales.Quotes;
 using Rochell.Sales.Pricing;
 using Rochell.Sales.Receipts;
 using Rochell.Tax;
@@ -187,6 +188,15 @@ public static class CommandEndpoints
         sales.MapCommand<ApproveCredit, ApproveCreditHandler>();
         sales.MapCommand<RejectCredit, RejectCreditHandler>();
         sales.MapCommand<CancelSalesOrder, CancelSalesOrderHandler>();
+        sales.MapCommand<CreateQuote, CreateQuoteHandler>();
+        sales.MapCommand<UpdateDraftQuote, UpdateDraftQuoteHandler>();
+        sales.MapCommand<SubmitQuoteForApproval, SubmitQuoteForApprovalHandler>();
+        sales.MapCommand<ApproveQuotePrices, ApproveQuotePricesHandler>();
+        sales.MapCommand<ReturnQuoteToDraft, ReturnQuoteToDraftHandler>();
+        sales.MapCommand<SendQuote, SendQuoteHandler>();
+        sales.MapCommand<MarkQuoteLost, MarkQuoteLostHandler>();
+        sales.MapCommand<CancelQuote, CancelQuoteHandler>();
+        sales.MapCommand<CopyQuote, CopyQuoteHandler>();
         sales.MapCommand<PlanDelivery, PlanDeliveryHandler>();
         sales.MapCommand<StartLoading, StartLoadingHandler>();
         sales.MapCommand<ConfirmLoaded, ConfirmLoadedHandler>();
@@ -267,6 +277,8 @@ public static class CommandEndpoints
         typeof(RegisterVehicleHandler), typeof(UpdateVehicleHandler), typeof(DeactivateVehicleHandler), typeof(ActivateVehicleHandler), typeof(RegisterDriverHandler), typeof(UpdateDriverHandler), typeof(DeactivateDriverHandler), typeof(ActivateDriverHandler),
         typeof(PrepareOpeningInventoryHandler), typeof(PostOpeningInventoryHandler), typeof(ReverseOpeningInventoryHandler),
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),
+        typeof(CreateQuoteHandler), typeof(UpdateDraftQuoteHandler), typeof(SubmitQuoteForApprovalHandler), typeof(ApproveQuotePricesHandler), typeof(ReturnQuoteToDraftHandler),
+        typeof(SendQuoteHandler), typeof(MarkQuoteLostHandler), typeof(CancelQuoteHandler), typeof(CopyQuoteHandler),
         typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),

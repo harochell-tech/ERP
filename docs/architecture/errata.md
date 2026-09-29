@@ -676,6 +676,18 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-QUO1-01-10 | QUO1-01 | The schema only has the party FK; the commands check a DRAFT or ACTIVE customer (QUO1-02). |
 | E-QUO1-01-11 | QUO1-01 | `quote:manage` (VENDEDOR), `quote:approve_price` (APROBADOR_POLITICAS); SoD pair; 113 permissions, 42 SoD rules. |
 | E-QUO1-01-12 | QUO1-01 | Migration 0057 (tables, guards, state history, RLS, column grants, the order column) and the table inventory. |
+| E-QUO1-02-1 | QUO1-02 | `quote:manage`: CreateQuote, UpdateDraftQuote, SubmitQuoteForApproval, SendQuote, MarkQuoteLost, CancelQuote, CopyQuote; `quote:approve_price`: ApproveQuotePrices (step-up) and ReturnQuoteToDraft (reason). |
+| E-QUO1-02-2 | QUO1-02 | A line is item, unit, quantity and an optional price (none = the list's); the list price comes from the list in force, missing → `PRICE_MISSING`. |
+| E-QUO1-02-3 | QUO1-02 | The party is a DRAFT or ACTIVE customer; blocked or not a customer is refused. |
+| E-QUO1-02-4 | QUO1-02 | The quote date is today's business date; `valid_until` required and not before today (`QUOTE_VALIDITY_INVALID`). |
+| E-QUO1-02-5 | QUO1-02 | Submitting needs a line below the list without approval (`QUOTE_NOTHING_TO_APPROVE`); a pending quote is not edited: the approver approves or returns it with a reason. |
+| E-QUO1-02-6 | QUO1-02 | Approval covers every special line of the current lines version; not by the author (`QUOTE_SAME_PERSON`, also a CHECK); new lines with a special price need a new approval. |
+| E-QUO1-02-7 | QUO1-02 | Sending needs the current approval when there are special prices (`QUOTE_PRICE_APPROVAL_REQUIRED`) and a quote not expired (`QUOTE_EXPIRED`); a sent quote is frozen. |
+| E-QUO1-02-8 | QUO1-02 | Lost (from SENT) and cancelled (from DRAFT or SENT) need a reason (`QUOTE_REASON_REQUIRED`). |
+| E-QUO1-02-9 | QUO1-02 | CopyQuote from any status: a new DRAFT with the same customer, header and quoted prices, list prices in force and a new required validity; special prices need approval again. |
+| E-QUO1-02-10 | QUO1-02 | Queries with `sales:read`: list (status, customer, expired only), detail (lines with list and quoted price and the special flag, approval, history, order, copies), print (issuer, customer, lines with informative ITBIS at the quote date's rule, totals, validity, notes); "expired" is derived. |
+| E-QUO1-02-11 | QUO1-02 | 9 commands under `/sales/`, 3 queries under `/sales/quotes`; 162 command endpoints. |
+| E-QUO1-02-12 | QUO1-02 | Error codes `QUOTE_NOT_FOUND`, `QUOTE_INVALID_STATE`, `QUOTE_VERSION_CONFLICT`, `QUOTE_VALIDITY_INVALID`, `QUOTE_NOTHING_TO_APPROVE`, `QUOTE_PRICE_APPROVAL_REQUIRED`, `QUOTE_SAME_PERSON`, `QUOTE_REASON_REQUIRED`, `QUOTE_EXPIRED`. |
 
 Implementation rules derived from the above (no architectural change):
 
