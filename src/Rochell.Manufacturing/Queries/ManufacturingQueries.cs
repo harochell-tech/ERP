@@ -392,3 +392,66 @@ public sealed class ListCostCollectorsHandler : IQueryHandler<ListCostCollectors
         return ApiJson.Serialize(new CostCollectorList(items));
     }
 }
+
+// E-MFG1-06-1: a plant's production of one business date — runs, units, scrap and lots; consumption real vs theoretical per material.
+
+public sealed record GetProductionDay(Guid CompanyId, Guid SessionId, Guid PlantId, DateOnly BusinessDate) : IQuery;
+
+public sealed record ProductionDayRun(
+    Guid RunId, string RunNo, string MachineCode, string ShiftCode, string ItemCode, string Status, string? SummaryStatus, decimal? GoodUnits, decimal? MixScrapUnits,
+    decimal? FreshScrapUnits, string? LotCode, string? LotStatus);
+
+public sealed record ProductionDayMaterial(Guid MaterialItemId, string MaterialCode, string BaseUom, decimal Qty, decimal TheoreticalQty, decimal Difference);
+
+public sealed record ProductionDay(Guid PlantId, DateOnly BusinessDate, IReadOnlyList<ProductionDayRun> Runs, decimal GoodUnits, IReadOnlyList<ProductionDayMaterial> Materials);
+
+[RequiresPermission("production:read")]
+public sealed class GetProductionDayHandler : IQueryHandler<GetProductionDay>
+{
+    public string QueryType => "Manufacturing.GetProductionDay";
+
+    public async Task<string> HandleAsync(GetProductionDay query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var runs = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT r.run_id, r.run_no, m.code, s.code, i.code, r.status, ss.status, ss.good_units, ss.mix_scrap_units, ss.fresh_scrap_units, l.lot_code, f.status
+            FROM mfg.production_run r
+            JOIN md.machine m ON m.machine_id = r.machine_id
+            JOIN mfg.shift s ON s.shift_id = r.shift_id
+            JOIN md.item i ON i.item_id = r.item_id
+            LEFT JOIN mfg.shift_summary ss ON ss.run_id = r.run_id AND ss.status IN ('DRAFT', 'POSTED')
+            LEFT JOIN mfg.fg_lot f ON f.summary_id = ss.summary_id
+            LEFT JOIN inv.lot l ON l.lot_id = f.lot_id
+            WHERE r.company_id = @c AND r.plant_id = @p AND r.business_date = @d
+            ORDER BY s.starts_at, m.code, r.run_no
+            """,
+            r => new ProductionDayRun(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.NullableString(6),
+                r.IsDBNull(7) ? null : r.GetDecimal(7), r.IsDBNull(8) ? null : r.GetDecimal(8), r.IsDBNull(9) ? null : r.GetDecimal(9), r.NullableString(10), r.NullableString(11)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("p", query.PlantId),
+            ("d", query.BusinessDate)).ConfigureAwait(false);
+        var materials = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT c.material_item_id, i.code, i.base_uom, sum(c.qty), sum(c.theoretical_qty), sum(c.qty) - sum(c.theoretical_qty)
+            FROM mfg.material_consumption c
+            JOIN mfg.shift_summary ss ON ss.summary_id = c.summary_id AND ss.status IN ('DRAFT', 'POSTED')
+            JOIN mfg.production_run r ON r.run_id = ss.run_id
+            JOIN md.item i ON i.item_id = c.material_item_id
+            WHERE r.company_id = @c AND r.plant_id = @p AND r.business_date = @d
+            GROUP BY c.material_item_id, i.code, i.base_uom ORDER BY i.code
+            """,
+            r => new ProductionDayMaterial(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("p", query.PlantId),
+            ("d", query.BusinessDate)).ConfigureAwait(false);
+        return ApiJson.Serialize(new ProductionDay(query.PlantId, query.BusinessDate, runs, runs.Sum(r => r.GoodUnits ?? 0m), materials));
+    }
+}

@@ -561,6 +561,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG1-05-6 | MFG1-05 | Policy PRODUCTION, parameter `usage_tolerance_pct` as a fraction 0–1 like the other tolerances (e.g. 0.025 = 2.5 %); without an ACTIVE version USAGE-TOLERANCE reports FAILED once there is posted production (MATCHED when there is none). |
 | E-MFG1-05-7 | MFG1-05 | Query `ListCostCollectors` (plant, month, status): runs, WIP balance, usage and price variances; `production:read`. |
 | E-MFG1-05-8 | MFG1-05 | Migration 0052. |
+| E-MFG1-06-1 | MFG1-06 | `GetProductionDay` (plant + business date, `production:read`, `GET /manufacturing/production-day`): each run (machine, shift, product, statuses, good units, mix and fresh scrap, lot) and the day's real vs theoretical consumption per material. |
+| E-MFG1-06-2 | MFG1-06 | E2E-M1 over HTTP (`ManufacturingAcceptanceTests`): machine and shift → recipe → standard from the recipe → run → summary → posting → dispatch from CURADO refused → release → pickup → invoice → settlement → INV-MOV refused before COST-SET, then OP-DAY, COST-SET and INV-MOV closed. The raw materials' stock comes from fixture receipts (their purchase is VS#1's E2E). |
+| E-MFG1-06-3 | MFG1-06 | New acceptance tests MFG-01 (run without an ACTIVE recipe → `RECIPE_NOT_ACTIVE`) and MFG-04 over the API (confirm-loaded from CURADO → `LOCATION_INVALID`); MFG-10 and INV-M arrive with MFG1-08. |
+| E-MFG1-06-4 | MFG1-06 | `[Trait("AcceptanceMfg1", "<ID>")]`, `docs/acceptance/mfg1.md` and `AcceptanceMfg1TraceabilityTests` (pending IDs listed in the test and the matrix; a tagged pending ID fails). |
+| E-MFG1-06-5 | MFG1-06 | No migration. |
 
 Implementation rules derived from the above (no architectural change):
 

@@ -87,3 +87,10 @@ is SETTLED for good and its runs can no longer be reversed.
 
 Close snapshots: OP-DAY records the runs by status; COST-SET the collectors and the WIP balance by collector. `rochell-migrate
 open-periods` opens OP-DAY and COST-SET with the other components. Query `GET /manufacturing/cost-collectors`.
+
+## MFG1-06 — production day, E2E-M1 over the API, acceptance matrix (E-MFG1-06-1…5)
+
+`GET /manufacturing/production-day?plantId=&businessDate=` (`production:read`): the day's runs with their summary and lot, and the
+consumption per material (real, theoretical, difference). E2E-M1 runs over HTTP in `Rochell.Api.Tests`
+(`ManufacturingAcceptanceTests`); the acceptance matrix is `docs/acceptance/mfg1.md` (MFG-10 and INV-M pending for MFG1-08, the UI
+half of E2E-M1 for MFG1-07).

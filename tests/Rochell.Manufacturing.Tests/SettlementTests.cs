@@ -30,6 +30,7 @@ public sealed class SettlementTests(PostgresFixture postgres)
         return (s, run, started.GetProperty("collectorId").GetGuid(), usage, price);
     }
 
+    [Trait("AcceptanceMfg1", "MFG-07")]
     [Fact]
     public async Task MFG07_the_settlement_splits_the_WIP_into_usage_and_price_variances_and_leaves_it_at_zero()
     {
@@ -65,6 +66,7 @@ public sealed class SettlementTests(PostgresFixture postgres)
             .Select(r => $"{r.GetProperty("code").GetString()}:{r.GetProperty("status").GetString()}").Order(StringComparer.Ordinal)));
     }
 
+    [Trait("AcceptanceMfg1", "MFG-11")]
     [Fact]
     public async Task MFG11_production_reconciliations_report_open_runs_usage_out_of_tolerance_and_the_close_order()
     {

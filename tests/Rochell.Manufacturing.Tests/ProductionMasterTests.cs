@@ -82,6 +82,7 @@ public sealed class ProductionMasterTests(PostgresFixture postgres)
             $"{x.GetProperty("code").GetString()}:{x.GetProperty("startsAt").GetString()}-{x.GetProperty("endsAt").GetString()}:{x.GetProperty("crossesMidnight").GetBoolean()}")));
     }
 
+    [Trait("AcceptanceMfg1", "MFG-01")]
     [Fact]
     public async Task A_recipe_is_prepared_by_the_supervisor_and_approved_by_the_plant_manager_replacing_the_active_one()
     {
@@ -139,6 +140,7 @@ public sealed class ProductionMasterTests(PostgresFixture postgres)
         Assert.Equal(s.Area, await h.ScalarAsync<Guid>("SELECT valuation_area_id FROM md.standard_cost_version WHERE cost_version_id = @id", ("id", cost.GetProperty("costVersionId").GetGuid())));
     }
 
+    [Trait("AcceptanceMfg1", "MFG-08")]
     [Fact]
     public async Task Approving_a_new_standard_with_stock_revalues_it_with_REVAL_unless_units_are_in_transit()
     {

@@ -19365,6 +19365,90 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/manufacturing/production-day": {
+      "get": {
+        "tags": [
+          "Manufacturing"
+        ],
+        "operationId": "GetProductionDay",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "plantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "businessDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductionDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/sales/plants": {
       "get": {
         "tags": [
@@ -32433,6 +32517,164 @@
             ]
           },
           "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProductionDay": {
+        "required": [
+          "plantId",
+          "businessDate",
+          "runs",
+          "goodUnits",
+          "materials"
+        ],
+        "type": "object",
+        "properties": {
+          "plantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionDayRun"
+            }
+          },
+          "goodUnits": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductionDayMaterial"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProductionDayMaterial": {
+        "required": [
+          "materialItemId",
+          "materialCode",
+          "baseUom",
+          "qty",
+          "theoreticalQty",
+          "difference"
+        ],
+        "type": "object",
+        "properties": {
+          "materialItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "materialCode": {
+            "type": "string"
+          },
+          "baseUom": {
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "theoreticalQty": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "difference": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProductionDayRun": {
+        "required": [
+          "runId",
+          "runNo",
+          "machineCode",
+          "shiftCode",
+          "itemCode",
+          "status",
+          "summaryStatus",
+          "goodUnits",
+          "mixScrapUnits",
+          "freshScrapUnits",
+          "lotCode",
+          "lotStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runNo": {
+            "type": "string"
+          },
+          "machineCode": {
+            "type": "string"
+          },
+          "shiftCode": {
+            "type": "string"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summaryStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "goodUnits": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "mixScrapUnits": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "freshScrapUnits": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "lotCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lotStatus": {
             "type": [
               "null",
               "string"
