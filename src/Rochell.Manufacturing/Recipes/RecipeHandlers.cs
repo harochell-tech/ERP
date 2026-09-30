@@ -188,7 +188,7 @@ public sealed class ApproveRecipeHandler : ICommandHandler<ApproveRecipe>
         }
 
         var approver = await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == row.PreparedBy)
+        if (approver == row.PreparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(ManufacturingErrors.FourEyes, "A recipe is approved by someone other than who prepared it.");
         }

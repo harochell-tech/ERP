@@ -62,7 +62,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
                 ("r", role)));
         }
 
-        Assert.Equal(ExpectedRoles.Count, (int)await h.ScalarAsync<long>("SELECT count(*) FROM iam.role WHERE code <> 'TEST_PINGER'"));
+        Assert.Equal(ExpectedRoles.Count + 1, (int)await h.ScalarAsync<long>("SELECT count(*) FROM iam.role WHERE code <> 'TEST_PINGER'")); // + SUPERADMIN (SuperadminTests)
     }
 
     [Fact]
@@ -75,6 +75,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             SELECT count(*) FROM iam.sod_rule s
             JOIN iam.role_permission a ON a.permission_code = s.permission_a
             JOIN iam.role_permission b ON b.permission_code = s.permission_b AND b.role_id = a.role_id
+            WHERE a.role_id <> (SELECT role_id FROM iam.role WHERE code = 'SUPERADMIN') -- E-ADM-2-3: exempt by design
             """));
     }
 

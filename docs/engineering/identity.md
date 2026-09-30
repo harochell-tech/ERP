@@ -33,6 +33,8 @@ of duties and the four-eyes CHECKs apply to them exactly as to people.
 
 ## Director (E-ADM-1)
 
+(The "nobody holds every permission" part is superseded by the superadministrator, E-ADM-2, below.)
+
 Role `DIRECTOR` (migration `0031__director_role.sql`) holds every READ permission of the matrix — including
 `bank_account_number:read` — and no WRITE or SECURITY permission: it opens every screen and report and executes nothing, so it
 takes part in no segregation-of-duties pair. Nobody holds every permission: SoD pairs and the four-eyes CHECKs (preparer ≠
@@ -66,3 +68,23 @@ is written at every sign-in and step-up when the token carries one (trimmed, at 
 unchanged) and never used for identity: the e-mail and the OIDC subject stay the identity. Queries that show who prepared,
 approved or changed something return `coalesce(display_name, email)`; the users and role-request lists keep the e-mail and add
 `displayName` / `userDisplayName`; the session description adds `displayName` and each company's `plants` (code and name).
+
+## Superadministrator (ADM-2, E-ADM-2-1…7)
+
+Role `SUPERADMIN` (migration `0061__superadmin.sql`) holds every permission except `identity:act_as`; a trigger on
+`iam.permission` grants it each permission a later migration adds. An assignment is company-wide and ends within 90 days
+(`iam.role_assignment_superadmin_term` fills 90 days when no end is given and refuses more); it is revoked earlier like any role
+(`valid_to` may be brought forward while in the future) and renewed with a new request. The first one is granted with
+`rochell-migrate grant-role <email> SUPERADMIN <rnc>`, which prints the end date.
+
+`iam.controls_waived(company, user[, at])` is true while the user holds an unexpired SUPERADMIN assignment. With it:
+
+- `iam.enforce_sod()` does not check the user (roles granted meanwhile remain after the assignment ends);
+- the 22 "decider ≠ preparer" rules, now `core.four_eyes(decider, preparer, constraint)` triggers (SQLSTATE 23514 and the former
+  constraint name), and the role-request requester ≠ decider rules let the same person decide; the affected user of a role request
+  still never decides, and nobody requests or grants roles for themselves;
+- the 24 command checks call `ControlWaiver.WaivedAsync(context, ct)` (Platform, application clock) only when decider = preparer.
+
+Each waiver sets `app.controls_waived` for the transaction: `core.command_log.controls_waived` is set when the command's result
+is written and `core.state_history.controls_waived` on rows inserted after it. CONTROLS-WAIVED (WARNING) lists the waived
+commands of the cutoff's month.

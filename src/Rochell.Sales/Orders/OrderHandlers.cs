@@ -449,7 +449,7 @@ internal static class CreditDecisions
 
         await Orders.LockCustomerCreditAsync(context, row.PartyId, cancellationToken).ConfigureAwait(false);
         var decider = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (decider == row.CreatedBy)
+        if (decider == row.CreatedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(SalesErrors.FourEyes, "Credit is decided by someone other than who created the order (SAL-02).");
         }

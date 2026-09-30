@@ -29,7 +29,7 @@ public static class Reconciliations
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
          "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
          "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER",
-         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606"];
+         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -544,6 +544,17 @@ public static class Reconciliations
             FROM gl WHERE (SELECT coalesce(sum(itbis_to_advance), 0) FROM r WHERE record_kind = 'NCF') <> gl.amount
             UNION ALL
             SELECT 'ncf:' || r.ncf, r.total_amount, NULL::numeric, w, 'WARNING', NULL::text FROM r CROSS JOIN unnest(r.warnings) AS w) f
+            """,
+            null),
+        ["CONTROLS-WAIVED"] = (
+            Findings + """
+            -- E-ADM-2-5: the commands of the cutoff's month in which a superadministrator waived a four-eyes control (a warning).
+            SELECT 'command:' || l.command_type || ':' || l.command_id::text AS match_key, NULL::numeric AS value_a, NULL::numeric AS value_b,
+                   'CONTROL_WAIVED' AS classification, 'WARNING' AS severity, NULL::text AS component
+            FROM core.command_log l
+            WHERE l.company_id = @c AND l.controls_waived
+              AND (l.committed_at AT TIME ZONE 'America/Santo_Domingo')::date >= date_trunc('month', @cutoff)::date
+              AND (l.committed_at AT TIME ZONE 'America/Santo_Domingo')::date < (date_trunc('month', @cutoff) + interval '1 month')::date) f
             """,
             null),
         ["GRNI-AGING"] = (

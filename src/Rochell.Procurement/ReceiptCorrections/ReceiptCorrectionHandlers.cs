@@ -190,7 +190,7 @@ public sealed class ApproveReceiptCorrectionHandler : ICommandHandler<ApproveRec
         }
 
         var approver = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == rc.CreatedBy)
+        if (approver == rc.CreatedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(ProcurementErrors.ApproverIsCreator, "The person who created the correction cannot approve it.");
         }

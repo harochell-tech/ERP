@@ -314,7 +314,7 @@ public sealed class ApproveMatchExceptionHandler : ICommandHandler<ApproveMatchE
         }
 
         var approver = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == header.CreatedBy)
+        if (approver == header.CreatedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(ProcurementErrors.ApproverIsCreator, "The person who registered the invoice cannot approve its exception.");
         }

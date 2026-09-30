@@ -955,7 +955,7 @@ public sealed class CloseShortSalesOrderHandler : ICommandHandler<CloseShortSale
         }
 
         var closer = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (closer == row.CreatedBy)
+        if (closer == row.CreatedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(SalesErrors.FourEyes, "An order is closed short by someone other than who created it (E-VS3-04-13).");
         }

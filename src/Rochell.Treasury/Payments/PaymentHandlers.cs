@@ -183,7 +183,7 @@ public sealed class ReleaseSupplierPaymentHandler : ICommandHandler<ReleaseSuppl
         // Lock order (VS#2 §5): payment → AP documents by id → bank account → period × components (engine).
         var row = await PaymentRules.ReadLockedAsync(context, command.PaymentId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         var releaser = await PaymentRules.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (releaser == row.PreparedBy)
+        if (releaser == row.PreparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(PaymentErrors.SamePerson, "The preparer cannot release the payment (PAY-04).");
         }
