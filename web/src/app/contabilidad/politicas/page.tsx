@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import { initialPolicyValues } from "@/lib/configuration";
 import { formatDate, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -16,11 +16,16 @@ type Version = Schemas["PolicyVersionView"];
 // (accounting_policy:approve, someone else, step-up). Values stay as typed strings; the server checks types and bounds.
 
 function PrepareVersion({ policy, onDone }: { policy: Policy; onDone: () => void }) {
-  const prepare = useCommand(`prepare-policy:${policy.policyCode}`, "/api/v1/companies/{companyId}/finance/prepare-accounting-policy-version");
+  const prepare = useCommand(
+    `prepare-policy:${policy.policyCode}`,
+    "/api/v1/companies/{companyId}/finance/prepare-accounting-policy-version",
+    `Borrador de la política ${policy.policyCode} guardado; falta su aprobación.`,
+  );
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState(() => initialPolicyValues(policy.definitions, policy.versions));
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const [justification, setJustification] = useState("");
+  const fe = useFieldErrors();
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)}>
@@ -30,8 +35,20 @@ function PrepareVersion({ policy, onDone }: { policy: Policy; onDone: () => void
   }
   return (
     <form
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
+        const found: Record<string, string | false> = {
+          effectiveFrom: !effectiveFrom && "Indique desde cuándo rige la versión.",
+          justification: !justification.trim() && "Explique por qué cambia la política.",
+        };
+        for (const d of policy.definitions) {
+          const optional = (d.allowedValues?.length ?? 0) > 0;
+          found[`param-${d.paramCode}`] = !optional && !(values[d.paramCode] ?? "").trim() && `Indique el valor de ${d.paramCode}.`;
+        }
+        if (!fe.check(found)) {
+          return;
+        }
         if (await prepare.run({ policyCode: policy.policyCode, effectiveFrom, parameters: values, justification: justification.trim() })) {
           setOpen(false);
           onDone();
@@ -39,7 +56,7 @@ function PrepareVersion({ policy, onDone }: { policy: Policy; onDone: () => void
       }}
     >
       {policy.definitions.map((d) => (
-        <Field key={d.paramCode} label={`${d.description} (${d.paramCode})`}>
+        <Field key={d.paramCode} label={`${d.description} (${d.paramCode})`} required={!d.allowedValues?.length} error={fe.errors[`param-${d.paramCode}`]}>
           {d.allowedValues && d.allowedValues.length > 0 ? (
             <select value={values[d.paramCode] ?? ""} onChange={(e) => setValues({ ...values, [d.paramCode]: e.target.value })}>
               <option value="">—</option>
@@ -48,18 +65,18 @@ function PrepareVersion({ policy, onDone }: { policy: Policy; onDone: () => void
               ))}
             </select>
           ) : (
-            <input value={values[d.paramCode] ?? ""} onChange={(e) => setValues({ ...values, [d.paramCode]: e.target.value })} required />
+            <input value={values[d.paramCode] ?? ""} onChange={(e) => setValues({ ...values, [d.paramCode]: e.target.value })} />
           )}
         </Field>
       ))}
-      <Field label="Vigente desde">
-        <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} required />
+      <Field label="Vigente desde" required error={fe.errors.effectiveFrom}>
+        <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
       </Field>
-      <Field label="Justificación">
-        <input value={justification} onChange={(e) => setJustification(e.target.value)} required />
+      <Field label="Justificación" required error={fe.errors.justification}>
+        <input value={justification} onChange={(e) => setJustification(e.target.value)} />
       </Field>
-      <div className="actions">
-        <button type="submit" disabled={prepare.busy}>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={prepare.busy}>
           Guardar borrador
         </button>
         <button type="button" onClick={() => setOpen(false)}>
@@ -72,10 +89,11 @@ function PrepareVersion({ policy, onDone }: { policy: Policy; onDone: () => void
 }
 
 function VersionRow({ version, onDone }: { version: Version; onDone: () => void }) {
-  const { can, state } = useSession();
+  const { can, isMine } = useSession();
   // Four eyes: the database refuses the preparer as approver; the screen does not offer it.
-  const preparedByMe = state.status === "ready" && version.preparedBy === state.session.email;
-  const approve = useCommand(`approve-policy:${version.policyVersionId}`, "/api/v1/companies/{companyId}/finance/approve-accounting-policy-version");
+  // UX1-01b: the API returns the preparer's display name (its e-mail until the first sign-in brings a name, E-UX1-01-3).
+  const preparedByMe = isMine(version.preparedBy);
+  const approve = useCommand(`approve-policy:${version.policyVersionId}`, "/api/v1/companies/{companyId}/finance/approve-accounting-policy-version", `Versión ${version.version} de la política aprobada y activa.`);
   return (
     <tr>
       <td className="num">{version.version}</td>
@@ -91,14 +109,19 @@ function VersionRow({ version, onDone }: { version: Version; onDone: () => void 
           </div>
         ))}
       </td>
-      <td>{version.justification}</td>
-      <td>{version.preparedBy ?? "Despliegue"}</td>
-      <td>{version.approvedBy ?? "—"}</td>
+      <td className="wrap">{version.justification}</td>
+      <td className="wrap">{version.preparedBy ?? "Despliegue"}</td>
+      <td className="wrap">{version.approvedBy ?? "—"}</td>
       <td>
         {version.status === "DRAFT" && can("accounting_policy:approve") && !preparedByMe ? (
-          <button type="button" disabled={approve.busy} onClick={async () => (await approve.run({ policyVersionId: version.policyVersionId })) && onDone()}>
-            Aprobar
-          </button>
+          <ConfirmAction
+            label="Aprobar"
+            title={`¿Aprobar la versión ${version.version} de la política?`}
+            stepUp
+            busy={approve.busy}
+            consequence={`La versión ${version.version} queda activa desde ${formatDate(version.effectiveFrom)} y sus valores rigen la contabilización desde esa fecha; la versión anterior termina. No se puede volver a borrador.`}
+            onConfirm={async () => (await approve.run({ policyVersionId: version.policyVersionId })) && onDone()}
+          />
         ) : null}
         <ErrorBox error={approve.error} />
       </td>
@@ -129,7 +152,7 @@ export default function Page() {
           {policy.versions.length === 0 ? (
             <p className="muted">Sin versiones.</p>
           ) : (
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th className="num">Versión</th>
@@ -147,7 +170,7 @@ export default function Page() {
                   <VersionRow key={`${v.policyVersionId}:${v.status}`} version={v} onDone={reload} />
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </section>
       ))}

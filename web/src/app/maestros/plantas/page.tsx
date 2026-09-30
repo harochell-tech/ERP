@@ -7,7 +7,7 @@ import { useLoad } from "@/lib/useQuery";
 
 // UI-01: plants and their locations, read only (created with the deployment CLI, E-B03-15-2).
 export default function Page() {
-  const { companyId, can, plantFor } = useSession();
+  const { companyId, can, plantFor, plantName } = useSession();
   const plantId = plantFor("master_data:read");
   const { data, error } = useLoad(
     can("master_data:read") ? () => query("/api/v1/companies/{companyId}/master-data/plants", { path: { companyId }, query: { plantId } }) : null,
@@ -23,7 +23,7 @@ export default function Page() {
       {data === null ? (
         <Loading error={error} />
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Planta</th>
@@ -34,13 +34,13 @@ export default function Page() {
           <tbody>
             {data.items.map((p) => (
               <tr key={p.plantId}>
-                <td className="mono">{p.code}</td>
+                <td>{plantName(p.plantId, p.code)}</td>
                 <td className="mono">{p.valuationAreaCode}</td>
-                <td>{p.locations.map((l) => l.code).join(", ") || "—"}</td>
+                <td className="wrap">{p.locations.map((l) => l.code).join(", ") || "—"}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

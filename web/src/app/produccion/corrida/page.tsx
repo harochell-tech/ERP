@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { usePlants } from "@/components/Production";
-import { ErrorBox, Field, Loading, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import { parseWholeNumber, stockLocations } from "@/lib/production";
@@ -29,8 +29,12 @@ interface ConsumptionDraft {
 
 function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; lines: RecipeLine[]; locations: Location[]; onDone: () => void }) {
   const run = detail.run;
-  const record = useCommand(`record-shift-summary:${run.runId}`, "/api/v1/companies/{companyId}/manufacturing/record-shift-summary");
   const existing = detail.summary?.status === "DRAFT" ? detail.summary : null;
+  const record = useCommand(
+    `record-shift-summary:${run.runId}`,
+    "/api/v1/companies/{companyId}/manufacturing/record-shift-summary",
+    `Resumen del turno de la corrida ${run.runNo} ${existing ? "reemplazado" : "registrado"}; falta contabilizarlo.`,
+  );
   const [form, setForm] = useState(() => ({
     batches: existing ? String(existing.batches) : "",
     goodUnits: existing?.goodUnits ?? "",
@@ -52,56 +56,59 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
       }),
     ),
   );
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   const setLine = (materialItemId: string, patch: Partial<ConsumptionDraft>) =>
     setConsumption({ ...consumption, [materialItemId]: { ...(consumption[materialItemId] ?? { locationId: "", quantity: "", uom: "" }), ...patch } });
+  const scrapInvalid = (value: string) => value !== "" && (!isDecimal(value, 6) || value.startsWith("-"));
   return (
     <form
       className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         const batches = parseWholeNumber(form.batches);
         const goodUnits = normalizeInput(form.goodUnits);
         const mixScrapUnits = normalizeInput(form.mixScrapUnits) || "0";
         const freshScrapUnits = normalizeInput(form.freshScrapUnits) || "0";
-        if (batches === null || batches <= 0) {
-          setInvalid("Indique las tandas (un número entero mayor que cero).");
-          return;
-        }
-        if (!isPositiveDecimal(goodUnits, 6) || !isDecimal(mixScrapUnits, 6) || !isDecimal(freshScrapUnits, 6) || mixScrapUnits.startsWith("-") || freshScrapUnits.startsWith("-")) {
-          setInvalid("Las unidades buenas son mayores que cero; el scrap es cero o más (hasta 6 decimales).");
-          return;
-        }
         const body = lines.map((l) => {
           const c = consumption[l.materialItemId] ?? { locationId: "", quantity: "", uom: l.baseUom };
           return { materialItemId: l.materialItemId, locationId: c.locationId, quantity: normalizeInput(c.quantity), uom: c.uom.trim() };
         });
-        if (body.some((c) => !c.locationId || !isPositiveDecimal(c.quantity, 6) || c.uom === "")) {
-          setInvalid("Indique la ubicación, la cantidad consumida (mayor que cero) y la unidad de cada material.");
+        const found: Record<string, string | false> = {
+          batches: (batches === null || batches <= 0) && "Indique las tandas (un número entero mayor que cero).",
+          goodUnits: !isPositiveDecimal(goodUnits, 6) && "Unidades buenas mayores que cero (hasta 6 decimales).",
+          mixScrapUnits: scrapInvalid(mixScrapUnits) && "Cero o más (hasta 6 decimales).",
+          freshScrapUnits: scrapInvalid(freshScrapUnits) && "Cero o más (hasta 6 decimales).",
+        };
+        for (const c of body) {
+          found[`location-${c.materialItemId}`] = !c.locationId && "Elija la ubicación.";
+          found[`quantity-${c.materialItemId}`] = !isPositiveDecimal(c.quantity, 6) && "Cantidad consumida mayor que cero.";
+          found[`uom-${c.materialItemId}`] = c.uom === "" && "Indique la unidad.";
+        }
+        if (!fe.check(found) || batches === null) {
           return;
         }
-        setInvalid(null);
         if (await record.run({ plantId: run.plantId, runId: run.runId, batches, goodUnits, mixScrapUnits, freshScrapUnits, consumption: body })) {
           onDone();
         }
       }}
     >
       <h2>{existing ? "Reemplazar resumen del turno" : "Registrar resumen del turno"}</h2>
-      <Field label="Tandas">
+      <Field label="Tandas" required error={fe.errors.batches}>
         <input inputMode="numeric" value={form.batches} onChange={(e) => setForm({ ...form, batches: e.target.value })} />
       </Field>
-      <Field label="Unidades buenas">
+      <Field label="Unidades buenas" required error={fe.errors.goodUnits}>
         <input inputMode="decimal" value={form.goodUnits} onChange={(e) => setForm({ ...form, goodUnits: e.target.value })} />
       </Field>
-      <Field label="Scrap de mezcla (unidades)">
+      <Field label="Scrap de mezcla (unidades)" error={fe.errors.mixScrapUnits}>
         <input inputMode="decimal" value={form.mixScrapUnits} onChange={(e) => setForm({ ...form, mixScrapUnits: e.target.value })} />
       </Field>
-      <Field label="Scrap fresco (unidades)">
+      <Field label="Scrap fresco (unidades)" error={fe.errors.freshScrapUnits}>
         <input inputMode="decimal" value={form.freshScrapUnits} onChange={(e) => setForm({ ...form, freshScrapUnits: e.target.value })} />
       </Field>
       <h3>Consumo real</h3>
       {locations.length === 0 ? <p className="warning">No hay ubicaciones de existencias disponibles para la planta.</p> : null}
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Material</th>
@@ -114,6 +121,9 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
         <tbody>
           {lines.map((l) => {
             const c = consumption[l.materialItemId] ?? { locationId: "", quantity: "", uom: l.baseUom };
+            const locationError = fe.errors[`location-${l.materialItemId}`];
+            const quantityError = fe.errors[`quantity-${l.materialItemId}`];
+            const uomError = fe.errors[`uom-${l.materialItemId}`];
             return (
               <tr key={l.materialItemId}>
                 <td>
@@ -123,7 +133,12 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
                   {formatQuantity(l.qtyPerBatch)} {l.baseUom}
                 </td>
                 <td>
-                  <select aria-label={`Ubicación ${l.materialCode}`} value={c.locationId} onChange={(e) => setLine(l.materialItemId, { locationId: e.target.value })}>
+                  <select
+                    aria-label={`Ubicación ${l.materialCode}`}
+                    value={c.locationId}
+                    onChange={(e) => setLine(l.materialItemId, { locationId: e.target.value })}
+                    {...fieldAria(locationError, `location-${l.materialItemId}-message`, true)}
+                  >
                     <option value="">—</option>
                     {locations.map((loc) => (
                       <option key={loc.locationId} value={loc.locationId}>
@@ -131,25 +146,39 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
                       </option>
                     ))}
                   </select>
+                  <FieldMessage id={`location-${l.materialItemId}-message`} error={locationError} />
                 </td>
                 <td>
-                  <input aria-label={`Consumo ${l.materialCode}`} inputMode="decimal" value={c.quantity} onChange={(e) => setLine(l.materialItemId, { quantity: e.target.value })} />
+                  <input
+                    aria-label={`Consumo ${l.materialCode}`}
+                    inputMode="decimal"
+                    value={c.quantity}
+                    onChange={(e) => setLine(l.materialItemId, { quantity: e.target.value })}
+                    {...fieldAria(quantityError, `quantity-${l.materialItemId}-message`, true)}
+                  />
+                  <FieldMessage id={`quantity-${l.materialItemId}-message`} error={quantityError} />
                 </td>
                 <td>
-                  <input aria-label={`Unidad ${l.materialCode}`} value={c.uom} onChange={(e) => setLine(l.materialItemId, { uom: e.target.value })} size={6} />
+                  <input
+                    aria-label={`Unidad ${l.materialCode}`}
+                    value={c.uom}
+                    onChange={(e) => setLine(l.materialItemId, { uom: e.target.value })}
+                    style={{ maxWidth: "8rem" }}
+                    {...fieldAria(uomError, `uom-${l.materialItemId}-message`, true)}
+                  />
+                  <FieldMessage id={`uom-${l.materialItemId}-message`} error={uomError} />
                 </td>
               </tr>
             );
           })}
         </tbody>
-      </table>
-      <div className="actions">
-        <button type="submit" disabled={record.busy}>
+      </LineTable>
+      <ErrorBox error={record.error} />
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={record.busy}>
           {existing ? "Reemplazar resumen" : "Registrar resumen"}
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
-      <ErrorBox error={record.error} />
     </form>
   );
 }
@@ -158,21 +187,35 @@ function Actions({ detail, onDone }: { detail: Detail; onDone: () => void }) {
   const { can } = useSession();
   const run = detail.run;
   const summary = detail.summary;
-  const post = useCommand(`post-shift-summary:${run.runId}`, "/api/v1/companies/{companyId}/manufacturing/post-shift-summary");
-  const reverse = useCommand(`reverse-shift-summary:${run.runId}`, "/api/v1/companies/{companyId}/manufacturing/reverse-shift-summary");
-  const cancel = useCommand(`cancel-production-run:${run.runId}`, "/api/v1/companies/{companyId}/manufacturing/cancel-production-run");
+  const post = useCommand(`post-shift-summary:${run.runId}`, "/api/v1/companies/{companyId}/manufacturing/post-shift-summary", (response) => {
+    const lotCode = (response.result as { lotCode?: string } | null)?.lotCode;
+    return `Resumen de la corrida ${run.runNo} contabilizado${lotCode ? `; lote ${lotCode} en curado` : ""}.`;
+  });
+  const reverse = useCommand(
+    `reverse-shift-summary:${run.runId}`,
+    "/api/v1/companies/{companyId}/manufacturing/reverse-shift-summary",
+    `Resumen de la corrida ${run.runNo} revertido; la corrida vuelve a estar en proceso.`,
+  );
+  const cancel = useCommand(`cancel-production-run:${run.runId}`, "/api/v1/companies/{companyId}/manufacturing/cancel-production-run", `Corrida ${run.runNo} cancelada.`);
   const busy = post.busy || reverse.busy || cancel.busy;
   const after = (response: unknown) => response && onDone();
   return (
     <div className="actions">
       {summary?.status === "DRAFT" && can("shift_summary:post") ? (
-        <button type="button" disabled={busy} onClick={async () => after(await post.run({ plantId: run.plantId, runId: run.runId, expectedVersion: summary.version }))}>
-          Contabilizar resumen
-        </button>
+        <ConfirmAction
+          label="Contabilizar resumen"
+          title={`¿Contabilizar el resumen de la corrida ${run.runNo}?`}
+          consequence="Se consumen los materiales del inventario, se contabilizan los asientos y el lote entra a curado; la corrida queda completada. Solo se deshace revirtiendo el resumen."
+          className="primary"
+          busy={busy}
+          onConfirm={async () => after(await post.run({ plantId: run.plantId, runId: run.runId, expectedVersion: summary.version }))}
+        />
       ) : null}
       {summary?.status === "POSTED" && can("shift_summary:post") ? (
         <ReasonAction
           label="Revertir resumen"
+          consequence="Se reversan los asientos y los consumos, el lote se anula y la corrida vuelve a estar en proceso. Solo es posible si el lote no se ha movido."
+          stepUp
           busy={busy}
           onConfirm={async (reason) => after(await reverse.run({ plantId: run.plantId, runId: run.runId, expectedVersion: summary.version, reason }))}
         />
@@ -180,6 +223,7 @@ function Actions({ detail, onDone }: { detail: Detail; onDone: () => void }) {
       {run.status === "IN_PROGRESS" && summary === null && can("production_run:manage") ? (
         <ReasonAction
           label="Cancelar corrida"
+          consequence="La corrida queda cancelada y no se podrá registrar producción en ella."
           busy={busy}
           onConfirm={async (reason) => after(await cancel.run({ plantId: run.plantId, runId: run.runId, expectedVersion: run.version, reason }))}
         />
@@ -191,7 +235,7 @@ function Actions({ detail, onDone }: { detail: Detail; onDone: () => void }) {
 
 function RunDetail() {
   const id = useSearchParams().get("id") ?? "";
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const plants = usePlants();
   const { data, error, reload } = useLoad(
     can("production:read") && id
@@ -230,7 +274,7 @@ function RunDetail() {
       </p>
       <h1>Corrida {run.runNo}</h1>
       <p>
-        <StatusBadge status={run.status} testId="run-status" /> · planta {run.plantCode} · máquina {run.machineCode} · turno {run.shiftCode} · {formatDate(run.businessDate)} ·{" "}
+        <StatusBadge status={run.status} testId="run-status" /> · planta {plantName(run.plantId, run.plantCode)} · máquina {run.machineCode} · turno {run.shiftCode} · {formatDate(run.businessDate)} ·{" "}
         {run.itemCode}
       </p>
 
@@ -249,7 +293,7 @@ function RunDetail() {
             · scrap de mezcla {formatQuantity(summary.mixScrapUnits)} · scrap fresco {formatQuantity(summary.freshScrapUnits)}
           </p>
           {detail.consumption.length > 0 ? (
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th>Material</th>
@@ -276,7 +320,7 @@ function RunDetail() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           ) : null}
         </>
       )}

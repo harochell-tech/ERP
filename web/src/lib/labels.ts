@@ -178,19 +178,44 @@ export function classificationLabel(classification: string): string {
   return EXCEPTION_CLASSIFICATIONS[classification] ?? classification;
 }
 
+/** E-UX1-01-5: dates read dd/mm/aaaa; a date-time value shows its Dominican calendar day. */
 export function formatDate(value: string | null | undefined): string {
   if (!value) {
     return "—";
+  }
+  if (value.length > 10 && value.includes("T")) {
+    return formatDateTime(value).slice(0, 10);
   }
   const [year, month, day] = value.slice(0, 10).split("-");
   return `${day}/${month}/${year}`;
 }
 
+const DATE_TIME_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Santo_Domingo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: true,
+});
+
+/**
+ * E-UX1-01-5: one date-time format, "29/09/2026 11:15 p. m." (Dominican time), built from parts so it does not depend on the
+ * browser's locale data.
+ */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) {
     return "—";
   }
-  return new Date(value).toLocaleString("es-DO", { timeZone: "America/Santo_Domingo", dateStyle: "short", timeStyle: "short" });
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const parts = DATE_TIME_PARTS.formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const period = get("dayPeriod").toUpperCase() === "PM" ? "p. m." : "a. m.";
+  return `${get("day")}/${get("month")}/${get("year")} ${get("hour")}:${get("minute")} ${period}`;
 }
 
 /** Today's date in the Dominican Republic (the business calendar of the slice), as yyyy-MM-dd. */

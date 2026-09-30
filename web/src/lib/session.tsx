@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError, query, type Schemas } from "@/api/client";
+import { plantLabel } from "./plants";
 import { can as canIn, hasPlantScope, queryPlant, scopeOf, type PermissionScope, type SessionCompany } from "./scope";
 
 type SessionDescription = Schemas["SessionDescription"];
@@ -24,6 +25,13 @@ interface SessionContextValue {
   /** plantId to send on a query guarded by `permission` (E-PR18b-8). */
   plantFor: (permission: string) => string | undefined;
   plantScoped: boolean;
+  /** E-UX1-01-4: a plant id or code as "Name (CODE)" (the code when the session has no name for it). */
+  plantName: (key: string | null | undefined, fallback?: string) => string;
+  /**
+   * Whether a shown actor (name or e-mail) is the signed-in person, to hide a decision the server would refuse (four eyes).
+   * Always false for a superadministrator, whose four-eyes controls are waived (E-ADM-2-4).
+   */
+  isMine: (actor: string | null | undefined) => boolean;
   reload: () => void;
 }
 
@@ -101,6 +109,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       scope: (permission) => scopeOf(company, permission),
       plantFor: (permission) => queryPlant(company, permission, plantId),
       plantScoped: hasPlantScope(company),
+      plantName: (key, fallback) => plantLabel(company?.plants, key, fallback),
+      isMine: (actor) =>
+        state.status === "ready" &&
+        !!actor &&
+        !(company?.assignments ?? []).some((a) => a.roleCode === "SUPERADMIN") &&
+        [state.session.email, state.session.displayName?.trim()].includes(actor),
       reload: () => setGeneration((g) => g + 1),
     }),
     [state, company, selectCompany, plantId, selectPlant],

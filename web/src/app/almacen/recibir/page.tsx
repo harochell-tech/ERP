@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -24,12 +24,16 @@ function localNow(): string {
 }
 
 function Receive() {
-  const { companyId, can, plantFor } = useSession();
+  const { companyId, can, plantFor, plantName } = useSession();
   const router = useRouter();
   const poId = useSearchParams().get("oc") ?? "";
-  const post = useCommand<"/api/v1/companies/{companyId}/procurement/post-goods-receipt", Values>(`post-gr:${poId}`, "/api/v1/companies/{companyId}/procurement/post-goods-receipt");
+  const post = useCommand<"/api/v1/companies/{companyId}/procurement/post-goods-receipt", Values>(
+    `post-gr:${poId}`,
+    "/api/v1/companies/{companyId}/procurement/post-goods-receipt",
+    (_, doc) => (doc ? `Recepción ${doc} registrada y contabilizada.` : "Recepción registrada y contabilizada."),
+  );
   const [values, setValues] = useState<Values>(() => post.restored ?? { locationId: "", occurredAt: localNow(), weighTicketRef: "", lines: {} });
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   const allowed = can("goods_receipt:post");
 
   const { data, error } = useLoad(
@@ -63,15 +67,17 @@ function Receive() {
         quantity: normalizeInput(x.input!.quantity),
         supplierLotNumber: x.input!.supplierLotNumber.trim() || null,
       }));
-    if (!values.locationId || !values.occurredAt) {
-      setInvalid("Seleccione la ubicación y la fecha y hora de la recepción.");
+    const found: Record<string, string | false> = {
+      locationId: !values.locationId && "Elija la ubicación.",
+      occurredAt: !values.occurredAt && "Indique la fecha y hora de la recepción.",
+      lines: lines.length === 0 && "Indique al menos una cantidad a recibir.",
+    };
+    for (const l of lines) {
+      found[`line-${l.purchaseOrderLineId}`] = !isPositiveDecimal(l.quantity, 6) && "Cantidad mayor que cero (hasta 6 decimales).";
+    }
+    if (!fe.check(found)) {
       return;
     }
-    if (lines.length === 0 || lines.some((l) => !isPositiveDecimal(l.quantity, 6))) {
-      setInvalid("Indique al menos una cantidad mayor que cero (hasta 6 decimales).");
-      return;
-    }
-    setInvalid(null);
     const response = await post.run(
       {
         plantId: order.plantId,
@@ -95,10 +101,10 @@ function Receive() {
     <>
       <h1>Recibir material — orden {order.poNo}</h1>
       <p>
-        Proveedor: {order.supplierName}. Planta: {order.plantCode}.
+        Proveedor: {order.supplierName}. Planta: {plantName(order.plantId, order.plantCode)}.
       </p>
       <div>
-        <Field label="Ubicación">
+        <Field label="Ubicación" required error={fe.errors.locationId}>
           <select aria-label="Ubicación" value={values.locationId} onChange={(e) => setValues({ ...values, locationId: e.target.value })}>
             <option value="">—</option>
             {locations.map((l) => (
@@ -108,14 +114,14 @@ function Receive() {
             ))}
           </select>
         </Field>
-        <Field label="Fecha y hora (pesaje)">
+        <Field label="Fecha y hora (pesaje)" required error={fe.errors.occurredAt}>
           <input type="datetime-local" aria-label="Fecha y hora" value={values.occurredAt} onChange={(e) => setValues({ ...values, occurredAt: e.target.value })} />
         </Field>
         <Field label="Ticket de báscula">
           <input aria-label="Ticket de báscula" value={values.weighTicketRef} onChange={(e) => setValues({ ...values, weighTicketRef: e.target.value })} />
         </Field>
       </div>
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Artículo</th>
@@ -136,10 +142,12 @@ function Receive() {
               <td className="num">
                 <input
                   aria-label={`Cantidad a recibir ${l.itemCode}`}
+                  {...fieldAria(fe.errors[`line-${l.poLineId}`], `gr-line-${l.poLineId}`)}
                   inputMode="decimal"
                   value={values.lines[l.poLineId]?.quantity ?? ""}
                   onChange={(e) => setLine(l.poLineId, { quantity: e.target.value })}
                 />
+                <FieldMessage id={`gr-line-${l.poLineId}`} error={fe.errors[`line-${l.poLineId}`]} />
               </td>
               <td>
                 <input aria-label={`Lote ${l.itemCode}`} value={values.lines[l.poLineId]?.supplierLotNumber ?? ""} onChange={(e) => setLine(l.poLineId, { supplierLotNumber: e.target.value })} />
@@ -147,13 +155,13 @@ function Receive() {
             </tr>
           ))}
         </tbody>
-      </table>
-      <div className="actions">
-        <button type="button" disabled={post.busy} onClick={submit}>
+      </LineTable>
+      {fe.errors.lines ? <div className="error">{fe.errors.lines}</div> : null}
+      <div className="actions form-actions">
+        <button type="button" className="primary" disabled={post.busy} onClick={submit}>
           Registrar recepción
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={post.error} />
     </>
   );

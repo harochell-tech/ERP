@@ -6,7 +6,8 @@ import { Suspense } from "react";
 import { query } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
 import { History } from "@/components/History";
-import { AccountingStatus, ErrorBox, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { AccountingStatus, ConfirmAction, ErrorBox, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { formatDecimal } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -27,7 +28,7 @@ function NotePackage({ creditNoteId }: { creditNoteId: string }) {
   return (
     <>
       <h2>Paquete fiscal para el portal</h2>
-      <table>
+      <div className="table-wrap"><table>
         <tbody>
           <CopyField label="Tipo de e-CF" value={data.ecfType} />
           <CopyField label="e-NCF modificado" value={data.modifiedEncf} />
@@ -40,7 +41,7 @@ function NotePackage({ creditNoteId }: { creditNoteId: string }) {
           <CopyField label="ITBIS" value={data.taxTotal} />
           <CopyField label="Total" value={data.total} />
         </tbody>
-      </table>
+      </table></div>
     </>
   );
 }
@@ -52,8 +53,8 @@ function NoteDetail() {
     can("sales:read") && id ? () => query("/api/v1/companies/{companyId}/sales/credit-notes/{creditNoteId}", { path: { companyId, creditNoteId: id } }) : null,
     [companyId, id],
   );
-  const issue = useCommand(`issue-credit-note:${id}`, "/api/v1/companies/{companyId}/sales/issue-credit-note");
-  const record = useCommand(`record-credit-note-ecf:${id}`, "/api/v1/companies/{companyId}/sales/record-external-credit-note-document");
+  const issue = useCommand(`issue-credit-note:${id}`, "/api/v1/companies/{companyId}/sales/issue-credit-note", () => `Nota de crédito ${data?.header.creditNoteNo ?? ""} emitida y contabilizada.`);
+  const record = useCommand(`record-credit-note-ecf:${id}`, "/api/v1/companies/{companyId}/sales/record-external-credit-note-document", () => `e-CF 34 registrado en la nota de crédito ${data?.header.creditNoteNo ?? ""}.`);
   if (!can("sales:read")) {
     return <NoPermission />;
   }
@@ -78,20 +79,25 @@ function NoteDetail() {
       </p>
       {h.commercialStatus === "DRAFT" && can("credit_note:issue") ? (
         <div className="actions">
-          <button type="button" className="primary" disabled={issue.busy} onClick={async () => (await issue.run({ creditNoteId: h.creditNoteId, expectedVersion: h.version })) && reload()}>
-            Emitir nota de crédito
-          </button>
+          <ConfirmAction
+            label="Emitir nota de crédito"
+            className="primary"
+            stepUp
+            busy={issue.busy}
+            consequence={`La nota ${h.creditNoteNo} se confirma y se contabiliza: reduce el saldo de la factura ${h.invoiceNo} por RD$ ${formatDecimal(h.total ?? h.netTotal)}. Ya no se puede editar; después se registra su e-CF 34.`}
+            onConfirm={async () => (await issue.run({ creditNoteId: h.creditNoteId, expectedVersion: h.version })) && reload()}
+          />
           <ErrorBox error={issue.error} />
         </div>
       ) : null}
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th className="num">Línea de factura</th>
             <th>Producto</th>
-            <th className="num">Neto</th>
+            <th className="num">Neto (RD$)</th>
             <th className="num">Tasa</th>
-            <th className="num">ITBIS</th>
+            <th className="num">ITBIS (RD$)</th>
           </tr>
         </thead>
         <tbody>
@@ -127,7 +133,7 @@ function NoteDetail() {
             </td>
           </tr>
         </tbody>
-      </table>
+      </table></div>
       {h.fiscalStatus === "PENDING_EXTERNAL" ? <NotePackage creditNoteId={h.creditNoteId} /> : null}
       {h.fiscalStatus === "PENDING_EXTERNAL" && can("fiscal_document:record") ? (
         <>

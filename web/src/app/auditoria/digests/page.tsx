@@ -26,7 +26,7 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">Todavía no hay resúmenes escritos.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Día</th>
@@ -49,11 +49,11 @@ export default function Page() {
                 <td className="mono" title={d.digestHash}>
                   {d.digestHash.slice(0, 16)}…
                 </td>
-                <td className="mono">{d.wormObjectKey}</td>
+                <td className="mono wrap">{d.wormObjectKey}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

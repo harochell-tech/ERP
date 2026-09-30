@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
-import { ErrorBox, Field, Loading, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDateTime, statusLabel } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
@@ -19,8 +19,21 @@ type Delivery = Schemas["DeliveryDetail"];
 // VS3-10a (E-VS3-10-5, E-VS3-04-1…15): a delivery and the dispatcher's next step. Weigh tickets and PODs are identified by the
 // SHA-256 of their file, computed here; the file is not uploaded (E-VS3-6).
 
+interface EvidenceValue {
+  ref: string;
+  sha256: string;
+}
+
+/** Per-field messages of an evidence (reference and SHA-256), or nothing when it is valid. */
+function evidenceErrors(value: EvidenceValue): { ref?: string; sha256?: string } {
+  return {
+    ref: value.ref.trim() === "" ? "Elija el archivo o escriba su referencia." : undefined,
+    sha256: /^[0-9a-fA-F]{64}$/.test(value.sha256.trim()) ? undefined : "El SHA-256 tiene 64 caracteres hexadecimales (se calcula al elegir el archivo).",
+  };
+}
+
 /** A file picker that fills a reference and its SHA-256. */
-function Evidence({ label, value, onChange }: { label: string; value: { ref: string; sha256: string }; onChange: (v: { ref: string; sha256: string }) => void }) {
+function Evidence({ label, value, onChange, errors }: { label: string; value: EvidenceValue; onChange: (v: EvidenceValue) => void; errors?: { ref?: string; sha256?: string } }) {
   return (
     <>
       <Field label={label}>
@@ -35,11 +48,11 @@ function Evidence({ label, value, onChange }: { label: string; value: { ref: str
           }}
         />
       </Field>
-      <Field label="Referencia">
-        <input value={value.ref} onChange={(e) => onChange({ ...value, ref: e.target.value })} required />
+      <Field label="Referencia" required error={errors?.ref}>
+        <input value={value.ref} onChange={(e) => onChange({ ...value, ref: e.target.value })} />
       </Field>
-      <Field label="SHA-256">
-        <input value={value.sha256} onChange={(e) => onChange({ ...value, sha256: e.target.value })} required pattern="[0-9a-fA-F]{64}" size={66} />
+      <Field label="SHA-256" required error={errors?.sha256}>
+        <input className="mono" value={value.sha256} onChange={(e) => onChange({ ...value, sha256: e.target.value })} />
       </Field>
     </>
   );
@@ -48,9 +61,10 @@ function Evidence({ label, value, onChange }: { label: string; value: { ref: str
 function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const { companyId } = useSession();
   const id = delivery.header.deliveryId;
-  const start = useCommand(`start-loading:${id}`, "/api/v1/companies/{companyId}/sales/start-loading");
+  const start = useCommand(`start-loading:${id}`, "/api/v1/companies/{companyId}/sales/start-loading", `Conduce ${delivery.header.deliveryNo}: carga iniciada.`);
   const own = delivery.header.deliveryTermCode === "DELIVERED_OWN_TRANSPORT";
   const [form, setForm] = useState({ vehicleId: "", driverId: "", plate: "", driverName: "" });
+  const fe = useFieldErrors<"vehicleId" | "driverId" | "plate" | "driverName">();
   const { data, error } = useLoad(
     own
       ? async () => {
@@ -68,9 +82,16 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
   }
   return (
     <form
-      className="inline-form"
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
+        const valid = own
+          ? fe.check({ vehicleId: !form.vehicleId && "Elija el camión.", driverId: !form.driverId && "Elija el chofer." })
+          : fe.check({ plate: form.plate.trim() === "" && "Indique la placa del vehículo del cliente.", driverName: form.driverName.trim() === "" && "Indique el nombre del chofer del cliente." });
+        if (!valid) {
+          return;
+        }
         const body = own
           ? { deliveryId: id, expectedVersion: delivery.header.version, vehicleId: form.vehicleId, driverId: form.driverId, customerVehiclePlate: null, customerDriverName: null }
           : { deliveryId: id, expectedVersion: delivery.header.version, vehicleId: null, driverId: null, customerVehiclePlate: form.plate.trim(), customerDriverName: form.driverName.trim() };
@@ -81,8 +102,8 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
     >
       {own && data ? (
         <>
-          <Field label="Camión">
-            <select value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })} required>
+          <Field label="Camión" required error={fe.errors.vehicleId}>
+            <select value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
               <option value="">—</option>
               {data.vehicles.map((v) => (
                 <option key={v.vehicleId} value={v.vehicleId}>
@@ -91,8 +112,8 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
               ))}
             </select>
           </Field>
-          <Field label="Chofer">
-            <select value={form.driverId} onChange={(e) => setForm({ ...form, driverId: e.target.value })} required>
+          <Field label="Chofer" required error={fe.errors.driverId}>
+            <select value={form.driverId} onChange={(e) => setForm({ ...form, driverId: e.target.value })}>
               <option value="">—</option>
               {data.drivers.map((d) => (
                 <option key={d.driverId} value={d.driverId}>
@@ -104,27 +125,30 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
         </>
       ) : (
         <>
-          <Field label="Placa del cliente">
-            <input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} required />
+          <Field label="Placa del cliente" required error={fe.errors.plate}>
+            <input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} />
           </Field>
-          <Field label="Chofer del cliente">
-            <input value={form.driverName} onChange={(e) => setForm({ ...form, driverName: e.target.value })} required />
+          <Field label="Chofer del cliente" required error={fe.errors.driverName}>
+            <input value={form.driverName} onChange={(e) => setForm({ ...form, driverName: e.target.value })} />
           </Field>
         </>
       )}
-      <button type="submit" className="primary" disabled={start.busy}>
-        Iniciar carga
-      </button>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={start.busy}>
+          Iniciar carga
+        </button>
+      </div>
       <ErrorBox error={start.error} />
     </form>
   );
 }
 
 function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
-  const { companyId } = useSession();
+  const { companyId, plantName } = useSession();
   const id = delivery.header.deliveryId;
-  const confirm = useCommand(`confirm-loaded:${id}`, "/api/v1/companies/{companyId}/sales/confirm-loaded");
+  const confirm = useCommand(`confirm-loaded:${id}`, "/api/v1/companies/{companyId}/sales/confirm-loaded", `Conduce ${delivery.header.deliveryNo}: carga confirmada.`);
   const [sources, setSources] = useState<Record<string, string>>({});
+  const fe = useFieldErrors();
   const { data, error } = useLoad(() => query("/api/v1/companies/{companyId}/sales/plants", { path: { companyId } }), [companyId]);
   if (data === null) {
     return <Loading error={error} />;
@@ -132,15 +156,20 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
   const locations = data.items.find((p) => p.code === delivery.header.plantCode)?.locations ?? [];
   return (
     <form
+      className="card"
       onSubmit={async (e) => {
         e.preventDefault();
         const lines = delivery.lines.map((l) => ({ deliveryLineId: l.deliveryLineId, sourceLocationId: sources[l.deliveryLineId] ?? locations[0]?.locationId ?? "" }));
+        const missing = Object.fromEntries(lines.filter((l) => !l.sourceLocationId).map((l) => [l.deliveryLineId, `No hay ubicación de existencias en la planta ${plantName(delivery.header.plantCode)}.`]));
+        if (!fe.check(missing)) {
+          return;
+        }
         if (await confirm.run({ deliveryId: id, expectedVersion: delivery.header.version, lines })) {
           onDone();
         }
       }}
     >
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Producto</th>
@@ -151,28 +180,36 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
         <tbody>
           {delivery.lines.map((l) => (
             <tr key={l.deliveryLineId}>
-              <td>
+              <td className="wrap">
                 {l.itemCode} — {l.itemDescription}
               </td>
               <td className="num">
                 {formatQuantity(l.qtyPlanned)} {l.uom}
               </td>
               <td>
-                <select aria-label={`Ubicación ${l.itemCode}`} value={sources[l.deliveryLineId] ?? locations[0]?.locationId ?? ""} onChange={(e) => setSources({ ...sources, [l.deliveryLineId]: e.target.value })}>
+                <select
+                  aria-label={`Ubicación ${l.itemCode}`}
+                  value={sources[l.deliveryLineId] ?? locations[0]?.locationId ?? ""}
+                  onChange={(e) => setSources({ ...sources, [l.deliveryLineId]: e.target.value })}
+                  {...fieldAria(fe.errors[l.deliveryLineId], `source-${l.deliveryLineId}`, true)}
+                >
                   {locations.map((loc) => (
                     <option key={loc.locationId} value={loc.locationId}>
                       {loc.code}
                     </option>
                   ))}
                 </select>
+                <FieldMessage id={`source-${l.deliveryLineId}`} error={fe.errors[l.deliveryLineId]} />
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
-      <button type="submit" className="primary" disabled={confirm.busy}>
-        Confirmar carga
-      </button>
+      </LineTable>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={confirm.busy}>
+          Confirmar carga
+        </button>
+      </div>
       <ErrorBox error={confirm.error} />
     </form>
   );
@@ -180,38 +217,45 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
 
 function GateOut({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const id = delivery.header.deliveryId;
-  const gate = useCommand(`gate-out:${id}`, "/api/v1/companies/{companyId}/sales/record-gate-out");
+  const gate = useCommand(`gate-out:${id}`, "/api/v1/companies/{companyId}/sales/record-gate-out", `Conduce ${delivery.header.deliveryNo}: pesada y salida registradas.`);
   const [gross, setGross] = useState("");
   const [tare, setTare] = useState("");
-  const [ticket, setTicket] = useState({ ref: "", sha256: "" });
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const [ticket, setTicket] = useState<EvidenceValue>({ ref: "", sha256: "" });
+  const fe = useFieldErrors<"gross" | "tare" | "ref" | "sha256">();
   return (
     <form
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         const grossKg = normalizeInput(gross);
         const tareKg = normalizeInput(tare);
-        if (!isPositiveDecimal(grossKg, 6) || !isDecimal(tareKg, 6) || tareKg.startsWith("-")) {
-          setInvalid("Indique el peso bruto y la tara en kg.");
+        if (
+          !fe.check({
+            gross: !isPositiveDecimal(grossKg, 6) && "Indique el peso bruto en kg (mayor que cero).",
+            tare: (!isDecimal(tareKg, 6) || tareKg.startsWith("-")) && "Indique la tara en kg (cero o más).",
+            ...evidenceErrors(ticket),
+          })
+        ) {
           return;
         }
-        setInvalid(null);
         if (await gate.run({ deliveryId: id, expectedVersion: delivery.header.version, grossKg, tareKg, weighTicketRef: ticket.ref.trim(), weighTicketSha256: ticket.sha256.trim() })) {
           onDone();
         }
       }}
     >
-      <Field label="Peso bruto (kg)">
+      <Field label="Peso bruto (kg)" required error={fe.errors.gross}>
         <input inputMode="decimal" value={gross} onChange={(e) => setGross(e.target.value)} />
       </Field>
-      <Field label="Tara (kg)">
+      <Field label="Tara (kg)" required error={fe.errors.tare}>
         <input inputMode="decimal" value={tare} onChange={(e) => setTare(e.target.value)} />
       </Field>
-      <Evidence label="Ticket de báscula" value={ticket} onChange={setTicket} />
-      <button type="submit" className="primary" disabled={gate.busy}>
-        Registrar pesada y salida
-      </button>
-      {invalid ? <div className="error">{invalid}</div> : null}
+      <Evidence label="Ticket de báscula" value={ticket} onChange={setTicket} errors={{ ref: fe.errors.ref, sha256: fe.errors.sha256 }} />
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={gate.busy}>
+          Registrar pesada y salida
+        </button>
+      </div>
       <ErrorBox error={gate.error} />
     </form>
   );
@@ -219,16 +263,18 @@ function GateOut({ delivery, onDone }: { delivery: Delivery; onDone: () => void 
 
 function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const id = delivery.header.deliveryId;
-  const pod = useCommand(`pod:${id}`, "/api/v1/companies/{companyId}/sales/record-pod");
+  const pod = useCommand(`pod:${id}`, "/api/v1/companies/{companyId}/sales/record-pod", `Conduce ${delivery.header.deliveryNo}: entrega (POD) registrada.`);
   const [receiver, setReceiver] = useState("");
   const [receivedAt, setReceivedAt] = useState("");
-  const [evidence, setEvidence] = useState({ ref: "", sha256: "" });
+  const [evidence, setEvidence] = useState<EvidenceValue>({ ref: "", sha256: "" });
   const [received, setReceived] = useState<Record<string, string>>(() => Object.fromEntries(delivery.lines.map((l) => [l.deliveryLineId, l.qtyIssued])));
   const [returned, setReturned] = useState<Record<string, string>>({});
   const [exception, setException] = useState("");
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   return (
     <form
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         const lines = delivery.lines.map((l) => ({
@@ -236,11 +282,25 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
           qtyReceived: normalizeInput(received[l.deliveryLineId] ?? "0"),
           qtyReturned: normalizeInput(returned[l.deliveryLineId] ?? "0") || "0",
         }));
-        if (!receivedAt || lines.some((l) => !isDecimal(l.qtyReceived, 6) || !isDecimal(l.qtyReturned, 6))) {
-          setInvalid("Indique fecha y hora de recepción y las cantidades recibidas y devueltas.");
+        const lineErrors: Record<string, string | undefined> = {};
+        for (const l of lines) {
+          if (!isDecimal(l.qtyReceived, 6) || l.qtyReceived.startsWith("-")) {
+            lineErrors[`received-${l.deliveryLineId}`] = "Cantidad recibida no válida (cero o más).";
+          }
+          if (!isDecimal(l.qtyReturned, 6) || l.qtyReturned.startsWith("-")) {
+            lineErrors[`returned-${l.deliveryLineId}`] = "Cantidad devuelta no válida (cero o más).";
+          }
+        }
+        if (
+          !fe.check({
+            receiver: receiver.trim() === "" && "Indique quién recibió.",
+            receivedAt: !receivedAt && "Indique la fecha y hora de recepción.",
+            ...evidenceErrors(evidence),
+            ...lineErrors,
+          })
+        ) {
           return;
         }
-        setInvalid(null);
         if (
           await pod.run({
             deliveryId: id,
@@ -257,14 +317,14 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
         }
       }}
     >
-      <Field label="Recibió (nombre)">
-        <input value={receiver} onChange={(e) => setReceiver(e.target.value)} required />
+      <Field label="Recibió (nombre)" required error={fe.errors.receiver}>
+        <input value={receiver} onChange={(e) => setReceiver(e.target.value)} />
       </Field>
-      <Field label="Fecha y hora de recepción">
-        <input type="datetime-local" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} required />
+      <Field label="Fecha y hora de recepción" required error={fe.errors.receivedAt}>
+        <input type="datetime-local" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} />
       </Field>
-      <Evidence label="Evidencia del POD (foto o firma)" value={evidence} onChange={setEvidence} />
-      <table>
+      <Evidence label="Evidencia del POD (foto o firma)" value={evidence} onChange={setEvidence} errors={{ ref: fe.errors.ref, sha256: fe.errors.sha256 }} />
+      <LineTable>
         <thead>
           <tr>
             <th>Producto</th>
@@ -274,43 +334,63 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
           </tr>
         </thead>
         <tbody>
-          {delivery.lines.map((l) => (
-            <tr key={l.deliveryLineId}>
-              <td>
-                {l.itemCode} — {l.itemDescription}
-              </td>
-              <td className="num">{formatQuantity(l.qtyIssued)}</td>
-              <td className="num">
-                <input aria-label={`Recibido ${l.itemCode}`} inputMode="decimal" value={received[l.deliveryLineId] ?? ""} onChange={(e) => setReceived({ ...received, [l.deliveryLineId]: e.target.value })} />
-              </td>
-              <td className="num">
-                <input aria-label={`Devuelto ${l.itemCode}`} inputMode="decimal" value={returned[l.deliveryLineId] ?? ""} onChange={(e) => setReturned({ ...returned, [l.deliveryLineId]: e.target.value })} />
-              </td>
-            </tr>
-          ))}
+          {delivery.lines.map((l) => {
+            const receivedError = fe.errors[`received-${l.deliveryLineId}`];
+            const returnedError = fe.errors[`returned-${l.deliveryLineId}`];
+            return (
+              <tr key={l.deliveryLineId}>
+                <td className="wrap">
+                  {l.itemCode} — {l.itemDescription}
+                </td>
+                <td className="num">{formatQuantity(l.qtyIssued)}</td>
+                <td className="num">
+                  <input
+                    aria-label={`Recibido ${l.itemCode}`}
+                    inputMode="decimal"
+                    value={received[l.deliveryLineId] ?? ""}
+                    onChange={(e) => setReceived({ ...received, [l.deliveryLineId]: e.target.value })}
+                    {...fieldAria(receivedError, `received-${l.deliveryLineId}`, true)}
+                  />
+                  <FieldMessage id={`received-${l.deliveryLineId}`} error={receivedError} />
+                </td>
+                <td className="num">
+                  <input
+                    aria-label={`Devuelto ${l.itemCode}`}
+                    inputMode="decimal"
+                    value={returned[l.deliveryLineId] ?? ""}
+                    onChange={(e) => setReturned({ ...returned, [l.deliveryLineId]: e.target.value })}
+                    {...fieldAria(returnedError, `returned-${l.deliveryLineId}`)}
+                  />
+                  <FieldMessage id={`returned-${l.deliveryLineId}`} error={returnedError} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
-      </table>
-      <Field label="Motivo de la excepción (si hubo faltante o devolución)">
+      </LineTable>
+      <Field label="Motivo de la excepción (si hubo faltante o devolución)" wide>
         <input value={exception} onChange={(e) => setException(e.target.value)} />
       </Field>
-      <button type="submit" className="primary" disabled={pod.busy}>
-        Registrar entrega (POD)
-      </button>
-      {invalid ? <div className="error">{invalid}</div> : null}
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={pod.busy}>
+          Registrar entrega (POD)
+        </button>
+      </div>
       <ErrorBox error={pod.error} />
     </form>
   );
 }
 
+
 function DeliveryDetail() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const id = useSearchParams().get("id") ?? "";
   const { data, error, reload } = useLoad(
     can("sales:read") && id ? () => query("/api/v1/companies/{companyId}/sales/deliveries/{deliveryId}", { path: { companyId, deliveryId: id } }) : null,
     [companyId, id],
   );
-  const returnTrip = useCommand(`return-trip:${id}`, "/api/v1/companies/{companyId}/sales/record-return-trip");
-  const cancel = useCommand(`cancel-delivery:${id}`, "/api/v1/companies/{companyId}/sales/cancel-delivery");
+  const returnTrip = useCommand(`return-trip:${id}`, "/api/v1/companies/{companyId}/sales/record-return-trip", () => `Conduce ${data?.header.deliveryNo ?? ""}: viaje de regreso registrado.`);
+  const cancel = useCommand(`cancel-delivery:${id}`, "/api/v1/companies/{companyId}/sales/cancel-delivery", () => `Conduce ${data?.header.deliveryNo ?? ""} cancelado.`);
   if (!can("sales:read")) {
     return <NoPermission />;
   }
@@ -329,7 +409,7 @@ function DeliveryDetail() {
         Conduce {h.deliveryNo} <StatusBadge status={h.status} testId="delivery-status" />
       </h1>
       <p>
-        Pedido <Link href={`/ventas/pedido/?id=${h.salesOrderId}`}>{h.orderNo}</Link> · {h.customerName} · planta {h.plantCode} ·{" "}
+        Pedido <Link href={`/ventas/pedido/?id=${h.salesOrderId}`}>{h.orderNo}</Link> · {h.customerName} · planta {plantName(h.plantCode)} ·{" "}
         {DELIVERY_TERMS[h.deliveryTermCode] ?? h.deliveryTermCode}
       </p>
       <p className="muted">
@@ -348,15 +428,15 @@ function DeliveryDetail() {
       {can("delivery:manage") ? (
         <div className="actions">
           {h.status === "IN_TRANSIT" ? (
-            <ReasonAction label="Rechazo total: viaje de regreso" busy={returnTrip.busy} onConfirm={async (reason) => (await returnTrip.run({ ...target, reason })) && reload()} />
+            <ReasonAction label="Rechazo total: viaje de regreso" consequence="El cliente rechazó toda la carga: el conduce queda devuelto y la mercancía regresa a la planta. No se puede deshacer." busy={returnTrip.busy} onConfirm={async (reason) => (await returnTrip.run({ ...target, reason })) && reload()} />
           ) : null}
-          {cancellable(h.status) ? <ReasonAction label="Cancelar conduce" busy={cancel.busy} onConfirm={async (reason) => (await cancel.run({ ...target, reason })) && reload()} /> : null}
+          {cancellable(h.status) ? <ReasonAction label="Cancelar conduce" consequence="El conduce queda cancelado y su cantidad vuelve a quedar pendiente en el pedido. No se puede deshacer." busy={cancel.busy} onConfirm={async (reason) => (await cancel.run({ ...target, reason })) && reload()} /> : null}
           <ErrorBox error={returnTrip.error ?? cancel.error} />
         </div>
       ) : null}
 
       <h2>Líneas</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>Producto</th>
@@ -388,7 +468,7 @@ function DeliveryDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       {data.pod ? (
         <>
           <h2>Entrega (POD)</h2>

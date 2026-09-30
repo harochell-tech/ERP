@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { ACCOUNT_CLASSES, accountClassLabel } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -29,9 +29,9 @@ function AccountRow({ account, onDone }: { account: Account; onDone: () => void 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(account.name);
   const [accountClass, setAccountClass] = useState(account.accountClass ?? "");
-  const update = useCommand(`update-account:${account.accountId}`, "/api/v1/companies/{companyId}/finance/update-account");
-  const deactivate = useCommand(`deactivate-account:${account.accountId}`, "/api/v1/companies/{companyId}/finance/deactivate-account");
-  const activate = useCommand(`activate-account:${account.accountId}`, "/api/v1/companies/{companyId}/finance/activate-account");
+  const update = useCommand(`update-account:${account.accountId}`, "/api/v1/companies/{companyId}/finance/update-account", `Cuenta ${account.code} actualizada.`);
+  const deactivate = useCommand(`deactivate-account:${account.accountId}`, "/api/v1/companies/{companyId}/finance/deactivate-account", `Cuenta ${account.code} desactivada.`);
+  const activate = useCommand(`activate-account:${account.accountId}`, "/api/v1/companies/{companyId}/finance/activate-account", `Cuenta ${account.code} activada.`);
   const busy = update.busy || deactivate.busy || activate.busy;
   const manage = can("account:manage");
   const after = (response: unknown) => {
@@ -78,9 +78,14 @@ function AccountRow({ account, onDone }: { account: Account; onDone: () => void 
               </button>
             )}
             {account.status === "ACTIVE" ? (
-              <button type="button" disabled={busy} onClick={async () => after(await deactivate.run({ accountId: account.accountId }))}>
-                Desactivar
-              </button>
+              <ConfirmAction
+                label="Desactivar"
+                title={`¿Desactivar la cuenta ${account.code}?`}
+                danger
+                busy={busy}
+                consequence={`La cuenta ${account.code} ${account.name} deja de aceptar movimientos y ajustes. Se rechaza si tiene saldo; se puede volver a activar.`}
+                onConfirm={async () => after(await deactivate.run({ accountId: account.accountId }))}
+              />
             ) : (
               <button type="button" disabled={busy} onClick={async () => after(await activate.run({ accountId: account.accountId }))}>
                 Activar
@@ -94,22 +99,23 @@ function AccountRow({ account, onDone }: { account: Account; onDone: () => void 
 }
 
 function NewAccount({ onDone }: { onDone: () => void }) {
-  const create = useCommand("create-account", "/api/v1/companies/{companyId}/finance/create-account");
   const [code, setCode] = useState("");
+  const create = useCommand("create-account", "/api/v1/companies/{companyId}/finance/create-account", (_, doc) => `Cuenta ${doc ?? code.trim()} creada.`);
   const [name, setName] = useState("");
   const [accountClass, setAccountClass] = useState("");
   const [isControl, setIsControl] = useState(false);
+  const fe = useFieldErrors<"code" | "name" | "accountClass">();
   return (
     <div className="card">
       <strong>Nueva cuenta</strong>
       <div>
-        <Field label="Código">
+        <Field label="Código" required error={fe.errors.code}>
           <input aria-label="Código de la cuenta" maxLength={20} value={code} onChange={(e) => setCode(e.target.value)} />
         </Field>
-        <Field label="Nombre">
+        <Field label="Nombre" required error={fe.errors.name}>
           <input aria-label="Nombre de la cuenta" maxLength={200} value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label="Clase">
+        <Field label="Clase" required error={fe.errors.accountClass}>
           <ClassSelect label="Clase de la cuenta" value={accountClass} onChange={setAccountClass} />
         </Field>
         <label className="field">
@@ -119,22 +125,29 @@ function NewAccount({ onDone }: { onDone: () => void }) {
           </span>
         </label>
       </div>
-      <button
-        type="button"
-        className="primary"
-        disabled={create.busy || !code.trim() || !name.trim() || !accountClass}
-        onClick={async () => {
-          if (await create.run({ code: code.trim(), name: name.trim(), accountClass, isControl })) {
-            setCode("");
-            setName("");
-            setAccountClass("");
-            setIsControl(false);
-            onDone();
-          }
-        }}
-      >
-        Crear cuenta
-      </button>
+      <div className="actions form-actions">
+        <button
+          type="button"
+          className="primary"
+          disabled={create.busy}
+          onClick={async () => {
+            const valid = fe.check({
+              code: !code.trim() && "Indique el código de la cuenta.",
+              name: !name.trim() && "Indique el nombre de la cuenta.",
+              accountClass: !accountClass && "Elija la clase de la cuenta.",
+            });
+            if (valid && (await create.run({ code: code.trim(), name: name.trim(), accountClass, isControl }))) {
+              setCode("");
+              setName("");
+              setAccountClass("");
+              setIsControl(false);
+              onDone();
+            }
+          }}
+        >
+          Crear cuenta
+        </button>
+      </div>
       <ErrorBox error={create.error} />
     </div>
   );
@@ -162,7 +175,7 @@ export default function Page() {
       {data === null ? (
         <Loading error={error} />
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Código</th>
@@ -178,7 +191,7 @@ export default function Page() {
               <AccountRow key={`${a.accountId}:${a.name}:${a.accountClass}:${a.status}`} account={a} onDone={reload} />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

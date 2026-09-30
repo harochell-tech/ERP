@@ -35,11 +35,11 @@ function Blocked({ error }: { error: unknown }) {
 function Lines({ lines, unassigned }: { lines: Schemas["StatementLine"][]; unassigned: Schemas["StatementAccount"][] }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   return (
-    <table>
+    <div className="table-wrap"><table>
       <thead>
         <tr>
           <th>Concepto</th>
-          <th className="num">Monto</th>
+          <th className="num">Monto (RD$)</th>
         </tr>
       </thead>
       <tbody>
@@ -83,7 +83,7 @@ function Lines({ lines, unassigned }: { lines: Schemas["StatementLine"][]; unass
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></div>
   );
 }
 
@@ -92,7 +92,7 @@ function Total({ label, value, testId }: { label: string; value: string; testId?
     <div className="stat">
       <span>{label}</span>
       <span className="value">
-        <Money value={value} testId={testId} />
+        <Money value={value} testId={testId} currency />
       </span>
     </div>
   );

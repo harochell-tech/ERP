@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
 import { AUTHORIZATION_STATUSES, expiredCount } from "@/lib/authorizations";
 import { formatDate, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -16,14 +16,19 @@ import { useLoad } from "@/lib/useQuery";
 // command the daily process runs). The net amounts are the server's.
 
 function ExpireButton({ onDone }: { onDone: () => void }) {
-  const expire = useCommand("expire-fiscal-authorizations", "/api/v1/companies/{companyId}/tax/expire-fiscal-authorizations");
+  const expire = useCommand("expire-fiscal-authorizations", "/api/v1/companies/{companyId}/tax/expire-fiscal-authorizations", (r) => {
+    const count = expiredCount(r.result);
+    return count === 0 ? "No había autorizaciones vencidas." : `Se vencieron ${count} autorización(es) fiscal(es).`;
+  });
   const [message, setMessage] = useState<string | null>(null);
   return (
     <span className="inline-form">
-      <button
-        type="button"
-        disabled={expire.busy}
-        onClick={async () => {
+      <ConfirmAction
+        label="Vencer autorizaciones vencidas"
+        title="¿Vencer las autorizaciones pasadas de fecha?"
+        consequence="Las autorizaciones cuya vigencia terminó pasan a Vencido y ya no permiten facturar con e-CF 44. No se deshace (es lo mismo que hace el proceso diario)."
+        busy={expire.busy}
+        onConfirm={async () => {
           setMessage(null);
           const response = await expire.run({});
           if (response) {
@@ -32,9 +37,7 @@ function ExpireButton({ onDone }: { onDone: () => void }) {
             onDone();
           }
         }}
-      >
-        Vencer autorizaciones vencidas
-      </button>
+      />
       {message ? (
         <span className="notice" data-testid="expire-result">
           {message}
@@ -112,7 +115,7 @@ function Authorizations() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay autorizaciones.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Certificado</th>
@@ -120,8 +123,8 @@ function Authorizations() {
               <th>Proyecto</th>
               <th>Vigente hasta</th>
               <th>Estado</th>
-              <th className="num">Neto autorizado</th>
-              <th className="num">Neto consumido</th>
+              <th className="num">Neto autorizado (RD$)</th>
+              <th className="num">Neto consumido (RD$)</th>
             </tr>
           </thead>
           <tbody>
@@ -133,7 +136,7 @@ function Authorizations() {
                 <td>
                   {a.customerName} <span className="muted">({a.customerRnc})</span>
                 </td>
-                <td>{a.projectName}</td>
+                <td className="wrap">{a.projectName}</td>
                 <td>{formatDate(a.validUntil)}</td>
                 <td>
                   <StatusBadge status={a.status} />
@@ -147,7 +150,7 @@ function Authorizations() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

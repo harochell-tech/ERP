@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -61,7 +61,7 @@ function AuthorizationForm() {
   const register = useCommand<"/api/v1/companies/{companyId}/tax/register-fiscal-authorization", Values>(formId, "/api/v1/companies/{companyId}/tax/register-fiscal-authorization");
   const update = useCommand<"/api/v1/companies/{companyId}/tax/update-draft-authorization", Values>(formId, "/api/v1/companies/{companyId}/tax/update-draft-authorization");
   const [values, setValues] = useState<Values | null>(() => register.restored ?? update.restored ?? null);
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   const allowed = can("fiscal_authorization:register") && can("sales:read");
 
   const { data, error } = useLoad(
@@ -119,15 +119,22 @@ function AuthorizationForm() {
 
   const submit = async () => {
     const lines = current.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: normalizeInput(l.quantity), netAmount: normalizeInput(l.netAmount) }));
-    if (!current.partyId || current.certificateNo.trim() === "" || !current.issuedOn || current.projectName.trim() === "" || current.confoturResolutionNo.trim() === "") {
-      setInvalid("Complete cliente, número de certificado, fecha de emisión, proyecto y resolución CONFOTUR.");
+    const found: Record<string, string | false> = {
+      partyId: !current.partyId && "Elija el cliente.",
+      certificateNo: current.certificateNo.trim() === "" && "Indique el número de certificado.",
+      issuedOn: !current.issuedOn && "Indique la fecha de emisión.",
+      validUntil: current.validUntil !== "" && current.issuedOn !== "" && current.validUntil < current.issuedOn && "La vigencia es igual o posterior a la emisión.",
+      projectName: current.projectName.trim() === "" && "Indique el proyecto.",
+      confoturResolutionNo: current.confoturResolutionNo.trim() === "" && "Indique la resolución CONFOTUR.",
+    };
+    lines.forEach((l, index) => {
+      found[`line-${index}-item`] = !l.itemId && "Elija el producto.";
+      found[`line-${index}-quantity`] = !isPositiveDecimal(l.quantity, 6) && "Mayor que cero, hasta 6 decimales.";
+      found[`line-${index}-net`] = !isPositiveDecimal(l.netAmount, 2) && "Mayor que cero, hasta 2 decimales.";
+    });
+    if (!fe.check(found)) {
       return;
     }
-    if (lines.some((l) => !l.itemId || !isPositiveDecimal(l.quantity, 6) || !isPositiveDecimal(l.netAmount, 2))) {
-      setInvalid("Cada línea necesita producto, cantidad mayor que cero (hasta 6 decimales) y neto mayor que cero (hasta 2 decimales).");
-      return;
-    }
-    setInvalid(null);
     const header = {
       certificateNo: current.certificateNo.trim(),
       issuedOn: current.issuedOn,
@@ -139,19 +146,24 @@ function AuthorizationForm() {
       lines,
     };
     const response = authorization
-      ? await update.run({ authorizationId: authorization.header.authorizationId, expectedVersion: authorization.header.version, ...header }, current)
-      : await register.run({ partyId: current.partyId, ...header }, current);
+      ? await update.run(
+          { authorizationId: authorization.header.authorizationId, expectedVersion: authorization.header.version, ...header },
+          current,
+          `Autorización ${header.certificateNo} guardada (borrador).`,
+        )
+      : await register.run({ partyId: current.partyId, ...header }, current, `Autorización ${header.certificateNo} registrada en borrador: adjunte el certificado y envíela a verificación.`);
     if (response) {
       router.push(`/fiscal/autorizacion/?id=${authorization ? authorization.header.authorizationId : response.resultRef}`);
     }
   };
+  const lineError = (index: number, field: string) => fe.errors[`line-${index}-${field}`];
 
   return (
     <>
       <h1>{authorization ? `Editar autorización ${authorization.header.certificateNo}` : "Registrar autorización fiscal"}</h1>
       <p className="muted">Régimen CONFOTUR. Copie los datos del certificado de exención emitido por la DGII; el certificado se adjunta después, en la autorización.</p>
       <div>
-        <Field label="Cliente">
+        <Field label="Cliente" required error={fe.errors.partyId}>
           <select aria-label="Cliente" value={current.partyId} disabled={authorization !== null} onChange={(e) => set({ partyId: e.target.value, salesOrderId: "" })}>
             <option value="">—</option>
             {data.customers.map((c) => (
@@ -161,19 +173,19 @@ function AuthorizationForm() {
             ))}
           </select>
         </Field>
-        <Field label="Número de certificado">
+        <Field label="Número de certificado" required error={fe.errors.certificateNo}>
           <input value={current.certificateNo} onChange={setText("certificateNo")} />
         </Field>
-        <Field label="Emitido el">
+        <Field label="Emitido el" required error={fe.errors.issuedOn}>
           <input type="date" value={current.issuedOn} onChange={setText("issuedOn")} />
         </Field>
-        <Field label="Vigente hasta">
+        <Field label="Vigente hasta" error={fe.errors.validUntil}>
           <input type="date" value={current.validUntil} onChange={setText("validUntil")} />
         </Field>
-        <Field label="Proyecto">
+        <Field label="Proyecto" required error={fe.errors.projectName}>
           <input value={current.projectName} onChange={setText("projectName")} />
         </Field>
-        <Field label="Resolución CONFOTUR">
+        <Field label="Resolución CONFOTUR" required error={fe.errors.confoturResolutionNo}>
           <input value={current.confoturResolutionNo} onChange={setText("confoturResolutionNo")} />
         </Field>
         <Field label="Fin del plazo del proyecto (opcional)">
@@ -182,13 +194,13 @@ function AuthorizationForm() {
         <OriginOrder partyId={current.partyId} value={current.salesOrderId} onChange={(salesOrderId) => set({ salesOrderId })} />
       </div>
       <h2>Alcance</h2>
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Producto</th>
             <th>Unidad</th>
             <th className="num">Cantidad autorizada</th>
-            <th className="num">Neto autorizado</th>
+            <th className="num">Neto autorizado (RD$)</th>
             <th />
           </tr>
         </thead>
@@ -198,6 +210,7 @@ function AuthorizationForm() {
               <td>
                 <select
                   aria-label={`Producto ${index + 1}`}
+                  {...fieldAria(lineError(index, "item"), `auth-line-${index}-item`, true)}
                   value={line.itemId && line.uom ? `${line.itemId}|${line.uom}` : ""}
                   onChange={(e) => {
                     const [itemId = "", uom = ""] = e.target.value.split("|");
@@ -211,13 +224,28 @@ function AuthorizationForm() {
                     </option>
                   ))}
                 </select>
+                <FieldMessage id={`auth-line-${index}-item`} error={lineError(index, "item")} />
               </td>
               <td>{line.uom}</td>
               <td className="num">
-                <input aria-label={`Cantidad ${index + 1}`} inputMode="decimal" value={line.quantity} onChange={(e) => setLine(index, { quantity: e.target.value })} />
+                <input
+                  aria-label={`Cantidad ${index + 1}`}
+                  {...fieldAria(lineError(index, "quantity"), `auth-line-${index}-quantity`, true)}
+                  inputMode="decimal"
+                  value={line.quantity}
+                  onChange={(e) => setLine(index, { quantity: e.target.value })}
+                />
+                <FieldMessage id={`auth-line-${index}-quantity`} error={lineError(index, "quantity")} />
               </td>
               <td className="num">
-                <input aria-label={`Neto ${index + 1}`} inputMode="decimal" value={line.netAmount} onChange={(e) => setLine(index, { netAmount: e.target.value })} />
+                <input
+                  aria-label={`Neto ${index + 1}`}
+                  {...fieldAria(lineError(index, "net"), `auth-line-${index}-net`, true)}
+                  inputMode="decimal"
+                  value={line.netAmount}
+                  onChange={(e) => setLine(index, { netAmount: e.target.value })}
+                />
+                <FieldMessage id={`auth-line-${index}-net`} error={lineError(index, "net")} />
               </td>
               <td>
                 {current.lines.length > 1 ? (
@@ -229,8 +257,8 @@ function AuthorizationForm() {
             </tr>
           ))}
         </tbody>
-      </table>
-      <div className="actions">
+      </LineTable>
+      <div className="actions form-actions">
         <button type="button" onClick={() => set({ lines: [...current.lines, { ...EMPTY_LINE }] })}>
           Agregar línea
         </button>
@@ -238,7 +266,6 @@ function AuthorizationForm() {
           {authorization ? "Guardar borrador" : "Registrar autorización"}
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={register.error ?? update.error} />
     </>
   );

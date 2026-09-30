@@ -34,7 +34,7 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">Todavía no hay estructuras.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Reporte</th>
@@ -60,12 +60,12 @@ export default function Page() {
                 </td>
                 <td className="num">{s.lines}</td>
                 <td className="num">{s.accounts}</td>
-                <td>{s.preparedBy ?? "—"}</td>
-                <td>{s.approvedBy ?? "—"}</td>
+                <td className="wrap">{s.preparedBy ?? "—"}</td>
+                <td className="wrap">{s.approvedBy ?? "—"}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

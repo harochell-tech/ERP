@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { FINISHED_GOOD_CATEGORIES } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -13,28 +13,39 @@ import { useLoad } from "@/lib/useQuery";
 function CreateFinishedGood({ onDone }: { onDone: () => void }) {
   const create = useCommand("create-finished-good", "/api/v1/companies/{companyId}/master-data/create-finished-good");
   const [form, setForm] = useState({ code: "", description: "", baseUom: "un", itemCategory: "BLOQUE" });
+  const fe = useFieldErrors<"code" | "description" | "baseUom">();
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
   return (
     <form
-      className="inline-form"
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await create.run({ code: form.code.trim(), description: form.description.trim(), baseUom: form.baseUom.trim(), itemCategory: form.itemCategory })) {
+        if (
+          !fe.check({
+            code: form.code.trim() === "" && "Indique el código del producto.",
+            description: form.description.trim() === "" && "Indique la descripción.",
+            baseUom: form.baseUom.trim() === "" && "Indique la unidad base.",
+          })
+        ) {
+          return;
+        }
+        if (await create.run({ code: form.code.trim(), description: form.description.trim(), baseUom: form.baseUom.trim(), itemCategory: form.itemCategory }, undefined, `Producto ${form.code.trim()} creado en borrador.`)) {
           setForm({ ...form, code: "", description: "" });
           onDone();
         }
       }}
     >
-      <Field label="Código">
-        <input value={form.code} onChange={set("code")} required />
+      <Field label="Código" required error={fe.errors.code}>
+        <input value={form.code} onChange={set("code")} />
       </Field>
-      <Field label="Descripción">
-        <input value={form.description} onChange={set("description")} required />
+      <Field label="Descripción" required error={fe.errors.description}>
+        <input value={form.description} onChange={set("description")} />
       </Field>
-      <Field label="Unidad base">
-        <input value={form.baseUom} onChange={set("baseUom")} required size={6} />
+      <Field label="Unidad base" required error={fe.errors.baseUom}>
+        <input value={form.baseUom} onChange={set("baseUom")} size={6} />
       </Field>
-      <Field label="Categoría">
+      <Field label="Categoría" required>
         <select value={form.itemCategory} onChange={set("itemCategory")}>
           {Object.entries(FINISHED_GOOD_CATEGORIES).map(([code, label]) => (
             <option key={code} value={code}>
@@ -43,16 +54,18 @@ function CreateFinishedGood({ onDone }: { onDone: () => void }) {
           ))}
         </select>
       </Field>
-      <button type="submit" disabled={create.busy}>
-        Crear producto
-      </button>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={create.busy}>
+          Crear producto
+        </button>
+      </div>
       <ErrorBox error={create.error} />
     </form>
   );
 }
 
-function Activate({ itemId, version, onDone }: { itemId: string; version: number; onDone: () => void }) {
-  const activate = useCommand(`activate-item:${itemId}`, "/api/v1/companies/{companyId}/master-data/activate-item");
+function Activate({ itemId, code, version, onDone }: { itemId: string; code: string; version: number; onDone: () => void }) {
+  const activate = useCommand(`activate-item:${itemId}`, "/api/v1/companies/{companyId}/master-data/activate-item", `Producto ${code} activado.`);
   return (
     <>
       <button type="button" disabled={activate.busy} onClick={async () => (await activate.run({ itemId, expectedVersion: version })) && onDone()}>
@@ -82,7 +95,7 @@ export default function Page() {
       ) : goods.length === 0 ? (
         <p className="muted">No hay productos terminados.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Código</th>
@@ -97,17 +110,17 @@ export default function Page() {
             {goods.map((i) => (
               <tr key={`${i.itemId}:${i.version}`}>
                 <td className="mono">{i.code}</td>
-                <td>{i.description}</td>
+                <td className="wrap">{i.description}</td>
                 <td>{FINISHED_GOOD_CATEGORIES[i.itemCategory] ?? i.itemCategory}</td>
                 <td>{i.baseUom}</td>
                 <td>
                   <StatusBadge status={i.status} />
                 </td>
-                <td className="actions">{i.status !== "ACTIVE" && can("item:activate") ? <Activate itemId={i.itemId} version={i.version} onDone={reload} /> : null}</td>
+                <td className="actions">{i.status !== "ACTIVE" && can("item:activate") ? <Activate itemId={i.itemId} code={i.code} version={i.version} onDone={reload} /> : null}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

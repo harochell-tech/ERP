@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { actAs, loginUrl, logout, query, stopActingAs } from "@/api/client";
 import { ErrorBox } from "./ui";
 import { useSession } from "@/lib/session";
 import { identityLabel, showIdentitySelector, type TestIdentityOption } from "@/lib/identities";
+import { environmentBadge, type EnvironmentBadge } from "@/lib/environment";
+import { ROLES } from "@/lib/labels";
 
 interface NavItem {
   href: string;
@@ -174,15 +176,153 @@ function isActive(pathname: string, href: string): boolean {
   return pathname.startsWith(href) || parent === href;
 }
 
-function SideMenu({ pathname, can }: { pathname: string; can: (permission: string) => boolean }) {
+
+/** The label of the current screen for the mobile top bar: its menu item (or its list's, for a detail page). */
+export function screenTitle(pathname: string): string {
+  if (pathname === "/") {
+    return "Inicio";
+  }
+  for (const group of NAV) {
+    for (const item of group.items) {
+      if (isActive(pathname, item.href)) {
+        return item.label;
+      }
+    }
+  }
+  return "Rochell Core";
+}
+
+const COLLAPSED_KEY = "rochell.menu.collapsed";
+
+function readCollapsed(): string[] {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSED_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCollapsed(groups: string[]): void {
+  try {
+    window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(groups));
+  } catch {
+    // Private windows: the folded groups simply are not remembered.
+  }
+}
+
+const MOBILE_QUERY = "(max-width: 900px)";
+
+/** E-UX1-01-1: below 900 px the shell switches to the top bar and the menu panel. */
+function useIsMobile(): boolean {
+  return useSyncExternalStore(
+    (notify) => {
+      const media = window.matchMedia(MOBILE_QUERY);
+      media.addEventListener("change", notify);
+      return () => media.removeEventListener("change", notify);
+    },
+    () => window.matchMedia(MOBILE_QUERY).matches,
+    () => false,
+  );
+}
+
+function useEnvironmentBadge(): EnvironmentBadge {
+  const hostname = useSyncExternalStore(
+    () => () => undefined,
+    () => window.location.hostname,
+    () => "",
+  );
+  return environmentBadge(hostname);
+}
+
+function SideMenu({
+  pathname,
+  can,
+  mobile,
+  open,
+  onClose,
+  footer,
+}: {
+  pathname: string;
+  can: (permission: string) => boolean;
+  mobile: boolean;
+  open: boolean;
+  onClose: () => void;
+  footer?: ReactNode;
+}) {
+  const [collapsed, setCollapsed] = useState<string[]>(() => (typeof window === "undefined" ? [] : readCollapsed()));
+  const ref = useRef<HTMLElement>(null);
+
+  const toggle = (title: string) => {
+    const next = collapsed.includes(title) ? collapsed.filter((t) => t !== title) : [...collapsed, title];
+    setCollapsed(next);
+    writeCollapsed(next);
+  };
+
+  // The open panel keeps the focus inside (Tab cycles), Escape closes it.
+  useEffect(() => {
+    if (!mobile || !open) {
+      return;
+    }
+    const nav = ref.current;
+    const focusables = () => [...(nav?.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), select:not([disabled])") ?? [])];
+    focusables()[0]?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") {
+        return;
+      }
+      const items = focusables();
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) {
+        return;
+      }
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobile, open, onClose]);
+
+  const hidden = mobile && !open;
   return (
-    <nav className="sidebar" aria-label="Menú principal">
-      <Link href="/" className="brand">
-        <span className="brand-mark" aria-hidden="true">
-          R
-        </span>
-        Rochell Core
-      </Link>
+    <nav
+      ref={ref}
+      id="main-menu"
+      className={`sidebar${mobile ? " sidebar-mobile" : ""}${open ? " open" : ""}`}
+      aria-label="Menú principal"
+      aria-hidden={hidden || undefined}
+      inert={hidden || undefined}
+      onClick={(e) => {
+        if (mobile && (e.target as HTMLElement).closest("a")) {
+          onClose();
+        }
+      }}
+    >
+      <div className="sidebar-head">
+        <Link href="/" className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            R
+          </span>
+          Rochell Core
+        </Link>
+        {mobile ? (
+          <button type="button" className="menu-close" aria-label="Cerrar menú" onClick={onClose}>
+            ×
+          </button>
+        ) : null}
+      </div>
       <ul>
         <li>
           <Link href="/" className={pathname === "/" ? "active" : undefined}>
@@ -195,13 +335,22 @@ function SideMenu({ pathname, can }: { pathname: string; can: (permission: strin
         if (items.length === 0) {
           return null;
         }
+        const folded = collapsed.includes(group.title);
+        const listId = `menu-group-${group.title.replace(/\W+/g, "-")}`;
         return (
-          <div key={group.title}>
-            <h2>{group.title}</h2>
-            <ul>
+          <div key={group.title} className="menu-group">
+            <h2>
+              <button type="button" className="menu-group-toggle" aria-expanded={!folded} aria-controls={listId} onClick={() => toggle(group.title)}>
+                <span>{group.title}</span>
+                <span className="chevron" aria-hidden="true">
+                  {folded ? "▸" : "▾"}
+                </span>
+              </button>
+            </h2>
+            <ul id={listId} hidden={folded}>
               {items.map((item) => (
                 <li key={item.href}>
-                  <Link href={item.href} className={isActive(pathname, item.href) ? "active" : undefined}>
+                  <Link href={item.href} className={isActive(pathname, item.href) ? "active" : undefined} aria-current={isActive(pathname, item.href) ? "page" : undefined}>
                     {item.label}
                   </Link>
                 </li>
@@ -210,35 +359,26 @@ function SideMenu({ pathname, can }: { pathname: string; can: (permission: strin
           </div>
         );
       })}
+      {footer ? <div className="sidebar-footer">{footer}</div> : null}
     </nav>
   );
 }
 
 function PlantSelector() {
-  const { companyId, company, plantId, selectPlant, plantScoped } = useSession();
-  const [plants, setPlants] = useState<{ plantId: string; code: string }[]>([]);
+  const { company, plantId, selectPlant, plantScoped, plantName } = useSession();
   const assigned = [...new Set((company?.assignments ?? []).flatMap((a) => (a.plantId ? [a.plantId] : [])))];
   const firstPlant = assigned[0];
-
-  useEffect(() => {
-    if (!plantScoped || !companyId || !firstPlant) {
-      return;
-    }
-    query("/api/v1/companies/{companyId}/master-data/plants", { path: { companyId }, query: { plantId: firstPlant } })
-      .then((list) => setPlants(list.items))
-      .catch(() => setPlants([]));
-  }, [companyId, plantScoped, firstPlant]);
 
   if (!plantScoped) {
     return null;
   }
   return (
-    <label>
+    <label className="plant-selector">
       Planta:{" "}
       <select aria-label="Planta" value={plantId ?? firstPlant ?? ""} onChange={(e) => selectPlant(e.target.value)}>
         {assigned.map((id) => (
           <option key={id} value={id}>
-            {plants.find((p) => p.plantId === id)?.code ?? id.slice(0, 8)}
+            {plantName(id, id.slice(0, 8))}
           </option>
         ))}
       </select>
@@ -302,9 +442,72 @@ function IdentitySelector() {
   );
 }
 
+/** "Name · main role" (E-UX1-01-3): the Google name (the e-mail until the first sign-in brings it), the e-mail as tooltip. */
+function UserBlock() {
+  const { state, company, reload } = useSession();
+  if (state.status !== "ready") {
+    return null;
+  }
+  const session = state.session;
+  const role = company?.assignments[0];
+  const roleName = role ? (ROLES[role.roleCode] ?? role.roleName) : null;
+  return (
+    <span className="user-block">
+      <span className="user" data-testid="user-email" title={session.email ?? undefined}>
+        <strong>{session.displayName?.trim() || session.email}</strong>
+        {roleName ? <span className="muted"> · {roleName}</span> : null}
+      </span>
+      <button
+        type="button"
+        onClick={async () => {
+          await logout();
+          reload();
+        }}
+      >
+        Cerrar sesión
+      </button>
+    </span>
+  );
+}
+
+function CompanyName() {
+  const { state, company, selectCompany } = useSession();
+  if (state.status !== "ready") {
+    return null;
+  }
+  return state.session.companies.length > 1 ? (
+    <select aria-label="Empresa" value={company?.companyId} onChange={(e) => selectCompany(e.target.value)}>
+      {state.session.companies.map((c) => (
+        <option key={c.companyId} value={c.companyId}>
+          {c.legalName}
+        </option>
+      ))}
+    </select>
+  ) : (
+    <span className="company">{company?.legalName ?? "Sin empresa asignada"}</span>
+  );
+}
+
+function EnvironmentTag() {
+  const badge = useEnvironmentBadge();
+  return badge ? (
+    <span className={`env-badge env-${badge.tone}`} data-testid="environment-badge" title="Ambiente de pruebas: los datos no son reales.">
+      {badge.label}
+    </span>
+  ) : null;
+}
+
 export function Shell({ children }: { children: ReactNode }) {
-  const { state, company, selectCompany, can, reload } = useSession();
+  const { state, company, can } = useSession();
   const pathname = usePathname();
+  const mobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    toggleRef.current?.focus();
+  }, []);
+  const menuVisible = mobile && menuOpen;
 
   if (state.status === "loading") {
     return <main className="page">Cargando…</main>;
@@ -321,46 +524,51 @@ export function Shell({ children }: { children: ReactNode }) {
       <main className="page">
         <h1>Rochell Core</h1>
         <p>Inicie sesión con su cuenta de la organización.</p>
-        <a className="button" href={loginUrl(pathname)}>
+        <a className="button primary" href={loginUrl(pathname)}>
           Iniciar sesión
         </a>
       </main>
     );
   }
 
-  const session = state.session;
+  const account = (
+    <>
+      <PlantSelector />
+      <IdentitySelector />
+      <UserBlock />
+    </>
+  );
   return (
-    <div className="app">
-      <SideMenu pathname={pathname} can={can} />
-      <div className="main">
-        <header className="topbar">
-          <span className="spacer" />
-          {session.companies.length > 1 ? (
-            <select aria-label="Empresa" value={company?.companyId} onChange={(e) => selectCompany(e.target.value)}>
-              {session.companies.map((c) => (
-                <option key={c.companyId} value={c.companyId}>
-                  {c.legalName}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span>{company?.legalName ?? "Sin empresa asignada"}</span>
-          )}
-          <PlantSelector />
-          <IdentitySelector />
-          <span className="muted" data-testid="user-email">
-            {session.email}
-          </span>
-          <button
-            type="button"
-            onClick={async () => {
-              await logout();
-              reload();
-            }}
-          >
-            Cerrar sesión
-          </button>
-        </header>
+    <div className={`app${mobile ? " app-mobile" : ""}`}>
+      <SideMenu pathname={pathname} can={can} mobile={mobile} open={menuVisible} onClose={closeMenu} footer={mobile ? account : undefined} />
+      {menuVisible ? <div className="menu-backdrop" aria-hidden="true" onClick={closeMenu} /> : null}
+      <div className="main" inert={menuVisible || undefined}>
+        {mobile ? (
+          <header className="topbar topbar-mobile">
+            <button
+              ref={toggleRef}
+              type="button"
+              className="menu-toggle"
+              aria-expanded={menuOpen}
+              aria-controls="main-menu"
+              onClick={() => setMenuOpen(true)}
+            >
+              <span aria-hidden="true">☰</span> Menú
+            </button>
+            <span className="screen-title">{screenTitle(pathname)}</span>
+            <span className="topbar-right">
+              <EnvironmentTag />
+              <CompanyName />
+            </span>
+          </header>
+        ) : (
+          <header className="topbar">
+            <EnvironmentTag />
+            <span className="spacer" />
+            <CompanyName />
+            {account}
+          </header>
+        )}
         <main className="page">{company ? children : <p>No tiene roles asignados en ninguna empresa.</p>}</main>
       </div>
     </div>

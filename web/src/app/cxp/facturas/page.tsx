@@ -33,14 +33,14 @@ export default function Invoices() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay facturas.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>NCF</th>
               <th>Proveedor</th>
               <th>Fecha</th>
               <th>Vence</th>
-              <th className="num">Total</th>
+              <th className="num">Total (RD$)</th>
               <th>Estado</th>
               <th>Contabilidad</th>
             </tr>
@@ -51,7 +51,7 @@ export default function Invoices() {
                 <td>
                   <Link href={`/cxp/factura/?id=${si.supplierInvoiceId}`}>{si.supplierFiscalNumber}</Link>
                 </td>
-                <td>{si.supplierName}</td>
+                <td className="wrap">{si.supplierName}</td>
                 <td>{formatDate(si.docDate)}</td>
                 <td>{formatDate(si.dueDate)}</td>
                 <td className="num">{formatDecimal(si.totalAmount)}</td>
@@ -62,7 +62,7 @@ export default function Invoices() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

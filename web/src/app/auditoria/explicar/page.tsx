@@ -54,8 +54,8 @@ function Explain() {
       <dl className="facts">
         <dt>Línea</dt>
         <dd>
-          {data.entry.lineNo} ({data.entry.ruleLineCode}) — {data.entry.account.code} {data.entry.account.name} [{data.entry.account.role}] — débito{" "}
-          {formatDecimal(data.entry.debit)}, crédito {formatDecimal(data.entry.credit)}
+          {data.entry.lineNo} ({data.entry.ruleLineCode}) — {data.entry.account.code} {data.entry.account.name} [{data.entry.account.role}] — débito RD${" "}
+          {formatDecimal(data.entry.debit)}, crédito RD$ {formatDecimal(data.entry.credit)}
         </dd>
         <dt>Asiento</dt>
         <dd>
@@ -87,13 +87,13 @@ function Explain() {
       {data.fiscal ? (
         <>
           <h2>Determinación fiscal ({formatDate(data.fiscal.date)})</h2>
-          <table>
+          <div className="table-wrap"><table>
             <thead>
               <tr>
                 <th>Impuesto</th>
-                <th className="num">Base</th>
+                <th className="num">Base (RD$)</th>
                 <th className="num">Tasa</th>
-                <th className="num">Monto</th>
+                <th className="num">Monto (RD$)</th>
                 <th>Efecto</th>
               </tr>
             </thead>
@@ -108,7 +108,7 @@ function Explain() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </>
       ) : null}
       <h2>Mapeo de cuenta</h2>

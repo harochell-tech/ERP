@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -14,35 +14,40 @@ function RegisterVehicle({ onDone }: { onDone: () => void }) {
   const register = useCommand("register-vehicle", "/api/v1/companies/{companyId}/sales/register-vehicle");
   const [plate, setPlate] = useState("");
   const [capacity, setCapacity] = useState("");
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<"plate" | "capacity">();
   return (
     <form
-      className="inline-form"
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         const capacityKg = normalizeInput(capacity);
-        if (!isPositiveDecimal(capacityKg, 6)) {
-          setInvalid("Indique la capacidad en kg, mayor que cero.");
+        if (
+          !fe.check({
+            plate: plate.trim() === "" && "Indique la placa.",
+            capacity: !isPositiveDecimal(capacityKg, 6) && "Indique la capacidad en kg, mayor que cero.",
+          })
+        ) {
           return;
         }
-        setInvalid(null);
-        if (await register.run({ plate: plate.trim(), capacityKg })) {
+        if (await register.run({ plate: plate.trim(), capacityKg }, undefined, `Vehículo ${plate.trim()} registrado.`)) {
           setPlate("");
           setCapacity("");
           onDone();
         }
       }}
     >
-      <Field label="Placa">
-        <input value={plate} onChange={(e) => setPlate(e.target.value)} required />
+      <Field label="Placa" required error={fe.errors.plate}>
+        <input value={plate} onChange={(e) => setPlate(e.target.value)} />
       </Field>
-      <Field label="Capacidad (kg)">
+      <Field label="Capacidad (kg)" required error={fe.errors.capacity}>
         <input inputMode="decimal" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
       </Field>
-      <button type="submit" disabled={register.busy}>
-        Registrar vehículo
-      </button>
-      {invalid ? <div className="error">{invalid}</div> : null}
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={register.busy}>
+          Registrar vehículo
+        </button>
+      </div>
       <ErrorBox error={register.error} />
     </form>
   );
@@ -51,9 +56,9 @@ function RegisterVehicle({ onDone }: { onDone: () => void }) {
 function VehicleRow({ vehicle, onDone }: { vehicle: Schemas["VehicleView"]; onDone: () => void }) {
   const { can } = useSession();
   const id = vehicle.vehicleId;
-  const update = useCommand(`update-vehicle:${id}`, "/api/v1/companies/{companyId}/sales/update-vehicle");
-  const deactivate = useCommand(`deactivate-vehicle:${id}`, "/api/v1/companies/{companyId}/sales/deactivate-vehicle");
-  const activate = useCommand(`activate-vehicle:${id}`, "/api/v1/companies/{companyId}/sales/activate-vehicle");
+  const update = useCommand(`update-vehicle:${id}`, "/api/v1/companies/{companyId}/sales/update-vehicle", `Capacidad del vehículo ${vehicle.plate} actualizada.`);
+  const deactivate = useCommand(`deactivate-vehicle:${id}`, "/api/v1/companies/{companyId}/sales/deactivate-vehicle", `Vehículo ${vehicle.plate} desactivado.`);
+  const activate = useCommand(`activate-vehicle:${id}`, "/api/v1/companies/{companyId}/sales/activate-vehicle", `Vehículo ${vehicle.plate} activado.`);
   const [capacity, setCapacity] = useState<string | null>(null);
   const busy = update.busy || deactivate.busy || activate.busy;
   const target = { vehicleId: id, expectedVersion: vehicle.version };
@@ -78,9 +83,13 @@ function VehicleRow({ vehicle, onDone }: { vehicle: Schemas["VehicleView"]; onDo
                 Cambiar capacidad
               </button>
               {vehicle.status === "ACTIVE" ? (
-                <button type="button" disabled={busy} onClick={async () => (await deactivate.run(target)) && onDone()}>
-                  Desactivar
-                </button>
+                <ConfirmAction
+                  label="Desactivar"
+                  danger
+                  busy={busy}
+                  consequence={`El vehículo ${vehicle.plate} ya no se podrá asignar a conduces nuevos hasta que se active de nuevo.`}
+                  onConfirm={async () => (await deactivate.run(target)) && onDone()}
+                />
               ) : (
                 <button type="button" disabled={busy} onClick={async () => (await activate.run(target)) && onDone()}>
                   Activar
@@ -117,27 +126,40 @@ function RegisterDriver({ onDone }: { onDone: () => void }) {
   const register = useCommand("register-driver", "/api/v1/companies/{companyId}/sales/register-driver");
   const [fullName, setFullName] = useState("");
   const [nationalId, setNationalId] = useState("");
+  const fe = useFieldErrors<"fullName" | "nationalId">();
   return (
     <form
-      className="inline-form"
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await register.run({ fullName: fullName.trim(), nationalId: nationalId.replace(/\D/g, "") })) {
+        const digits = nationalId.replace(/\D/g, "");
+        if (
+          !fe.check({
+            fullName: fullName.trim() === "" && "Indique el nombre completo del chofer.",
+            nationalId: digits.length !== 11 && "La cédula debe tener 11 dígitos.",
+          })
+        ) {
+          return;
+        }
+        if (await register.run({ fullName: fullName.trim(), nationalId: digits }, undefined, `Chofer ${fullName.trim()} registrado.`)) {
           setFullName("");
           setNationalId("");
           onDone();
         }
       }}
     >
-      <Field label="Nombre completo">
-        <input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+      <Field label="Nombre completo" required error={fe.errors.fullName}>
+        <input value={fullName} onChange={(e) => setFullName(e.target.value)} />
       </Field>
-      <Field label="Cédula">
-        <input value={nationalId} onChange={(e) => setNationalId(e.target.value)} required />
+      <Field label="Cédula" required error={fe.errors.nationalId}>
+        <input inputMode="numeric" value={nationalId} onChange={(e) => setNationalId(e.target.value)} />
       </Field>
-      <button type="submit" disabled={register.busy}>
-        Registrar chofer
-      </button>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={register.busy}>
+          Registrar chofer
+        </button>
+      </div>
       <ErrorBox error={register.error} />
     </form>
   );
@@ -146,15 +168,15 @@ function RegisterDriver({ onDone }: { onDone: () => void }) {
 function DriverRow({ driver, onDone }: { driver: Schemas["DriverView"]; onDone: () => void }) {
   const { can } = useSession();
   const id = driver.driverId;
-  const update = useCommand(`update-driver:${id}`, "/api/v1/companies/{companyId}/sales/update-driver");
-  const deactivate = useCommand(`deactivate-driver:${id}`, "/api/v1/companies/{companyId}/sales/deactivate-driver");
-  const activate = useCommand(`activate-driver:${id}`, "/api/v1/companies/{companyId}/sales/activate-driver");
+  const update = useCommand(`update-driver:${id}`, "/api/v1/companies/{companyId}/sales/update-driver", `Nombre del chofer ${driver.nationalId} corregido.`);
+  const deactivate = useCommand(`deactivate-driver:${id}`, "/api/v1/companies/{companyId}/sales/deactivate-driver", `Chofer ${driver.fullName} desactivado.`);
+  const activate = useCommand(`activate-driver:${id}`, "/api/v1/companies/{companyId}/sales/activate-driver", `Chofer ${driver.fullName} activado.`);
   const [name, setName] = useState<string | null>(null);
   const busy = update.busy || deactivate.busy || activate.busy;
   const target = { driverId: id, expectedVersion: driver.version };
   return (
     <tr>
-      <td>{name === null ? driver.fullName : <input aria-label={`Nombre ${driver.nationalId}`} value={name} onChange={(e) => setName(e.target.value)} />}</td>
+      <td className="wrap">{name === null ? driver.fullName : <input aria-label={`Nombre ${driver.nationalId}`} value={name} onChange={(e) => setName(e.target.value)} />}</td>
       <td className="mono">{driver.nationalId}</td>
       <td>
         <StatusBadge status={driver.status} />
@@ -167,9 +189,13 @@ function DriverRow({ driver, onDone }: { driver: Schemas["DriverView"]; onDone: 
                 Corregir nombre
               </button>
               {driver.status === "ACTIVE" ? (
-                <button type="button" disabled={busy} onClick={async () => (await deactivate.run(target)) && onDone()}>
-                  Desactivar
-                </button>
+                <ConfirmAction
+                  label="Desactivar"
+                  danger
+                  busy={busy}
+                  consequence={`El chofer ${driver.fullName} ya no se podrá asignar a conduces nuevos hasta que se active de nuevo.`}
+                  onConfirm={async () => (await deactivate.run(target)) && onDone()}
+                />
               ) : (
                 <button type="button" disabled={busy} onClick={async () => (await activate.run(target)) && onDone()}>
                   Activar
@@ -230,7 +256,7 @@ export default function Page() {
       {data.vehicles.length === 0 ? (
         <p className="muted">No hay vehículos.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Placa</th>
@@ -244,14 +270,14 @@ export default function Page() {
               <VehicleRow key={`${v.vehicleId}:${v.version}`} vehicle={v} onDone={reload} />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       <h2>Choferes</h2>
       {can("fleet:manage") ? <RegisterDriver onDone={reload} /> : null}
       {data.drivers.length === 0 ? (
         <p className="muted">No hay choferes.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Nombre</th>
@@ -265,7 +291,7 @@ export default function Page() {
               <DriverRow key={`${d.driverId}:${d.version}`} driver={d} onDone={reload} />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

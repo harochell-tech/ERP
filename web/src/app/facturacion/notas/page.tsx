@@ -24,7 +24,7 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay notas de crédito.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
@@ -32,7 +32,7 @@ export default function Page() {
               <th>Factura</th>
               <th>Cliente</th>
               <th>Fecha</th>
-              <th className="num">Total</th>
+              <th className="num">Total (RD$)</th>
               <th>Estado</th>
               <th>Fiscal</th>
             </tr>
@@ -47,7 +47,7 @@ export default function Page() {
                 <td className="mono">
                   <Link href={`/facturacion/factura/?id=${n.invoiceId}`}>{n.invoiceNo}</Link>
                 </td>
-                <td>{n.customerName}</td>
+                <td className="wrap">{n.customerName}</td>
                 <td>{formatDate(n.creditDate)}</td>
                 <td className="num">
                   <Money value={n.total} />
@@ -61,7 +61,7 @@ export default function Page() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -21,7 +21,11 @@ const MONEY_SCALE = 2;
 function PrepareForm({ supplier, today }: { supplier: Supplier; today: string }) {
   const { companyId, can } = useSession();
   const router = useRouter();
-  const prepare = useCommand(`prepare-payment:${supplier.supplierId}`, "/api/v1/companies/{companyId}/treasury/prepare-supplier-payment");
+  const prepare = useCommand(
+    `prepare-payment:${supplier.supplierId}`,
+    "/api/v1/companies/{companyId}/treasury/prepare-supplier-payment",
+    (_, doc) => `Pago ${doc ? `${doc} ` : ""}preparado para ${supplier.supplierName}; falta que otra persona lo libere.`,
+  );
   const { data: banks } = useLoad(() => query("/api/v1/companies/{companyId}/treasury/bank-accounts", { path: { companyId } }), [companyId]);
   const active = (banks?.items ?? []).filter((b) => b.status === "ACTIVE");
   const [bankAccountId, setBankAccountId] = useState("");
@@ -31,16 +35,29 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
     Object.fromEntries(supplier.invoices.map((i) => [i.apDocId, normalizeInput(formatDecimal(i.openAmount))])),
   );
   const [picked, setPicked] = useState<Record<string, boolean>>({});
-  const applications = supplier.invoices.filter((i) => picked[i.apDocId]).map((i) => ({ apDocId: i.apDocId, amount: normalizeInput(chosen[i.apDocId] ?? "") }));
-  const invalid = applications.some((a) => !isPositiveDecimal(a.amount, MONEY_SCALE));
+  const fe = useFieldErrors();
   const canPrepare = can("payment:prepare") && supplier.partyBankAccountId !== null;
   const bank = bankAccountId || active[0]?.bankAccountId || "";
 
   return (
     <form
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         if (!supplier.partyBankAccountId) {
+          return;
+        }
+        const pickedInvoices = supplier.invoices.filter((i) => picked[i.apDocId]);
+        const applications = pickedInvoices.map((i) => ({ apDocId: i.apDocId, amount: normalizeInput(chosen[i.apDocId] ?? "") }));
+        const found: Record<string, string | false> = {
+          invoices: applications.length === 0 && "Marque al menos una factura para pagar.",
+          bank: bank === "" && "Elija la cuenta de la empresa.",
+          valueDate: valueDate === "" && "Indique la fecha valor.",
+        };
+        for (const a of applications) {
+          found[`amount-${a.apDocId}`] = !isPositiveDecimal(a.amount, MONEY_SCALE) && "Monto mayor que cero, con máximo 2 decimales.";
+        }
+        if (!fe.check(found)) {
           return;
         }
         const response = await prepare.run({
@@ -56,56 +73,66 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
         }
       }}
     >
-      <table>
+      <LineTable>
         <thead>
           <tr>
-            <th>
-              <span className="muted">Pagar</span>
-            </th>
+            <th>Pagar</th>
             <th>NCF</th>
             <th>Fecha</th>
             <th>Vence</th>
-            <th className="num">Saldo abierto</th>
-            <th className="num">A pagar</th>
+            <th className="num">Saldo abierto (RD$)</th>
+            <th className="num">A pagar (RD$)</th>
           </tr>
         </thead>
         <tbody>
-          {supplier.invoices.map((i) => (
-            <tr key={i.apDocId}>
-              <td>
-                <input
-                  type="checkbox"
-                  aria-label={`Pagar ${i.supplierFiscalNumber}`}
-                  checked={picked[i.apDocId] ?? false}
-                  onChange={(e) => setPicked({ ...picked, [i.apDocId]: e.target.checked })}
-                  style={{ minHeight: 20, width: 20 }}
-                />
-              </td>
-              <td className="mono">{i.supplierFiscalNumber}</td>
-              <td>{formatDate(i.docDate)}</td>
-              <td>{i.dueDate < today ? <StatusBadge status="MATCH_EXCEPTION" label={`Vencida ${formatDate(i.dueDate)}`} /> : formatDate(i.dueDate)}</td>
-              <td className="num">
-                <Money value={i.openAmount} />
-              </td>
-              <td className="num">
-                <input
-                  aria-label={`A pagar ${i.supplierFiscalNumber}`}
-                  className="mono"
-                  style={{ width: 150, textAlign: "right" }}
-                  value={chosen[i.apDocId] ?? ""}
-                  disabled={!picked[i.apDocId]}
-                  onChange={(e) => setChosen({ ...chosen, [i.apDocId]: e.target.value })}
-                />
-              </td>
-            </tr>
-          ))}
+          {supplier.invoices.map((i) => {
+            const amountError = fe.errors[`amount-${i.apDocId}`];
+            const messageId = `amount-${i.apDocId}-message`;
+            return (
+              <tr key={i.apDocId}>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Pagar ${i.supplierFiscalNumber}`}
+                    checked={picked[i.apDocId] ?? false}
+                    onChange={(e) => setPicked({ ...picked, [i.apDocId]: e.target.checked })}
+                    style={{ minHeight: 20, width: 20 }}
+                  />
+                </td>
+                <td className="mono">{i.supplierFiscalNumber}</td>
+                <td>{formatDate(i.docDate)}</td>
+                <td>{i.dueDate < today ? <StatusBadge status="MATCH_EXCEPTION" label={`Vencida ${formatDate(i.dueDate)}`} /> : formatDate(i.dueDate)}</td>
+                <td className="num">
+                  <Money value={i.openAmount} />
+                </td>
+                <td className="num">
+                  <input
+                    aria-label={`A pagar ${i.supplierFiscalNumber}`}
+                    className="mono"
+                    style={{ width: "100%", maxWidth: 160, textAlign: "right" }}
+                    inputMode="decimal"
+                    value={chosen[i.apDocId] ?? ""}
+                    disabled={!picked[i.apDocId]}
+                    onChange={(e) => setChosen({ ...chosen, [i.apDocId]: e.target.value })}
+                    {...fieldAria(amountError, messageId, picked[i.apDocId] ?? false)}
+                  />
+                  <FieldMessage id={messageId} error={amountError} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
-      </table>
+      </LineTable>
+      {fe.errors.invoices ? (
+        <div className="error" role="alert">
+          {fe.errors.invoices}
+        </div>
+      ) : null}
       {canPrepare ? (
         <div className="card">
           <h2 style={{ marginTop: 0 }}>Preparar pago</h2>
-          <Field label="Cuenta de la empresa">
-            <select value={bank} onChange={(e) => setBankAccountId(e.target.value)} required>
+          <Field label="Cuenta de la empresa" required error={fe.errors.bank}>
+            <select value={bank} onChange={(e) => setBankAccountId(e.target.value)}>
               {active.map((b) => (
                 <option key={b.bankAccountId} value={b.bankAccountId}>
                   {b.bankCode} {b.accountNumber}
@@ -113,23 +140,22 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
               ))}
             </select>
           </Field>
-          <Field label="Fecha valor">
-            <input type="date" value={valueDate} onChange={(e) => setValueDate(e.target.value)} required />
+          <Field label="Fecha valor" required error={fe.errors.valueDate}>
+            <input type="date" value={valueDate} onChange={(e) => setValueDate(e.target.value)} />
           </Field>
           <Field label="Referencia (opcional)">
             <input value={reference} onChange={(e) => setReference(e.target.value)} />
           </Field>
-          <div className="actions">
-            <button type="submit" className="primary" disabled={prepare.busy || applications.length === 0 || invalid || bank === ""}>
-              Preparar pago
-            </button>
-            {invalid ? <span className="muted">Montos mayores que cero con máximo 2 decimales.</span> : null}
-          </div>
           <p className="muted">
             Preparar no reserva saldo ni contabiliza. Al liberar se vuelven a validar saldos, la cuenta del proveedor y la fecha valor. El número PAG- y el
             total salen del servidor: escriba el número en la transferencia.
           </p>
           <ErrorBox error={prepare.error} />
+          <div className="actions form-actions">
+            <button type="submit" className="primary" disabled={prepare.busy}>
+              Preparar pago
+            </button>
+          </div>
         </div>
       ) : supplier.partyBankAccountId === null ? (
         <p className="notice">El proveedor no tiene una cuenta bancaria verificada: solicítela desde su ficha.</p>
@@ -164,7 +190,7 @@ export default function Page() {
             <select value={supplier?.supplierId ?? ""} onChange={(e) => setSupplierId(e.target.value)}>
               {data.suppliers.map((s) => (
                 <option key={s.supplierId} value={s.supplierId}>
-                  {s.supplierName} — {formatDecimal(s.openAmount)}
+                  {s.supplierName} — RD$ {formatDecimal(s.openAmount)}
                 </option>
               ))}
             </select>

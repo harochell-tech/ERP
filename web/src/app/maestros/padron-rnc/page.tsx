@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { query } from "@/api/client";
 import { Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { formatDate, formatDateTime } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 
@@ -34,15 +35,15 @@ export default function Page() {
         <p className="warning">Aún no se ha importado el padrón de la DGII.</p>
       ) : (
         <p className="muted" data-testid="rnc-registry-import">
-          Padrón de la DGII del {last.sourceDate}: {last.rows.toLocaleString("es-DO")} contribuyentes ({last.skipped} filas omitidas), importado por{" "}
-          {last.importedBy} el {new Date(last.importedAt).toLocaleString("es-DO")}.
+          Padrón de la DGII del {formatDate(last.sourceDate)}: {last.rows.toLocaleString("es-DO")} contribuyentes ({last.skipped} filas omitidas), importado por{" "}
+          {last.importedBy} el {formatDateTime(last.importedAt)}.
         </p>
       )}
       <h2>Clientes y proveedores con diferencias</h2>
       {last === null ? null : data.discrepancies.length === 0 ? (
         <p className="muted">Todos los clientes y proveedores coinciden con el padrón.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>RNC</th>
@@ -63,11 +64,11 @@ export default function Page() {
                 <td>
                   <StatusBadge status={d.issue} />
                 </td>
-                <td>{d.registryName ? `${d.registryName} · ${d.registryStatus}` : "—"}</td>
+                <td className="wrap">{d.registryName ? `${d.registryName} · ${d.registryStatus}` : "—"}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

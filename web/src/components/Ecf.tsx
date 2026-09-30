@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ErrorBox, Field } from "./ui";
+import { ErrorBox, Field, useFieldErrors } from "./ui";
 import { isDecimal, normalizeInput } from "@/lib/decimal";
 import { sha256Hex } from "@/lib/ledger";
 
@@ -14,7 +14,7 @@ export function CopyField({ label, value }: { label: string; value: string | nul
   return (
     <tr>
       <th>{label}</th>
-      <td className="mono">{value ?? "—"}</td>
+      <td className="mono wrap">{value ?? "—"}</td>
       <td>
         {value ? (
           <button
@@ -50,7 +50,8 @@ export interface EcfValues {
 
 /**
  * The e-CF as the portal issued it. The totals are typed from the portal (not copied from the document), so the server's check
- * compares both; the XML is identified by its SHA-256 computed here, not uploaded.
+ * compares both; the XML is identified by its SHA-256 computed here, not uploaded. UX1-01b (E-UX1-01-6): every field is
+ * mandatory and a wrong one says so under it.
  */
 export function RecordEcfForm({
   prefix,
@@ -64,29 +65,40 @@ export function RecordEcfForm({
   onSubmit: (values: EcfValues) => Promise<unknown>;
 }) {
   const [form, setForm] = useState<EcfValues>({ encf: prefix, issuedAt: "", securityCode: "", evidenceRef: "", evidenceSha256: "", receiverRnc: "", netTotal: "", taxTotal: "", total: "" });
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<keyof EcfValues>();
   const set = (key: keyof EcfValues) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
+  const amount = "Monto del portal, hasta 2 decimales.";
   return (
     <form
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         const totals = { netTotal: normalizeInput(form.netTotal), taxTotal: normalizeInput(form.taxTotal), total: normalizeInput(form.total) };
-        if (!new RegExp(`^${prefix}[0-9]{10}$`).test(form.encf.trim().toUpperCase()) || !form.issuedAt || Object.values(totals).some((t) => !isDecimal(t, 2))) {
-          setInvalid(`El e-NCF es ${prefix} seguido de 10 dígitos; indique la fecha de emisión y los totales del portal (hasta 2 decimales).`);
+        const valid = fe.check({
+          encf: !new RegExp(`^${prefix}[0-9]{10}$`).test(form.encf.trim().toUpperCase()) && `El e-NCF es ${prefix} seguido de 10 dígitos.`,
+          issuedAt: !form.issuedAt && "Indique la fecha y hora de emisión.",
+          securityCode: form.securityCode.trim() === "" && "Indique el código de seguridad.",
+          evidenceRef: form.evidenceRef.trim() === "" && "Adjunte el archivo o escriba su referencia.",
+          evidenceSha256: !/^[0-9a-fA-F]{64}$/.test(form.evidenceSha256.trim()) && "El SHA-256 tiene 64 caracteres hexadecimales (se calcula al adjuntar el archivo).",
+          receiverRnc: form.receiverRnc.trim() === "" && "Indique el RNC del receptor según el portal.",
+          netTotal: !isDecimal(totals.netTotal, 2) && amount,
+          taxTotal: !isDecimal(totals.taxTotal, 2) && amount,
+          total: !isDecimal(totals.total, 2) && amount,
+        });
+        if (!valid) {
           return;
         }
-        setInvalid(null);
         await onSubmit({ ...form, ...totals, encf: form.encf.trim().toUpperCase(), issuedAt: new Date(form.issuedAt).toISOString() });
       }}
     >
-      <Field label="e-NCF">
-        <input value={form.encf} onChange={set("encf")} required />
+      <Field label="e-NCF" required error={fe.errors.encf}>
+        <input value={form.encf} onChange={set("encf")} />
       </Field>
-      <Field label="Emitido el">
-        <input type="datetime-local" value={form.issuedAt} onChange={set("issuedAt")} required />
+      <Field label="Emitido el" required error={fe.errors.issuedAt}>
+        <input type="datetime-local" value={form.issuedAt} onChange={set("issuedAt")} />
       </Field>
-      <Field label="Código de seguridad">
-        <input value={form.securityCode} onChange={set("securityCode")} required />
+      <Field label="Código de seguridad" required error={fe.errors.securityCode}>
+        <input value={form.securityCode} onChange={set("securityCode")} />
       </Field>
       <Field label="XML o PDF del e-CF">
         <input
@@ -100,28 +112,29 @@ export function RecordEcfForm({
           }}
         />
       </Field>
-      <Field label="Referencia del archivo">
-        <input value={form.evidenceRef} onChange={set("evidenceRef")} required />
+      <Field label="Referencia del archivo" required error={fe.errors.evidenceRef}>
+        <input value={form.evidenceRef} onChange={set("evidenceRef")} />
       </Field>
-      <Field label="SHA-256">
-        <input value={form.evidenceSha256} onChange={set("evidenceSha256")} required pattern="[0-9a-fA-F]{64}" size={66} />
+      <Field label="SHA-256" required error={fe.errors.evidenceSha256} wide>
+        <input className="mono" value={form.evidenceSha256} onChange={set("evidenceSha256")} />
       </Field>
-      <Field label="RNC del receptor (según el portal)">
-        <input value={form.receiverRnc} onChange={set("receiverRnc")} required />
+      <Field label="RNC del receptor (según el portal)" required error={fe.errors.receiverRnc}>
+        <input value={form.receiverRnc} onChange={set("receiverRnc")} />
       </Field>
-      <Field label="Neto (según el portal)">
-        <input inputMode="decimal" value={form.netTotal} onChange={set("netTotal")} required />
+      <Field label="Neto (según el portal)" required error={fe.errors.netTotal}>
+        <input inputMode="decimal" value={form.netTotal} onChange={set("netTotal")} />
       </Field>
-      <Field label="ITBIS (según el portal)">
-        <input inputMode="decimal" value={form.taxTotal} onChange={set("taxTotal")} required />
+      <Field label="ITBIS (según el portal)" required error={fe.errors.taxTotal}>
+        <input inputMode="decimal" value={form.taxTotal} onChange={set("taxTotal")} />
       </Field>
-      <Field label="Total (según el portal)">
-        <input inputMode="decimal" value={form.total} onChange={set("total")} required />
+      <Field label="Total (según el portal)" required error={fe.errors.total}>
+        <input inputMode="decimal" value={form.total} onChange={set("total")} />
       </Field>
-      <button type="submit" className="primary" disabled={busy}>
-        Registrar e-CF
-      </button>
-      {invalid ? <div className="error">{invalid}</div> : null}
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={busy}>
+          Registrar e-CF
+        </button>
+      </div>
       <ErrorBox error={error} />
     </form>
   );

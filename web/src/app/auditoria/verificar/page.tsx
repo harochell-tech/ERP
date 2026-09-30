@@ -28,7 +28,9 @@ const LEDGERS: Readonly<Record<string, string>> = { GL: "Libro mayor", INV: "Inv
 // (hash:verify). Nothing is stored; without WORM storage in the environment the server answers "not available".
 export default function Page() {
   const { can } = useSession();
-  const verify = useCommand("verify-hash-chain", "/api/v1/companies/{companyId}/audit/verify-hash-chain");
+  const verify = useCommand("verify-hash-chain", "/api/v1/companies/{companyId}/audit/verify-hash-chain", (r) =>
+    (r.result as unknown as Report | null)?.valid ? "Verificación terminada: la cadena es válida." : "Verificación terminada: revise los problemas encontrados.",
+  );
   const [report, setReport] = useState<Report | null>(null);
   if (!can("hash:verify")) {
     return <NoPermission />;
@@ -63,7 +65,7 @@ export default function Page() {
           <p data-testid="chain-result">
             Resultado: <StatusBadge status={report.valid ? "MATCHED" : "FAILED"} label={report.valid ? "Cadena válida" : "Cadena con problemas"} />
           </p>
-          <table>
+          <div className="table-wrap"><table>
             <thead>
               <tr>
                 <th>Libro</th>
@@ -86,13 +88,13 @@ export default function Page() {
                   </td>
                   <td>{c.firstInvalidSequence ?? "—"}</td>
                   <td>{c.gaps.length === 0 ? "—" : c.gaps.join(", ")}</td>
-                  <td>{c.digestMismatches.length === 0 ? "—" : c.digestMismatches.join("; ")}</td>
+                  <td className="wrap">{c.digestMismatches.length === 0 ? "—" : c.digestMismatches.join("; ")}</td>
                   <td className="num">{c.stalePending}</td>
                   <td className="num">{c.sealErrors}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </>
       ) : null}
     </>

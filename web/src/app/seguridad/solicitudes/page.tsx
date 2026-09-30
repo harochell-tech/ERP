@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Loading, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { Person } from "@/components/Person";
+import { ConfirmAction, ErrorBox, Loading, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { personLabel } from "@/lib/identities";
 import { formatDateTime, ROLES } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -14,8 +16,10 @@ type RoleRequest = Schemas["RoleRequestView"];
 // the change takes effect at once, SoD checked) or rejects with a reason.
 function Decision({ request, onDone }: { request: RoleRequest; onDone: () => void }) {
   const { state } = useSession();
-  const approve = useCommand(`approve-role:${request.requestId}`, "/api/v1/companies/{companyId}/identity/approve-role-change");
-  const reject = useCommand(`reject-role:${request.requestId}`, "/api/v1/companies/{companyId}/identity/reject-role-change");
+  const who = personLabel(request.userDisplayName, request.userEmail, request.userId);
+  const change = `${request.action === "ASSIGN" ? "asignar" : "revocar"} el rol ${ROLES[request.roleCode] ?? request.roleName}`;
+  const approve = useCommand(`approve-role:${request.requestId}`, "/api/v1/companies/{companyId}/identity/approve-role-change", `Solicitud aprobada: ${change} a ${who}.`);
+  const reject = useCommand(`reject-role:${request.requestId}`, "/api/v1/companies/{companyId}/identity/reject-role-change", `Solicitud rechazada: ${change} a ${who}.`);
   const me = state.status === "ready" ? state.session.userId : null;
   if (me === request.requestedById || me === request.userId) {
     return <span className="muted">La decide otra persona.</span>;
@@ -23,20 +27,22 @@ function Decision({ request, onDone }: { request: RoleRequest; onDone: () => voi
   const busy = approve.busy || reject.busy;
   return (
     <div className="inline-form">
-      <button
-        type="button"
+      <ConfirmAction
+        label="Aprobar"
         className="primary"
-        disabled={busy}
-        onClick={async () => {
+        title="¿Aprobar la solicitud de rol?"
+        consequence={`Se va a ${change} a ${who}. El cambio de permisos rige de inmediato (se verifica la segregación de funciones).`}
+        stepUp
+        busy={busy}
+        onConfirm={async () => {
           if (await approve.run({ requestId: request.requestId })) {
             onDone();
           }
         }}
-      >
-        Aprobar
-      </button>
+      />
       <ReasonAction
         label="Rechazar"
+        consequence={`La solicitud de ${change} a ${who} queda rechazada; para volver a pedirla hay que crear otra.`}
         busy={busy}
         onConfirm={async (reason) => {
           if (await reject.run({ requestId: request.requestId, reason })) {
@@ -50,7 +56,7 @@ function Decision({ request, onDone }: { request: RoleRequest; onDone: () => voi
 }
 
 export default function Page() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const [status, setStatus] = useState("REQUESTED");
   const { data, error, reload } = useLoad(
     can("iam:read") ? () => query("/api/v1/companies/{companyId}/identity/role-requests", { path: { companyId }, query: { status, limit: 200 } }) : null,
@@ -76,7 +82,7 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay solicitudes.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Usuario</th>
@@ -89,18 +95,20 @@ export default function Page() {
           <tbody>
             {data.items.map((r) => (
               <tr key={r.requestId}>
-                <td>{r.userEmail ?? r.userId}</td>
-                <td>
-                  {r.action === "ASSIGN" ? "Asignar" : "Revocar"} {ROLES[r.roleCode] ?? r.roleName}
-                  {r.plantCode ? ` (planta ${r.plantCode})` : ""}
+                <td className="wrap">
+                  <Person name={r.userDisplayName} email={r.userEmail} fallback={r.userId} />
                 </td>
                 <td>
+                  {r.action === "ASSIGN" ? "Asignar" : "Revocar"} {ROLES[r.roleCode] ?? r.roleName}
+                  {r.plantId || r.plantCode ? ` (planta ${plantName(r.plantId ?? r.plantCode, r.plantCode ?? undefined)})` : ""}
+                </td>
+                <td className="wrap">
                   {r.requestedBy ?? "—"} <span className="muted">{formatDateTime(r.requestedAt)}</span>
                 </td>
                 <td>
                   <StatusBadge status={r.status} />
                 </td>
-                <td>
+                <td className="wrap">
                   {r.status === "REQUESTED" && can("role:second_approve") ? (
                     <Decision request={r} onDone={reload} />
                   ) : r.status === "APPROVED" ? (
@@ -114,7 +122,7 @@ export default function Page() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

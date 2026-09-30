@@ -37,11 +37,11 @@ export default function Page() {
       ) : data.customers.length === 0 ? (
         <p className="muted">No hay saldos abiertos.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Cliente</th>
-              <th className="num">Al día</th>
+              <th className="num">Al día (RD$)</th>
               <th className="num">1–{b.bucket1Days}</th>
               <th className="num">
                 {b.bucket1Days + 1}–{b.bucket2Days}
@@ -49,16 +49,16 @@ export default function Page() {
               <th className="num">
                 {b.bucket2Days + 1}–{b.bucket3Days}
               </th>
-              <th className="num">Más de {b.bucket3Days}</th>
-              <th className="num">Total</th>
-              <th className="num">A favor</th>
-              <th className="num">Neto</th>
+              <th className="num">Más de {b.bucket3Days} días</th>
+              <th className="num">Total (RD$)</th>
+              <th className="num">A favor (RD$)</th>
+              <th className="num">Neto (RD$)</th>
             </tr>
           </thead>
           <tbody>
             {data.customers.map((c) => (
               <tr key={c.customerId}>
-                <td>
+                <td className="wrap">
                   {c.customerName}
                   <div className="muted">{c.documents.map((d) => `${d.invoiceNo} vence ${formatDate(d.dueDate)}`).join(" · ")}</div>
                 </td>
@@ -101,7 +101,7 @@ export default function Page() {
               </td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

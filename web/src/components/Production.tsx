@@ -58,12 +58,13 @@ export function useChosenPlant(plants: readonly PlantOption[] | null) {
 }
 
 export function PlantSelect({ plants, value, onChange }: { plants: readonly PlantOption[]; value: string; onChange: (plantId: string) => void }) {
+  const { plantName } = useSession();
   return (
     <Field label="Planta de producción">
       <select aria-label="Planta de producción" value={value} onChange={(e) => onChange(e.target.value)}>
         {plants.map((p) => (
           <option key={p.plantId} value={p.plantId}>
-            {p.code}
+            {plantName(p.plantId, p.code)}
           </option>
         ))}
       </select>

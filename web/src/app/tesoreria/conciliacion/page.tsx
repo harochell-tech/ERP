@@ -3,7 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { formatDecimal } from "@/lib/decimal";
 import { formatDate, lineStatusLabel, todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -44,8 +45,8 @@ function ReceiptActions({ line, onDone }: { line: Line; onDone: () => void }) {
     open ? () => query("/api/v1/companies/{companyId}/treasury/bank-statement-lines/{lineId}/receipt-candidates", { path: { companyId, lineId: line.lineId } }) : null,
     [companyId, line.lineId, open],
   );
-  const match = useCommand(`match-receipt-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/match-bank-line-to-receipt");
-  const bounce = useCommand(`bounce-from-line:${line.lineId}`, "/api/v1/companies/{companyId}/sales/mark-receipt-bounced");
+  const match = useCommand(`match-receipt-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/match-bank-line-to-receipt", "Línea del extracto conciliada.");
+  const bounce = useCommand(`bounce-from-line:${line.lineId}`, "/api/v1/companies/{companyId}/sales/mark-receipt-bounced", "Cheque marcado como devuelto.");
   const busy = match.busy || bounce.busy;
   if (!can("bank_line:match")) {
     return null;
@@ -61,7 +62,11 @@ function ReceiptActions({ line, onDone }: { line: Line; onDone: () => void }) {
     return <Loading error={candidates.error} />;
   }
   const matchTo = (c: Schemas["ReceiptCandidate"]) =>
-    match.run({ lineId: line.lineId, expectedLineVersion: line.version, expectedVersion: c.version, receiptId: c.receiptId ?? null, depositId: c.depositId ?? null });
+    match.run(
+      { lineId: line.lineId, expectedLineVersion: line.version, expectedVersion: c.version, receiptId: c.receiptId ?? null, depositId: c.depositId ?? null },
+      undefined,
+      `Línea del extracto conciliada con ${RECEIPT_KINDS[c.kind] ?? c.kind} ${c.number}.`,
+    );
   return (
     <>
       {candidates.data.candidates.length === 0 ? <span className="muted">Sin cobros con la misma cuenta y monto.</span> : null}
@@ -71,9 +76,11 @@ function ReceiptActions({ line, onDone }: { line: Line; onDone: () => void }) {
             <ReasonAction
               key={c.number}
               label={`Cheque devuelto ${c.number}`}
+              consequence="El cheque queda devuelto: se contabiliza la reversa del cobro, sus facturas vuelven a quedar pendientes y la línea del extracto se concilia con la devolución."
+              stepUp
               busy={busy}
               onConfirm={async (reason) => {
-                if (!(await bounce.run({ receiptId: c.receiptId!, expectedVersion: c.version, reason }))) {
+                if (!(await bounce.run({ receiptId: c.receiptId!, expectedVersion: c.version, reason }, undefined, `Cheque ${c.number} marcado como devuelto.`))) {
                   return;
                 }
                 const after = await query("/api/v1/companies/{companyId}/treasury/bank-statement-lines/{lineId}/receipt-candidates", { path: { companyId, lineId: line.lineId } });
@@ -115,9 +122,9 @@ function LineActions({
   onDone: () => void;
 }) {
   const { can } = useSession();
-  const match = useCommand(`match-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/match-bank-line");
-  const unmatch = useCommand(`unmatch-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/unmatch-bank-line");
-  const charge = useCommand(`charge-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/recognize-bank-charge");
+  const match = useCommand(`match-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/match-bank-line", "Línea del extracto conciliada.");
+  const unmatch = useCommand(`unmatch-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/unmatch-bank-line", `Línea «${line.description}» desconciliada.`);
+  const charge = useCommand(`charge-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/recognize-bank-charge", `Cargo bancario «${line.description}» registrado y contabilizado.`);
   const [manual, setManual] = useState("");
   const busy = match.busy || unmatch.busy || charge.busy;
   const after = (response: unknown) => {
@@ -126,14 +133,14 @@ function LineActions({
     }
   };
   const candidates = line.direction === "DEBIT" ? released : reversed;
-  const run = (paymentId: string, paymentVersion: number) =>
-    match.run({ lineId: line.lineId, expectedLineVersion: line.version, paymentId, expectedPaymentVersion: paymentVersion });
+  const run = (paymentId: string, paymentVersion: number, paymentNo: string) =>
+    match.run({ lineId: line.lineId, expectedLineVersion: line.version, paymentId, expectedPaymentVersion: paymentVersion }, undefined, `Línea del extracto conciliada con ${paymentNo}.`);
 
   return (
     <div className="inline-form">
       {line.status === "UNMATCHED" && can("bank_line:match")
         ? (suggestion?.candidates ?? []).map((c) => (
-            <button key={c.paymentId} type="button" className="primary" disabled={busy} onClick={async () => after(await run(c.paymentId, c.paymentVersion))}>
+            <button key={c.paymentId} type="button" className="primary" disabled={busy} onClick={async () => after(await run(c.paymentId, c.paymentVersion, c.paymentNo))}>
               Conciliar con {c.paymentNo} ({BASIS[c.basis] ?? c.basis})
             </button>
           ))
@@ -154,7 +161,7 @@ function LineActions({
             onClick={async () => {
               const p = candidates.find((x) => x.paymentId === manual);
               if (p) {
-                after(await run(p.paymentId, p.version));
+                after(await run(p.paymentId, p.version, p.paymentNo));
               }
             }}
           >
@@ -163,13 +170,23 @@ function LineActions({
         </>
       ) : null}
       {line.status === "UNMATCHED" && line.direction === "DEBIT" && can("bank_charge:recognize") ? (
-        <button type="button" disabled={busy} onClick={async () => after(await charge.run({ lineId: line.lineId, expectedVersion: line.version }))}>
-          Registrar como cargo
-        </button>
+        <ConfirmAction
+          label="Registrar como cargo"
+          title="¿Registrar la línea como cargo bancario?"
+          consequence={`Se contabiliza un cargo bancario de RD$ ${formatDecimal(line.amount)} («${line.description}») contra la cuenta de la empresa y la línea queda como cargo registrado.`}
+          busy={busy}
+          onConfirm={async () => after(await charge.run({ lineId: line.lineId, expectedVersion: line.version }))}
+        />
       ) : null}
       {line.status === "UNMATCHED" ? <ReceiptActions line={line} onDone={onDone} /> : null}
       {line.status === "MATCHED" && can("bank_line:unmatch") ? (
-        <ReasonAction label="Desconciliar" busy={busy} onConfirm={async (reason) => after(await unmatch.run({ lineId: line.lineId, expectedVersion: line.version, reason }))} />
+        <ReasonAction
+          label="Desconciliar"
+          consequence="La línea vuelve a quedar sin conciliar y el pago vuelve a estar liberado (en tránsito)."
+          stepUp
+          busy={busy}
+          onConfirm={async (reason) => after(await unmatch.run({ lineId: line.lineId, expectedVersion: line.version, reason }))}
+        />
       ) : null}
       <ErrorBox error={match.error ?? unmatch.error ?? charge.error} />
     </div>
@@ -274,12 +291,12 @@ function Reconciliation() {
             <div className="stat">
               <span>Saldo en libros</span>
               <span className="value">
-                <Money value={r.glBalance} />
+                <Money value={r.glBalance} currency />
               </span>
             </div>
             <div className="stat">
               <span>Saldo del extracto</span>
-              <span className="value">{r.statementBalance === null ? "Sin extracto" : <Money value={r.statementBalance} />}</span>
+              <span className="value">{r.statementBalance === null ? "Sin extracto" : <Money value={r.statementBalance} currency />}</span>
             </div>
             <div className="stat">
               <span>Partidas en tránsito</span>
@@ -287,8 +304,8 @@ function Reconciliation() {
             </div>
             <div className={`stat ${r.findings.some((f) => f.severity === "ERROR") ? "bad" : "good"}`}>
               <span>Diferencia (BANK-GL)</span>
-              <span className="value" data-testid="bank-gl-difference">
-                {r.difference === null ? "—" : <Money value={r.difference} />}
+              <span className="value">
+                {r.difference === null ? <span data-testid="bank-gl-difference">—</span> : <Money value={r.difference} testId="bank-gl-difference" currency />}
               </span>
             </div>
           </div>
@@ -315,13 +332,13 @@ function Reconciliation() {
         items.length === 0 ? (
           <p className="muted">No hay partidas en tránsito a esa fecha.</p>
         ) : (
-          <table>
+          <div className="table-wrap"><table>
             <thead>
               <tr>
                 <th>Partida</th>
                 <th>Referencia</th>
                 <th>Fecha</th>
-                <th className="num">Efecto</th>
+                <th className="num">Efecto (RD$)</th>
               </tr>
             </thead>
             <tbody>
@@ -336,20 +353,20 @@ function Reconciliation() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )
       ) : lines.data === null ? (
         <Loading error={lines.error} />
       ) : shown.length === 0 ? (
         <p className="muted">No hay líneas en esta pestaña.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Fecha</th>
               <th>Descripción · referencia</th>
-              <th className="num">Débito</th>
-              <th className="num">Crédito</th>
+              <th className="num">Débito (RD$)</th>
+              <th className="num">Crédito (RD$)</th>
               <th>Estado</th>
               <th>Acción</th>
             </tr>
@@ -358,16 +375,16 @@ function Reconciliation() {
             {shown.map((l) => (
               <tr key={l.lineId}>
                 <td>{formatDate(l.valueDate)}</td>
-                <td>
+                <td className="wrap">
                   {l.description} {l.bankReference ? <span className="muted">· {l.bankReference}</span> : null}
                   {l.matchedPaymentNo ? <div className="mono muted">{l.matchedPaymentNo}</div> : null}
                 </td>
                 <td className="num">{l.direction === "DEBIT" ? <Money value={l.amount} /> : null}</td>
                 <td className="num">{l.direction === "CREDIT" ? <Money value={l.amount} /> : null}</td>
-                <td>
+                <td className="wrap">
                   <StatusBadge status={l.status} label={lineStatusLabel(l.status)} />
                 </td>
-                <td>
+                <td className="wrap">
                   <LineActions
                     line={l}
                     suggestion={suggestions.data?.lines.find((s) => s.lineId === l.lineId)}
@@ -379,7 +396,7 @@ function Reconciliation() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

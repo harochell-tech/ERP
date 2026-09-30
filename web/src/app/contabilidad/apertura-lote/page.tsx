@@ -5,8 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
 import { History } from "@/components/History";
-import { AccountingStatus, ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
-import { formatQuantity } from "@/lib/decimal";
+import { AccountingStatus, ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { formatDecimal, formatQuantity } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -16,14 +16,14 @@ import { useLoad } from "@/lib/useQuery";
 // preparer, with step-up; reversed whole with a reason while none of its lots moved.
 
 function BatchDetail() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const id = useSearchParams().get("id") ?? "";
   const { data, error, reload } = useLoad(
     can("configuration:read") && id ? () => query("/api/v1/companies/{companyId}/sales/opening-batches/{batchId}", { path: { companyId, batchId: id } }) : null,
     [companyId, id],
   );
-  const post = useCommand(`post-opening:${id}`, "/api/v1/companies/{companyId}/sales/post-opening-inventory");
-  const reverse = useCommand(`reverse-opening:${id}`, "/api/v1/companies/{companyId}/sales/reverse-opening-inventory");
+  const post = useCommand(`post-opening:${id}`, "/api/v1/companies/{companyId}/sales/post-opening-inventory", `Apertura ${data?.header.fileName ?? ""} contabilizada.`);
+  const reverse = useCommand(`reverse-opening:${id}`, "/api/v1/companies/{companyId}/sales/reverse-opening-inventory", `Apertura ${data?.header.fileName ?? ""} reversada.`);
   if (!can("configuration:read")) {
     return <NoPermission />;
   }
@@ -41,22 +41,33 @@ function BatchDetail() {
         {h.fileName} <StatusBadge status={h.status} />
       </h1>
       <p>
-        Fecha de corte {formatDate(h.cutoverDate)} · {h.lines} líneas · valor <Money value={h.total} /> · contabilidad{" "}
+        Fecha de corte {formatDate(h.cutoverDate)} · {h.lines} líneas · valor <Money value={h.total} currency /> · contabilidad{" "}
         <AccountingStatus status={h.status === "DRAFT" ? "NOT_POSTED" : h.status} eventId={h.postingEventId} />
       </p>
       {h.reversalReason ? <p className="muted">Motivo de la reversa: {h.reversalReason}</p> : null}
       <div className="actions">
         {h.status === "DRAFT" && can("opening_inventory:post") ? (
-          <button type="button" disabled={post.busy} onClick={async () => (await post.run(target)) && reload()}>
-            Contabilizar apertura
-          </button>
+          <ConfirmAction
+            label="Contabilizar apertura"
+            className="primary"
+            stepUp
+            busy={post.busy}
+            consequence={`Se crean los lotes de producto terminado y el asiento de apertura (OPEN-INV) por ${formatDecimal(h.total)} al costo estándar. Solo se deshace reversando la apertura completa mientras ningún lote se haya movido.`}
+            onConfirm={async () => (await post.run(target)) && reload()}
+          />
         ) : null}
         {h.status === "POSTED" && can("opening_inventory:post") ? (
-          <ReasonAction label="Reversar apertura" busy={reverse.busy} onConfirm={async (reason) => (await reverse.run({ ...target, reason })) && reload()} />
+          <ReasonAction
+            label="Reversar apertura"
+            stepUp
+            consequence="Se reversa el asiento de apertura y se retiran todos sus lotes; solo es posible si ningún lote se ha movido."
+            busy={reverse.busy}
+            onConfirm={async (reason) => (await reverse.run({ ...target, reason })) && reload()}
+          />
         ) : null}
       </div>
       <ErrorBox error={post.error ?? reverse.error} />
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th className="num">#</th>
@@ -65,8 +76,8 @@ function BatchDetail() {
             <th>Ubicación</th>
             <th>Producto</th>
             <th className="num">Cantidad</th>
-            <th className="num">Costo</th>
-            <th className="num">Valor</th>
+            <th className="num">Costo (RD$)</th>
+            <th className="num">Valor (RD$)</th>
             <th>Lote</th>
           </tr>
         </thead>
@@ -75,7 +86,7 @@ function BatchDetail() {
             <tr key={l.lineNo}>
               <td className="num">{l.lineNo}</td>
               <td>{l.sourceDocumentNumber}</td>
-              <td>{l.plantCode}</td>
+              <td>{plantName(l.plantCode)}</td>
               <td>{l.locationCode}</td>
               <td>
                 {l.itemCode} — {l.itemDescription}
@@ -91,7 +102,7 @@ function BatchDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <History history={data.history} />
     </>
   );

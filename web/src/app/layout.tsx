@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Shell } from "@/components/Shell";
 import { SessionProvider } from "@/lib/session";
+import { ToastProvider } from "@/lib/toast";
 // E-UI-6: the typefaces ship with the export; no call to an external font service.
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/500.css";
@@ -18,10 +19,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es-DO">
       <body>
         <SessionProvider>
-          <Shell>{children}</Shell>
+          <ToastProvider>
+            <Shell>{children}</Shell>
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>

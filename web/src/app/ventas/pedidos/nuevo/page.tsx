@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { DELIVERY_TERMS } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -32,14 +32,14 @@ interface Values {
 const EMPTY_LINE: Line = { itemId: "", uom: "", quantity: "" };
 
 function OrderForm() {
-  const { companyId, can, scope } = useSession();
+  const { companyId, can, scope, plantName } = useSession();
   const router = useRouter();
   const editId = useSearchParams().get("id");
   const formId = editId ? `edit-order:${editId}` : "create-order";
-  const create = useCommand<"/api/v1/companies/{companyId}/sales/create-sales-order", Values>(formId, "/api/v1/companies/{companyId}/sales/create-sales-order");
-  const update = useCommand<"/api/v1/companies/{companyId}/sales/update-sales-order-draft", Values>(formId, "/api/v1/companies/{companyId}/sales/update-sales-order-draft");
+  const create = useCommand<"/api/v1/companies/{companyId}/sales/create-sales-order", Values>(formId, "/api/v1/companies/{companyId}/sales/create-sales-order", (_, doc) => (doc ? `Pedido ${doc} creado en borrador.` : "Pedido creado en borrador."));
+  const update = useCommand<"/api/v1/companies/{companyId}/sales/update-sales-order-draft", Values>(formId, "/api/v1/companies/{companyId}/sales/update-sales-order-draft", "Borrador del pedido guardado.");
   const [values, setValues] = useState<Values | null>(() => create.restored ?? update.restored ?? null);
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<string>();
   const allowed = can("sales_order:create");
   const permission = scope("sales_order:create");
 
@@ -99,19 +99,18 @@ function OrderForm() {
 
   const submit = async () => {
     const lines = current.lines.map((l) => ({ ...l, quantity: normalizeInput(l.quantity) }));
-    if (!current.partyId || !current.plantId) {
-      setInvalid("Elija cliente y planta.");
+    const found: Record<string, string | false> = {
+      partyId: !current.partyId && "Elija el cliente.",
+      plantId: !current.plantId && "Elija la planta.",
+      siteAddress: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.siteAddress.trim() === "" && "Una entrega en obra necesita la dirección de la obra.",
+    };
+    lines.forEach((l, i) => {
+      found[`line-${i}-item`] = !l.itemId && "Elija el producto.";
+      found[`line-${i}-quantity`] = !isPositiveDecimal(l.quantity, 6) && "Indique una cantidad mayor que cero (hasta 6 decimales).";
+    });
+    if (!fe.check(found)) {
       return;
     }
-    if (current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.siteAddress.trim() === "") {
-      setInvalid("Una entrega en obra necesita la dirección de la obra.");
-      return;
-    }
-    if (lines.some((l) => !l.itemId || !isPositiveDecimal(l.quantity, 6))) {
-      setInvalid("Cada línea necesita producto y cantidad mayor que cero.");
-      return;
-    }
-    setInvalid(null);
     const header = {
       plantId: current.plantId,
       deliveryTermCode: current.deliveryTermCode,
@@ -132,7 +131,7 @@ function OrderForm() {
     <>
       <h1>{order ? `Editar pedido ${order.header.orderNo}` : "Nuevo pedido de venta"}</h1>
       <div>
-        <Field label="Cliente">
+        <Field label="Cliente" required error={fe.errors.partyId}>
           <select aria-label="Cliente" value={current.partyId} disabled={order !== null} onChange={(e) => set({ partyId: e.target.value })}>
             <option value="">—</option>
             {data.customers.map((c) => (
@@ -142,16 +141,16 @@ function OrderForm() {
             ))}
           </select>
         </Field>
-        <Field label="Planta">
+        <Field label="Planta" required error={fe.errors.plantId}>
           <select aria-label="Planta del pedido" value={current.plantId} onChange={(e) => set({ plantId: e.target.value })}>
             {data.plants.map((p) => (
               <option key={p.plantId} value={p.plantId}>
-                {p.code}
+                {plantName(p.plantId, p.code)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Entrega">
+        <Field label="Entrega" required>
           <select aria-label="Término de entrega" value={current.deliveryTermCode} onChange={(e) => set({ deliveryTermCode: e.target.value })}>
             {Object.entries(DELIVERY_TERMS).map(([code, label]) => (
               <option key={code} value={code}>
@@ -161,7 +160,7 @@ function OrderForm() {
           </select>
         </Field>
         {current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" ? (
-          <Field label="Dirección de la obra">
+          <Field label="Dirección de la obra" required error={fe.errors.siteAddress}>
             <input aria-label="Dirección de la obra" value={current.siteAddress} onChange={(e) => set({ siteAddress: e.target.value })} />
           </Field>
         ) : null}
@@ -172,12 +171,12 @@ function OrderForm() {
           <input value={current.customerPoRef} onChange={(e) => set({ customerPoRef: e.target.value })} />
         </Field>
       </div>
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Producto</th>
             <th>Unidad</th>
-            <th className="num">Precio de lista</th>
+            <th className="num">Precio de lista (RD$)</th>
             <th className="num">Cantidad</th>
             <th />
           </tr>
@@ -190,6 +189,7 @@ function OrderForm() {
                 <td>
                   <select
                     aria-label={`Producto ${index + 1}`}
+                    {...fieldAria(fe.errors[`line-${index}-item`], `order-line-${index}-item`, true)}
                     value={line.itemId && line.uom ? `${line.itemId}|${line.uom}` : ""}
                     onChange={(e) => {
                       const [itemId = "", uom = ""] = e.target.value.split("|");
@@ -203,13 +203,21 @@ function OrderForm() {
                       </option>
                     ))}
                   </select>
+                  <FieldMessage id={`order-line-${index}-item`} error={fe.errors[`line-${index}-item`]} />
                 </td>
                 <td>{line.uom}</td>
                 <td className="num">
                   <Money value={price?.unitPrice} />
                 </td>
                 <td className="num">
-                  <input aria-label={`Cantidad ${index + 1}`} inputMode="decimal" value={line.quantity} onChange={(e) => setLine(index, { quantity: e.target.value })} />
+                  <input
+                    aria-label={`Cantidad ${index + 1}`}
+                    {...fieldAria(fe.errors[`line-${index}-quantity`], `order-line-${index}-quantity`, true)}
+                    inputMode="decimal"
+                    value={line.quantity}
+                    onChange={(e) => setLine(index, { quantity: e.target.value })}
+                  />
+                  <FieldMessage id={`order-line-${index}-quantity`} error={fe.errors[`line-${index}-quantity`]} />
                 </td>
                 <td>
                   {current.lines.length > 1 ? (
@@ -222,9 +230,9 @@ function OrderForm() {
             );
           })}
         </tbody>
-      </table>
+      </LineTable>
       <p className="muted">El total del pedido lo calcula el sistema al guardar, con los precios de la lista vigente.</p>
-      <div className="actions">
+      <div className="actions form-actions">
         <button type="button" onClick={() => set({ lines: [...current.lines, { ...EMPTY_LINE }] })}>
           Agregar línea
         </button>
@@ -232,7 +240,6 @@ function OrderForm() {
           {order ? "Guardar borrador" : "Crear pedido"}
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={create.error ?? update.error} />
     </>
   );

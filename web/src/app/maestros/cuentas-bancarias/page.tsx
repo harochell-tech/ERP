@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ErrorBox, Field, Loading, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -22,12 +22,23 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
   const [accountNumber, setAccountNumber] = useState("");
   const [glAccountCode, setGlAccountCode] = useState("");
   const controls = (accounts?.items ?? []).filter((a) => a.isControl);
+  const fe = useFieldErrors<"bankCode" | "accountNumber" | "glAccountCode">();
   return (
     <form
       className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await register.run({ bankCode: bankCode.trim(), accountNumber: accountNumber.trim(), glAccountCode })) {
+        if (
+          !fe.check({
+            bankCode: bankCode.trim() === "" && "Indique el código del banco.",
+            accountNumber: !/^\d{5,30}$/.test(accountNumber.trim()) && "Indique el número de cuenta (5 a 30 dígitos).",
+            glAccountCode: glAccountCode === "" && "Elija la cuenta contable de control.",
+          })
+        ) {
+          return;
+        }
+        if (await register.run({ bankCode: bankCode.trim(), accountNumber: accountNumber.trim(), glAccountCode }, undefined, `Cuenta bancaria ${bankCode.trim()} ${accountNumber.trim()} registrada.`)) {
           setBankCode("");
           setAccountNumber("");
           setGlAccountCode("");
@@ -35,15 +46,15 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
         }
       }}
     >
-      <h2 style={{ marginTop: 0 }}>Registrar cuenta de la empresa</h2>
-      <Field label="Banco (código)">
-        <input value={bankCode} onChange={(e) => setBankCode(e.target.value)} required />
+      <h2>Registrar cuenta de la empresa</h2>
+      <Field label="Banco (código)" required error={fe.errors.bankCode}>
+        <input value={bankCode} onChange={(e) => setBankCode(e.target.value)} />
       </Field>
-      <Field label="Número de cuenta">
-        <input className="mono" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} required />
+      <Field label="Número de cuenta" required error={fe.errors.accountNumber}>
+        <input className="mono" inputMode="numeric" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
       </Field>
-      <Field label="Cuenta contable de control">
-        <select value={glAccountCode} onChange={(e) => setGlAccountCode(e.target.value)} required>
+      <Field label="Cuenta contable de control" required error={fe.errors.glAccountCode}>
+        <select value={glAccountCode} onChange={(e) => setGlAccountCode(e.target.value)}>
           <option value="">Elegir…</option>
           {controls.map((a) => (
             <option key={a.accountId} value={a.code}>
@@ -52,7 +63,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
           ))}
         </select>
       </Field>
-      <div className="actions">
+      <div className="actions form-actions">
         <button type="submit" className="primary" disabled={register.busy}>
           Registrar cuenta
         </button>
@@ -64,14 +75,14 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
 
 function Row({ account, onDone }: { account: BankAccount; onDone: () => void }) {
   const { can } = useSession();
-  const close = useCommand(`close-bank-account:${account.bankAccountId}`, "/api/v1/companies/{companyId}/treasury/close-bank-account");
+  const close = useCommand(`close-bank-account:${account.bankAccountId}`, "/api/v1/companies/{companyId}/treasury/close-bank-account", `Cuenta bancaria ${account.bankCode} ${account.accountNumber} cerrada.`);
   return (
     <tr>
       <td className="mono">
         {account.bankCode} {account.accountNumber}
       </td>
       <td>{account.currency}</td>
-      <td>
+      <td className="wrap">
         {account.glAccountCode} — {account.glAccountName}
       </td>
       <td>
@@ -81,6 +92,8 @@ function Row({ account, onDone }: { account: BankAccount; onDone: () => void }) 
         {account.status === "ACTIVE" && can("bank_account:manage") ? (
           <ReasonAction
             label="Cerrar cuenta"
+            consequence={`La cuenta ${account.bankCode} ${account.accountNumber} quedará cerrada: no admitirá más pagos ni extractos, y no se puede reabrir.`}
+            stepUp
             busy={close.busy}
             onConfirm={async (reason) => {
               if (await close.run({ bankAccountId: account.bankAccountId, expectedVersion: account.version, reason })) {
@@ -113,7 +126,7 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay cuentas bancarias registradas.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Banco y cuenta</th>
@@ -128,7 +141,7 @@ export default function Page() {
               <Row key={a.bankAccountId} account={a} onDone={reload} />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

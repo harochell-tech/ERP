@@ -6,7 +6,7 @@ import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
 import { History } from "@/components/History";
-import { AccountingStatus, ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { AccountingStatus, ConfirmAction, ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { invoiceEncfPrefix } from "@/lib/authorizations";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime, statusLabel, todayInDominicanRepublic } from "@/lib/labels";
@@ -24,7 +24,7 @@ const EXEMPT_ECF_TYPE = "44";
 // Controller).
 
 function Issue({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) {
-  const issue = useCommand(`issue-invoice:${invoice.header.invoiceId}`, "/api/v1/companies/{companyId}/sales/issue-invoice");
+  const issue = useCommand(`issue-invoice:${invoice.header.invoiceId}`, "/api/v1/companies/{companyId}/sales/issue-invoice", `Factura ${invoice.header.invoiceNo} emitida y contabilizada.`);
   const [ecfType, setEcfType] = useState("");
   // FIS1-05 (E-FIS1-05-9): an invoice under a fiscal authorization is always an e-CF 44; there is nothing to choose.
   const exempt = invoice.header.ecfType === EXEMPT_ECF_TYPE;
@@ -41,16 +41,16 @@ function Issue({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) {
           </select>
         </Field>
       )}
-      <button
-        type="button"
+      <ConfirmAction
+        label="Emitir factura"
         className="primary"
-        disabled={issue.busy}
-        onClick={async () =>
+        stepUp
+        busy={issue.busy}
+        consequence={`La factura ${invoice.header.invoiceNo} se confirma y se contabiliza (cuenta por cobrar e ingreso); ya no se puede editar. Después se registra su e-CF del portal.`}
+        onConfirm={async () =>
           (await issue.run({ invoiceId: invoice.header.invoiceId, expectedVersion: invoice.header.version, ecfType: exempt || ecfType === "" ? null : ecfType })) && onDone()
         }
-      >
-        Emitir factura
-      </button>
+      />
       <ErrorBox error={issue.error} />
     </div>
   );
@@ -79,7 +79,7 @@ function FiscalPackage({ invoiceId }: { invoiceId: string }) {
   return (
     <>
       <h2>Paquete fiscal para el portal</h2>
-      <table>
+      <div className="table-wrap"><table>
         <tbody>
           <CopyField label="Tipo de e-CF" value={data.ecfType} />
           <CopyField label="RNC del emisor" value={data.issuerRnc} />
@@ -99,76 +99,98 @@ function FiscalPackage({ invoiceId }: { invoiceId: string }) {
             </>
           ) : null}
         </tbody>
-      </table>
+      </table></div>
     </>
   );
 }
 
 function CreditNoteForm({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) {
-  const create = useCommand(`create-credit-note:${invoice.header.invoiceId}`, "/api/v1/companies/{companyId}/sales/create-credit-note");
+  const create = useCommand(`create-credit-note:${invoice.header.invoiceId}`, "/api/v1/companies/{companyId}/sales/create-credit-note", (_r, doc) =>
+    doc ? `Nota de crédito ${doc} creada en borrador sobre ${invoice.header.invoiceNo}.` : `Nota de crédito creada en borrador sobre ${invoice.header.invoiceNo}.`,
+  );
   const [nets, setNets] = useState<Record<string, string>>({});
   const [category, setCategory] = useState("DESCUENTO");
   const [reason, setReason] = useState("");
   const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   return (
-    <>
+    <div className="card">
       <h3>Nueva nota de crédito</h3>
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th className="num">Línea</th>
             <th>Producto</th>
-            <th className="num">Neto</th>
-            <th className="num">Ya acreditado</th>
-            <th className="num">Queda</th>
-            <th className="num">Acreditar</th>
+            <th className="num">Neto (RD$)</th>
+            <th className="num">Ya acreditado (RD$)</th>
+            <th className="num">Queda (RD$)</th>
+            <th className="num">Acreditar (RD$)</th>
           </tr>
         </thead>
         <tbody>
-          {invoice.creditable.map((l) => (
-            <tr key={l.invoiceLineId}>
-              <td className="num">{l.lineNo}</td>
-              <td>{l.itemCode}</td>
-              <td className="num">
-                <Money value={l.netAmount} />
-              </td>
-              <td className="num">
-                <Money value={l.creditedNet} />
-              </td>
-              <td className="num">
-                <Money value={l.remainingNet} />
-              </td>
-              <td className="num">
-                <input aria-label={`Acreditar línea ${l.lineNo}`} inputMode="decimal" value={nets[l.invoiceLineId] ?? ""} onChange={(e) => setNets({ ...nets, [l.invoiceLineId]: e.target.value })} />
-              </td>
-            </tr>
-          ))}
+          {invoice.creditable.map((l) => {
+            const lineError = fe.errors[`line-${l.invoiceLineId}`];
+            return (
+              <tr key={l.invoiceLineId}>
+                <td className="num">{l.lineNo}</td>
+                <td className="wrap">{l.itemCode}</td>
+                <td className="num">
+                  <Money value={l.netAmount} />
+                </td>
+                <td className="num">
+                  <Money value={l.creditedNet} />
+                </td>
+                <td className="num">
+                  <Money value={l.remainingNet} />
+                </td>
+                <td className="num">
+                  <input
+                    aria-label={`Acreditar línea ${l.lineNo}`}
+                    inputMode="decimal"
+                    value={nets[l.invoiceLineId] ?? ""}
+                    onChange={(e) => setNets({ ...nets, [l.invoiceLineId]: e.target.value })}
+                    {...fieldAria(lineError, `credit-${l.invoiceLineId}`)}
+                  />
+                  <FieldMessage id={`credit-${l.invoiceLineId}`} error={lineError} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
-      </table>
-      <div className="inline-form">
-        <Field label="Motivo">
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option value="DESCUENTO">Descuento</option>
-            <option value="ERROR_DE_PRECIO">Error de precio</option>
-            <option value="OTRO">Otro</option>
-          </select>
-        </Field>
-        <Field label="Explicación">
-          <input value={reason} onChange={(e) => setReason(e.target.value)} />
-        </Field>
+      </LineTable>
+      <Field label="Motivo" required>
+        <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <option value="DESCUENTO">Descuento</option>
+          <option value="ERROR_DE_PRECIO">Error de precio</option>
+          <option value="OTRO">Otro</option>
+        </select>
+      </Field>
+      <Field label="Explicación" required error={fe.errors.reason}>
+        <input value={reason} onChange={(e) => setReason(e.target.value)} />
+      </Field>
+      <p className="muted">El ITBIS de la nota lo calcula el sistema con la tasa de la factura. La nota la emite otra persona de Facturación.</p>
+      <div className="actions form-actions">
         <button
           type="button"
+          className="primary"
           disabled={create.busy}
           onClick={async () => {
-            const lines = Object.entries(nets)
+            const entered = Object.entries(nets)
               .map(([invoiceLineId, net]) => ({ invoiceLineId, netAmount: normalizeInput(net) }))
               .filter((l) => l.netAmount !== "");
-            if (lines.length === 0 || lines.some((l) => !isPositiveDecimal(l.netAmount, 2)) || reason.trim() === "") {
-              setInvalid("Indique al menos un monto a acreditar (hasta 2 decimales) y la explicación.");
+            const lineErrors = Object.fromEntries(
+              entered.filter((l) => !isPositiveDecimal(l.netAmount, 2)).map((l) => [`line-${l.invoiceLineId}`, "Monto mayor que cero, hasta 2 decimales."]),
+            );
+            if (!fe.check({ ...lineErrors, reason: reason.trim() === "" && "Escriba la explicación de la nota." })) {
+              setInvalid(null);
+              return;
+            }
+            if (entered.length === 0) {
+              setInvalid("Indique al menos un monto a acreditar.");
               return;
             }
             setInvalid(null);
-            if (await create.run({ invoiceId: invoice.header.invoiceId, reasonCategory: category, reason: reason.trim(), lines })) {
+            if (await create.run({ invoiceId: invoice.header.invoiceId, reasonCategory: category, reason: reason.trim(), lines: entered })) {
               setNets({});
               setReason("");
               onDone();
@@ -177,30 +199,40 @@ function CreditNoteForm({ invoice, onDone }: { invoice: Invoice; onDone: () => v
         >
           Crear nota de crédito
         </button>
+        {invalid ? (
+          <span className="error" role="alert">
+            {invalid}
+          </span>
+        ) : null}
       </div>
-      <p className="muted">El ITBIS de la nota lo calcula el sistema con la tasa de la factura. La nota la emite otra persona de Facturación.</p>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={create.error} />
-    </>
+    </div>
   );
 }
 
 function RecordWithholding({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) {
-  const record = useCommand(`record-withholding:${invoice.header.invoiceId}`, "/api/v1/companies/{companyId}/sales/record-customer-withholding");
+  const record = useCommand(`record-withholding:${invoice.header.invoiceId}`, "/api/v1/companies/{companyId}/sales/record-customer-withholding", () => `Retención registrada en ${invoice.header.invoiceNo}.`);
   const [form, setForm] = useState({ kind: "ITBIS", amount: "", date: todayInDominicanRepublic(), certificateNo: "", evidenceRef: "", evidenceSha256: "" });
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<"amount" | "date" | "certificateNo" | "evidenceRef" | "evidenceSha256">();
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
   return (
     <form
-      className="inline-form"
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         const amount = normalizeInput(form.amount);
-        if (!isPositiveDecimal(amount, 2)) {
-          setInvalid("Indique el monto retenido (hasta 2 decimales).");
+        if (
+          !fe.check({
+            amount: !isPositiveDecimal(amount, 2) && "Indique el monto retenido (mayor que cero, hasta 2 decimales).",
+            date: !form.date && "Indique la fecha de la retención.",
+            certificateNo: form.certificateNo.trim() === "" && "Indique el número de certificado.",
+            evidenceRef: form.evidenceRef.trim() === "" && "Elija el archivo del certificado o escriba su referencia.",
+            evidenceSha256: !/^[0-9a-fA-F]{64}$/.test(form.evidenceSha256.trim()) && "El SHA-256 tiene 64 caracteres hexadecimales (se calcula al elegir el archivo).",
+          })
+        ) {
           return;
         }
-        setInvalid(null);
         if (
           await record.run({
             invoiceId: invoice.header.invoiceId,
@@ -216,20 +248,20 @@ function RecordWithholding({ invoice, onDone }: { invoice: Invoice; onDone: () =
         }
       }}
     >
-      <Field label="Tipo">
+      <Field label="Tipo" required>
         <select value={form.kind} onChange={set("kind")}>
           <option value="ITBIS">ITBIS</option>
           <option value="ISR">ISR</option>
         </select>
       </Field>
-      <Field label="Monto">
+      <Field label="Monto" required error={fe.errors.amount}>
         <input inputMode="decimal" value={form.amount} onChange={set("amount")} />
       </Field>
-      <Field label="Fecha">
-        <input type="date" value={form.date} onChange={set("date")} required />
+      <Field label="Fecha" required error={fe.errors.date}>
+        <input type="date" value={form.date} onChange={set("date")} />
       </Field>
-      <Field label="Número de certificado">
-        <input value={form.certificateNo} onChange={set("certificateNo")} required />
+      <Field label="Número de certificado" required error={fe.errors.certificateNo}>
+        <input value={form.certificateNo} onChange={set("certificateNo")} />
       </Field>
       <Field label="Certificado">
         <input
@@ -243,16 +275,17 @@ function RecordWithholding({ invoice, onDone }: { invoice: Invoice; onDone: () =
           }}
         />
       </Field>
-      <Field label="Referencia">
-        <input value={form.evidenceRef} onChange={set("evidenceRef")} required />
+      <Field label="Referencia" required error={fe.errors.evidenceRef}>
+        <input value={form.evidenceRef} onChange={set("evidenceRef")} />
       </Field>
-      <Field label="SHA-256">
-        <input value={form.evidenceSha256} onChange={set("evidenceSha256")} required pattern="[0-9a-fA-F]{64}" size={66} />
+      <Field label="SHA-256" required error={fe.errors.evidenceSha256}>
+        <input className="mono" value={form.evidenceSha256} onChange={set("evidenceSha256")} />
       </Field>
-      <button type="submit" disabled={record.busy}>
-        Registrar retención
-      </button>
-      {invalid ? <div className="error">{invalid}</div> : null}
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={record.busy}>
+          Registrar retención
+        </button>
+      </div>
       <ErrorBox error={record.error} />
     </form>
   );
@@ -260,7 +293,7 @@ function RecordWithholding({ invoice, onDone }: { invoice: Invoice; onDone: () =
 
 function WithholdingRow({ w, onDone }: { w: Schemas["InvoiceWithholdingView"]; onDone: () => void }) {
   const { can } = useSession();
-  const reverse = useCommand(`reverse-withholding:${w.withholdingId}`, "/api/v1/companies/{companyId}/sales/reverse-customer-withholding");
+  const reverse = useCommand(`reverse-withholding:${w.withholdingId}`, "/api/v1/companies/{companyId}/sales/reverse-customer-withholding", `Retención ${w.kind} (certificado ${w.certificateNo}) reversada.`);
   return (
     <tr>
       <td>{w.kind}</td>
@@ -275,7 +308,7 @@ function WithholdingRow({ w, onDone }: { w: Schemas["InvoiceWithholdingView"]; o
       </td>
       <td>
         {w.status === "ACTIVE" && can("customer_withholding:reverse") ? (
-          <ReasonAction label="Reversar" busy={reverse.busy} onConfirm={async (reason) => (await reverse.run({ withholdingId: w.withholdingId, expectedVersion: w.version, reason })) && onDone()} />
+          <ReasonAction label="Reversar" stepUp consequence="La retención se reversa con un asiento contrario y el saldo de la factura vuelve a subir por su monto. No se puede deshacer." busy={reverse.busy} onConfirm={async (reason) => (await reverse.run({ withholdingId: w.withholdingId, expectedVersion: w.version, reason })) && onDone()} />
         ) : null}
         <ErrorBox error={reverse.error} />
       </td>
@@ -290,8 +323,8 @@ function InvoiceDetail() {
     can("sales:read") && id ? () => query("/api/v1/companies/{companyId}/sales/invoices/{invoiceId}", { path: { companyId, invoiceId: id } }) : null,
     [companyId, id],
   );
-  const record = useCommand(`record-ecf:${id}`, "/api/v1/companies/{companyId}/sales/record-external-fiscal-document");
-  const voidInvoice = useCommand(`void-invoice:${id}`, "/api/v1/companies/{companyId}/sales/void-unfiscalized-invoice");
+  const record = useCommand(`record-ecf:${id}`, "/api/v1/companies/{companyId}/sales/record-external-fiscal-document", () => `e-CF registrado en la factura ${data?.header.invoiceNo ?? ""}.`);
+  const voidInvoice = useCommand(`void-invoice:${id}`, "/api/v1/companies/{companyId}/sales/void-unfiscalized-invoice", () => `Factura ${data?.header.invoiceNo ?? ""} anulada.`);
   if (!can("sales:read")) {
     return <NoPermission />;
   }
@@ -319,16 +352,16 @@ function InvoiceDetail() {
       {issued && h.ecfType === EXEMPT_ECF_TYPE ? <Exemption invoiceId={h.invoiceId} /> : null}
       {h.commercialStatus === "DRAFT" && can("invoice:issue") ? <Issue invoice={data} onDone={reload} /> : null}
 
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th className="num">#</th>
             <th>Conduce</th>
             <th>Producto</th>
             <th className="num">Cantidad</th>
-            <th className="num">Precio</th>
-            <th className="num">Neto</th>
-            <th className="num">ITBIS</th>
+            <th className="num">Precio (RD$)</th>
+            <th className="num">Neto (RD$)</th>
+            <th className="num">ITBIS (RD$)</th>
           </tr>
         </thead>
         <tbody>
@@ -369,7 +402,7 @@ function InvoiceDetail() {
             </td>
           </tr>
         </tbody>
-      </table>
+      </table></div>
 
       {pendingEcf ? <FiscalPackage invoiceId={h.invoiceId} /> : null}
       {pendingEcf && can("fiscal_document:record") ? (
@@ -391,7 +424,7 @@ function InvoiceDetail() {
       ) : null}
       {h.commercialStatus === "CONFIRMED" && h.fiscalStatus === "PENDING_EXTERNAL" && can("invoice:void") ? (
         <div className="actions">
-          <ReasonAction label="Anular factura (nunca fiscalizada)" busy={voidInvoice.busy} onConfirm={async (reason) => (await voidInvoice.run({ invoiceId: h.invoiceId, expectedVersion: h.version, reason })) && reload()} />
+          <ReasonAction label="Anular factura (nunca fiscalizada)" stepUp consequence="La factura queda anulada y su asiento se reversa; los conduces vuelven a quedar por facturar. No se puede deshacer." busy={voidInvoice.busy} onConfirm={async (reason) => (await voidInvoice.run({ invoiceId: h.invoiceId, expectedVersion: h.version, reason })) && reload()} />
           <ErrorBox error={voidInvoice.error} />
         </div>
       ) : null}
@@ -414,11 +447,11 @@ function InvoiceDetail() {
       {data.withholdings.length === 0 ? (
         <p className="muted">Sin retenciones.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Tipo</th>
-              <th className="num">Monto</th>
+              <th className="num">Monto (RD$)</th>
               <th>Fecha</th>
               <th>Certificado</th>
               <th>Estado</th>
@@ -430,7 +463,7 @@ function InvoiceDetail() {
               <WithholdingRow key={`${w.withholdingId}:${w.version}`} w={w} onDone={reload} />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       {open && can("customer_withholding:record") ? <RecordWithholding invoice={data} onDone={reload} /> : null}
       <History history={data.history} />

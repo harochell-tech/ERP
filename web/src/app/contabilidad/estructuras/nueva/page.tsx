@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { accountClassLabel, REPORTS } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
@@ -37,9 +37,14 @@ function StructureEditor() {
   const search = useSearchParams();
   const report = search.get("reporte") === "INCOME_STATEMENT" ? "INCOME_STATEMENT" : "BALANCE_SHEET";
   const source = search.get("desde");
-  const prepare = useCommand<"/api/v1/companies/{companyId}/finance/prepare-report-structure", Values>(`prepare-report-structure:${report}`, "/api/v1/companies/{companyId}/finance/prepare-report-structure");
+  const prepare = useCommand<"/api/v1/companies/{companyId}/finance/prepare-report-structure", Values>(
+    `prepare-report-structure:${report}`,
+    "/api/v1/companies/{companyId}/finance/prepare-report-structure",
+    `Nueva versión de ${REPORTS[report]} preparada; falta su aprobación.`,
+  );
   const [values, setValues] = useState<Values | null>(prepare.restored);
   const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   const allowed = can("account:manage") && can("configuration:read");
 
   const { data, error } = useLoad(
@@ -83,11 +88,20 @@ function StructureEditor() {
   const codes = values.lines.map((l) => l.lineCode.trim()).filter((c) => c.length > 0);
 
   const submit = async () => {
-    if (values.lines.length === 0 || values.lines.some((l) => !l.lineCode.trim() || !l.caption.trim()) || new Set(codes).size !== codes.length) {
-      setInvalid("Cada línea necesita un código único y un concepto.");
+    if (values.lines.length === 0) {
+      setInvalid("Agregue al menos una línea.");
       return;
     }
     setInvalid(null);
+    const found: Record<string, string | false> = { effectiveFrom: !values.effectiveFrom && "Indique desde cuándo rige la versión." };
+    values.lines.forEach((l, index) => {
+      const code = l.lineCode.trim();
+      found[`line-${index}-code`] = !code ? "Indique el código." : codes.indexOf(code) !== codes.lastIndexOf(code) && "Código repetido.";
+      found[`line-${index}-caption`] = !l.caption.trim() && "Indique el concepto.";
+    });
+    if (!fe.check(found)) {
+      return;
+    }
     const response = await prepare.run(
       {
         report,
@@ -112,11 +126,11 @@ function StructureEditor() {
     <>
       <h1>Nueva versión: {REPORTS[report]}</h1>
       <p className="muted">{data.copiedVersion ? `Copia de la versión ${data.copiedVersion}.` : "Sin versión anterior: agregue las líneas."} El orden de las filas es el orden del reporte.</p>
-      <Field label="Vigente desde">
+      <Field label="Vigente desde" required error={fe.errors.effectiveFrom}>
         <input type="date" aria-label="Vigente desde" value={values.effectiveFrom} onChange={(e) => set({ effectiveFrom: e.target.value })} />
       </Field>
       <h2>Líneas</h2>
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Código</th>
@@ -130,10 +144,26 @@ function StructureEditor() {
           {values.lines.map((l, index) => (
             <tr key={index}>
               <td>
-                <input aria-label={`Código de línea ${index + 1}`} size={8} maxLength={20} value={l.lineCode} onChange={(e) => setLine(index, { lineCode: e.target.value })} />
+                <input
+                  aria-label={`Código de línea ${index + 1}`}
+                  size={8}
+                  maxLength={20}
+                  value={l.lineCode}
+                  onChange={(e) => setLine(index, { lineCode: e.target.value })}
+                  {...fieldAria(fe.errors[`line-${index}-code`], `line-${index}-code-message`, true)}
+                />
+                <FieldMessage id={`line-${index}-code-message`} error={fe.errors[`line-${index}-code`]} />
               </td>
               <td>
-                <input aria-label={`Concepto ${index + 1}`} size={36} maxLength={200} value={l.caption} onChange={(e) => setLine(index, { caption: e.target.value })} />
+                <input
+                  aria-label={`Concepto ${index + 1}`}
+                  style={{ width: "min(22rem, 100%)" }}
+                  maxLength={200}
+                  value={l.caption}
+                  onChange={(e) => setLine(index, { caption: e.target.value })}
+                  {...fieldAria(fe.errors[`line-${index}-caption`], `line-${index}-caption-message`, true)}
+                />
+                <FieldMessage id={`line-${index}-caption-message`} error={fe.errors[`line-${index}-caption`]} />
               </td>
               <td>
                 <select aria-label={`Dentro de ${index + 1}`} value={l.parentLineCode} onChange={(e) => setLine(index, { parentLineCode: e.target.value })}>
@@ -161,14 +191,14 @@ function StructureEditor() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </LineTable>
       <div className="actions">
         <button type="button" onClick={() => set({ lines: [...values.lines, { lineCode: "", caption: "", parentLineCode: "", sign: report === "BALANCE_SHEET" ? 1 : -1 }] })}>
           Agregar línea
         </button>
       </div>
       <h2>Cuentas</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>Cuenta</th>
@@ -196,13 +226,13 @@ function StructureEditor() {
             </tr>
           ))}
         </tbody>
-      </table>
-      <div className="actions">
+      </table></div>
+      <div className="actions form-actions">
         <button type="button" className="primary" disabled={prepare.busy} onClick={submit}>
           Preparar versión
         </button>
+        {invalid ? <span className="field-error">{invalid}</span> : null}
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={prepare.error} />
     </>
   );

@@ -55,14 +55,14 @@ function Payments() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay pagos con ese estado.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
               <th>Proveedor</th>
               <th>Cuenta de la empresa</th>
               <th>Fecha valor</th>
-              <th className="num">Monto</th>
+              <th className="num">Monto (RD$)</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -72,7 +72,7 @@ function Payments() {
                 <td className="mono">
                   <Link href={`/tesoreria/pago/?id=${p.paymentId}`}>{p.paymentNo}</Link>
                 </td>
-                <td>{p.supplierName}</td>
+                <td className="wrap">{p.supplierName}</td>
                 <td className="mono">
                   {p.bankCode} {p.accountNumber}
                 </td>
@@ -86,7 +86,7 @@ function Payments() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

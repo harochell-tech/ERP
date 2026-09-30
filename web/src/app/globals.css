@@ -81,8 +81,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* Forms and actions. */
 .error { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-line); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
 .notice { background: #eef3fa; color: #0a3d73; border-radius: 8px; padding: 12px 14px; margin: 12px 0; font-size: 14px; }
-.field { display: inline-flex; flex-direction: column; gap: 6px; margin: 0 16px 12px 0; }
-.field span { font-size: 12px; font-weight: 600; color: var(--muted); }
 input, select, textarea { font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid #c9c7c0; border-radius: 8px; background: #fff; min-height: 40px; box-sizing: border-box; }
 button, .button { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 16px; min-height: 40px; border-radius: 8px; border: 1px solid #c9c7c0; background: #fff; color: var(--fg); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; box-sizing: border-box; }
 button.primary, .button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -99,11 +97,140 @@ dl.summary dt { font-size: 12px; font-weight: 600; color: var(--muted); text-tra
 dl.summary dd { margin: 4px 0 0; }
 pre { background: #f5f5f7; padding: 0.5rem; overflow-x: auto; }
 
+/* UX1-01b (E-UX1-01-1): menu groups fold; the top bar carries the environment badge and "Name · main role". */
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.menu-group h2 { padding: 0; }
+.menu-group-toggle { width: 100%; justify-content: space-between; min-height: 30px; padding: 0 10px; border: none; background: none; color: #8d8b84; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 6px; }
+.menu-group-toggle:hover { color: #fff; background: #2c2c31; }
+.menu-group ul[hidden] { display: none; }
+.sidebar-footer { margin-top: auto; padding: 12px 8px 4px; border-top: 1px solid #3a3a40; display: flex; flex-direction: column; gap: 10px; color: var(--nav-fg); font-size: 14px; }
+.sidebar-footer .muted { color: #a9a7a0; }
+.sidebar-footer select { width: 100%; }
+.sidebar-footer .user-block { flex-direction: column; align-items: stretch; }
+.menu-close { background: none; border: 1px solid #3a3a40; color: #fff; font-size: 22px; min-width: 44px; justify-content: center; }
+.user-block { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.user { overflow-wrap: anywhere; }
+.env-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+.env-staging { background: #fbe6cf; color: #8a3f06; border: 1px solid #f0c08e; }
+.env-test { background: #e7e0f7; color: #4b2a8c; border: 1px solid #c9b9ef; }
+.plant-selector { display: inline-flex; align-items: center; gap: 6px; }
+
+/* E-UX1-01-1: below 900 px a fixed top bar with the menu button; the menu is a side panel over the page. */
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
-  .sidebar { padding: 12px; }
-  .page { padding: 16px; }
-  .topbar { padding: 8px 16px; }
+  .page { padding: 16px 16px 96px; max-width: 100vw; }
+  .page h1 { font-size: 22px; overflow-wrap: anywhere; }
+}
+.app-mobile { display: block; }
+.app-mobile .main { padding-top: 56px; }
+.topbar-mobile { position: fixed; top: 0; left: 0; right: 0; z-index: 30; min-height: 56px; padding: 0 12px; gap: 10px; flex-wrap: nowrap; }
+.topbar-mobile .screen-title { flex: 1; min-width: 0; font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-mobile .topbar-right { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 40%; }
+.topbar-mobile .company { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-mobile select { max-width: 100%; }
+.menu-toggle { flex: none; }
+.sidebar-mobile { position: fixed; top: 0; bottom: 0; left: 0; z-index: 50; width: min(320px, 86vw); overflow-y: auto; box-sizing: border-box; transform: translateX(-105%); visibility: hidden; transition: transform 0.18s ease, visibility 0.18s; box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3); }
+.sidebar-mobile.open { transform: none; visibility: visible; }
+.sidebar-mobile li a { min-height: 44px; }
+.menu-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.45); }
+@media (prefers-reduced-motion: reduce) { .sidebar-mobile { transition: none; } }
+
+/* E-UX1-01-2: a table scrolls sideways inside its own box, never the page. */
+.table-wrap { overflow-x: auto; max-width: 100%; margin: 8px 0 16px; -webkit-overflow-scrolling: touch; }
+.table-wrap > table { margin: 0; }
+td, th { overflow-wrap: normal; }
+td .wrap, dd, .facts dd, .summary dd { overflow-wrap: anywhere; min-width: 0; }
+.page { min-width: 0; }
+.page p, .page li { overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .table-wrap > table { width: max-content; min-width: 100%; }
+  td, th { white-space: nowrap; }
+  td.wrap, td .wrap { white-space: normal; min-width: 10rem; max-width: 18rem; }
+  dl.facts { grid-template-columns: 1fr; gap: 2px 0; }
+  dl.facts dd { margin-bottom: 8px; }
+  dl.summary { grid-template-columns: 1fr 1fr; }
+  .field { display: flex; margin-right: 0; }
+  .field input, .field select, .field textarea { width: 100%; }
+  .tabs { overflow-x: auto; }
+  .tabs button { white-space: nowrap; }
+  .actions { gap: 8px; }
+  .cards { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+  dl.summary, .cards { grid-template-columns: 1fr; }
+}
+
+/* E-UX1-01-2: line editors become stacked cards below 700 px (each cell labelled with its column). */
+@media (max-width: 700px) {
+  .table-wrap > table.line-editor { width: 100%; min-width: 0; background: none; }
+  table.line-editor thead { display: none; }
+  table.line-editor, table.line-editor tbody, table.line-editor tfoot { display: block; }
+  table.line-editor tr { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 0 0 10px; }
+  table.line-editor td { display: flex; flex-direction: column; gap: 4px; border: none; padding: 6px 0; white-space: normal; text-align: left; }
+  table.line-editor td[data-label]::before { content: attr(data-label); font-size: 12px; font-weight: 600; color: var(--muted); font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  table.line-editor td:empty { display: none; }
+  table.line-editor td input, table.line-editor td select, table.line-editor td textarea { width: 100%; }
+  table.line-editor td.num { text-align: left; }
+}
+
+/* E-UX1-01-2: the primary action of a form stays reachable at the bottom on a phone. */
+@media (max-width: 900px) {
+  .form-actions { position: sticky; bottom: 0; z-index: 20; background: var(--surface); margin: 12px -16px 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06); }
+  .form-actions .primary { flex: 1 1 auto; justify-content: center; }
+}
+.form-actions .primary { order: 10; }
+.form-actions .primary + *, .form-actions > :not(.primary) { order: 1; }
+@media (min-width: 901px) {
+  .form-actions .primary { margin-left: 12px; }
+}
+
+/* E-UX1-01-2: several row buttons under one "Acciones" button below 700 px. */
+.row-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.row-actions-toggle { display: none; }
+.row-actions-list { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .row-actions { position: relative; display: inline-block; }
+  .row-actions-toggle { display: inline-flex; }
+  .row-actions-list { display: none; }
+  .row-actions.open .row-actions-list { display: flex; flex-direction: column; align-items: stretch; margin-top: 6px; }
+}
+
+/* E-UX1-01-6: fields — required mark, message under the field, invalid outline. */
+.field { display: inline-flex; flex-direction: column; gap: 4px; margin: 0 16px 12px 0; vertical-align: top; max-width: 100%; }
+.field > label { display: flex; flex-direction: column; gap: 6px; }
+label.field { gap: 6px; }
+label.field > span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.field .field-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+/* The mark is generated content with empty alternative text, so the label text (and Playwright getByLabel) stays the plain label. */
+.is-required::after { content: " *"; content: " *" / ""; color: var(--bad); }
+@media (max-width: 900px) { .field { display: flex; margin-right: 0; } }
+.field.wide { display: flex; margin-right: 0; }
+.field.wide textarea, .field.wide input { width: 100%; }
+.field-error { display: block; color: var(--bad); font-size: 13px; font-weight: 600; max-width: 36rem; }
+.field-hint { display: block; color: var(--muted); font-size: 12px; max-width: 36rem; }
+[aria-invalid="true"] { border-color: var(--bad) !important; box-shadow: 0 0 0 2px var(--bad-line); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary, .button.primary { box-shadow: 0 1px 2px rgba(11, 92, 173, 0.35); }
+button.danger-solid { background: var(--bad); border-color: var(--bad); color: #fff; }
+details.technical { margin-top: 6px; font-size: 13px; }
+details.technical summary { cursor: pointer; }
+.currency { color: var(--muted); }
+
+/* E-UX1-01-8: the confirmation dialog. */
+dialog.confirm-dialog { border: none; border-radius: 12px; padding: 20px 22px; width: min(480px, calc(100vw - 32px)); box-sizing: border-box; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); color: var(--fg); }
+dialog.confirm-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+dialog.confirm-dialog h2 { margin: 0 0 10px; font-size: 18px; }
+dialog.confirm-dialog .confirm-body p { margin: 0 0 12px; line-height: 1.45; }
+dialog.confirm-dialog textarea { width: 100%; font: inherit; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+/* E-UX1-01-9: success notices. */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; flex-direction: column; gap: 8px; max-width: min(420px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: none; display: flex; align-items: flex-start; gap: 10px; background: #14573a; color: #fff; border-radius: 10px; padding: 12px 14px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); font-size: 14px; overflow-wrap: anywhere; }
+.toast span { flex: 1; }
+.toast-close { pointer-events: auto; background: none; border: none; color: #fff; min-height: 0; padding: 0 4px; font-size: 18px; line-height: 1; }
+@media (max-width: 900px) {
+  .toasts { top: 64px; bottom: auto; left: 16px; right: 16px; max-width: none; }
 }
 
 /* FIS1-05 (E-FIS1-05-7): the proforma's signature area and printing without the shell. */

@@ -35,15 +35,15 @@ function DepositDetail() {
         Depósito {h.depositNo} <StatusBadge status={h.status} />
       </h1>
       <p>
-        {h.bankCode} {h.accountNumber} · {formatDate(h.depositDate)} · total <Money value={h.total} />
+        {h.bankCode} {h.accountNumber} · {formatDate(h.depositDate)} · total <Money value={h.total} currency />
       </p>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>Recibo</th>
             <th>Cliente</th>
             <th>Medio</th>
-            <th className="num">Monto</th>
+            <th className="num">Monto (RD$)</th>
             <th>Estado</th>
           </tr>
         </thead>
@@ -53,7 +53,7 @@ function DepositDetail() {
               <td className="mono">
                 <Link href={`/cobros/recibo/?id=${r.receiptId}`}>{r.receiptNo}</Link>
               </td>
-              <td>{r.customerName}</td>
+              <td className="wrap">{r.customerName}</td>
               <td>{METHODS[r.method] ?? r.method}</td>
               <td className="num">
                 <Money value={r.amount} />
@@ -64,7 +64,7 @@ function DepositDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       {data.matchedLines.map((l) => (
         <p key={l.lineId} className="muted">
           Conciliado con la línea del {formatDate(l.valueDate)} · {l.description}

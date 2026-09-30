@@ -22,7 +22,7 @@ const FILTERS: readonly { value: string; label: string }[] = [
 ];
 
 function Orders() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const router = useRouter();
   const params = useSearchParams();
   const status = params.get("estado") ?? "";
@@ -58,7 +58,7 @@ function Orders() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay pedidos con ese estado.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
@@ -66,7 +66,7 @@ function Orders() {
               <th>Cliente</th>
               <th>Planta</th>
               <th>Entrega</th>
-              <th className="num">Total neto</th>
+              <th className="num">Total neto (RD$)</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -77,8 +77,8 @@ function Orders() {
                   <Link href={`/ventas/pedido/?id=${o.salesOrderId}`}>{o.orderNo}</Link>
                 </td>
                 <td>{formatDate(o.orderDate)}</td>
-                <td>{o.customerName}</td>
-                <td>{o.plantCode}</td>
+                <td className="wrap">{o.customerName}</td>
+                <td>{plantName(o.plantCode)}</td>
                 <td>{DELIVERY_TERMS[o.deliveryTermCode] ?? o.deliveryTermCode}</td>
                 <td className="num">
                   <Money value={o.totalNet} />
@@ -89,7 +89,7 @@ function Orders() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

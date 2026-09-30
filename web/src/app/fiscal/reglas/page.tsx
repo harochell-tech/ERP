@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import {
   CASES_TEMPLATE,
   DEFINITION_HELP,
@@ -26,26 +26,36 @@ type TestCase = Schemas["FiscalTestCase"];
 // and runs the regression cases; the specialist (someone else, step-up) activates a READY version. The database enforces the gate.
 
 function ConfigureVersion({ onDone }: { onDone: () => void }) {
-  const configure = useCommand("configure-fiscal-rule", "/api/v1/companies/{companyId}/tax/configure-fiscal-rule-version");
+  const configure = useCommand("configure-fiscal-rule", "/api/v1/companies/{companyId}/tax/configure-fiscal-rule-version", (r) => {
+    const result = r.result as unknown as { ruleCode?: string; version?: number } | null;
+    return result?.ruleCode ? `Regla ${result.ruleCode} versión ${result.version ?? ""} configurada.` : "Versión de la regla fiscal configurada.";
+  });
   const [ruleCode, setRuleCode] = useState("");
   const [ruleKind, setRuleKind] = useState<FiscalRuleKind>("PURCHASE_ITBIS");
   const [definition, setDefinition] = useState(DEFINITION_TEMPLATES.PURCHASE_ITBIS);
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const parsed = parseJson<unknown>(definition);
+  const fe = useFieldErrors<"ruleCode" | "definition" | "effectiveFrom">();
 
   return (
     <form
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (parsed.error === null && (await configure.run({ ruleCode: ruleCode.trim(), ruleKind, definition, effectiveFrom }))) {
+        const valid = fe.check({
+          ruleCode: ruleCode.trim() === "" && "Indique el código de la regla.",
+          definition: parsed.error,
+          effectiveFrom: !effectiveFrom && "Indique desde cuándo rige.",
+        });
+        if (valid && (await configure.run({ ruleCode: ruleCode.trim(), ruleKind, definition, effectiveFrom }))) {
           onDone();
         }
       }}
     >
-      <Field label="Código de la regla">
-        <input value={ruleCode} onChange={(e) => setRuleCode(e.target.value)} required placeholder="ITBIS_COMPRAS" />
+      <Field label="Código de la regla" required error={fe.errors.ruleCode}>
+        <input value={ruleCode} onChange={(e) => setRuleCode(e.target.value)} placeholder="ITBIS_COMPRAS" />
       </Field>
-      <Field label="Tipo">
+      <Field label="Tipo" required>
         <select
           value={ruleKind}
           onChange={(e) => {
@@ -61,34 +71,40 @@ function ConfigureVersion({ onDone }: { onDone: () => void }) {
           ))}
         </select>
       </Field>
-      <Field label="Definición (JSON; confirme la tasa contra la fuente oficial)">
-        <textarea rows={7} cols={70} value={definition} onChange={(e) => setDefinition(e.target.value)} />
+      <Field label="Definición (JSON; confirme la tasa contra la fuente oficial)" required wide error={fe.errors.definition ?? parsed.error}>
+        <textarea className="mono" rows={7} value={definition} onChange={(e) => setDefinition(e.target.value)} />
       </Field>
-      {parsed.error ? <p className="error">{parsed.error}</p> : null}
       {(DEFINITION_HELP[ruleKind] ?? []).map((line) => (
         <p key={line} className="muted">
           {line}
         </p>
       ))}
-      <Field label="Vigente desde">
-        <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} required />
+      <Field label="Vigente desde" required error={fe.errors.effectiveFrom}>
+        <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
       </Field>
-      <button type="submit" disabled={configure.busy || parsed.error !== null}>
-        Configurar versión
-      </button>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={configure.busy}>
+          Configurar versión
+        </button>
+      </div>
       <ErrorBox error={configure.error} />
     </form>
   );
 }
 
-function VersionActions({ ruleKind, version, sources, onDone }: { ruleKind: string; version: RuleVersion; sources: readonly Source[]; onDone: () => void }) {
-  const { can, state } = useSession();
+function VersionActions({ ruleCode, ruleKind, version, sources, onDone }: { ruleCode: string; ruleKind: string; version: RuleVersion; sources: readonly Source[]; onDone: () => void }) {
+  const { can, isMine } = useSession();
   const id = version.ruleVersionId;
-  // The activator is never the configurer (E-PR03-4 a); the screen does not offer it.
-  const configuredByMe = state.status === "ready" && version.configuredBy === state.session.email;
-  const link = useCommand(`link-source:${id}`, "/api/v1/companies/{companyId}/tax/link-fiscal-source");
-  const test = useCommand(`run-tests:${id}`, "/api/v1/companies/{companyId}/tax/run-fiscal-rule-tests");
-  const activate = useCommand(`activate-rule:${id}`, "/api/v1/companies/{companyId}/tax/activate-fiscal-rule-version");
+  const label = `${ruleCode} versión ${version.version}`;
+  // The activator is never the configurer (E-PR03-4 a); the screen does not offer it. UX1-01b (E-UX1-01-3): configuredBy is the
+  // configurer's display name (the e-mail until a sign-in brings it), so both are compared.
+  const configuredByMe =
+    isMine(version.configuredBy);
+  const link = useCommand(`link-source:${id}`, "/api/v1/companies/{companyId}/tax/link-fiscal-source", `Fuente vinculada a la regla ${label}.`);
+  const test = useCommand(`run-tests:${id}`, "/api/v1/companies/{companyId}/tax/run-fiscal-rule-tests", (r) =>
+    (r.result as unknown as { passed?: boolean } | null)?.passed ? `Pruebas de la regla ${label}: pasaron.` : `Pruebas de la regla ${label}: fallaron; revise los casos.`,
+  );
+  const activate = useCommand(`activate-rule:${id}`, "/api/v1/companies/{companyId}/tax/activate-fiscal-rule-version", `Regla ${label} activada.`);
   const unlinked = sources.filter((s) => !version.sources.some((l) => l.sourceId === s.sourceId));
   const [sourceId, setSourceId] = useState(unlinked[0]?.sourceId ?? "");
   const [cases, setCases] = useState(CASES_TEMPLATE);
@@ -120,7 +136,7 @@ function VersionActions({ ruleKind, version, sources, onDone }: { ruleKind: stri
       ) : can("fiscal_rule:configure") ? (
         <details>
           <summary>Correr pruebas de regresión</summary>
-          <textarea aria-label="Casos de prueba" rows={10} cols={70} value={cases} onChange={(e) => setCases(e.target.value)} />
+          <textarea aria-label="Casos de prueba" className="mono" rows={10} style={{ width: "100%", boxSizing: "border-box" }} value={cases} onChange={(e) => setCases(e.target.value)} />
           {parsed.error ? <p className="error">{parsed.error}</p> : null}
           <button type="button" disabled={test.busy || parsed.value === null} onClick={async () => parsed.value && done(await test.run({ ruleVersionId: id, cases: parsed.value }))}>
             Correr pruebas
@@ -128,9 +144,15 @@ function VersionActions({ ruleKind, version, sources, onDone }: { ruleKind: stri
         </details>
       ) : null}
       {version.status === "READY" && can("fiscal_rule:activate") && !configuredByMe ? (
-        <button type="button" disabled={activate.busy} onClick={async () => done(await activate.run({ ruleVersionId: id }))}>
-          Activar versión
-        </button>
+        <ConfirmAction
+          label="Activar versión"
+          className="primary"
+          title={`¿Activar la regla ${label}?`}
+          consequence={`Desde ${formatDate(version.effectiveFrom)} la regla ${label} determina los impuestos de los documentos que se contabilicen; la versión activa anterior del mismo tipo queda reemplazada. No se deshace: un cambio exige otra versión.`}
+          stepUp
+          busy={activate.busy}
+          onConfirm={async () => done(await activate.run({ ruleVersionId: id }))}
+        />
       ) : null}
       <ErrorBox error={link.error ?? test.error ?? activate.error} />
     </div>
@@ -165,7 +187,7 @@ export default function Page() {
             <h2>
               {rule.code} — {FISCAL_KIND_LABELS[rule.ruleKind] ?? rule.ruleKind}
             </h2>
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th className="num">Versión</th>
@@ -187,7 +209,7 @@ export default function Page() {
                       {formatDate(v.effectiveFrom)}
                       {v.effectiveTo ? ` – ${formatDate(v.effectiveTo)}` : ""}
                     </td>
-                    <td>
+                    <td className="wrap" style={{ minWidth: 220 }}>
                       <code>{v.definition}</code>
                     </td>
                     <td>{v.sources.length === 0 ? "—" : v.sources.map((s) => s.documentTitle).join(", ")}</td>
@@ -202,12 +224,12 @@ export default function Page() {
                       {v.configuredBy ?? "—"} / {v.activatedBy ?? "—"}
                     </td>
                     <td>
-                      <VersionActions ruleKind={rule.ruleKind} version={v} sources={sources.data?.items ?? []} onDone={rules.reload} />
+                      <VersionActions ruleCode={rule.code} ruleKind={rule.ruleKind} version={v} sources={sources.data?.items ?? []} onDone={rules.reload} />
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </section>
         ))
       )}

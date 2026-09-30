@@ -73,15 +73,15 @@ function Statement() {
           <p>
             {s.customerName} · RNC {s.rnc ?? "—"}
           </p>
-          <table>
+          <div className="table-wrap"><table>
             <thead>
               <tr>
                 <th>Fecha</th>
                 <th>Tipo</th>
                 <th>Documento</th>
-                <th className="num">Débito</th>
-                <th className="num">Crédito</th>
-                <th className="num">Saldo</th>
+                <th className="num">Débito (RD$)</th>
+                <th className="num">Crédito (RD$)</th>
+                <th className="num">Saldo (RD$)</th>
               </tr>
             </thead>
             <tbody>
@@ -121,7 +121,7 @@ function Statement() {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         </>
       )}
     </>

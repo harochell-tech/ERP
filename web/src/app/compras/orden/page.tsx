@@ -18,10 +18,10 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
   const { can } = useSession();
   const id = order.purchaseOrderId;
   const target = { plantId: order.plantId, purchaseOrderId: id, expectedVersion: order.version };
-  const submit = useCommand(`submit-po:${id}`, "/api/v1/companies/{companyId}/procurement/submit-purchase-order");
-  const approve = useCommand(`approve-po:${id}`, "/api/v1/companies/{companyId}/procurement/approve-purchase-order");
-  const reject = useCommand(`reject-po:${id}`, "/api/v1/companies/{companyId}/procurement/reject-purchase-order");
-  const cancel = useCommand(`cancel-po:${id}`, "/api/v1/companies/{companyId}/procurement/cancel-purchase-order");
+  const submit = useCommand(`submit-po:${id}`, "/api/v1/companies/{companyId}/procurement/submit-purchase-order", `Orden de compra ${order.poNo} enviada a aprobación.`);
+  const approve = useCommand(`approve-po:${id}`, "/api/v1/companies/{companyId}/procurement/approve-purchase-order", `Orden de compra ${order.poNo} aprobada.`);
+  const reject = useCommand(`reject-po:${id}`, "/api/v1/companies/{companyId}/procurement/reject-purchase-order", `Orden de compra ${order.poNo} rechazada: vuelve a borrador.`);
+  const cancel = useCommand(`cancel-po:${id}`, "/api/v1/companies/{companyId}/procurement/cancel-purchase-order", `Orden de compra ${order.poNo} cancelada.`);
   const busy = submit.busy || approve.busy || reject.busy || cancel.busy;
   const after = (response: unknown) => {
     if (response) {
@@ -43,11 +43,11 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
             <button type="button" disabled={busy} onClick={async () => after(await approve.run(target))}>
               Aprobar
             </button>
-            <ReasonAction label="Rechazar" busy={busy} onConfirm={async (reason) => after(await reject.run({ ...target, reason }))} />
+            <ReasonAction label="Rechazar" consequence="La orden vuelve a borrador para que el comprador la corrija." busy={busy} onConfirm={async (reason) => after(await reject.run({ ...target, reason }))} />
           </>
         ) : null}
         {(order.status === "DRAFT" || order.status === "PENDING_APPROVAL" || order.status === "APPROVED") && can("purchase_order:cancel") ? (
-          <ReasonAction label="Cancelar orden" busy={busy} onConfirm={async (reason) => after(await cancel.run({ ...target, reason }))} />
+          <ReasonAction label="Cancelar orden" consequence="La orden queda cancelada y ya no se podrá recibir ni facturar. No se puede deshacer." busy={busy} onConfirm={async (reason) => after(await cancel.run({ ...target, reason }))} />
         ) : null}
         {receivable && can("goods_receipt:post") ? (
           <Link className="button" href={`/almacen/recibir/?oc=${id}`}>
@@ -61,7 +61,7 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
 }
 
 function OrderDetail() {
-  const { companyId, can, plantFor } = useSession();
+  const { companyId, can, plantFor, plantName } = useSession();
   const id = useSearchParams().get("id") ?? "";
   const plantId = plantFor("purchase_order:read");
   const { data: order, error, reload } = useLoad(
@@ -86,7 +86,7 @@ function OrderDetail() {
         <dt>Proveedor</dt>
         <dd>{order.supplierName}</dd>
         <dt>Planta</dt>
-        <dd>{order.plantCode}</dd>
+        <dd>{plantName(order.plantId, order.plantCode)}</dd>
         <dt>Fecha</dt>
         <dd>{formatDate(order.orderDate)}</dd>
         <dt>Creada por</dt>
@@ -96,14 +96,14 @@ function OrderDetail() {
       </dl>
       <Actions order={order} onDone={reload} />
       <h2>Líneas</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>#</th>
             <th>Artículo</th>
             <th>Unidad</th>
             <th className="num">Pedido</th>
-            <th className="num">Precio</th>
+            <th className="num">Precio (RD$)</th>
             <th className="num">Recibido</th>
             <th className="num">Facturado</th>
           </tr>
@@ -125,7 +125,7 @@ function OrderDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <h2>Recepciones</h2>
       {order.goodsReceipts.length === 0 ? (
         <p className="muted">Sin recepciones.</p>

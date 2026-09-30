@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { RncHint, useRncLookup } from "@/components/RncLookup";
-import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -18,12 +18,17 @@ function CreateSupplier({ onDone }: { onDone: () => void }) {
   const [rnc, setRnc] = useState("");
   const [legalName, setLegalName] = useState("");
   const registry = useRncLookup((name) => setLegalName((current) => (current.trim() ? current : name)));
+  const fe = useFieldErrors<"rnc" | "legalName">();
   return (
     <form
-      className="inline-form"
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await create.run({ rnc: rnc.trim(), legalName: legalName.trim() })) {
+        if (!fe.check({ rnc: rnc.trim() === "" && "Indique el RNC o la cédula.", legalName: legalName.trim() === "" && "Indique la razón social." })) {
+          return;
+        }
+        if (await create.run({ rnc: rnc.trim(), legalName: legalName.trim() }, undefined, `Proveedor ${legalName.trim()} creado en borrador.`)) {
           setRnc("");
           setLegalName("");
           registry.clear();
@@ -31,16 +36,18 @@ function CreateSupplier({ onDone }: { onDone: () => void }) {
         }
       }}
     >
-      <Field label="RNC o cédula">
-        <input value={rnc} onChange={(e) => setRnc(e.target.value)} onBlur={() => registry.lookUp(rnc)} required />
+      <Field label="RNC o cédula" required error={fe.errors.rnc}>
+        <input value={rnc} inputMode="numeric" onChange={(e) => setRnc(e.target.value)} onBlur={() => registry.lookUp(rnc)} />
       </Field>
-      <Field label="Razón social">
-        <input value={legalName} onChange={(e) => setLegalName(e.target.value)} required />
+      <Field label="Razón social" required error={fe.errors.legalName}>
+        <input value={legalName} onChange={(e) => setLegalName(e.target.value)} />
       </Field>
-      <button type="submit" disabled={create.busy}>
-        Crear proveedor
-      </button>
       <RncHint result={registry.result} />
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={create.busy}>
+          Crear proveedor
+        </button>
+      </div>
       <ErrorBox error={create.error} />
     </form>
   );
@@ -49,8 +56,8 @@ function CreateSupplier({ onDone }: { onDone: () => void }) {
 function SupplierRow({ supplier, onDone }: { supplier: Supplier; onDone: () => void }) {
   const { can } = useSession();
   const id = supplier.supplierId;
-  const update = useCommand(`update-supplier:${id}`, "/api/v1/companies/{companyId}/master-data/update-supplier");
-  const activate = useCommand(`activate-supplier:${id}`, "/api/v1/companies/{companyId}/master-data/activate-supplier");
+  const update = useCommand(`update-supplier:${id}`, "/api/v1/companies/{companyId}/master-data/update-supplier", `Proveedor ${supplier.legalName} actualizado.`);
+  const activate = useCommand(`activate-supplier:${id}`, "/api/v1/companies/{companyId}/master-data/activate-supplier", `Proveedor ${supplier.legalName} activado.`);
   const [editing, setEditing] = useState(false);
   const [rnc, setRnc] = useState(supplier.rnc ?? "");
   const [legalName, setLegalName] = useState(supplier.legalName);
@@ -61,7 +68,7 @@ function SupplierRow({ supplier, onDone }: { supplier: Supplier; onDone: () => v
       <td>
         {editing ? <input aria-label="RNC" value={rnc} onChange={(e) => setRnc(e.target.value)} /> : (supplier.rnc ?? "—")}
       </td>
-      <td>
+      <td className="wrap">
         {editing ? (
           <input aria-label="Razón social" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
         ) : (
@@ -135,14 +142,14 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay proveedores.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>RNC</th>
               <th>Razón social</th>
               <th>Estado</th>
               <th>Cuenta bancaria</th>
-              <th className="num">CxP abierta</th>
+              <th className="num">CxP abierta (RD$)</th>
               <th />
             </tr>
           </thead>
@@ -151,7 +158,7 @@ export default function Page() {
               <SupplierRow key={`${s.supplierId}:${s.version}`} supplier={s} onDone={reload} />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

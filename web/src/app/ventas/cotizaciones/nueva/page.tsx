@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { compareDecimals, DEFAULT_QUOTE_VALIDITY_DAYS, isSpecialPrice } from "@/lib/quotes";
 import { addDays, DELIVERY_TERMS, todayInDominicanRepublic } from "@/lib/labels";
@@ -39,14 +39,14 @@ const EMPTY_LINE: Line = { itemId: "", uom: "", quantity: "", unitPrice: "" };
 const optional = (text: string) => (text.trim() === "" ? null : text.trim());
 
 function QuoteForm() {
-  const { companyId, can, scope } = useSession();
+  const { companyId, can, scope, plantName } = useSession();
   const router = useRouter();
   const editId = useSearchParams().get("id");
   const formId = editId ? `edit-quote:${editId}` : "create-quote";
-  const create = useCommand<"/api/v1/companies/{companyId}/sales/create-quote", Values>(formId, "/api/v1/companies/{companyId}/sales/create-quote");
-  const update = useCommand<"/api/v1/companies/{companyId}/sales/update-draft-quote", Values>(formId, "/api/v1/companies/{companyId}/sales/update-draft-quote");
+  const create = useCommand<"/api/v1/companies/{companyId}/sales/create-quote", Values>(formId, "/api/v1/companies/{companyId}/sales/create-quote", (_, doc) => (doc ? `Cotización ${doc} creada en borrador.` : "Cotización creada en borrador."));
+  const update = useCommand<"/api/v1/companies/{companyId}/sales/update-draft-quote", Values>(formId, "/api/v1/companies/{companyId}/sales/update-draft-quote", (_, doc) => (doc ? `Borrador de la cotización ${doc} guardado.` : "Borrador de la cotización guardado."));
   const [values, setValues] = useState<Values | null>(() => create.restored ?? update.restored ?? null);
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<string>();
   const allowed = can("quote:manage") && can("sales:read");
   const permission = scope("quote:manage");
 
@@ -117,19 +117,20 @@ function QuoteForm() {
 
   const submit = async () => {
     const lines = current.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: normalizeInput(l.quantity), unitPrice: normalizeInput(l.unitPrice) }));
-    if (!current.partyId || !current.plantId || !current.validUntil) {
-      setInvalid("Elija cliente, planta y fecha de vigencia.");
+    const found: Record<string, string | false> = {
+      partyId: !current.partyId && "Elija el cliente.",
+      plantId: !current.plantId && "Elija la planta.",
+      validUntil: !current.validUntil && "Indique la fecha de vigencia.",
+      siteAddress: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.siteAddress.trim() === "" && "Una entrega en obra necesita la dirección de la obra.",
+    };
+    lines.forEach((l, i) => {
+      found[`line-${i}-item`] = !l.itemId && "Elija el producto.";
+      found[`line-${i}-quantity`] = !isPositiveDecimal(l.quantity, 6) && "Indique una cantidad mayor que cero (hasta 6 decimales).";
+      found[`line-${i}-price`] = l.unitPrice !== "" && !isPositiveDecimal(l.unitPrice, 4) && "El precio, si se indica, es mayor que cero (hasta 4 decimales).";
+    });
+    if (!fe.check(found)) {
       return;
     }
-    if (current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.siteAddress.trim() === "") {
-      setInvalid("Una entrega en obra necesita la dirección de la obra.");
-      return;
-    }
-    if (lines.some((l) => !l.itemId || !isPositiveDecimal(l.quantity, 6) || (l.unitPrice !== "" && !isPositiveDecimal(l.unitPrice, 4)))) {
-      setInvalid("Cada línea necesita producto y cantidad mayor que cero (hasta 6 decimales); el precio, si se indica, mayor que cero (hasta 4 decimales).");
-      return;
-    }
-    setInvalid(null);
     const header = {
       plantId: current.plantId,
       validUntil: current.validUntil,
@@ -151,7 +152,7 @@ function QuoteForm() {
     <>
       <h1>{quote ? `Editar cotización ${quote.header.quoteNo}` : "Nueva cotización"}</h1>
       <div>
-        <Field label="Cliente">
+        <Field label="Cliente" required error={fe.errors.partyId}>
           <select aria-label="Cliente" value={current.partyId} disabled={quote !== null} onChange={(e) => set({ partyId: e.target.value })}>
             <option value="">—</option>
             {data.customers.map((c) => (
@@ -162,19 +163,19 @@ function QuoteForm() {
             ))}
           </select>
         </Field>
-        <Field label="Planta">
+        <Field label="Planta" required error={fe.errors.plantId}>
           <select aria-label="Planta de la cotización" value={current.plantId} onChange={(e) => set({ plantId: e.target.value })}>
             {data.plants.map((p) => (
               <option key={p.plantId} value={p.plantId}>
-                {p.code}
+                {plantName(p.plantId, p.code)}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Vigente hasta">
+        <Field label="Vigente hasta" required error={fe.errors.validUntil}>
           <input type="date" aria-label="Vigente hasta" value={current.validUntil} onChange={(e) => set({ validUntil: e.target.value })} />
         </Field>
-        <Field label="Entrega">
+        <Field label="Entrega" required>
           <select aria-label="Término de entrega" value={current.deliveryTermCode} onChange={(e) => set({ deliveryTermCode: e.target.value })}>
             {Object.entries(DELIVERY_TERMS).map(([code, label]) => (
               <option key={code} value={code}>
@@ -184,7 +185,7 @@ function QuoteForm() {
           </select>
         </Field>
         {current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" ? (
-          <Field label="Dirección de la obra">
+          <Field label="Dirección de la obra" required error={fe.errors.siteAddress}>
             <input aria-label="Dirección de la obra" value={current.siteAddress} onChange={(e) => set({ siteAddress: e.target.value })} />
           </Field>
         ) : null}
@@ -198,14 +199,14 @@ function QuoteForm() {
       {customerStatus === "DRAFT" ? (
         <p className="notice">El cliente está en borrador: se puede cotizar, pero para convertir la cotización en pedido debe estar activo.</p>
       ) : null}
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Producto</th>
             <th>Unidad</th>
             <th className="num">Cantidad</th>
-            <th className="num">Precio de lista</th>
-            <th className="num">Precio cotizado (opcional)</th>
+            <th className="num">Precio de lista (RD$)</th>
+            <th className="num">Precio cotizado (RD$, opcional)</th>
             <th />
           </tr>
         </thead>
@@ -218,6 +219,7 @@ function QuoteForm() {
                 <td>
                   <select
                     aria-label={`Producto ${index + 1}`}
+                    {...fieldAria(fe.errors[`line-${index}-item`], `quote-line-${index}-item`, true)}
                     value={line.itemId && line.uom ? `${line.itemId}|${line.uom}` : ""}
                     onChange={(e) => {
                       const [itemId = "", uom = ""] = e.target.value.split("|");
@@ -231,10 +233,18 @@ function QuoteForm() {
                       </option>
                     ))}
                   </select>
+                  <FieldMessage id={`quote-line-${index}-item`} error={fe.errors[`line-${index}-item`]} />
                 </td>
                 <td>{line.uom}</td>
                 <td className="num">
-                  <input aria-label={`Cantidad ${index + 1}`} inputMode="decimal" value={line.quantity} onChange={(e) => setLine(index, { quantity: e.target.value })} />
+                  <input
+                    aria-label={`Cantidad ${index + 1}`}
+                    {...fieldAria(fe.errors[`line-${index}-quantity`], `quote-line-${index}-quantity`, true)}
+                    inputMode="decimal"
+                    value={line.quantity}
+                    onChange={(e) => setLine(index, { quantity: e.target.value })}
+                  />
+                  <FieldMessage id={`quote-line-${index}-quantity`} error={fe.errors[`line-${index}-quantity`]} />
                 </td>
                 <td className="num">
                   <Money value={price?.unitPrice} testId={`list-price:${index + 1}`} />
@@ -242,11 +252,13 @@ function QuoteForm() {
                 <td className="num">
                   <input
                     aria-label={`Precio ${index + 1}`}
+                    {...fieldAria(fe.errors[`line-${index}-price`], `quote-line-${index}-price`)}
                     inputMode="decimal"
                     placeholder="Precio de lista"
                     value={line.unitPrice}
                     onChange={(e) => setLine(index, { unitPrice: e.target.value })}
                   />
+                  <FieldMessage id={`quote-line-${index}-price`} error={fe.errors[`line-${index}-price`]} />
                   {special ? (
                     <div className="warning" data-testid={`special-price:${index + 1}`}>
                       Precio especial: requiere aprobación
@@ -264,12 +276,12 @@ function QuoteForm() {
             );
           })}
         </tbody>
-      </table>
+      </LineTable>
       <p className="muted">
         Sin precio cotizado, la línea toma el de la lista vigente. Los netos y el total los calcula el sistema al guardar. Un precio por debajo de la lista
         necesita la aprobación del Aprobador de políticas antes de enviar la cotización.
       </p>
-      <div className="actions">
+      <div className="actions form-actions">
         <button type="button" onClick={() => set({ lines: [...current.lines, { ...EMPTY_LINE }] })}>
           Agregar línea
         </button>
@@ -277,7 +289,6 @@ function QuoteForm() {
           {quote ? "Guardar borrador" : "Crear cotización"}
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={create.error ?? update.error} />
     </>
   );

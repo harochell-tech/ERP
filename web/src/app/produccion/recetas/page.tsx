@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { query } from "@/api/client";
 import { itemLabel, PlantSelect, useChosenPlant, useItems, usePlants } from "@/components/Production";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { parseWholeNumber } from "@/lib/production";
@@ -32,50 +32,60 @@ function PrepareRecipe({ plantId, onDone }: { plantId: string; onDone: (recipeVe
   );
   const [form, setForm] = useState(EMPTY_FORM);
   const [lines, setLines] = useState<LineDraft[]>([{ materialItemId: "", qtyPerBatch: "" }]);
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   if (items.data === null || machines.data === null) {
     return <Loading error={items.error ?? machines.error} />;
   }
   const goods = items.data.filter((i) => i.itemType === "FINISHED_GOOD" && i.status === "ACTIVE");
   const materials = items.data.filter((i) => i.itemType === "RAW_MATERIAL" && i.status === "ACTIVE");
   const setLine = (index: number, patch: Partial<LineDraft>) => setLines(lines.map((l, i) => (i === index ? { ...l, ...patch } : l)));
+  const unitsError = "Mayor que cero (hasta 6 decimales).";
   return (
     <form
       className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         const units = [form.unitsPerBatch, form.unitsPerCycle, form.unitsPerRack].map(normalizeInput);
         const minCuringHours = parseWholeNumber(form.minCuringHours);
         const maxCuringHours = parseWholeNumber(form.maxCuringHours);
         const body = lines.map((l) => ({ materialItemId: l.materialItemId, qtyPerBatch: normalizeInput(l.qtyPerBatch) }));
-        if (!form.itemId || !form.machineId) {
-          setInvalid("Elija el producto y la máquina.");
-          return;
-        }
-        if (!units.every((u) => isPositiveDecimal(u, 6))) {
-          setInvalid("Las unidades por tanda, por ciclo y por rack son mayores que cero (hasta 6 decimales).");
-          return;
-        }
-        if (minCuringHours === null || maxCuringHours === null || maxCuringHours <= minCuringHours) {
-          setInvalid("Indique las horas de curado en números enteros; el máximo debe ser mayor que el mínimo.");
-          return;
-        }
-        if (body.length === 0 || body.some((l) => !l.materialItemId || !isPositiveDecimal(l.qtyPerBatch, 6))) {
-          setInvalid("Cada línea necesita una materia prima y una cantidad por tanda mayor que cero (hasta 6 decimales).");
-          return;
-        }
-        setInvalid(null);
-        const response = await prepare.run({
-          plantId,
-          itemId: form.itemId,
-          machineId: form.machineId,
-          unitsPerBatch: units[0] ?? "",
-          unitsPerCycle: units[1] ?? "",
-          unitsPerRack: units[2] ?? "",
-          minCuringHours,
-          maxCuringHours,
-          lines: body,
+        const found: Record<string, string | false> = {
+          itemId: !form.itemId && "Elija el producto.",
+          machineId: !form.machineId && "Elija la máquina.",
+          unitsPerBatch: !isPositiveDecimal(units[0] ?? "", 6) && unitsError,
+          unitsPerCycle: !isPositiveDecimal(units[1] ?? "", 6) && unitsError,
+          unitsPerRack: !isPositiveDecimal(units[2] ?? "", 6) && unitsError,
+          minCuringHours: minCuringHours === null && "Horas en número entero (0 o más).",
+          maxCuringHours:
+            maxCuringHours === null
+              ? "Horas en número entero."
+              : minCuringHours !== null && maxCuringHours <= minCuringHours && "El máximo debe ser mayor que el mínimo.",
+        };
+        body.forEach((l, index) => {
+          found[`line-${index}-material`] = !l.materialItemId && "Elija la materia prima.";
+          found[`line-${index}-quantity`] = !isPositiveDecimal(l.qtyPerBatch, 6) && "Cantidad por tanda mayor que cero (hasta 6 decimales).";
         });
+        if (!fe.check(found) || minCuringHours === null || maxCuringHours === null) {
+          return;
+        }
+        const machine = machines.data?.items.find((m) => m.machineId === form.machineId);
+        const good = goods.find((g) => g.itemId === form.itemId);
+        const response = await prepare.run(
+          {
+            plantId,
+            itemId: form.itemId,
+            machineId: form.machineId,
+            unitsPerBatch: units[0] ?? "",
+            unitsPerCycle: units[1] ?? "",
+            unitsPerRack: units[2] ?? "",
+            minCuringHours,
+            maxCuringHours,
+            lines: body,
+          },
+          undefined,
+          `Receta de ${good?.code ?? "producto"} en ${machine?.code ?? "la máquina"} preparada; falta que el Gerente de planta la apruebe.`,
+        );
         if (response) {
           setForm(EMPTY_FORM);
           setLines([{ materialItemId: "", qtyPerBatch: "" }]);
@@ -85,7 +95,7 @@ function PrepareRecipe({ plantId, onDone }: { plantId: string; onDone: (recipeVe
     >
       <h2>Preparar receta</h2>
       <div>
-        <Field label="Producto">
+        <Field label="Producto" required error={fe.errors.itemId}>
           <select aria-label="Producto" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
             <option value="">—</option>
             {goods.map((g) => (
@@ -95,7 +105,7 @@ function PrepareRecipe({ plantId, onDone }: { plantId: string; onDone: (recipeVe
             ))}
           </select>
         </Field>
-        <Field label="Máquina">
+        <Field label="Máquina" required error={fe.errors.machineId}>
           <select aria-label="Máquina" value={form.machineId} onChange={(e) => setForm({ ...form, machineId: e.target.value })}>
             <option value="">—</option>
             {machines.data.items.map((m) => (
@@ -107,26 +117,26 @@ function PrepareRecipe({ plantId, onDone }: { plantId: string; onDone: (recipeVe
         </Field>
       </div>
       <div>
-        <Field label="Unidades por tanda">
+        <Field label="Unidades por tanda" required error={fe.errors.unitsPerBatch}>
           <input inputMode="decimal" value={form.unitsPerBatch} onChange={(e) => setForm({ ...form, unitsPerBatch: e.target.value })} />
         </Field>
-        <Field label="Unidades por ciclo">
+        <Field label="Unidades por ciclo" required error={fe.errors.unitsPerCycle}>
           <input inputMode="decimal" value={form.unitsPerCycle} onChange={(e) => setForm({ ...form, unitsPerCycle: e.target.value })} />
         </Field>
-        <Field label="Unidades por rack">
+        <Field label="Unidades por rack" required error={fe.errors.unitsPerRack}>
           <input inputMode="decimal" value={form.unitsPerRack} onChange={(e) => setForm({ ...form, unitsPerRack: e.target.value })} />
         </Field>
-        <Field label="Curado mínimo (horas)">
+        <Field label="Curado mínimo (horas)" required error={fe.errors.minCuringHours}>
           <input inputMode="numeric" value={form.minCuringHours} onChange={(e) => setForm({ ...form, minCuringHours: e.target.value })} />
         </Field>
-        <Field label="Curado máximo (horas)">
+        <Field label="Curado máximo (horas)" required error={fe.errors.maxCuringHours}>
           <input inputMode="numeric" value={form.maxCuringHours} onChange={(e) => setForm({ ...form, maxCuringHours: e.target.value })} />
         </Field>
       </div>
       <h3>Materiales por tanda</h3>
       {lines.map((line, index) => (
         <div key={index}>
-          <Field label={`Material ${index + 1}`}>
+          <Field label={`Material ${index + 1}`} required error={fe.errors[`line-${index}-material`]}>
             <select aria-label={`Material ${index + 1}`} value={line.materialItemId} onChange={(e) => setLine(index, { materialItemId: e.target.value })}>
               <option value="">—</option>
               {materials.map((m) => (
@@ -136,7 +146,7 @@ function PrepareRecipe({ plantId, onDone }: { plantId: string; onDone: (recipeVe
               ))}
             </select>
           </Field>
-          <Field label={`Cantidad por tanda ${index + 1}`}>
+          <Field label={`Cantidad por tanda ${index + 1}`} required error={fe.errors[`line-${index}-quantity`]}>
             <input inputMode="decimal" value={line.qtyPerBatch} onChange={(e) => setLine(index, { qtyPerBatch: e.target.value })} />
           </Field>
           {lines.length > 1 ? (
@@ -146,16 +156,15 @@ function PrepareRecipe({ plantId, onDone }: { plantId: string; onDone: (recipeVe
           ) : null}
         </div>
       ))}
-      <div className="actions">
+      <ErrorBox error={prepare.error} />
+      <div className="actions form-actions">
         <button type="button" onClick={() => setLines([...lines, { materialItemId: "", qtyPerBatch: "" }])}>
           Agregar material
         </button>
-        <button type="submit" disabled={prepare.busy}>
+        <button type="submit" className="primary" disabled={prepare.busy}>
           Preparar receta
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
-      <ErrorBox error={prepare.error} />
     </form>
   );
 }
@@ -210,7 +219,7 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay recetas.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Producto</th>
@@ -245,7 +254,7 @@ export default function Page() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

@@ -40,7 +40,7 @@ function AuthorizationChoice({ partyId, value, onChange }: { partyId: string; va
 export default function Page() {
   const { companyId, can } = useSession();
   const router = useRouter();
-  const create = useCommand("create-invoice", "/api/v1/companies/{companyId}/sales/create-invoice-from-deliveries");
+  const create = useCommand("create-invoice", "/api/v1/companies/{companyId}/sales/create-invoice-from-deliveries", (_r, doc) => (doc ? `Factura ${doc} creada en borrador.` : "Factura creada en borrador."));
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [authorizations, setAuthorizations] = useState<Record<string, string>>({});
   const { data, error } = useLoad(can("sales:read") ? () => query("/api/v1/companies/{companyId}/sales/billable-deliveries", { path: { companyId } }) : null, [companyId]);
@@ -61,7 +61,7 @@ export default function Page() {
         return (
           <section key={partyId}>
             <h2>{name}</h2>
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th />
@@ -69,8 +69,8 @@ export default function Page() {
                   <th>Pedido</th>
                   <th>Producto</th>
                   <th className="num">Por facturar</th>
-                  <th className="num">Precio</th>
-                  <th className="num">Neto</th>
+                  <th className="num">Precio (RD$)</th>
+                  <th className="num">Neto (RD$)</th>
                 </tr>
               </thead>
               <tbody>
@@ -86,7 +86,7 @@ export default function Page() {
                     </td>
                     <td className="mono">{l.deliveryNo}</td>
                     <td className="mono">{l.orderNo}</td>
-                    <td>{l.itemCode}</td>
+                    <td className="wrap">{l.itemCode}</td>
                     <td className="num">
                       {formatQuantity(l.qtyBillable)} {l.uom}
                     </td>
@@ -99,9 +99,10 @@ export default function Page() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
             {can("invoice:create") ? <AuthorizationChoice partyId={partyId} value={authorizations[partyId] ?? ""} onChange={(id) => setAuthorizations({ ...authorizations, [partyId]: id })} /> : null}
             {can("invoice:create") ? (
+              <div className="actions">
               <button
                 type="button"
                 className="primary"
@@ -115,6 +116,7 @@ export default function Page() {
               >
                 Crear factura con {chosen.length} línea(s)
               </button>
+              </div>
             ) : null}
           </section>
         );

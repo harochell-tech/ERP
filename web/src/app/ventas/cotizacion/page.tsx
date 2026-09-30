@@ -6,7 +6,7 @@ import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
 import { QuoteStatusBadge } from "@/components/QuoteStatus";
-import { ErrorBox, Loading, Money, NoPermission, ReasonAction } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
 import { addDays, DELIVERY_TERMS, formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labels";
 import { DEFAULT_QUOTE_VALIDITY_DAYS, quoteActions, quoteStatusLabel } from "@/lib/quotes";
@@ -23,7 +23,7 @@ type Quote = Schemas["QuoteDetail"];
 
 function CopyAction({ quoteId, busy }: { quoteId: string; busy: boolean }) {
   const router = useRouter();
-  const copy = useCommand(`copy-quote:${quoteId}`, "/api/v1/companies/{companyId}/sales/copy-quote");
+  const copy = useCommand(`copy-quote:${quoteId}`, "/api/v1/companies/{companyId}/sales/copy-quote", (_, doc) => (doc ? `Copia ${doc} creada en borrador.` : "Copia de la cotización creada en borrador."));
   const [open, setOpen] = useState(false);
   const [validUntil, setValidUntil] = useState(() => addDays(todayInDominicanRepublic(), DEFAULT_QUOTE_VALIDITY_DAYS));
   if (!open) {
@@ -36,8 +36,10 @@ function CopyAction({ quoteId, busy }: { quoteId: string; busy: boolean }) {
   return (
     <span className="inline-form">
       <label className="field">
-        <span>Vigente hasta (copia)</span>
-        <input type="date" aria-label="Vigente hasta (copia)" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+        <span className="is-required">
+          Vigente hasta (copia)
+        </span>
+        <input type="date" aria-label="Vigente hasta (copia)" aria-required value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
       </label>
       <button
         type="button"
@@ -68,13 +70,13 @@ function Actions({ quote, onDone }: { quote: Quote; onDone: () => void }) {
   const target = { quoteId: h.quoteId, expectedVersion: h.version };
   const approvalPending = h.specialPrices && !quote.priceApprovalCurrent;
   const actions = quoteActions(h.status, h.expired, approvalPending, can);
-  const submit = useCommand(`submit-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/submit-quote-for-approval");
-  const approve = useCommand(`approve-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/approve-quote-prices");
-  const giveBack = useCommand(`return-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/return-quote-to-draft");
-  const send = useCommand(`send-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/send-quote");
-  const lost = useCommand(`lost-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/mark-quote-lost");
-  const cancel = useCommand(`cancel-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/cancel-quote");
-  const convert = useCommand(`convert-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/convert-quote");
+  const submit = useCommand(`submit-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/submit-quote-for-approval", `Cotización ${h.quoteNo} enviada a aprobación de precios.`);
+  const approve = useCommand(`approve-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/approve-quote-prices", `Precios de la cotización ${h.quoteNo} aprobados.`);
+  const giveBack = useCommand(`return-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/return-quote-to-draft", `Cotización ${h.quoteNo} devuelta a borrador.`);
+  const send = useCommand(`send-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/send-quote", `Cotización ${h.quoteNo} marcada como enviada al cliente.`);
+  const lost = useCommand(`lost-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/mark-quote-lost", `Cotización ${h.quoteNo} marcada como perdida.`);
+  const cancel = useCommand(`cancel-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/cancel-quote", `Cotización ${h.quoteNo} cancelada.`);
+  const convert = useCommand(`convert-quote:${h.quoteId}`, "/api/v1/companies/{companyId}/sales/convert-quote", (_, doc) => (doc ? `Cotización ${h.quoteNo} convertida en el pedido ${doc}.` : `Cotización ${h.quoteNo} convertida en pedido.`));
   const busy = submit.busy || approve.busy || giveBack.busy || send.busy || lost.busy || cancel.busy || convert.busy;
   const after = (response: unknown) => response && onDone();
   return (
@@ -96,32 +98,57 @@ function Actions({ quote, onDone }: { quote: Quote; onDone: () => void }) {
           </button>
         ) : null}
         {actions.includes("APPROVE") ? (
-          <button type="button" className="primary" disabled={busy} onClick={async () => after(await approve.run(target))}>
-            Aprobar precios
-          </button>
-        ) : null}
-        {actions.includes("RETURN") ? <ReasonAction label="Devolver a borrador" busy={busy} onConfirm={async (reason) => after(await giveBack.run({ ...target, reason }))} /> : null}
-        {actions.includes("CONVERT") ? (
-          <button
-            type="button"
+          <ConfirmAction
+            label="Aprobar precios"
             className="primary"
-            disabled={busy}
-            onClick={async () => {
+            busy={busy}
+            stepUp
+            consequence={`Los precios por debajo de la lista de la cotización ${h.quoteNo} quedan aprobados y el Vendedor podrá enviarla al cliente y convertirla en pedido a esos precios.`}
+            onConfirm={async () => after(await approve.run(target))}
+          />
+        ) : null}
+        {actions.includes("RETURN") ? (
+          <ReasonAction
+            label="Devolver a borrador"
+            busy={busy}
+            consequence={`La cotización ${h.quoteNo} vuelve a borrador para que el Vendedor corrija los precios.`}
+            onConfirm={async (reason) => after(await giveBack.run({ ...target, reason }))}
+          />
+        ) : null}
+        {actions.includes("CONVERT") ? (
+          <ConfirmAction
+            label="Convertir en pedido"
+            className="primary"
+            busy={busy}
+            consequence={`Se crea un pedido en borrador con las líneas y los precios de la cotización ${h.quoteNo}, y la cotización queda convertida (no se puede volver a convertir).`}
+            onConfirm={async () => {
               const response = await convert.run(target);
               if (response) {
                 router.push(`/ventas/pedido/?id=${response.resultRef}`);
               }
             }}
-          >
-            Convertir en pedido
-          </button>
+          />
         ) : null}
         <Link className="button" href={`/ventas/cotizacion/imprimir/?id=${h.quoteId}`}>
           Imprimir cotización
         </Link>
         {actions.includes("COPY") ? <CopyAction quoteId={h.quoteId} busy={busy} /> : null}
-        {actions.includes("LOST") ? <ReasonAction label="Marcar perdida" busy={busy} onConfirm={async (reason) => after(await lost.run({ ...target, reason }))} /> : null}
-        {actions.includes("CANCEL") ? <ReasonAction label="Cancelar cotización" busy={busy} onConfirm={async (reason) => after(await cancel.run({ ...target, reason }))} /> : null}
+        {actions.includes("LOST") ? (
+          <ReasonAction
+            label="Marcar perdida"
+            busy={busy}
+            consequence={`La cotización ${h.quoteNo} queda cerrada como perdida y ya no se podrá convertir en pedido. No se puede deshacer.`}
+            onConfirm={async (reason) => after(await lost.run({ ...target, reason }))}
+          />
+        ) : null}
+        {actions.includes("CANCEL") ? (
+          <ReasonAction
+            label="Cancelar cotización"
+            busy={busy}
+            consequence={`La cotización ${h.quoteNo} queda cancelada y ya no se podrá enviar ni convertir. No se puede deshacer.`}
+            onConfirm={async (reason) => after(await cancel.run({ ...target, reason }))}
+          />
+        ) : null}
       </div>
       {h.status === "SENT" && h.expired && can("quote:manage") ? <p className="notice">La cotización está vencida: cópiela con una nueva vigencia para ofrecerla de nuevo.</p> : null}
       {h.status === "DRAFT" && approvalPending && can("quote:manage") ? (
@@ -133,7 +160,7 @@ function Actions({ quote, onDone }: { quote: Quote; onDone: () => void }) {
 }
 
 function QuoteDetail() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const id = useSearchParams().get("id") ?? "";
   const { data, error, reload } = useLoad(
     can("sales:read") && id ? () => query("/api/v1/companies/{companyId}/sales/quotes/{quoteId}", { path: { companyId, quoteId: id } }) : null,
@@ -163,7 +190,7 @@ function QuoteDetail() {
         </dd>
         <dt>Planta · entrega</dt>
         <dd>
-          {h.plantCode} · {DELIVERY_TERMS[h.deliveryTermCode] ?? h.deliveryTermCode}
+          {plantName(h.plantCode)} · {DELIVERY_TERMS[h.deliveryTermCode] ?? h.deliveryTermCode}
           {data.siteAddress ? ` · obra: ${data.siteAddress}` : ""}
         </dd>
         {data.customerRef ? (
@@ -218,16 +245,16 @@ function QuoteDetail() {
       </dl>
       <Actions quote={data} onDone={reload} />
 
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th className="num">#</th>
             <th>Producto</th>
             <th>Unidad</th>
             <th className="num">Cantidad</th>
-            <th className="num">Precio de lista</th>
-            <th className="num">Precio cotizado</th>
-            <th className="num">Neto</th>
+            <th className="num">Precio de lista (RD$)</th>
+            <th className="num">Precio cotizado (RD$)</th>
+            <th className="num">Neto (RD$)</th>
             <th />
           </tr>
         </thead>
@@ -253,14 +280,14 @@ function QuoteDetail() {
             </tr>
           ))}
           <tr>
-            <th colSpan={6}>Total neto (sin ITBIS)</th>
+            <th colSpan={6}>Total neto (sin ITBIS, RD$)</th>
             <td className="num">
               <Money value={h.totalNet} testId="quote-total" />
             </td>
             <td />
           </tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h2>Aprobación de precios</h2>
       {data.priceApprovedBy ? (

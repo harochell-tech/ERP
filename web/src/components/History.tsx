@@ -8,7 +8,7 @@ export function History({ history }: { history: Schemas["StateChange"][] }) {
   return (
     <>
       <h2>Historial</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>Fecha</th>
@@ -24,12 +24,12 @@ export function History({ history }: { history: Schemas["StateChange"][] }) {
               <td>{formatDateTime(h.at)}</td>
               <td>{statusLabel(h.from)}</td>
               <td>{statusLabel(h.to)}</td>
-              <td>{h.by ?? "—"}</td>
-              <td>{h.reason ?? ""}</td>
+              <td className="wrap">{h.by ?? "—"}</td>
+              <td className="wrap">{h.reason ?? ""}</td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { PlantSelect, useChosenPlant, usePlants } from "@/components/Production";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatTime, toApiTime } from "@/lib/production";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -15,25 +15,31 @@ function CreateMachine({ plantId, onDone }: { plantId: string; onDone: () => voi
   const create = useCommand("create-machine", "/api/v1/companies/{companyId}/manufacturing/create-machine");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const fe = useFieldErrors<"code" | "name">();
   return (
     <form
       className="inline-form"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await create.run({ plantId, code: code.trim().toUpperCase(), name: name.trim() })) {
+        if (!fe.check({ code: code.trim() === "" && "Indique el código de la máquina.", name: name.trim() === "" && "Indique el nombre de la máquina." })) {
+          return;
+        }
+        const machineCode = code.trim().toUpperCase();
+        if (await create.run({ plantId, code: machineCode, name: name.trim() }, undefined, `Máquina ${machineCode} creada.`)) {
           setCode("");
           setName("");
           onDone();
         }
       }}
     >
-      <Field label="Código de la máquina">
-        <input value={code} onChange={(e) => setCode(e.target.value)} required />
+      <Field label="Código de la máquina" required error={fe.errors.code}>
+        <input value={code} onChange={(e) => setCode(e.target.value)} />
       </Field>
-      <Field label="Nombre de la máquina">
-        <input value={name} onChange={(e) => setName(e.target.value)} required />
+      <Field label="Nombre de la máquina" required error={fe.errors.name}>
+        <input value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <button type="submit" disabled={create.busy}>
+      <button type="submit" className="primary" disabled={create.busy}>
         Crear máquina
       </button>
       <ErrorBox error={create.error} />
@@ -42,10 +48,14 @@ function CreateMachine({ plantId, onDone }: { plantId: string; onDone: () => voi
 }
 
 function MachineRow({ machine, onDone }: { machine: Schemas["MachineView"]; onDone: () => void }) {
-  const { can } = useSession();
+  const { can, plantName } = useSession();
   const id = machine.machineId;
-  const rename = useCommand(`rename-machine:${id}`, "/api/v1/companies/{companyId}/manufacturing/rename-machine");
-  const status = useCommand(`set-machine-status:${id}`, "/api/v1/companies/{companyId}/manufacturing/set-machine-status");
+  const rename = useCommand(`rename-machine:${id}`, "/api/v1/companies/{companyId}/manufacturing/rename-machine", `Máquina ${machine.code} renombrada.`);
+  const status = useCommand(
+    `set-machine-status:${id}`,
+    "/api/v1/companies/{companyId}/manufacturing/set-machine-status",
+    `Máquina ${machine.code} ${machine.status === "ACTIVE" ? "desactivada" : "activada"}.`,
+  );
   const [name, setName] = useState<string | null>(null);
   const busy = rename.busy || status.busy;
   const target = { plantId: machine.plantId, machineId: id, expectedVersion: machine.version };
@@ -53,7 +63,7 @@ function MachineRow({ machine, onDone }: { machine: Schemas["MachineView"]; onDo
     <tr>
       <td className="mono">{machine.code}</td>
       <td>{name === null ? machine.name : <input aria-label={`Nombre ${machine.code}`} value={name} onChange={(e) => setName(e.target.value)} />}</td>
-      <td>{machine.plantCode}</td>
+      <td>{plantName(machine.plantId, machine.plantCode)}</td>
       <td>
         <StatusBadge status={machine.status} />
       </td>
@@ -64,13 +74,20 @@ function MachineRow({ machine, onDone }: { machine: Schemas["MachineView"]; onDo
               <button type="button" onClick={() => setName(machine.name)}>
                 Cambiar nombre
               </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={async () => (await status.run({ ...target, status: machine.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })) && onDone()}
-              >
-                {machine.status === "ACTIVE" ? "Desactivar" : "Activar"}
-              </button>
+              {machine.status === "ACTIVE" ? (
+                <ConfirmAction
+                  label="Desactivar"
+                  title={`¿Desactivar la máquina ${machine.code}?`}
+                  consequence="No se podrán iniciar corridas nuevas en esta máquina hasta que se active otra vez. Las corridas registradas no cambian."
+                  danger
+                  busy={busy}
+                  onConfirm={async () => (await status.run({ ...target, status: "INACTIVE" })) && onDone()}
+                />
+              ) : (
+                <button type="button" disabled={busy} onClick={async () => (await status.run({ ...target, status: "ACTIVE" })) && onDone()}>
+                  Activar
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -101,48 +118,56 @@ function MachineRow({ machine, onDone }: { machine: Schemas["MachineView"]; onDo
 function DefineShift({ plantId, onDone }: { plantId: string; onDone: () => void }) {
   const define = useCommand("define-shift", "/api/v1/companies/{companyId}/manufacturing/define-shift");
   const [form, setForm] = useState({ code: "", startsAt: "", endsAt: "" });
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<"code" | "startsAt" | "endsAt">();
   return (
     <form
       className="inline-form"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
         const startsAt = toApiTime(form.startsAt);
         const endsAt = toApiTime(form.endsAt);
-        if (startsAt === null || endsAt === null || startsAt === endsAt) {
-          setInvalid("Indique la hora de inicio y la de fin, distintas.");
+        const valid = fe.check({
+          code: form.code.trim() === "" && "Indique el código del turno.",
+          startsAt: startsAt === null && "Indique la hora de inicio.",
+          endsAt: endsAt === null ? "Indique la hora de fin." : startsAt === endsAt && "La hora de fin debe ser distinta de la de inicio.",
+        });
+        if (!valid || startsAt === null || endsAt === null) {
           return;
         }
-        setInvalid(null);
-        if (await define.run({ plantId, code: form.code.trim().toUpperCase(), startsAt, endsAt })) {
+        const shiftCode = form.code.trim().toUpperCase();
+        if (await define.run({ plantId, code: shiftCode, startsAt, endsAt }, undefined, `Turno ${shiftCode} definido.`)) {
           setForm({ code: "", startsAt: "", endsAt: "" });
           onDone();
         }
       }}
     >
-      <Field label="Código del turno">
-        <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+      <Field label="Código del turno" required error={fe.errors.code}>
+        <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
       </Field>
-      <Field label="Inicia">
+      <Field label="Inicia" required error={fe.errors.startsAt}>
         <input type="time" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} />
       </Field>
-      <Field label="Termina">
+      <Field label="Termina" required error={fe.errors.endsAt}>
         <input type="time" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} />
       </Field>
-      <button type="submit" disabled={define.busy}>
+      <button type="submit" className="primary" disabled={define.busy}>
         Definir turno
       </button>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={define.error} />
     </form>
   );
 }
 
 function ShiftRow({ shift, onDone }: { shift: Schemas["ShiftView"]; onDone: () => void }) {
-  const { can } = useSession();
+  const { can, plantName } = useSession();
   const id = shift.shiftId;
-  const times = useCommand(`update-shift-times:${id}`, "/api/v1/companies/{companyId}/manufacturing/update-shift-times");
-  const status = useCommand(`set-shift-status:${id}`, "/api/v1/companies/{companyId}/manufacturing/set-shift-status");
+  const times = useCommand(`update-shift-times:${id}`, "/api/v1/companies/{companyId}/manufacturing/update-shift-times", `Horario del turno ${shift.code} actualizado.`);
+  const status = useCommand(
+    `set-shift-status:${id}`,
+    "/api/v1/companies/{companyId}/manufacturing/set-shift-status",
+    `Turno ${shift.code} ${shift.status === "ACTIVE" ? "desactivado" : "activado"}.`,
+  );
   const [edit, setEdit] = useState<{ startsAt: string; endsAt: string } | null>(null);
   const busy = times.busy || status.busy;
   const target = { plantId: shift.plantId, shiftId: id, expectedVersion: shift.version };
@@ -166,7 +191,7 @@ function ShiftRow({ shift, onDone }: { shift: Schemas["ShiftView"]; onDone: () =
         )}
       </td>
       <td>{shift.crossesMidnight ? "Cruza la medianoche" : "—"}</td>
-      <td>{shift.plantCode}</td>
+      <td>{plantName(shift.plantId, shift.plantCode)}</td>
       <td>
         <StatusBadge status={shift.status} />
       </td>
@@ -177,13 +202,20 @@ function ShiftRow({ shift, onDone }: { shift: Schemas["ShiftView"]; onDone: () =
               <button type="button" onClick={() => setEdit({ startsAt: formatTime(shift.startsAt), endsAt: formatTime(shift.endsAt) })}>
                 Cambiar horario
               </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={async () => (await status.run({ ...target, status: shift.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })) && onDone()}
-              >
-                {shift.status === "ACTIVE" ? "Desactivar" : "Activar"}
-              </button>
+              {shift.status === "ACTIVE" ? (
+                <ConfirmAction
+                  label="Desactivar"
+                  title={`¿Desactivar el turno ${shift.code}?`}
+                  consequence="No se podrán iniciar corridas nuevas en este turno hasta que se active otra vez. Las corridas registradas no cambian."
+                  danger
+                  busy={busy}
+                  onConfirm={async () => (await status.run({ ...target, status: "INACTIVE" })) && onDone()}
+                />
+              ) : (
+                <button type="button" disabled={busy} onClick={async () => (await status.run({ ...target, status: "ACTIVE" })) && onDone()}>
+                  Activar
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -255,7 +287,7 @@ export default function Page() {
           {data.machines.length === 0 ? (
             <p className="muted">No hay máquinas en la planta.</p>
           ) : (
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th>Código</th>
@@ -270,14 +302,14 @@ export default function Page() {
                   <MachineRow key={`${m.machineId}:${m.version}`} machine={m} onDone={reload} />
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
           <h2>Turnos</h2>
           {can("production_master:manage") ? <DefineShift plantId={plantId} onDone={reload} /> : null}
           {data.shifts.length === 0 ? (
             <p className="muted">No hay turnos en la planta.</p>
           ) : (
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th>Código</th>
@@ -294,7 +326,7 @@ export default function Page() {
                   <ShiftRow key={`${s.shiftId}:${s.version}`} shift={s} onDone={reload} />
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </>
       )}

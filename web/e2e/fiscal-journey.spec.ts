@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { confirmAction, nav, signIn } from "./support";
 
 // FIS1-05 (E-FIS1-05-11): a CONFOTUR exempt sale through the UI. Facturación registers an authorization for Constructora Uno
 // (BLOQUE-6, 100 blocks / 5,000.00) with a unique certificate, attaches the DGII certificate and submits it; the Especialista fiscal
@@ -7,15 +8,6 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 // consumption. The journey opens its own order and delivery by URL and uses its own certificate, so other journeys' data never
 // matters (and it leaves nothing open for them: the order is fully delivered and invoiced).
 
-async function signIn(browser: Browser, account: string): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto("/");
-  await page.getByRole("link", { name: "Iniciar sesión" }).click();
-  await page.getByRole("link", { name: account, exact: true }).click();
-  await expect(page.getByTestId("user-email")).toBeVisible();
-  return page;
-}
 
 function dominicanNow(offsetMinutes = 0, offsetDays = 0): { date: string; dateTime: string } {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -44,7 +36,7 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
 
   // Facturación registers the authorization, attaches the DGII certificate and submits it.
   const billing = await signIn(browser, "Facturación");
-  await billing.getByRole("link", { name: "Autorizaciones fiscales" }).click();
+  await nav(billing, "Autorizaciones fiscales");
   await billing.getByRole("link", { name: "Registrar autorización" }).click();
   await expect(billing.getByRole("heading", { name: "Registrar autorización fiscal" })).toBeVisible();
   await billing.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
@@ -72,12 +64,12 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   const specialist = await signIn(browser, "Especialista fiscal");
   await expect(specialist.getByRole("link", { name: "Autorizaciones por verificar" })).toBeVisible();
   await specialist.goto(authorizationUrl);
-  await specialist.getByRole("button", { name: "Verificar" }).click();
+  await confirmAction(specialist, "Verificar");
   await expect(specialist.getByTestId("authorization-status")).toHaveText("Activo");
 
   // The Vendedor creates the order (40 blocks at 50.00) and opens its proforma.
   const seller = await signIn(browser, "Vendedor");
-  await seller.getByRole("link", { name: "Pedidos", exact: true }).click();
+  await nav(seller, "Pedidos");
   await seller.getByRole("link", { name: "Nuevo pedido" }).click();
   await seller.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
   await seller.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
@@ -116,7 +108,7 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await expect(delivery).toHaveText("Entregado");
 
   // Facturación invoices the delivery under the authorization: e-CF 44, ITBIS 0.00.
-  await billing.getByRole("link", { name: "Por facturar" }).click();
+  await nav(billing, "Por facturar");
   await billing.getByRole("checkbox", { name: `Facturar ${deliveryNo} BLOQUE-6` }).check();
   const choice = billing.getByLabel("Autorización fiscal (e-CF 44)");
   const option = choice.locator("option", { hasText: certificate });
@@ -124,7 +116,7 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await billing.getByRole("button", { name: "Crear factura con 1 línea(s)" }).click();
   await expect(billing.getByText(/e-CF 44/).first()).toBeVisible();
   await expect(billing.getByTestId("invoice-exemption")).toContainText("Exenta — CONFOTUR");
-  await billing.getByRole("button", { name: "Emitir factura" }).click();
+  await confirmAction(billing, "Emitir factura");
   await expect(billing.getByTestId("invoice-status")).toHaveText("Confirmado");
   await expect(billing.getByTestId("invoice-total")).toHaveText("2,000.00");
   await expect(billing.getByTestId("invoice-exemption")).toContainText(certificate);

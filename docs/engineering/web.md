@@ -249,3 +249,59 @@ source alone; "Última prueba" reads "No aplica"). The withholding kind's help e
 dev seed posts a supplier invoice today), sees the header, the records (as many as the count, one classified "09"), downloads
 `606-AAAAMM.csv` (as many lines as records, 23 fields each), opens the invoice from its NCF, the IT-1 (purchase ITBIS) and IR-17
 tabs, and finds the seeded classification on Reglas fiscales. It asserts shapes, not totals, which other journeys change.
+
+## UX1-01b — mobile shell, forms, confirmations, notices and error catalogue (E-UX1-01-1…11)
+
+Wave 1 of the UI audit (2026-09-30), on top of UX1-01a (display names and plant names in the API). No API change.
+
+- **Shell (E-UX1-01-1).** Below 900 px a fixed top bar holds "☰ Menú", the screen title (its menu item, or its list's for a
+  detail page: `screenTitle`) and the company; the menu opens as a side panel over the page (backdrop, focus kept inside, Escape
+  or a tap outside or choosing an item closes it; the page behind is `inert`). The plant selector, "Actuar como", the user and
+  "Cerrar sesión" move into the panel. Menu groups fold on every width; the folded groups are remembered in `localStorage`
+  (`rochell.menu.collapsed`, wrapped in try/catch). The top bar reads "Name · main role" (`session.displayName`, the e-mail
+  until the first sign-in brings a name; the e-mail as tooltip; the role of the company's first assignment).
+- **Responsive (E-UX1-01-2).** Every table sits in `.table-wrap` and scrolls sideways inside its own box; on phones cells do not
+  wrap except `td.wrap`. Line editors use `LineTable` (`components/ui.tsx`): below 700 px each row is a card and each cell shows
+  its column header (copied into `data-label` after each render). `.form-actions` keeps a form's primary button at the bottom
+  of the screen on phones (sticky) and places it last, apart from the secondary buttons. `RowActions` folds several row buttons
+  under "Acciones" below 700 px (Curado y liberación).
+- **Names and plants (E-UX1-01-3/4).** Seguridad shows "Nombre · correo" (`personLabel`, `components/Person.tsx`). A plant reads
+  "Name (CODE)" through `plantName(idOrCode, fallback)` of the session (`lib/plants.ts`, from the session's company `plants`) or
+  `<PlantName>`. Screens that hid an approval from its preparer compare against both the e-mail and the display name, since
+  the actor fields now carry the name.
+- **Formats (E-UX1-01-5).** `formatDate` → `29/09/2026`; `formatDateTime` → `29/09/2026 11:15 p. m.` (Dominican time, built
+  from `Intl` parts); `<html lang="es-DO">`; money columns say "(RD$)" in the header and single figures use
+  `<Money currency>` ("RD$ "); quantities use `formatQuantity` (trailing zeros dropped by string handling).
+- **Forms (E-UX1-01-6).** `Field` takes `required` (a CSS asterisk with empty alternative text, so labels keep their plain text, + `aria-required`), `error` (under
+  the input, `aria-describedby`, `aria-invalid`) and `hint`; `useFieldErrors().check({...})` keeps per-field messages and
+  focuses the first invalid input; line cells use `fieldAria` + `FieldMessage`. Every create / edit form maps its former single
+  message to the fields; rules spanning the whole form (debits = credits, "at least one line") stay next to the button.
+- **Errors (E-UX1-01-7).** `lib/errors.ts` has a Spanish message for every server code: the public string constants of the
+  `*Errors` classes of the production assemblies plus `SessionService.LoginRejected` / `TestIdentityUnavailable`
+  (`tests/Rochell.ArchitectureTests/ErrorCatalogueTests.cs` fails and lists any missing code). An unknown code reads "No se pudo
+  completar (CODE)." with the server's message folded under "Detalle técnico".
+- **Confirmations (E-UX1-01-8).** `ConfirmDialog` (native modal `<dialog>`: focus inside, Escape and a tap outside cancel,
+  "Cancelar" focused first) states the consequence and, for commands whose permission requires step-up, that re-authentication
+  may follow. `ConfirmAction` wraps a button (the dialog's button reads "Confirmar: <label>"); `ReasonAction` now asks for its
+  reason in the same dialog. Wired into posting / reversing shift summaries, settling costs, closing / reopening components,
+  approving rules, policies, maps, structures, recipes, price lists, standard costs, quote prices, credit, customers and terms,
+  activating fiscal rules, deactivating accounts, machines, shifts, trucks and drivers, issuing invoices and credit notes,
+  voiding, releasing / blocking / scrapping lots, releasing payments, recognising bank charges, converting quotes, expiring
+  authorizations, verifying supplier bank accounts and authorizations, posting / reversing opening stock.
+- **Notices (E-UX1-01-9).** `ToastProvider` (`lib/toast.tsx`, in the layout, so a notice survives the navigation after a command)
+  shows a green notice for 6 s. `useCommand(formId, path, success)` / `run(body, values, success)` take the message, a text or a
+  function of the response and the document number of its result (the first "…No" field, `lib/notices.ts`); every command
+  names its document and result ("Pedido PV-000012 enviado a crédito.").
+- **Environment badge (E-UX1-01-10).** The API exposes no environment to the browser, so `lib/environment.ts` decides by host:
+  `staging.…` → "STAGING", `localhost` / `127.0.0.1` → "PRUEBA", anything else (production) → no badge.
+- **Tests (E-UX1-01-11).** `playwright.config.ts` adds the project `mobile` (390 × 844, touch) over the sales, purchase,
+  production, treasury and quote journeys, against a second dev stack on port 5191 (the journeys expect the seeded data, so the
+  two runs never share a database). `e2e/support.ts` holds the shared `signIn`, `nav` (opens "☰ Menú" on a phone),
+  `confirmAction` (presses the button and "Confirmar: <label>"), `submit` (checks the primary button is visible and tappable)
+  and `expectFits` (fails when `document.documentElement.scrollWidth` exceeds the viewport), run on every navigation and form
+  submission. Vitest: `tests/unit/ux1.test.ts` (dates, quantities, plant names, environment badge, notices, screen title) and
+  `tests/unit/ui.test.tsx` (Field wiring, confirmation dialog markup); `errors.test.ts` covers the new fallback.
+
+`useSession().isMine(actor)` is the one place a screen asks whether a shown actor (name or e-mail) is the signed-in person, to
+hide a decision the server would refuse; it is always false for a superadministrator, whose four-eyes controls are waived
+(E-ADM-2-4).
