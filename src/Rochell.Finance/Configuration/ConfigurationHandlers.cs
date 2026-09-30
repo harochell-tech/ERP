@@ -15,6 +15,81 @@ internal static class ConfigurationSql
         await using var command = Sql.Command(context.Connection, context.Transaction, "SELECT user_id FROM iam.session WHERE session_id = @s", ("s", context.SessionId));
         return (Guid)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
     }
+
+    /// <summary>A mapping prepared by the CLI has no event yet; one prepared on screen has its AccountRoleMapPrepared.</summary>
+    public static async Task<long> NextMapEventVersionAsync(CommandContext context, Guid mapId, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT max(aggregate_version) FROM core.domain_event WHERE company_id = @c AND aggregate_type = 'AccountRoleMap' AND aggregate_id = @m",
+            ("c", context.CompanyId),
+            ("m", mapId));
+        return (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as long? ?? 0) + 1;
+    }
+}
+
+[RequiresPermission("account_role_map:prepare")]
+public sealed class PrepareAccountRoleMapHandler : ICommandHandler<PrepareAccountRoleMap>
+{
+    private static readonly string[] Categories = ["CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA"];
+
+    public string CommandType => "Finance.PrepareAccountRoleMap";
+
+    public async Task<string> HandleAsync(PrepareAccountRoleMap command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        if (command.ItemCategory is not null && !Categories.Contains(command.ItemCategory, StringComparer.Ordinal))
+        {
+            throw new DomainException(FinanceErrors.AccountRoleInvalid, $"Unknown item category {command.ItemCategory}.");
+        }
+
+        await using (var role = Sql.Command(
+            context.Connection, context.Transaction, "SELECT is_control FROM fin.account_role WHERE role_code = @r AND role_code <> 'MANUAL_ADJUSTMENT'", ("r", command.AccountRole)))
+        await using (var account = Sql.Command(
+            context.Connection, context.Transaction, "SELECT is_control FROM fin.account WHERE company_id = @c AND account_id = @a AND status = 'ACTIVE'", ("c", context.CompanyId), ("a", command.AccountId)))
+        {
+            var roleControl = await role.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as bool?
+                ?? throw new DomainException(FinanceErrors.AccountRoleInvalid, $"Account role {command.AccountRole} does not exist or is never mapped.");
+            var accountControl = await account.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as bool?
+                ?? throw new DomainException(FinanceErrors.MapAccountInvalid, "The account does not exist or is not active.");
+            if (roleControl != accountControl)
+            {
+                throw new DomainException(FinanceErrors.MapAccountInvalid, "A control role maps only to a control account, and a regular role only to a regular account (E-PR05-5).");
+            }
+        }
+
+        var preparer = await ConfigurationSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
+        var mapId = context.ResultRef;
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(
+                "AccountRoleMapPrepared",
+                1,
+                "AccountRoleMap",
+                mapId,
+                1,
+                JsonSerializer.Serialize(new { mapId, accountRole = command.AccountRole, itemCategory = command.ItemCategory, accountId = command.AccountId, effectiveFrom = command.EffectiveFrom }),
+                Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO fin.account_role_map (map_id, company_id, account_role, item_category, account_id, effective_from, prepared_by, status)
+            VALUES (@m, @c, @r, @cat, @a, @from, @by, 'DRAFT')
+            """,
+            cancellationToken,
+            ("m", mapId),
+            ("c", context.CompanyId),
+            ("r", command.AccountRole),
+            ("cat", command.ItemCategory),
+            ("a", command.AccountId),
+            ("from", command.EffectiveFrom),
+            ("by", preparer)).ConfigureAwait(false);
+        await context.AppendStateAsync("AccountRoleMap", mapId, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { mapId, status = "DRAFT" });
+    }
 }
 
 [RequiresPermission("account_role_map:approve", StepUp = true)]
@@ -99,7 +174,7 @@ public sealed class ApproveAccountRoleMapHandler : ICommandHandler<ApproveAccoun
         }
 
         var eventId = await context.AppendEventAsync(
-            new EventDraft("AccountRoleMapApproved", 1, "AccountRoleMap", command.MapId, 1, JsonSerializer.Serialize(new { mapId = command.MapId, accountRole = role, itemCategory = category, approvedBy = approver }), Publish: true),
+            new EventDraft("AccountRoleMapApproved", 1, "AccountRoleMap", command.MapId, await ConfigurationSql.NextMapEventVersionAsync(context, command.MapId, cancellationToken).ConfigureAwait(false), JsonSerializer.Serialize(new { mapId = command.MapId, accountRole = role, itemCategory = category, approvedBy = approver }), Publish: true),
             cancellationToken).ConfigureAwait(false);
         try
         {

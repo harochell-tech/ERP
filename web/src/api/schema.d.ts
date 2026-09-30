@@ -123,6 +123,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/master-data/update-company-legal-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UpdateCompanyLegalName"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/master-data/update-plant-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UpdatePlantName"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/master-data/create-supplier": {
         parameters: {
             query?: never;
@@ -805,6 +837,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ApproveValuationResidualAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/finance/prepare-account-role-map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PrepareAccountRoleMap"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2763,6 +2811,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/master-data/company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCompany"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/master-data/plants": {
         parameters: {
             query?: never;
@@ -2915,6 +2979,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetSupplierInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/reconciliation/setup-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSetupStatus"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3819,6 +3899,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/finance/account-roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListAccountRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/finance/posting-rules": {
         parameters: {
             query?: never;
@@ -4171,6 +4267,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/identity/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/identity/users": {
         parameters: {
             query?: never;
@@ -4252,6 +4364,9 @@ export interface components {
         AccountList: {
             items: components["schemas"]["AccountView"][];
         };
+        AccountRoleList: {
+            items: components["schemas"]["AccountRoleView"][];
+        };
         AccountRoleMapList: {
             items: components["schemas"]["AccountRoleMapView"][];
         };
@@ -4269,6 +4384,15 @@ export interface components {
             status: string;
             preparedBy: null | string;
             approvedBy: null | string;
+            accountRoleName?: null | string;
+        };
+        AccountRoleView: {
+            roleCode: string;
+            name: null | string;
+            description: string;
+            isControl: boolean;
+            usedByActiveRule: boolean;
+            mappedToday: boolean;
         };
         AccountView: {
             /** Format: uuid */
@@ -4288,6 +4412,9 @@ export interface components {
             description: string;
             definitions: components["schemas"]["PolicyParameterDefinitionView"][];
             versions: components["schemas"]["PolicyVersionView"][];
+            name?: null | string;
+            preparerRoles?: null | string[];
+            approverRoles?: null | string[];
         };
         ActAsRequest: {
             /** Format: uuid */
@@ -4806,6 +4933,19 @@ export interface components {
             resultRef: string;
             replayed: boolean;
             result: components["schemas"]["JsonElement"];
+        };
+        CompanyPlantView: {
+            /** Format: uuid */
+            plantId: string;
+            code: string;
+            name: null | string;
+        };
+        CompanyView: {
+            /** Format: uuid */
+            companyId: string;
+            rnc: string;
+            legalName: string;
+            plants: components["schemas"]["CompanyPlantView"][];
         };
         ComponentStateView: {
             component: string;
@@ -6467,6 +6607,10 @@ export interface components {
             maxValue: null | string;
             allowedValues: null | string[];
             description: string;
+            label?: null | string;
+            unit?: null | string;
+            example?: null | string;
+            affects?: null | string;
         };
         PolicyVersionView: {
             /** Format: uuid */
@@ -6517,6 +6661,14 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        PostingRuleLineView: {
+            code: string;
+            side: string;
+            accountRole: string;
+            accountRoleName: null | string;
+            amount: string;
+            explanation: null | string;
+        };
         PostingRuleList: {
             items: components["schemas"]["PostingRuleVersionView"][];
         };
@@ -6532,6 +6684,15 @@ export interface components {
             /** Format: date */
             effectiveTo: null | string;
             approvedBy: null | string;
+            lines?: null | components["schemas"]["PostingRuleLineView"][];
+        };
+        PrepareAccountRoleMap: {
+            accountRole: string;
+            itemCategory: null | string;
+            /** Format: uuid */
+            accountId: string;
+            /** Format: date */
+            effectiveFrom: string;
         };
         PrepareAccountingPolicyVersion: {
             policyCode: string;
@@ -7750,6 +7911,9 @@ export interface components {
             lastImport: null | components["schemas"]["RncRegistryImportView"];
             discrepancies: components["schemas"]["RncDiscrepancy"][];
         };
+        RoleList: {
+            items: components["schemas"]["RoleView"][];
+        };
         RoleRequestList: {
             items: components["schemas"]["RoleRequestView"][];
             /** Format: int32 */
@@ -7781,6 +7945,12 @@ export interface components {
             rejectedAt: null | string;
             rejectionReason: null | string;
             userDisplayName?: null | string;
+        };
+        RoleView: {
+            code: string;
+            name: string;
+            description: null | string;
+            permissions: string[];
         };
         RunFiscalRuleTests: {
             /** Format: uuid */
@@ -7997,6 +8167,18 @@ export interface components {
             collectorId: string;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        SetupStatus: {
+            steps: components["schemas"]["SetupStep"][];
+            complete: boolean;
+        };
+        SetupStep: {
+            /** Format: int32 */
+            order: number;
+            code: string;
+            area: string;
+            status: string;
+            missing: string[];
         };
         ShiftList: {
             items: components["schemas"]["ShiftView"][];
@@ -8349,6 +8531,9 @@ export interface components {
             name: string;
             accountClass: string;
         };
+        UpdateCompanyLegalName: {
+            legalName: string;
+        };
         UpdateCustomer: {
             /** Format: uuid */
             partyId: string;
@@ -8413,6 +8598,11 @@ export interface components {
             closeComponent: string;
             autoReverse: boolean;
             lines: components["schemas"]["ManualJournalLine"][];
+        };
+        UpdatePlantName: {
+            /** Format: uuid */
+            plantId: string;
+            name: string;
         };
         UpdatePreparedPayment: {
             /** Format: uuid */
@@ -8775,6 +8965,158 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateCompanyLegalName: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCompanyLegalName"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdatePlantName: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePlantName"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11993,6 +12335,82 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ApproveValuationResidualAdjustment"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PrepareAccountRoleMap: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareAccountRoleMap"];
             };
         };
         responses: {
@@ -21289,6 +21707,55 @@ export interface operations {
             };
         };
     };
+    GetCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListPlants: {
         parameters: {
             query?: {
@@ -21830,6 +22297,55 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSetupStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupStatus"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -24933,6 +25449,55 @@ export interface operations {
             };
         };
     };
+    ListAccountRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountRoleList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListPostingRules: {
         parameters: {
             query?: never;
@@ -26083,6 +26648,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BankStatementLineList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleList"];
                 };
             };
             /** @description Bad Request */

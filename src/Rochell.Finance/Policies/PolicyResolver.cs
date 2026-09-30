@@ -37,7 +37,10 @@ public sealed record ResolvedPolicy(Guid PolicyVersionId, string PolicyCode, int
     public string Text(string param) => Value(param);
 
     private string Value(string param)
-        => Values.TryGetValue(param, out var value) ? value : throw new InvalidOperationException($"Policy {PolicyCode} v{Version} has no parameter {param}.");
+        => Values.TryGetValue(param, out var value)
+            ? value
+            : throw new DomainException(
+                FinanceErrors.PostingPrerequisiteMissing, $"The ACTIVE {PolicyCode} accounting policy (version {Version}) has no {param}: prepare a new version (E-UX2-4).");
 }
 
 /// <summary>

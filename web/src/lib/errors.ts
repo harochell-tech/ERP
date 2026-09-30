@@ -54,6 +54,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   ALREADY_REVERSED: "El documento ya fue reversado.",
   EVIDENCE_REQUIRED: "Indique la evidencia (ticket corregido, foto o registro).",
   FOUR_EYES_REQUIRED: "Otra persona debe aprobar esta acción.",
+  ACCOUNT_ROLE_INVALID: "Ese rol de cuenta o categoría no existe o no se puede mapear.",
+  MAP_ACCOUNT_INVALID: "La cuenta no existe, está inactiva o no corresponde al rol: un rol de control va a una cuenta de control y un rol normal a una cuenta normal.",
   // FIN-1
   ACCOUNT_DUPLICATE: "Ya existe una cuenta con ese código.",
   ACCOUNT_INVALID: "La cuenta no es válida: revise código, nombre y clase.",

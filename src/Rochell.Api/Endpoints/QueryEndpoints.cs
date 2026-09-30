@@ -7,6 +7,7 @@ using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
 using Rochell.Identity.Queries;
 using Rochell.Manufacturing.Queries;
+using Rochell.MasterData.Company;
 using Rochell.MasterData.Queries;
 using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
@@ -38,12 +39,12 @@ public static class QueryEndpoints
 
     public static IReadOnlyList<Type> Handlers { get; } =
     [
-        typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler), typeof(GetRncHandler), typeof(GetRncRegistryStatusHandler),
+        typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler), typeof(GetCompanyHandler), typeof(GetRncHandler), typeof(GetRncRegistryStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
         typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(GetSupplierInvoiceHandler),
-        typeof(ListPeriodsHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
+        typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
-        typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
+        typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
@@ -55,7 +56,7 @@ public static class QueryEndpoints
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
-        typeof(ListUsersHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
+        typeof(ListUsersHandler), typeof(ListRolesHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
     public static void MapQueryEndpoints(this RouteGroupBuilder company)
@@ -68,6 +69,9 @@ public static class QueryEndpoints
         masterData.MapGet("/items", (HttpContext http, Guid companyId, Guid? plantId, string? status, int? limit, int? offset, ListItemsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListItems(companyId, s, plantId, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<ItemList>(nameof(ListItems));
+        masterData.MapGet("/company", (HttpContext http, Guid companyId, GetCompanyHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetCompany(companyId, s), handler, ct))
+            .Describe<CompanyView>(nameof(GetCompany));
         masterData.MapGet("/plants", (HttpContext http, Guid companyId, Guid? plantId, ListPlantsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPlants(companyId, s, plantId), handler, ct))
             .Describe<PlantList>(nameof(ListPlants));
@@ -103,6 +107,9 @@ public static class QueryEndpoints
             .Describe<SupplierInvoiceDetail>(nameof(GetSupplierInvoice), notFound: true);
 
         var reconciliation = company.MapGroup("/reconciliation").WithTags("Reconciliation");
+        reconciliation.MapGet("/setup-status", (HttpContext http, Guid companyId, GetSetupStatusHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetSetupStatus(companyId, s), handler, ct))
+            .Describe<SetupStatus>(nameof(GetSetupStatus));
         reconciliation.MapGet("/periods", (HttpContext http, Guid companyId, int year, ListPeriodsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPeriods(companyId, s, year), handler, ct))
             .Describe<PeriodList>(nameof(ListPeriods));
@@ -285,6 +292,9 @@ public static class QueryEndpoints
         finance.MapGet("/account-role-maps", (HttpContext http, Guid companyId, string? status, ListAccountRoleMapsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListAccountRoleMaps(companyId, s, status), handler, ct))
             .Describe<AccountRoleMapList>(nameof(ListAccountRoleMaps));
+        finance.MapGet("/account-roles", (HttpContext http, Guid companyId, ListAccountRolesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListAccountRoles(companyId, s), handler, ct))
+            .Describe<AccountRoleList>(nameof(ListAccountRoles));
         finance.MapGet("/posting-rules", (HttpContext http, Guid companyId, ListPostingRulesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPostingRules(companyId, s), handler, ct))
             .Describe<PostingRuleList>(nameof(ListPostingRules));
@@ -358,6 +368,9 @@ public static class QueryEndpoints
 
         // E-UI01-3/4: users, role change requests and the digests written to WORM.
         var identity = company.MapGroup("/identity").WithTags("Identity");
+        identity.MapGet("/roles", (HttpContext http, Guid companyId, ListRolesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListRoles(companyId, s), handler, ct))
+            .Describe<RoleList>(nameof(ListRoles));
         identity.MapGet("/users", (HttpContext http, Guid companyId, ListUsersHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListUsers(companyId, s), handler, ct))
             .Describe<UserList>(nameof(ListUsers));

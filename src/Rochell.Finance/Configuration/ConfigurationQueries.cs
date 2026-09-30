@@ -47,7 +47,8 @@ public sealed record AccountRoleMapView(
     DateOnly? EffectiveTo,
     string Status,
     string? PreparedBy,
-    string? ApprovedBy);
+    string? ApprovedBy,
+    string? AccountRoleName = null);
 
 public sealed record AccountRoleMapList(IReadOnlyList<AccountRoleMapView> Items);
 
@@ -64,9 +65,10 @@ public sealed class ListAccountRoleMapsHandler : IQueryHandler<ListAccountRoleMa
             context.Connection,
             context.Transaction,
             """
-            SELECT m.map_id, m.account_role, m.item_category, a.code, a.name, m.effective_from, m.effective_to, m.status, coalesce(p.display_name, p.email), coalesce(ap.display_name, ap.email)
+            SELECT m.map_id, m.account_role, m.item_category, a.code, a.name, m.effective_from, m.effective_to, m.status, coalesce(p.display_name, p.email), coalesce(ap.display_name, ap.email), ar.name
             FROM fin.account_role_map m
             JOIN fin.account a ON a.account_id = m.account_id
+            JOIN fin.account_role ar ON ar.role_code = m.account_role
             JOIN iam.user p ON p.user_id = m.prepared_by
             LEFT JOIN iam.user ap ON ap.user_id = m.approved_by
             WHERE m.company_id = @c AND (CAST(@status AS text) IS NULL OR m.status = CAST(@status AS text))
@@ -74,7 +76,7 @@ public sealed class ListAccountRoleMapsHandler : IQueryHandler<ListAccountRoleMa
             """,
             r => new AccountRoleMapView(
                 r.GetGuid(0), r.GetString(1), r.NullableString(2), r.GetString(3), r.GetString(4), r.Date(5), r.IsDBNull(6) ? null : r.Date(6),
-                r.GetString(7), r.NullableString(8), r.NullableString(9)),
+                r.GetString(7), r.NullableString(8), r.NullableString(9), r.NullableString(10)),
             cancellationToken,
             ("c", context.CompanyId),
             ("status", query.Status)).ConfigureAwait(false);
@@ -92,7 +94,11 @@ public sealed record PostingRuleVersionView(
     string CloseComponent,
     DateOnly EffectiveFrom,
     DateOnly? EffectiveTo,
-    string? ApprovedBy);
+    string? ApprovedBy,
+    IReadOnlyList<PostingRuleLineView>? Lines = null);
+
+/// <summary>E-UX2-7: one line of the journal a rule generates, with its Spanish explanation (a template with {placeholders}).</summary>
+public sealed record PostingRuleLineView(string Code, string Side, string AccountRole, string? AccountRoleName, string Amount, string? Explanation);
 
 public sealed record PostingRuleList(IReadOnlyList<PostingRuleVersionView> Items);
 
@@ -118,6 +124,61 @@ public sealed class ListPostingRulesHandler : IQueryHandler<ListPostingRules>
             r => new PostingRuleVersionView(
                 r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetString(3), r.GetString(4), r.Date(5), r.IsDBNull(6) ? null : r.Date(6), r.NullableString(7)),
             cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new PostingRuleList(items));
+        var lines = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT r.code, v.version, l.line ->> 'code', l.line ->> 'side', l.line ->> 'account_role', ar.name, l.line ->> 'amount',
+                   v.explanation_templates ->> (l.line ->> 'code')
+            FROM fin.posting_rule r
+            JOIN fin.posting_rule_version v ON v.posting_rule_id = r.posting_rule_id
+            CROSS JOIN LATERAL jsonb_array_elements(v.definition -> 'lines') WITH ORDINALITY AS l (line, n)
+            LEFT JOIN fin.account_role ar ON ar.role_code = l.line ->> 'account_role'
+            ORDER BY r.code, v.version, l.n
+            """,
+            r => (Rule: r.GetString(0), Version: r.GetInt32(1), Line: new PostingRuleLineView(
+                r.GetString(2), r.GetString(3), r.GetString(4), r.NullableString(5), r.GetString(6), r.NullableString(7))),
+            cancellationToken).ConfigureAwait(false)).ToLookup(l => (l.Rule, l.Version), l => l.Line);
+        return ApiJson.Serialize(new PostingRuleList(items.Select(i => i with { Lines = lines[(i.RuleCode, i.Version)].ToList() }).ToList()));
+    }
+}
+
+public sealed record ListAccountRoles(Guid CompanyId, Guid SessionId) : IQuery;
+
+/// <summary>
+/// E-UX2-5: an account role with its Spanish name. <see cref="UsedByActiveRule"/>: a line of an ACTIVE posting rule version posts to
+/// it; <see cref="MappedToday"/>: the company has an ACTIVE mapping for it covering today (any item category).
+/// </summary>
+public sealed record AccountRoleView(string RoleCode, string? Name, string Description, bool IsControl, bool UsedByActiveRule, bool MappedToday);
+
+public sealed record AccountRoleList(IReadOnlyList<AccountRoleView> Items);
+
+[RequiresPermission("configuration:read")]
+public sealed class ListAccountRolesHandler : IQueryHandler<ListAccountRoles>
+{
+    public string QueryType => "Finance.ListAccountRoles";
+
+    public async Task<string> HandleAsync(ListAccountRoles query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT ar.role_code, ar.name, ar.description, ar.is_control,
+                   EXISTS (SELECT 1 FROM fin.posting_rule_version v CROSS JOIN LATERAL jsonb_array_elements(v.definition -> 'lines') AS l (line)
+                           WHERE v.status = 'ACTIVE' AND (v.effective_to IS NULL OR v.effective_to > @today) AND l.line ->> 'account_role' = ar.role_code),
+                   EXISTS (SELECT 1 FROM fin.account_role_map m
+                           WHERE m.company_id = @c AND m.account_role = ar.role_code AND m.status = 'ACTIVE'
+                             AND m.effective_from <= @today AND (m.effective_to IS NULL OR m.effective_to > @today))
+            FROM fin.account_role ar
+            WHERE ar.role_code <> 'MANUAL_ADJUSTMENT'
+            ORDER BY ar.name
+            """,
+            r => new AccountRoleView(r.GetString(0), r.NullableString(1), r.GetString(2), r.GetBoolean(3), r.GetBoolean(4), r.GetBoolean(5)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("today", Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow))).ConfigureAwait(false);
+        return ApiJson.Serialize(new AccountRoleList(items));
     }
 }
