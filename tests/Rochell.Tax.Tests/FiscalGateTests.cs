@@ -82,6 +82,13 @@ public sealed class FiscalGateTests(PostgresFixture postgres)
         { FiscalRuleKinds.PurchaseWithholding, """{"tax_code":"RET","rate":"0.30","base":"NET","party_types":[]}""" },
         { FiscalRuleKinds.PurchaseWithholding, """{"tax_code":"RET","rate":"0.30","base":"NET","party_types":["FOREIGN"]}""" },
         { FiscalRuleKinds.PurchaseWithholding, """not json""" },
+        { FiscalRuleKinds.PurchaseWithholding, """{"tax_code":"RET_ISR","rate":"0.10","base":"NET","party_types":["INDIVIDUAL"],"isr_withholding_type":"10"}""" },
+        { FiscalRuleKinds.PurchaseWithholding, """{"tax_code":"RET_ISR","rate":"0.10","base":"NET","party_types":["INDIVIDUAL"],"isr_withholding_type":2}""" },
+        { FiscalRuleKinds.Report606Classification, """{"classes":{"CEMENTO":"09","AGREGADO":"09","ADITIVO":"09"}}""" }, // OTRA_MATERIA_PRIMA missing
+        { FiscalRuleKinds.Report606Classification, """{"classes":{"CEMENTO":"12","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"}}""" },
+        { FiscalRuleKinds.Report606Classification, """{"classes":{"CEMENTO":"9","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"}}""" },
+        { FiscalRuleKinds.Report606Classification, """{"classes":{"BLOQUE":"09","CEMENTO":"09","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"}}""" },
+        { FiscalRuleKinds.Report606Classification, """{"classes":{"CEMENTO":"09","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"},"tax_code":"X"}""" },
     };
 
     [Theory]
@@ -206,5 +213,50 @@ public sealed class FiscalGateTests(PostgresFixture postgres)
                 "SELECT (SELECT count(*) FROM tax.fiscal_rule) + (SELECT count(*) FROM tax.fiscal_rule_version) + (SELECT count(*) FROM tax.fiscal_rule_source)", connection, tx);
             Assert.Equal(0L, await count.ExecuteScalarAsync());
         }
+    }
+
+    private const string Classification = """{"classes":{"CEMENTO":"09","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"02"}}""";
+
+    [Fact]
+    public async Task A_606_classification_is_ready_with_its_source_alone_one_is_active_and_it_never_closes_the_purchase_gate()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var actors = await h.FiscalActorsAsync();
+        await h.ActivateRuleAsync(actors, "itbis", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition, From);
+        var version = await h.ConfigureAsync(actors, "cls", "CLASIF-606", FiscalRuleKinds.Report606Classification, Classification, From);
+        var blocked = await Status(h, version);
+        var source = await h.RegisterTestSourceAsync(actors, "src");
+        await h.RunAsync(new LinkFiscalSource(h.CompanyId, actors.Analyst, "lnk", version, source), new LinkFiscalSourceHandler());
+        var ready = await Status(h, version);
+        var tests = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
+            new RunFiscalRuleTests(h.CompanyId, actors.Analyst, "tst", version, [TaxSetup.PassingCase(FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition)]), new RunFiscalRuleTestsHandler()));
+
+        // A second classification waiting for its source does not close the purchase gate; the tax determination ignores both.
+        var pending = await h.ConfigureAsync(actors, "cls-2", "CLASIF-606-B", FiscalRuleKinds.Report606Classification, Classification, From);
+        var supplier = await h.CreateActiveSupplierAsync("101000011", "Cementos del Este, S.R.L.");
+        var cement = await h.CreateActiveItemAsync("CEMENTO-GRIS", "t", "CEMENTO");
+        var determined = JsonDocument.Parse((await h.RunAsync(
+            new TestDetermineTax(h.CompanyId, h.SessionId, "d", new DateOnly(2026, 3, 1), supplier, [new TaxLineInput(Guid.CreateVersion7(), cement, 1000m)]),
+            new TestDetermineTaxHandler())).ResultPayload).RootElement;
+        await h.RunAsync(new ActivateFiscalRuleVersion(h.CompanyId, actors.Specialist, "act", version), new ActivateFiscalRuleVersionHandler());
+        await h.RunAsync(new LinkFiscalSource(h.CompanyId, actors.Analyst, "lnk-2", pending, source), new LinkFiscalSourceHandler());
+        var second = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
+            new ActivateFiscalRuleVersion(h.CompanyId, actors.Specialist, "act-2", pending), new ActivateFiscalRuleVersionHandler()));
+
+        Assert.Equal(("BLOCKED_PENDING_SOURCE", "READY", "ACTIVE"), (blocked, ready, await Status(h, version)));
+        Assert.Equal((TaxErrors.TestsNotApplicable, TaxErrors.AnotherItbisRuleActive), (tests.Code, second.Code));
+        Assert.Equal("ITBIS:180.00:RECOVERABLE_INPUT", string.Join(",", determined.GetProperty("taxes").EnumerateArray().Select(t => t.GetString())));
+        Assert.Equal("02", await h.ScalarAsync<string>("SELECT definition -> 'classes' ->> 'OTRA_MATERIA_PRIMA' FROM tax.fiscal_rule_version WHERE rule_version_id = @v", ("v", version)));
+    }
+
+    [Fact]
+    public async Task A_withholding_rule_may_name_its_606_ISR_withholding_type()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var actors = await h.FiscalActorsAsync();
+        var version = await h.ConfigureAsync(actors, "ret", "RET-ISR-PF", FiscalRuleKinds.PurchaseWithholding,
+            """{"tax_code":"RET_ISR","rate":"0.10","base":"NET","party_types":["INDIVIDUAL"],"isr_withholding_type":"2"}""", From);
+
+        Assert.Equal("2", await h.ScalarAsync<string>("SELECT definition ->> 'isr_withholding_type' FROM tax.fiscal_rule_version WHERE rule_version_id = @v", ("v", version)));
     }
 }

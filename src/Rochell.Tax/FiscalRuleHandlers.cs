@@ -39,7 +39,10 @@ internal static class FiscalRuleStore
             : throw new DomainException(TaxErrors.VersionNotFound, "The fiscal rule version does not exist.");
     }
 
-    /// <summary>E-PR12-4: a version under configuration is READY exactly when it has a source and its latest test run passed.</summary>
+    /// <summary>
+    /// E-PR12-4: a version under configuration is READY exactly when it has a source and its latest test run passed. E-FIS2-01-9: a
+    /// report classification needs only its source (its definition's validation stands in for the tests).
+    /// </summary>
     public static async Task<string> RecomputeStatusAsync(CommandContext context, RuleVersion version, string commandType, CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(
@@ -47,11 +50,12 @@ internal static class FiscalRuleStore
             context.Transaction,
             """
             SELECT EXISTS (SELECT 1 FROM tax.fiscal_rule_version_source WHERE rule_version_id = @v)
-               AND coalesce((SELECT passed FROM tax.fiscal_rule_test_run
+               AND (@report OR coalesce((SELECT passed FROM tax.fiscal_rule_test_run
                              WHERE rule_version_id = @v AND environment = (SELECT environment FROM core.deployment_environment)
-                             ORDER BY executed_at DESC, test_run_id DESC LIMIT 1), false)
+                             ORDER BY executed_at DESC, test_run_id DESC LIMIT 1), false))
             """,
-            ("v", version.Id));
+            ("v", version.Id),
+            ("report", FiscalRuleKinds.IsReport(version.RuleKind)));
         var ready = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true;
         var desired = ready ? FiscalRuleStatus.Ready : FiscalRuleStatus.BlockedPendingSource;
         if (desired == version.Status)
@@ -307,6 +311,11 @@ public sealed class RunFiscalRuleTestsHandler : ICommandHandler<RunFiscalRuleTes
 
         var version = await FiscalRuleStore.LockVersionAsync(context, command.RuleVersionId, cancellationToken).ConfigureAwait(false);
         FiscalRuleStore.RequireConfigurable(version);
+        if (FiscalRuleKinds.IsReport(version.RuleKind))
+        {
+            throw new DomainException(TaxErrors.TestsNotApplicable, "A 606 classification computes no tax: it has no test runs and is READY with its official source (E-FIS2-01-9).");
+        }
+
         var rule = new ApplicableRule(version.Id, version.RuleCode, FiscalRuleDefinition.Parse(version.RuleKind, version.Definition));
 
         var failures = new List<string>();
@@ -408,7 +417,7 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
             }
         }
 
-        if (version.RuleKind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis)
+        if (version.RuleKind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis or FiscalRuleKinds.Report606Classification)
         {
             await using var other = Sql.Command(
                 context.Connection,
@@ -425,7 +434,11 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
                 ("from", version.EffectiveFrom));
             if (await other.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
             {
-                throw new DomainException(TaxErrors.AnotherItbisRuleActive, "Another purchase ITBIS rule is active; only one may apply at a time.");
+                throw new DomainException(
+                    TaxErrors.AnotherItbisRuleActive,
+                    FiscalRuleKinds.IsReport(version.RuleKind)
+                        ? "Another 606 classification is active; only one may apply at a time (E-FIS2-01-10)."
+                        : "Another ITBIS rule of this kind is active; only one may apply at a time.");
             }
         }
 

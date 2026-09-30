@@ -9,7 +9,8 @@ namespace Rochell.Tax;
 /// withheld) comes from the activated definition, never from code.
 /// PURCHASE_ITBIS: {"tax_code","rate","effect" (RECOVERABLE_INPUT | NON_RECOVERABLE_INPUT), "exempt_item_categories"?}.
 /// SALES_ITBIS (E-VS3-05-1): {"tax_code","rate","effect" (OUTPUT), "exempt_item_categories"?}.
-/// PURCHASE_WITHHOLDING: {"tax_code","rate","base" (NET | ITBIS),"party_types" (COMPANY | INDIVIDUAL)}.
+/// PURCHASE_WITHHOLDING: {"tax_code","rate","base" (NET | ITBIS),"party_types" (COMPANY | INDIVIDUAL),"isr_withholding_type"? ("1"…"9", E-FIS2-01-4)}.
+/// REPORT_606_CLASSIFICATION (E-FIS2-01-1/2): {"classes": {"&lt;raw-material category&gt;": "01"…"11"}} covering every raw-material category.
 /// Rates are decimal strings (E-PR06-5), 0 &lt; rate ≤ 1, at most 6 decimals.
 /// </summary>
 public sealed record FiscalRuleDefinition(
@@ -19,8 +20,13 @@ public sealed record FiscalRuleDefinition(
     string Effect,
     IReadOnlySet<string> ExemptItemCategories,
     string? Base,
-    IReadOnlySet<string> PartyTypes)
+    IReadOnlySet<string> PartyTypes,
+    string? IsrWithholdingType = null,
+    IReadOnlyDictionary<string, string>? Classes = null)
 {
+    /// <summary>E-FIS2-01-2: the purchased categories the 606 classifies (the raw materials of md.item).</summary>
+    public static readonly IReadOnlySet<string> RawMaterialCategories = new HashSet<string>(StringComparer.Ordinal) { "CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA" };
+
     /// <summary>The closed item category list of md.item (E-PR04-7).</summary>
     public static readonly IReadOnlySet<string> ItemCategories = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -28,7 +34,8 @@ public sealed record FiscalRuleDefinition(
     };
 
     private static readonly string[] ItbisKeys = ["tax_code", "rate", "effect", "exempt_item_categories"];
-    private static readonly string[] WithholdingKeys = ["tax_code", "rate", "base", "party_types"];
+    private static readonly string[] WithholdingKeys = ["tax_code", "rate", "base", "party_types", "isr_withholding_type"];
+    private static readonly string[] ClassificationKeys = ["classes"];
 
     public static FiscalRuleDefinition Parse(string kind, string json)
     {
@@ -51,11 +58,17 @@ public sealed record FiscalRuleDefinition(
         {
             FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis => ItbisKeys,
             FiscalRuleKinds.PurchaseWithholding => WithholdingKeys,
+            FiscalRuleKinds.Report606Classification => ClassificationKeys,
             _ => throw Invalid($"Unknown rule kind {kind}."),
         };
         foreach (var property in root.EnumerateObject().Where(p => !allowed.Contains(p.Name)))
         {
             throw Invalid($"Unknown key '{property.Name}' for {kind}.");
+        }
+
+        if (kind == FiscalRuleKinds.Report606Classification)
+        {
+            return new FiscalRuleDefinition(kind, kind, 0m, kind, new HashSet<string>(StringComparer.Ordinal), null, new HashSet<string>(StringComparer.Ordinal), null, ParseClasses(root));
         }
 
         var taxCode = RequiredString(root, "tax_code");
@@ -104,7 +117,44 @@ public sealed record FiscalRuleDefinition(
             throw Invalid("party_types cannot be empty.");
         }
 
-        return new FiscalRuleDefinition(kind, taxCode, rate, TaxEffects.Withholding, new HashSet<string>(StringComparer.Ordinal), @base, parties);
+        string? isrType = null;
+        if (root.TryGetProperty("isr_withholding_type", out var type))
+        {
+            isrType = type.ValueKind == JsonValueKind.String && type.GetString() is { } t && t.Length == 1 && t[0] is >= '1' and <= '9'
+                ? t
+                : throw Invalid("isr_withholding_type is one of \"1\"…\"9\" (the 606's ISR withholding types).");
+        }
+
+        return new FiscalRuleDefinition(kind, taxCode, rate, TaxEffects.Withholding, new HashSet<string>(StringComparer.Ordinal), @base, parties, isrType);
+    }
+
+    /// <summary>E-FIS2-01-2: every raw-material category mapped to a 606 goods-and-services code "01"…"11".</summary>
+    private static Dictionary<string, string> ParseClasses(JsonElement root)
+    {
+        if (!root.TryGetProperty("classes", out var classes) || classes.ValueKind != JsonValueKind.Object)
+        {
+            throw Invalid("classes is required: an object from each raw-material category to a 606 code \"01\"…\"11\".");
+        }
+
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in classes.EnumerateObject())
+        {
+            if (!RawMaterialCategories.Contains(entry.Name))
+            {
+                throw Invalid($"classes: '{entry.Name}' is not one of {string.Join(", ", RawMaterialCategories)}.");
+            }
+
+            var code = entry.Value.ValueKind == JsonValueKind.String ? entry.Value.GetString() : null;
+            if (code is null || code.Length != 2 || !int.TryParse(code, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number is < 1 or > 11)
+            {
+                throw Invalid($"classes: the code of {entry.Name} is \"01\"…\"11\".");
+            }
+
+            map[entry.Name] = code;
+        }
+
+        var missing = RawMaterialCategories.Where(c => !map.ContainsKey(c)).Order(StringComparer.Ordinal).ToList();
+        return missing.Count == 0 ? map : throw Invalid("classes must cover every raw-material category; missing: " + string.Join(", ", missing));
     }
 
     private static string RequiredString(JsonElement root, string name)

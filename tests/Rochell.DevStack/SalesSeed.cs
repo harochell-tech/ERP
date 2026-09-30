@@ -68,6 +68,10 @@ internal static class SalesSeed
         var actors = new FiscalActors(await h.CreateSessionAsync(analyst), await h.CreateSessionAsync(specialist));
         await h.ActivateRuleAsync(actors, "itbis-ventas", "ITBIS_VENTAS", FiscalRuleKinds.SalesItbis, SalesItbis, new DateOnly(2026, 1, 1));
 
+        // FIS2-01 (E-FIS2-01-8): the 606 classification, every raw material as "09" (purchases that become the cost of sales).
+        await h.ActivateRuleAsync(actors, "clasif-606", "CLASIF_606", FiscalRuleKinds.Report606Classification,
+            """{"classes":{"CEMENTO":"09","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"}}""", new DateOnly(2026, 1, 1));
+
         // The product, its cost and price, and the opening stock in the plant's first stock location.
         var block = Guid.CreateVersion7();
         await h.AdminRequireAsync($"INSERT INTO md.item VALUES ('{block}', '{h.CompanyId}', 'BLOQUE-6', 'Bloque de 6 pulgadas', 'FINISHED_GOOD', 'un', 'BLOQUE', 'ACTIVE', 1)");

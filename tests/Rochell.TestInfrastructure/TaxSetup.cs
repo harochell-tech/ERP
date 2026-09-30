@@ -92,7 +92,11 @@ public static class TaxSetup
         var version = await h.ConfigureAsync(actors, key + "-cfg", code, kind, definition, from);
         var source = await h.RegisterTestSourceAsync(actors, key + "-src");
         await h.RunAsync(new LinkFiscalSource(h.CompanyId, actors.Analyst, key + "-lnk", version, source), new LinkFiscalSourceHandler());
-        await h.RunAsync(new RunFiscalRuleTests(h.CompanyId, actors.Analyst, key + "-tst", version, [PassingCase(kind, definition)]), new RunFiscalRuleTestsHandler());
+        if (!FiscalRuleKinds.IsReport(kind))
+        {
+            await h.RunAsync(new RunFiscalRuleTests(h.CompanyId, actors.Analyst, key + "-tst", version, [PassingCase(kind, definition)]), new RunFiscalRuleTestsHandler());
+        }
+
         await h.RunAsync(new ActivateFiscalRuleVersion(h.CompanyId, actors.Specialist, key + "-act", version), new ActivateFiscalRuleVersionHandler());
         return version;
     }
