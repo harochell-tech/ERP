@@ -118,7 +118,7 @@ function VerifyForm({ version, onDone }: { version: Version; onDone: () => void 
 }
 
 function BankAccounts({ partyId }: { partyId: string }) {
-  const { companyId, can, state } = useSession();
+  const { companyId, can, isMine } = useSession();
   const { data, error, reload } = useLoad(
     () => query("/api/v1/companies/{companyId}/treasury/suppliers/{partyId}/bank-accounts", { path: { companyId, partyId } }),
     [companyId, partyId],
@@ -127,7 +127,6 @@ function BankAccounts({ partyId }: { partyId: string }) {
     return <Loading error={error} />;
   }
   // UX1-01a: requestedBy is the display name (the e-mail until the first sign-in brings one); either identifies the requester.
-  const me = state.status === "ready" ? [state.session.email, state.session.displayName?.trim()].filter((v): v is string => !!v) : [];
   const current = data.items.find((v) => v.status === "VERIFIED");
   const review = data.items.find((v) => v.status === "REVIEW");
   return (
@@ -143,7 +142,7 @@ function BankAccounts({ partyId }: { partyId: string }) {
       ) : (
         <p className="notice">El proveedor no tiene una cuenta verificada: no se le puede pagar.</p>
       )}
-      {review && can("party_bank_account:verify") && !me.includes(review.requestedBy ?? "") ? <VerifyForm version={review} onDone={reload} /> : null}
+      {review && can("party_bank_account:verify") && !isMine(review.requestedBy) ? <VerifyForm version={review} onDone={reload} /> : null}
       {!review && can("party_bank_account:request") ? <RequestForm partyId={partyId} onDone={reload} /> : null}
       <div className="table-wrap"><table>
         <thead>

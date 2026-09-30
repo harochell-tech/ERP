@@ -27,6 +27,11 @@ interface SessionContextValue {
   plantScoped: boolean;
   /** E-UX1-01-4: a plant id or code as "Name (CODE)" (the code when the session has no name for it). */
   plantName: (key: string | null | undefined, fallback?: string) => string;
+  /**
+   * Whether a shown actor (name or e-mail) is the signed-in person, to hide a decision the server would refuse (four eyes).
+   * Always false for a superadministrator, whose four-eyes controls are waived (E-ADM-2-4).
+   */
+  isMine: (actor: string | null | undefined) => boolean;
   reload: () => void;
 }
 
@@ -105,6 +110,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       plantFor: (permission) => queryPlant(company, permission, plantId),
       plantScoped: hasPlantScope(company),
       plantName: (key, fallback) => plantLabel(company?.plants, key, fallback),
+      isMine: (actor) =>
+        state.status === "ready" &&
+        !!actor &&
+        !(company?.assignments ?? []).some((a) => a.roleCode === "SUPERADMIN") &&
+        [state.session.email, state.session.displayName?.trim()].includes(actor),
       reload: () => setGeneration((g) => g + 1),
     }),
     [state, company, selectCompany, plantId, selectPlant],

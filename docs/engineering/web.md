@@ -301,3 +301,7 @@ Wave 1 of the UI audit (2026-09-30), on top of UX1-01a (display names and plant 
   and `expectFits` (fails when `document.documentElement.scrollWidth` exceeds the viewport), run on every navigation and form
   submission. Vitest: `tests/unit/ux1.test.ts` (dates, quantities, plant names, environment badge, notices, screen title) and
   `tests/unit/ui.test.tsx` (Field wiring, confirmation dialog markup); `errors.test.ts` covers the new fallback.
+
+`useSession().isMine(actor)` is the one place a screen asks whether a shown actor (name or e-mail) is the signed-in person, to
+hide a decision the server would refuse; it is always false for a superadministrator, whose four-eyes controls are waived
+(E-ADM-2-4).

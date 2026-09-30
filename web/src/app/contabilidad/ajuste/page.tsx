@@ -17,7 +17,7 @@ type Journal = Schemas["ManualJournalDetail"];
 // FIN1-04 (E-FIN1-04-4, E-FIN1-04-6): an adjustment and what can be done with it now. Totals and difference are the server's;
 // the preparer never sees "Aprobar" (four eyes, GL-03).
 function Actions({ journal, onDone }: { journal: Journal; onDone: () => void }) {
-  const { can, state } = useSession();
+  const { can, isMine } = useSession();
   const id = journal.manualJournalId;
   const target = { manualJournalId: id, expectedVersion: journal.version };
   const submit = useCommand(`submit-manual-journal:${id}`, "/api/v1/companies/{companyId}/finance/submit-manual-journal", `Ajuste ${journal.journalNo} enviado a aprobación.`);
@@ -27,8 +27,7 @@ function Actions({ journal, onDone }: { journal: Journal; onDone: () => void }) 
   const reverse = useCommand(`reverse-manual-journal:${id}`, "/api/v1/companies/{companyId}/finance/reverse-manual-journal", `Ajuste ${journal.journalNo} reversado.`);
   const busy = submit.busy || withdraw.busy || approve.busy || reject.busy || reverse.busy;
   // UX1-01b: the API returns the preparer's display name (its e-mail until the first sign-in brings a name, E-UX1-01-3).
-  const me = state.status === "ready" ? [state.session.email, state.session.displayName?.trim()].filter((v): v is string => !!v) : [];
-  const preparedByMe = journal.preparedBy !== null && me.includes(journal.preparedBy);
+  const preparedByMe = isMine(journal.preparedBy);
   const balanced = !/[1-9]/.test(journal.difference);
   const after = (response: unknown) => {
     if (response) {

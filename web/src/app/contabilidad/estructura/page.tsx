@@ -14,7 +14,7 @@ import { useLoad } from "@/lib/useQuery";
 // FIN1-04 (E-FIN1-04-10, E-FIN1-03-2): a structure version, its lines and accounts, the active accounts still missing, and
 // "Aprobar" for the Aprobador de políticas (never the preparer).
 function StructureDetail() {
-  const { companyId, can, state } = useSession();
+  const { companyId, can, isMine } = useSession();
   const id = useSearchParams().get("id") ?? "";
   const approve = useCommand(`approve-report-structure:${id}`, "/api/v1/companies/{companyId}/finance/approve-report-structure", "Estructura de reporte aprobada y activa.");
   const { data, error, reload } = useLoad(
@@ -29,7 +29,6 @@ function StructureDetail() {
   }
   const h = data.header;
   // UX1-01b: the API returns the preparer's display name (its e-mail until the first sign-in brings a name, E-UX1-01-3).
-  const me = state.status === "ready" ? [state.session.email, state.session.displayName?.trim()].filter((v): v is string => !!v) : [];
   const depth = (code: string | null | undefined): number => {
     let d = 0;
     for (let c = code; c; c = data.lines.find((l) => l.lineCode === c)?.parentLineCode ?? null) {
@@ -49,7 +48,7 @@ function StructureDetail() {
         Vigente desde {formatDate(h.effectiveFrom)} · preparó {h.preparedBy ?? "—"} · aprobó {h.approvedBy ?? "—"}
       </p>
       <div className="actions">
-        {h.status === "DRAFT" && can("report_structure:approve") && !(h.preparedBy && me.includes(h.preparedBy)) ? (
+        {h.status === "DRAFT" && can("report_structure:approve") && !isMine(h.preparedBy) ? (
           <ConfirmAction
             label="Aprobar estructura"
             className="primary"

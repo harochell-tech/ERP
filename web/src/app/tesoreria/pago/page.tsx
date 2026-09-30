@@ -20,7 +20,7 @@ const REVERSAL_REASON_MIN = 10;
 // VS2-08: a payment and what can be done with it now. The preparer never sees "Liberar" (PAY-04, four eyes); the total is the
 // server's (E-UI-3).
 function Actions({ payment, onDone }: { payment: Payment; onDone: () => void }) {
-  const { can, state } = useSession();
+  const { can, isMine } = useSession();
   const id = payment.paymentId;
   const target = { paymentId: id, expectedVersion: payment.version };
   const release = useCommand(`release-payment:${id}`, "/api/v1/companies/{companyId}/treasury/release-supplier-payment", `Pago ${payment.paymentNo} liberado.`);
@@ -28,8 +28,7 @@ function Actions({ payment, onDone }: { payment: Payment; onDone: () => void }) 
   const reverse = useCommand(`reverse-payment:${id}`, "/api/v1/companies/{companyId}/treasury/reverse-payment", `Pago ${payment.paymentNo} revertido.`);
   const busy = release.busy || voidPayment.busy || reverse.busy;
   // UX1-01b (E-UX1-01-3): preparedBy is the preparer's display name (the e-mail until the first sign-in brings one).
-  const me = state.status === "ready" ? [state.session.email, state.session.displayName?.trim()].filter((v): v is string => !!v) : [];
-  const preparedByMe = payment.preparedBy !== null && me.includes(payment.preparedBy);
+  const preparedByMe = isMine(payment.preparedBy);
   const after = (response: unknown) => {
     if (response) {
       onDone();

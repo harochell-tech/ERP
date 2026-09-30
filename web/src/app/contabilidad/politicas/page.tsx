@@ -89,10 +89,10 @@ function PrepareVersion({ policy, onDone }: { policy: Policy; onDone: () => void
 }
 
 function VersionRow({ version, onDone }: { version: Version; onDone: () => void }) {
-  const { can, state } = useSession();
+  const { can, isMine } = useSession();
   // Four eyes: the database refuses the preparer as approver; the screen does not offer it.
   // UX1-01b: the API returns the preparer's display name (its e-mail until the first sign-in brings a name, E-UX1-01-3).
-  const preparedByMe = state.status === "ready" && version.preparedBy !== null && [state.session.email, state.session.displayName?.trim()].includes(version.preparedBy);
+  const preparedByMe = isMine(version.preparedBy);
   const approve = useCommand(`approve-policy:${version.policyVersionId}`, "/api/v1/companies/{companyId}/finance/approve-accounting-policy-version", `Versión ${version.version} de la política aprobada y activa.`);
   return (
     <tr>

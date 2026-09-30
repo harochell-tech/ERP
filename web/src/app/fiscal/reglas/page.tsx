@@ -93,13 +93,13 @@ function ConfigureVersion({ onDone }: { onDone: () => void }) {
 }
 
 function VersionActions({ ruleCode, ruleKind, version, sources, onDone }: { ruleCode: string; ruleKind: string; version: RuleVersion; sources: readonly Source[]; onDone: () => void }) {
-  const { can, state } = useSession();
+  const { can, isMine } = useSession();
   const id = version.ruleVersionId;
   const label = `${ruleCode} versión ${version.version}`;
   // The activator is never the configurer (E-PR03-4 a); the screen does not offer it. UX1-01b (E-UX1-01-3): configuredBy is the
   // configurer's display name (the e-mail until a sign-in brings it), so both are compared.
   const configuredByMe =
-    state.status === "ready" && version.configuredBy !== null && [state.session.email, state.session.displayName].includes(version.configuredBy);
+    isMine(version.configuredBy);
   const link = useCommand(`link-source:${id}`, "/api/v1/companies/{companyId}/tax/link-fiscal-source", `Fuente vinculada a la regla ${label}.`);
   const test = useCommand(`run-tests:${id}`, "/api/v1/companies/{companyId}/tax/run-fiscal-rule-tests", (r) =>
     (r.result as unknown as { passed?: boolean } | null)?.passed ? `Pruebas de la regla ${label}: pasaron.` : `Pruebas de la regla ${label}: fallaron; revise los casos.`,
