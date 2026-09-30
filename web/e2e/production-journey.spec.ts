@@ -31,7 +31,8 @@ test("a production day from the recipe to a released lot (MFG-1)", async ({ brow
   await manager.getByRole("button", { name: "Definir turno" }).click();
   await expect(manager.getByRole("cell", { name: "DIA", exact: true })).toBeVisible();
 
-  // Recipe: 150 pavers per batch, 6 per cycle, 600 per rack, no minimum curing (so yesterday's lot can be released today).
+  // Recipe: 150 pavers per batch, 6 per cycle, 600 per rack, 1 hour of minimum curing (E-UX4-9): curing starts when yesterday's
+  // shift ends (E-MFG1-03-7), so yesterday's lot can be released today.
   const supervisor = await signIn(browser, "Supervisor de producción");
   await nav(supervisor, "Recetas");
   await supervisor.getByLabel("Producto", { exact: true }).selectOption({ label: "ADOQUIN-H — Adoquín holandés (un)" });
@@ -39,7 +40,7 @@ test("a production day from the recipe to a released lot (MFG-1)", async ({ brow
   await supervisor.getByLabel("Unidades por tanda").fill("150");
   await supervisor.getByLabel("Unidades por ciclo").fill("6");
   await supervisor.getByLabel("Unidades por rack").fill("600");
-  await supervisor.getByLabel("Curado mínimo (horas)").fill("0");
+  await supervisor.getByLabel("Curado mínimo (horas)").fill("1");
   await supervisor.getByLabel("Curado máximo (horas)").fill("168");
   const materials: [string, string][] = [
     ["CEMENTO-GRIS — CEMENTO-GRIS (t)", "0.18"],

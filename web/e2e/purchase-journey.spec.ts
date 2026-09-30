@@ -40,7 +40,7 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   await expect(storekeeper.getByTestId("open-ARENA-LAVADA")).toHaveText("40");
   await expect(storekeeper.getByTestId("max-ARENA-LAVADA")).not.toHaveText("—");
   await expect(storekeeper.getByLabel("Cantidad a recibir ARENA-LAVADA")).toHaveValue("40");
-  await storekeeper.getByLabel("Ubicación").selectOption({ index: 1 });
+  await storekeeper.getByLabel("Ubicación").selectOption({ label: "PATIO-A" }); // E-UX4-8: never CURADO or TRANSITO
   await submit(storekeeper, "Registrar recepción");
   await expect(storekeeper.getByRole("heading", { name: /^Recepción / })).toBeVisible();
   await expect(storekeeper.getByTestId("accounting-status")).toHaveText("Contabilizado");
