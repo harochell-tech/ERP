@@ -221,6 +221,82 @@ public sealed class AcceptanceTests(PostgresFixture postgres)
         Assert.Equal("CLOSED", await h.ScalarAsync<string>($"SELECT status FROM fin.close_component_state WHERE period_id = '{period}' AND component = 'BANK-REC'"));
     }
 
+    /// <summary>
+    /// FIS-2 E2E-F2 through the API (E-FIS2-03-7): purchase → invoice (40 t × 1,000 = 40,000.00 + ITBIS 7,200.00, 30 % of it withheld:
+    /// 2,160.00) → payment of 45,040.00 released this month → the month's 606 (JSON and the DGII tool's CSV), IT-1 and IR-17 summaries.
+    /// The 606 classification comes from the fixtures (the Analista configures it and the Especialista activates it).
+    /// </summary>
+    [Trait("AcceptanceFis2", "E2E-F2")]
+    [Fact]
+    public async Task E2EF2_purchase_invoice_payment_with_withholding_then_606_CSV_and_summaries_over_HTTP()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        using var api = new ApiHost(h);
+        var r = await h.CreateReceivingSetupAsync();
+        await h.EnableInvoicePostingAsync(withholdingDefinition: Withholding);
+        await h.ActivateRuleAsync(await h.FiscalActorsAsync(), "clasif", "CLASIF_606", Rochell.Tax.FiscalRuleKinds.Report606Classification,
+            """{"classes":{"CEMENTO":"09","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"}}""", new DateOnly(2026, 1, 1));
+        var actors = await Actors.SignInAsync(api, r);
+        var clerk = await api.SignInAsSessionUserAsync(await h.SessionWithRolesAsync("CUENTAS_POR_PAGAR"));
+        var treasurerSession = await h.SessionWithRolesAsync("TESORERO");
+        var treasurer = await api.SignInAsSessionUserAsync(treasurerSession);
+        var fiscal = await api.SignInAsSessionUserAsync(await h.SessionWithRolesAsync("CONTADOR"));
+        var (po, poLine) = await ApprovedOrderAsync(h, r, actors);
+        await ReceiveAsync(h, r, actors, po, poLine);
+        var today = BusinessCalendar.DefaultBusinessDate(DateTime.UtcNow);
+        var c = h.CompanyId;
+        var si = (await clerk.OkAsync(c, "procurement", "register-supplier-invoice", new
+        {
+            partyId = r.Purchasing.SupplierId,
+            supplierFiscalNumber = "B0100000001",
+            docDate = today,
+            dueDate = today.AddDays(30),
+            lines = new[] { new { purchaseOrderLineId = poLine, quantity = "40", unitPrice = "1000" } },
+        })).GetProperty("resultRef").GetGuid();
+        await clerk.OkAsync(c, "procurement", "match-supplier-invoice", new { supplierInvoiceId = si, expectedVersion = 1 });
+        await clerk.OkAsync(c, "procurement", "post-supplier-invoice", new { supplierInvoiceId = si, expectedVersion = 2 });
+
+        await h.CreateAccountAsync("1101", "Banco de prueba", isControl: true);
+        await actors.Controller.OkAsync(c, "finance", "approve-posting-rule-version", new { ruleCode = "R-09", version = 1 });
+        var bank = (await actors.Controller.OkAsync(c, "treasury", "register-bank-account", new { bankCode = "TEST_BANK", accountNumber = "0123456789", glAccountCode = "1101" }))
+            .GetProperty("resultRef").GetGuid();
+        var partyAccount = await h.VerifiedPartyBankAccountAsync(r.Purchasing.SupplierId, treasurerSession, r.Purchasing.Controller, 1, "9876543210", 73);
+        var apDoc = await h.ScalarAsync<Guid>("SELECT ap_doc_id FROM fin.ap_document WHERE source_doc_id = @s", ("s", si));
+        var payment = (await treasurer.OkAsync(c, "treasury", "prepare-supplier-payment", new
+        {
+            partyId = r.Purchasing.SupplierId,
+            bankAccountId = bank,
+            partyBankAccountId = partyAccount,
+            valueDate = today,
+            bankReference = "TRF-606",
+            applications = new[] { new { apDocId = apDoc, amount = "45040.00" } },
+        })).GetProperty("resultRef").GetGuid();
+        await actors.Controller.OkAsync(c, "treasury", "release-supplier-payment", new { paymentId = payment, expectedVersion = 1 });
+
+        // The 606: one record, paid this month by transfer (2), ITBIS 7,200.00 to advance, 2,160.00 of it withheld; goods type 09.
+        var period = today.ToString("yyyyMM", CultureInfo.InvariantCulture);
+        var report = await fiscal.GetOkAsync($"/api/v1/companies/{c}/tax/reports/606?period={period}");
+        var record = Assert.Single(report.GetProperty("records").EnumerateArray());
+        Assert.Equal($"NCF|B0100000001|09|{today:yyyy-MM-dd}|40000.00|7200.00|7200.00|2160.00|2", string.Join('|', new[]
+        {
+            "recordKind", "ncf", "goodsType", "paymentDate", "goodsAmount", "itbisBilled", "itbisToAdvance", "itbisWithheld", "paymentMethod",
+        }.Select(p => record.GetProperty(p).ToString())));
+        var file = await fiscal.GetAsync($"/api/v1/companies/{c}/tax/reports/606?period={period}&format=csv");
+        var bytes = await file.Content.ReadAsByteArrayAsync();
+        var rnc = await h.ScalarAsync<string>("SELECT rnc FROM md.party WHERE party_id = @p", ("p", r.Purchasing.SupplierId));
+        Assert.Equal("text/csv", file.Content.Headers.ContentType?.MediaType);
+        Assert.NotEqual(0xEF, bytes[0]); // no BOM (E-FIS2-02-5)
+        Assert.Equal($"{rnc},1,09,B0100000001,,{today:yyyyMMdd},{today:yyyyMMdd},,40000.00,40000.00,7200.00,2160.00,,,7200.00,,,,,,,,2\r\n", Encoding.UTF8.GetString(bytes));
+
+        var it1 = await fiscal.GetOkAsync($"/api/v1/companies/{c}/tax/reports/it1-summary?period={period}");
+        Assert.Equal("7200.00|0.00|7200.00|0", $"{it1.GetProperty("purchaseItbisBilled").GetString()}|{it1.GetProperty("purchaseItbisToCost").GetString()}|" +
+            $"{it1.GetProperty("purchaseItbisToAdvance").GetString()}|{it1.GetProperty("sales").GetArrayLength()}");
+        var ir17 = await fiscal.GetOkAsync($"/api/v1/companies/{c}/tax/reports/ir17-summary?period={period}");
+        Assert.Equal("ITBIS:1:7200.00:2160.00|2160.00|0.00", string.Join(',', ir17.GetProperty("lines").EnumerateArray().Select(l =>
+            $"{l.GetProperty("tax").GetString()}:{l.GetProperty("records").GetInt32()}:{l.GetProperty("base").GetString()}:{l.GetProperty("amount").GetString()}")) +
+            $"|{ir17.GetProperty("itbisWithheld").GetString()}|{ir17.GetProperty("isrWithheld").GetString()}");
+    }
+
     private static async Task<(Guid Po, Guid PoLine)> ApprovedOrderAsync(TestHarness h, TestReceiving r, Actors actors)
     {
         var p = r.Purchasing;

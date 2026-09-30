@@ -746,6 +746,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS2-02-10 | FIS2-02 | Tests F2-01…F2-06 with hand-derived amounts. |
 | E-FIS2-02-11 | FIS2-02 | The payment-month record of an earlier NCF repeats the invoiced amounts with ITBIS invoiced / to cost / to advance 0 (never advanced twice), the payment date, withholdings, type and method; to confirm with the accountant (X-1). |
 | E-FIS2-02-12 | FIS2-02 | The NCF-month record has the payment date (and the withholdings) only when the invoice was settled within that month, so a month's 606 is the same whenever it is generated. |
+| E-FIS2-03-1 | FIS2-03 | Menu: "Reportes fiscales" in the Fiscal group with `fiscal_report:read`. |
+| E-FIS2-03-2 | FIS2-03 | 606 screen: period (AAAAMM), header, the notice that only purchases recorded in the system are included, the 23 fields, the "Pago de retención" mark, warnings and the link to the supplier invoice. |
+| E-FIS2-03-3 | FIS2-03 | "Descargar CSV para la herramienta DGII" and three steps: header in the DGII tool, paste and validate, generate the TXT and file it on the Oficina Virtual. |
+| E-FIS2-03-4 | FIS2-03 | IT-1 and IR-17 tabs labelled "Informativo: no es el formulario oficial de la DGII". |
+| E-FIS2-03-5 | FIS2-03 | The 606 classification is configured on Fiscal › Reglas fiscales with its Spanish label and the 11 codes as help. |
+| E-FIS2-03-6 | FIS2-03 | Spanish labels for TAX-606 and its findings. |
+| E-FIS2-03-7 | FIS2-03 | E2E-F2 over the API (`AcceptanceTests`) and Playwright (`fiscal-reports-journey`); matrix `docs/acceptance/fis2.md` with `AcceptanceFis2TraceabilityTests`. |
+| E-FIS2-03-8 | FIS2-03 | The dev seed already activates the classification; the journey uses the purchases that exist or creates its own. |
 
 Implementation rules derived from the above (no architectural change):
 
