@@ -20,6 +20,9 @@ function Journals() {
       : null,
     [companyId, eventId],
   );
+  // UX2-02 (E-UX2-5): account roles by their names when the reader may see the configuration.
+  const roles = useLoad(can("configuration:read") ? () => query("/api/v1/companies/{companyId}/finance/account-roles", { path: { companyId } }) : null, [companyId]);
+  const roleName = (code: string) => roles.data?.items.find((r) => r.roleCode === code)?.name ?? code;
 
   if (!can("audit:read")) {
     return <NoPermission />;
@@ -56,7 +59,7 @@ function Journals() {
                   <td>
                     {e.accountCode} {e.accountName}
                   </td>
-                  <td>{e.accountRole}</td>
+                  <td title={e.accountRole}>{roleName(e.accountRole)}</td>
                   <td className="num">{formatDecimal(e.debit)}</td>
                   <td className="num">{formatDecimal(e.credit)}</td>
                   <td>

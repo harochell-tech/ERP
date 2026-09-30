@@ -245,3 +245,22 @@ dialog.confirm-dialog textarea { width: 100%; font: inherit; }
   .page { padding: 0; max-width: none; }
   table { background: #fff; }
 }
+
+/* UX2-02 (E-UX2-1…12): configuration screens. */
+.alert-block { background: var(--tone-attention-bg); color: var(--tone-attention-fg); border-radius: 8px; padding: 12px 14px; margin: 12px 0; font-size: 14px; }
+.alert-block strong { display: block; margin-bottom: 4px; }
+.alert-block ul { margin: 4px 0 0; padding-left: 20px; }
+.input-suffix { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.input-suffix > span { color: var(--muted); font-weight: 600; }
+tr.changed td { background: #fff6e8; }
+tr.changed td:first-child { box-shadow: inset 3px 0 0 var(--tone-attention-fg); }
+.checks { display: flex; flex-wrap: wrap; gap: 6px 16px; border: none; padding: 0; margin: 0 16px 12px 0; min-width: 0; }
+.checks legend { font-size: 12px; font-weight: 600; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.checks label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; min-height: 32px; }
+.checks input { min-height: 0; }
+.light { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; flex: none; }
+.light-green { background: #2f9e62; }
+.light-amber { background: #e0902a; }
+.light-red { background: #c7303c; }
+.areas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 12px 0; }
+.plain-list { margin: 0; padding-left: 18px; }

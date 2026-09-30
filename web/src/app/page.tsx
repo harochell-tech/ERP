@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { query } from "@/api/client";
+import { nextSteps, setupProgress, stepInfo } from "@/lib/setup";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 
@@ -146,6 +147,40 @@ function TaskItem({ task }: { task: Task }) {
   );
 }
 
+/** UX2-02 (E-UX2-10): "Puesta en marcha" for configuration:read holders until the 19 steps are DONE. */
+function SetupCard() {
+  const { companyId, can } = useSession();
+  const allowed = can("configuration:read");
+  const { data } = useLoad(allowed ? () => query("/api/v1/companies/{companyId}/reconciliation/setup-status", { path: { companyId } }) : null, [companyId, allowed]);
+  if (!allowed || data === null || data.complete) {
+    return null;
+  }
+  const progress = setupProgress(data);
+  return (
+    <section className="card" data-testid="setup-card">
+      <h2 style={{ marginTop: 0 }}>Puesta en marcha</h2>
+      <p>
+        <strong data-testid="setup-card-progress">
+          {progress.done} de {progress.total} pasos listos
+        </strong>
+      </p>
+      <progress value={progress.done} max={progress.total} aria-label="Pasos listos" style={{ width: "100%" }} />
+      <p style={{ marginBottom: 4 }}>Próximos pasos:</p>
+      <ul>
+        {nextSteps(data).map((s) => {
+          const info = stepInfo(s.code);
+          return (
+            <li key={s.code}>
+              <Link href={info.href}>{info.title}</Link>
+            </li>
+          );
+        })}
+      </ul>
+      <Link href="/configuracion/">Ir al Centro de configuración</Link>
+    </section>
+  );
+}
+
 export default function Home() {
   const { company, can, plantName } = useSession();
   const tasks = TASKS.filter((t) => can(t.permission));
@@ -156,6 +191,7 @@ export default function Home() {
         Roles en {company?.legalName}:{" "}
         {company?.assignments.map((a) => (a.plantId ? `${a.roleName} (planta ${plantName(a.plantId, a.plantId.slice(0, 8))})` : a.roleName)).join(", ")}
       </p>
+      <SetupCard />
       <h2>Tareas</h2>
       {tasks.length === 0 ? (
         <p className="muted">Sus roles no tienen tareas en esta versión de la interfaz.</p>
