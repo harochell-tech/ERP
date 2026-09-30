@@ -58,7 +58,7 @@ public sealed class ApproveAccountRoleMapHandler : ICommandHandler<ApproveAccoun
             throw new DomainException(FinanceErrors.ConfigurationNotDraft, $"The mapping is {status}.");
         }
 
-        if (approver == preparedBy)
+        if (approver == preparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(FinanceErrors.FourEyes, "The mapping must be approved by someone other than who prepared it.");
         }

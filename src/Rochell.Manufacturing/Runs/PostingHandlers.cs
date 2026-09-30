@@ -36,7 +36,7 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
         }
 
         var poster = await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (poster == summary.RecordedBy)
+        if (poster == summary.RecordedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(ManufacturingErrors.FourEyes, "A shift summary is posted by someone other than who recorded it (E-MFG1-03-5).");
         }

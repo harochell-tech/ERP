@@ -216,7 +216,7 @@ public sealed class ApproveAccountingPolicyVersionHandler : ICommandHandler<Appr
             throw new DomainException(FinanceErrors.ConfigurationNotDraft, $"The policy version is {status}.");
         }
 
-        if (approver == preparedBy)
+        if (approver == preparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(FinanceErrors.FourEyes, "The policy version must be approved by someone other than who prepared it.");
         }

@@ -172,7 +172,7 @@ public sealed class VerifyPartyBankAccountHandler : ICommandHandler<VerifyPartyB
         }
 
         var verifier = await PartyBankAccountRules.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (verifier == row.RequestedBy)
+        if (verifier == row.RequestedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(PartyBankAccountErrors.SamePerson, "The requester cannot verify the account (PAY-10).");
         }
@@ -244,7 +244,7 @@ public sealed class RejectPartyBankAccountHandler : ICommandHandler<RejectPartyB
         }
 
         var rejecter = await PartyBankAccountRules.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (rejecter == row.RequestedBy)
+        if (rejecter == row.RequestedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(PartyBankAccountErrors.SamePerson, "The requester cannot reject the account (E-VS2-01-10).");
         }

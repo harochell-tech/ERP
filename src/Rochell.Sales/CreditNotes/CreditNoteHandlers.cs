@@ -217,7 +217,7 @@ public sealed class IssueCreditNoteHandler : ICommandHandler<IssueCreditNote>
 
         Crediting.EnsureCreditable(invoice);
         var issuer = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (issuer == invoice.IssuedBy)
+        if (issuer == invoice.IssuedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(SalesErrors.FourEyes, "A credit note is issued by someone other than who issued the invoice (VS#3 §7).");
         }

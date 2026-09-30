@@ -157,6 +157,7 @@ export const RECONCILIATIONS: Readonly<Record<string, string>> = {
   "EXEMPT-WITHOUT-AUTH": "Facturas exentas sin autorización",
   "AUTH-EXPIRY": "Vencimiento de autorizaciones fiscales",
   "TAX-606": "Formato 606 contra el ITBIS contabilizado", // FIS2-03 (E-FIS2-03-6)
+  "CONTROLS-WAIVED": "Controles dispensados por un superadministrador", // ADM-2 (E-ADM-2-5)
 };
 
 /** FIS1-05: exception classifications in Spanish; the others are shown as the server sends them. */
@@ -170,6 +171,7 @@ export const EXCEPTION_CLASSIFICATIONS: Readonly<Record<string, string>> = {
   TAX606_ITBIS_DIFFERENCE: "ITBIS por adelantar del 606 ≠ ITBIS deducible contabilizado del mes",
   CLASSIFICATION_MISSING: "Compra sin clasificación del 606 (tipo de bienes y servicios en blanco)",
   ISR_WITHHOLDING_TYPE_MISSING: "Retención de ISR sin tipo de retención del 606",
+  CONTROL_WAIVED: "Un superadministrador preparó y aprobó solo (ADM-2)",
 };
 
 export function classificationLabel(classification: string): string {
@@ -214,6 +216,7 @@ export const ROLES: Readonly<Record<string, string>> = {
   PROBADOR: "Probador",
   DIRECTOR: "Director (solo lectura)",
   CONTADOR: "Contador",
+  SUPERADMIN: "Superadministrador", // ADM-2 (E-ADM-2-1)
   // VS#3 (E-VS3-3)
   VENDEDOR: "Vendedor",
   CREDITO: "Crédito",
