@@ -14,6 +14,7 @@ using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Queries;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
+using Rochell.Tax.Reports;
 using Rochell.Treasury.Queries;
 using Rochell.Treasury.Statements;
 
@@ -45,7 +46,7 @@ public static class QueryEndpoints
         typeof(ListAccountsHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
-        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
+        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
@@ -298,6 +299,16 @@ public static class QueryEndpoints
         tax.MapGet("/fiscal-rules", (HttpContext http, Guid companyId, ListFiscalRulesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListFiscalRules(companyId, s), handler, ct))
             .Describe<FiscalRuleList>(nameof(ListFiscalRules));
+        // E-FIS2-02-1…7: the 606 (?format=csv: the DGII tool's columns, no BOM) and the IT-1 / IR-17 summaries (fiscal_report:read).
+        tax.MapGet("/reports/606", (HttpContext http, Guid companyId, string period, string? format, GetReport606Handler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunReportAsync(http, format, s => new GetReport606(companyId, s, period), handler, Report606Csv.Build, $"606-{period}.csv", ct, byteOrderMark: false))
+            .Describe<Report606>(nameof(GetReport606));
+        tax.MapGet("/reports/it1-summary", (HttpContext http, Guid companyId, string period, GetIt1SummaryHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetIt1Summary(companyId, s, period), handler, ct))
+            .Describe<It1Summary>(nameof(GetIt1Summary));
+        tax.MapGet("/reports/ir17-summary", (HttpContext http, Guid companyId, string period, GetIr17SummaryHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetIr17Summary(companyId, s, period), handler, ct))
+            .Describe<Ir17Summary>(nameof(GetIr17Summary));
         // E-FIS1-02-7/8: fiscal authorizations and the order's proforma (sales:read).
         tax.MapGet("/fiscal-authorizations", (HttpContext http, Guid companyId, Guid? partyId, string? status, ListFiscalAuthorizationsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListFiscalAuthorizations(companyId, s, partyId, status), handler, ct))

@@ -3899,6 +3899,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/tax/reports/606": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetReport606"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/tax/reports/it1-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetIt1Summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/tax/reports/ir17-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetIr17Summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/tax/fiscal-authorizations": {
         parameters: {
             query?: never;
@@ -5837,6 +5885,24 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        Ir17Line: {
+            tax: string;
+            isrWithholdingType: null | string;
+            /** Format: int32 */
+            records: number;
+            /** Format: decimal */
+            base: string;
+            /** Format: decimal */
+            amount: string;
+        };
+        Ir17Summary: {
+            period: string;
+            lines: components["schemas"]["Ir17Line"][];
+            /** Format: decimal */
+            itbisWithheld: string;
+            /** Format: decimal */
+            isrWithheld: string;
+        };
         IssueCreditNote: {
             /** Format: uuid */
             creditNoteId: string;
@@ -5849,6 +5915,41 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             ecfType?: null | string;
+        };
+        It1SalesLine: {
+            ecfType: string;
+            /** Format: int32 */
+            invoices: number;
+            /** Format: decimal */
+            taxedNet: string;
+            /** Format: decimal */
+            exemptNet: string;
+            /** Format: decimal */
+            itbis: string;
+        };
+        It1Summary: {
+            period: string;
+            sales: components["schemas"]["It1SalesLine"][];
+            /** Format: int32 */
+            creditNotes: number;
+            /** Format: decimal */
+            creditNotesNet: string;
+            /** Format: decimal */
+            creditNotesItbis: string;
+            /** Format: decimal */
+            purchaseItbisBilled: string;
+            /** Format: decimal */
+            purchaseItbisToCost: string;
+            /** Format: decimal */
+            purchaseItbisToAdvance: string;
+            customerWithholdings: components["schemas"]["It1Withholding"][];
+        };
+        It1Withholding: {
+            kind: string;
+            /** Format: int32 */
+            count: number;
+            /** Format: decimal */
+            amount: string;
         };
         ItemList: {
             items: components["schemas"]["ItemView"][];
@@ -7394,6 +7495,63 @@ export interface components {
             /** Format: date-time */
             secondApprovedAt: null | string;
             rejectedBy: null | string;
+        };
+        Report606: {
+            companyRnc: string;
+            period: string;
+            /** Format: int32 */
+            recordCount: number;
+            /** Format: decimal */
+            totalAmount: string;
+            records: components["schemas"]["Report606Record"][];
+        };
+        Report606Record: {
+            /** Format: uuid */
+            supplierInvoiceId: string;
+            recordKind: string;
+            supplierName: string;
+            rnc: null | string;
+            /** Format: int32 */
+            idType: null | number;
+            goodsType: null | string;
+            ncf: string;
+            ncfModified: null | string;
+            /** Format: date */
+            ncfDate: string;
+            /** Format: date */
+            paymentDate: null | string;
+            /** Format: decimal */
+            servicesAmount: string;
+            /** Format: decimal */
+            goodsAmount: string;
+            /** Format: decimal */
+            totalAmount: string;
+            /** Format: decimal */
+            itbisBilled: string;
+            /** Format: decimal */
+            itbisWithheld: string;
+            /** Format: decimal */
+            itbisProportional: string;
+            /** Format: decimal */
+            itbisToCost: string;
+            /** Format: decimal */
+            itbisToAdvance: string;
+            /** Format: decimal */
+            itbisPerceived: string;
+            isrWithholdingType: null | string;
+            /** Format: decimal */
+            isrWithheld: string;
+            /** Format: decimal */
+            isrPerceived: string;
+            /** Format: decimal */
+            selectiveTax: string;
+            /** Format: decimal */
+            otherTaxes: string;
+            /** Format: decimal */
+            legalTip: string;
+            /** Format: int32 */
+            paymentMethod: number;
+            warnings: string[];
         };
         ReportLineInput: {
             lineCode: string;
@@ -24987,6 +25145,160 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FiscalRuleList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetReport606: {
+        parameters: {
+            query: {
+                period: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report606"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetIt1Summary: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["It1Summary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetIr17Summary: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ir17Summary"];
                 };
             };
             /** @description Bad Request */

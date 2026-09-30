@@ -53,6 +53,8 @@ public sealed class CloseTests(PostgresFixture postgres)
         await using var h = await TestHarness.CreateAsync(postgres);
         var s = await h.CreateInvoicingSetupAsync();
         await h.EnableInvoicePostingAsync();   // includes the INVENTORY policy that GRNI-AGING reads
+        await h.ActivateRuleAsync(await h.FiscalActorsAsync(), "clasif", "CLASIF_606", Rochell.Tax.FiscalRuleKinds.Report606Classification, // TAX-606 classifies the purchase
+            """{"classes":{"CEMENTO":"09","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"}}""", new DateOnly(2026, 1, 1));
         var si = (await h.RunAsync(
             new RegisterSupplierInvoice(h.CompanyId, s.Clerk, "r", s.Purchasing.SupplierId, "B0100000001", Today(h), Today(h).AddDays(30), [new(s.PoLineId, 6m, 1500m)]),
             new RegisterSupplierInvoiceHandler())).ResultRef;
@@ -69,7 +71,7 @@ public sealed class CloseTests(PostgresFixture postgres)
 
         // STRUCT-COVERAGE (FIN1-03) only warns: this fixture's accounts have no class and there is no report structure.
         Assert.All(result.GetProperty("runs").EnumerateArray().Where(r => r.GetProperty("code").GetString() is not ("STRUCT-COVERAGE" or "MIGRATION-CLEARING")), r => Assert.Equal("MATCHED", r.GetProperty("status").GetString()));
-        Assert.Equal(28L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_run")); // 8 of VS#1 + BANK-GL and PAY-APPL (VS2-06) + MANUAL-EVIDENCE and TB-BALANCED (FIN1-02) + STRUCT-COVERAGE + MIGRATION-CLEARING + 5 of VS3-08 + 6 of MFG1-05 + 3 of FIS1-04
+        Assert.Equal(29L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_run")); // 8 of VS#1 + BANK-GL and PAY-APPL (VS2-06) + MANUAL-EVIDENCE and TB-BALANCED (FIN1-02) + STRUCT-COVERAGE + MIGRATION-CLEARING + 5 of VS3-08 + 6 of MFG1-05 + 3 of FIS1-04 + TAX-606 (FIS2-02)
         Assert.Equal(0L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_exception WHERE severity <> 'WARNING'"));
     }
 

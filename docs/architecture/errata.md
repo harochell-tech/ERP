@@ -734,6 +734,18 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS2-01-8 | FIS2-01 | The dev seed activates the classification (every raw material → 09). |
 | E-FIS2-01-9 | FIS2-01 | A classification is READY with its source alone; test runs on it are refused (`FISCAL_RULE_TESTS_NOT_APPLICABLE`); the activation gate is replaced accordingly. |
 | E-FIS2-01-10 | FIS2-01 | One classification active at a time (`ANOTHER_ITBIS_RULE_ACTIVE` with its own message). |
+| E-FIS2-02-1 | FIS2-02 | `GET /tax/reports/606?period=AAAAMM` (`fiscal_report:read`): header (company RNC, period, record count, total) and the 23 fields per record, amounts with 2 decimals. |
+| E-FIS2-02-2 | FIS2-02 | Posted, not reversed supplier invoices whose NCF date is in the month. |
+| E-FIS2-02-3 | FIS2-02 | Goods-and-services type from the classification active at the NCF date, for the category of the invoice's largest line; no active classification → blank and a warning. |
+| E-FIS2-02-4 | FIS2-02 | Payment date = the last live application that settles the invoice; unsettled → blank and method 4; withholdings from the invoice's determination, the ISR type from its rule. |
+| E-FIS2-02-5 | FIS2-02 | `?format=csv`: one row per record in the DGII tool's column order, dates AAAAMMDD, decimal point, no thousands separator, UTF-8 without BOM, no header row. |
+| E-FIS2-02-6 | FIS2-02 | `GET /tax/reports/it1-summary`: sales taxed / exempt by e-CF type, ITBIS invoiced, credit notes and their ITBIS, the 606's purchase ITBIS, customer withholdings. |
+| E-FIS2-02-7 | FIS2-02 | `GET /tax/reports/ir17-summary`: withholdings made to suppliers by tax and ISR type, with base and amount. |
+| E-FIS2-02-8 | FIS2-02 | TAX-606 (warning): the 606's ITBIS to advance vs ITBIS_RECOVERABLE posted in the month; ISR withholdings without type; purchases without classification. |
+| E-FIS2-02-9 | FIS2-02 | Migration 0059: TAX-606 (29 reconciliations) and the read-only function `tax.report_606` shared by the query and TAX-606. |
+| E-FIS2-02-10 | FIS2-02 | Tests F2-01…F2-06 with hand-derived amounts. |
+| E-FIS2-02-11 | FIS2-02 | The payment-month record of an earlier NCF repeats the invoiced amounts with ITBIS invoiced / to cost / to advance 0 (never advanced twice), the payment date, withholdings, type and method; to confirm with the accountant (X-1). |
+| E-FIS2-02-12 | FIS2-02 | The NCF-month record has the payment date (and the withholdings) only when the invoice was settled within that month, so a month's 606 is the same whenever it is generated. |
 
 Implementation rules derived from the above (no architectural change):
 
