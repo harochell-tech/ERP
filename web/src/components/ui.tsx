@@ -133,7 +133,33 @@ export function Field({
   );
 }
 
-type Found<K extends string> = Partial<Record<K, string | false | null | undefined>>;
+/**
+ * UX2-02 (E-UX2-1): a text input followed by its unit ("%", "días"). Inside a Field it receives the Field's ARIA attributes and
+ * passes them to the input, so the label, the message and getByLabel keep working.
+ */
+export function SuffixInput({
+  suffix,
+  value,
+  onChange,
+  placeholder,
+  inputMode = "decimal",
+  ...aria
+}: {
+  suffix: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  inputMode?: "decimal" | "numeric" | "text";
+} & AriaProps) {
+  return (
+    <span className="input-suffix">
+      <input value={value} inputMode={inputMode} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} {...aria} />
+      {suffix ? <span aria-hidden="true">{suffix}</span> : null}
+    </span>
+  );
+}
+
+type Found<K extends string> =Partial<Record<K, string | false | null | undefined>>;
 
 /**
  * E-UX1-01-6: per-field validation. `check({ field: message-or-falsy, … })` keeps the messages, focuses the first invalid input

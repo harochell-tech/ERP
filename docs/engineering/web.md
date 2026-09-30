@@ -305,3 +305,59 @@ Wave 1 of the UI audit (2026-09-30), on top of UX1-01a (display names and plant 
 `useSession().isMine(actor)` is the one place a screen asks whether a shown actor (name or e-mail) is the signed-in person, to
 hide a decision the server would refuse; it is always false for a superadministrator, whose four-eyes controls are waived
 (E-ADM-2-4).
+
+## UX2-02 — configuration screens (E-UX2-1…13)
+
+Wave 2 of the UI audit, on top of UX2-01 (`docs/engineering/configuration.md`). No API change; the helpers are pure and unit-tested
+(`tests/unit/ux2.test.ts`).
+
+- **Percentages (E-UX2-1).** `lib/decimal.ts`: `shiftDecimalPoint`, `fractionToPercent` ("0.005" → "0.5"), `percentToFraction`
+  ("12.5" → "0.125", "5 %" accepted, "1,5" refused) and `formatPercent` move the decimal point on the text only (no JavaScript
+  number). DECIMAL_PERCENT policy parameters and fiscal rule rates are typed and shown in % (`SuffixInput`, the unit after the
+  input); the server still receives fractions.
+- **Políticas (E-UX2-2/3/4)** `/contabilidad/politicas/` (`lib/policies.ts`). Each policy reads "Name (CODE)" with who prepares
+  and approves (`preparerRoles` / `approverRoles`); a table of the parameters by label and unit ("Registro tardío (horas)"), the
+  value in force ("2 %", "RD$ 1.00", "48 horas") and what it affects. The prepare form validates each value by its unit (whole days
+  / hours, amounts and percentages with ≤ 4 decimals, bounds compared as text) with the example and `affects` as hint. A DRAFT
+  version shows an approval card and its confirmation dialog with "En vigor → Propuesta" per parameter, changed rows highlighted
+  (`policyDiff`, string comparison; the version in force is the ACTIVE one covering today, end date exclusive). Warnings "Sin
+  versión en vigor" and "Falta el parámetro X: prepare una versión nueva" (definitions missing from the version in force). The
+  history of versions is folded.
+- **Mapas de cuentas (E-UX2-5/6)** `/contabilidad/mapas/`: roles by their names (`/finance/account-roles`); "Preparar mapa"
+  (`account_role_map:prepare`: role by name, optional item category, account — only control accounts for a control role and
+  regular accounts otherwise —, effective date) calls `prepare-account-role-map`; the preparer is not offered the approval; the
+  alert "Roles sin cuenta" lists roles with `usedByActiveRule && !mappedToday`; a table of the account roles with their
+  description. The journals page (`/auditoria/asientos/`) names the role too when the reader has `configuration:read`.
+- **Reglas contables (E-UX2-7)** `/contabilidad/reglas/`: each version reads "Genera: Débito <role> / Crédito <role>"
+  (`ruleLinesSummary`) and lists its lines with the explanation, placeholders shown readable ("{ncf}" → "[NCF]",
+  `humanizeExplanation`); the alert "Reglas en borrador" lists the DRAFT versions.
+- **Reglas fiscales (E-UX2-8)** `/fiscal/reglas/` (`lib/fiscalRuleForm.ts`): a guided form per kind — tax code, rate in %,
+  effect, exempt item categories (checkboxes), party types (checkboxes), base, ISR withholding type ("1"…"9"), the 606 class of
+  each raw-material category (with the 11 names) — builds exactly the JSON of `FiscalRuleDefinition` (the templates' key order,
+  2-space JSON, rates as fractions; a rate read from a stored definition keeps its text while the percentage still means it, so
+  every template round-trips byte for byte). "Ver JSON (avanzado)" shows the text that is sent and lets it be edited; a hand edit
+  the form can show updates the form, otherwise the JSON wins and the form is not validated. The regression cases are a table
+  (case, party type, item category, net, ITBIS, expected taxes with code, amount and effect) producing the same `cases` payload
+  (`rowsToCases`), with per-cell messages; the first case takes the rule's tax code and effect and leaves the expected amount to
+  the analyst. Stored definitions read in words ("ITBIS al 18 %", "Exentas: Bloque"), the JSON folded under "Ver JSON".
+- **Configuración (E-UX2-9/10/11).** The menu group **Configuración** (last) gathers Centro de configuración, Empresa, Plantas y
+  ubicaciones, Catálogo de cuentas, Estructuras de reporte, Mapas de cuentas, Reglas contables, Políticas, Fuentes fiscales and
+  Reglas fiscales; the routes did not change. The lit item is the longest matching href. `/configuracion/` (Centro de
+  configuración, `configuration:read`) reads `/reconciliation/setup-status`: the count of DONE steps out of 19, one card per area
+  with a traffic light (red when a step is PENDING, amber when one is WARNING, green when all are DONE) and the 19 steps in order
+  with their Spanish title, status, what is missing in words (`lib/setup.ts`: role names, report names, rule kinds, account role
+  and policy names from their queries) and a link to the screen that resolves each. Inicio shows "Puesta en marcha" (progress and
+  the next three steps) to `configuration:read` holders until `complete`. `/configuracion/empresa/`: the RNC (read only: another
+  RNC is another company), the legal name and the plants' names, editable with `company:manage` (step-up) after a confirmation
+  dialog; the session is read again so the header and plant names follow.
+- **Roles (E-UX2-12).** Usuarios y roles offers the roles of `/identity/roles`, shows the chosen role's description under the
+  select, a tooltip on each held role and a table "Roles y para qué sirven"; Solicitudes de rol shows the description under each
+  requested role.
+- **Notices.** "Mapa <role> → <account> guardado en borrador; falta su aprobación.", "Razón social cambiada a …", "Planta … renombrada: …".
+- **Tests.** Vitest `tests/unit/ux2.test.ts`: percent helpers, policy units / validation / diff / version in force, fiscal form
+  JSON per kind (templates round-trip exactly), case table payload, rule-line summary, setup labels, lights and progress.
+  Playwright `e2e/configuration-journey.spec.ts` (desktop and mobile): the Controller prepares PURCHASING typing 7.5 % and the
+  Aprobador de políticas sees "2 % → 7.5 %" highlighted in the card and the dialog and approves it; the Contador prepares a map
+  of "Cargos y comisiones bancarias" and the Controller approves it; the Analista fiscal configures a withholding with the guided
+  form and the advanced JSON reads exactly the server's; the Controller renames a plant, opens the Centro de configuración (19
+  steps) and sees "Puesta en marcha" on Inicio while setup is incomplete. Everything it creates starts next year.

@@ -55,3 +55,63 @@ export function formatDecimal(value: string | null | undefined, minFraction = 2)
 export function formatQuantity(value: string | null | undefined): string {
   return formatDecimal(value, 0);
 }
+
+/** "007.500" → "7.5", "-0.0" → "0": leading integer zeros and trailing fraction zeros removed, on the text alone. */
+function normalizeDecimal(negative: boolean, integer: string, fraction: string): string {
+  const int = integer.replace(/^0+(?=\d)/, "") || "0";
+  const frac = fraction.replace(/0+$/, "");
+  const zero = /^0*$/.test(int + frac);
+  return (negative && !zero ? "-" : "") + int + (frac ? `.${frac}` : "");
+}
+
+/**
+ * Moves the decimal point `places` positions (positive: to the right, × 10^places; negative: to the left) on the text alone, so no
+ * digit is rounded or lost ("0.005", 2 → "0.5"; "12.5", -2 → "0.125"). Null when the text is not a plain decimal.
+ */
+export function shiftDecimalPoint(value: string, places: number): string | null {
+  const match = /^(-)?(\d*)(?:\.(\d*))?$/.exec(value.trim());
+  if (!match || ((match[2] ?? "") === "" && (match[3] ?? "") === "") || !Number.isInteger(places)) {
+    return null;
+  }
+  const negative = match[1] === "-";
+  const integer = match[2] ?? "";
+  const fraction = match[3] ?? "";
+  const digits = integer + fraction;
+  const point = integer.length + places;
+  if (point <= 0) {
+    return normalizeDecimal(negative, "0", "0".repeat(-point) + digits);
+  }
+  if (point >= digits.length) {
+    return normalizeDecimal(negative, digits + "0".repeat(point - digits.length), "");
+  }
+  return normalizeDecimal(negative, digits.slice(0, point), digits.slice(point));
+}
+
+/**
+ * E-UX2-1: a fraction as the server keeps it ("0.05") as a percentage ("5"); "1" → "100", "0.005" → "0.5", "0.125" → "12.5".
+ * Text only, no JavaScript number. Null when the value is not a decimal.
+ */
+export function fractionToPercent(fraction: string | null | undefined): string | null {
+  return fraction === null || fraction === undefined ? null : shiftDecimalPoint(fraction, 2);
+}
+
+/**
+ * E-UX2-1: a percentage typed by the user ("5", "12.5", "5 %") as the fraction the server expects ("0.05", "0.125"). A comma is
+ * not a decimal separator here ("1,5" is refused). Null when the text is not a decimal.
+ */
+export function percentToFraction(percent: string | null | undefined): string | null {
+  if (percent === null || percent === undefined) {
+    return null;
+  }
+  const text = percent.replace(/%/g, "").replace(/\s/g, "");
+  return text === "" ? null : shiftDecimalPoint(text, -2);
+}
+
+/** A fraction shown as a percentage: "0.05" → "5 %"; the value as is when it is not a decimal; "—" when empty. */
+export function formatPercent(fraction: string | null | undefined): string {
+  if (fraction === null || fraction === undefined || fraction === "") {
+    return "—";
+  }
+  const percent = fractionToPercent(fraction);
+  return percent === null ? fraction : `${percent} %`;
+}

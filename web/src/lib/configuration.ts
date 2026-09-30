@@ -88,3 +88,52 @@ export function initialPolicyValues(definitions: readonly PolicyDefinitionLike[]
   const source = versions.find((v) => v.status === "ACTIVE") ?? [...versions].sort((a, b) => b.version - a.version)[0];
   return Object.fromEntries(definitions.map((d) => [d.paramCode, source?.parameters[d.paramCode] ?? ""]));
 }
+
+export interface RuleLineLike {
+  side: string;
+  accountRole: string;
+  accountRoleName: string | null;
+  explanation?: string | null;
+}
+
+/** E-UX2-7: what a posting rule version generates — "Genera: Débito <role> / Crédito <role>" (roles of one side joined by " + "). */
+export function ruleLinesSummary(lines: readonly RuleLineLike[] | null | undefined): string {
+  if (!lines || lines.length === 0) {
+    return "";
+  }
+  const side = (s: string) => [...new Set(lines.filter((l) => l.side === s).map((l) => l.accountRoleName ?? l.accountRole))].join(" + ");
+  const parts = [side("DEBIT") && `Débito ${side("DEBIT")}`, side("CREDIT") && `Crédito ${side("CREDIT")}`].filter(Boolean);
+  return `Genera: ${parts.join(" / ")}`;
+}
+
+const PLACEHOLDERS: Readonly<Record<string, string>> = {
+  ncf: "NCF",
+  delivery_no: "n.º de conduce",
+  invoice_no: "n.º de factura",
+  receipt_no: "n.º de recibo",
+  order_no: "n.º de pedido",
+  deposit_no: "n.º de depósito",
+  credit_note_no: "n.º de nota de crédito",
+  payment_no: "n.º de pago",
+  po_no: "n.º de orden de compra",
+  gr_no: "n.º de recepción",
+  run_no: "n.º de corrida",
+  lot_code: "lote",
+  month: "mes",
+  quantity: "cantidad",
+  collector: "colector de costos",
+  certificate_no: "n.º de certificado",
+  material_code: "material",
+  reason: "motivo",
+  description: "descripción",
+  value_date: "fecha valor",
+  cutover_date: "fecha de corte",
+};
+
+/** E-UX2-7: an explanation template with its {placeholders} made readable ("Factura {ncf}" → "Factura [NCF]"). */
+export function humanizeExplanation(template: string | null | undefined): string {
+  if (!template) {
+    return "";
+  }
+  return template.replace(/\{([a-z_]+)\}/g, (_, name: string) => `[${PLACEHOLDERS[name] ?? name.replace(/_/g, " ")}]`);
+}

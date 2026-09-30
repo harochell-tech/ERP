@@ -30,7 +30,6 @@ export const NAV: readonly NavGroup[] = [
       { href: "/maestros/proveedores/", label: "Proveedores", permission: "master_data:read" },
       { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
       { href: "/maestros/cuentas-bancarias/", label: "Cuentas bancarias de la empresa", permission: "bank:read" },
-      { href: "/maestros/plantas/", label: "Plantas y ubicaciones", permission: "master_data:read" },
       { href: "/maestros/productos-terminados/", label: "Productos terminados", permission: "master_data:read" },
       { href: "/maestros/costos-estandar/", label: "Costos estándar", permission: "sales:read" },
       { href: "/maestros/precios/", label: "Lista de precios", permission: "sales:read" },
@@ -106,19 +105,12 @@ export const NAV: readonly NavGroup[] = [
       { href: "/contabilidad/balanza/", label: "Balanza", permission: "ledger:read" },
       { href: "/contabilidad/mayor/", label: "Mayor", permission: "ledger:read" },
       { href: "/contabilidad/estados/", label: "Estados financieros", permission: "ledger:read" },
-      { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
-      { href: "/contabilidad/estructuras/", label: "Estructuras de reporte", permission: "configuration:read" },
-      { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
-      { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
-      { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
       { href: "/contabilidad/apertura/", label: "Apertura de inventario", permission: "configuration:read" },
     ],
   },
   {
     title: "Fiscal",
     items: [
-      { href: "/fiscal/fuentes/", label: "Fuentes fiscales", permission: "configuration:read" },
-      { href: "/fiscal/reglas/", label: "Reglas fiscales", permission: "configuration:read" },
       { href: "/fiscal/autorizaciones/", label: "Autorizaciones fiscales", permission: "sales:read" }, // FIS1-05 (E-FIS1-05-1)
       { href: "/fiscal/reportes/", label: "Reportes fiscales", permission: "fiscal_report:read" }, // FIS2-03 (E-FIS2-03-1)
     ],
@@ -142,6 +134,22 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/seguridad/usuarios/", label: "Usuarios y roles", permission: "iam:read" },
       { href: "/seguridad/solicitudes/", label: "Solicitudes de rol", permission: "iam:read" },
+    ],
+  },
+  {
+    // UX2-02 (E-UX2-9): the company's setup in one place; the screens keep their routes.
+    title: "Configuración",
+    items: [
+      { href: "/configuracion/", label: "Centro de configuración", permission: "configuration:read" },
+      { href: "/configuracion/empresa/", label: "Empresa", permission: "configuration:read" },
+      { href: "/maestros/plantas/", label: "Plantas y ubicaciones", permission: "master_data:read" },
+      { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
+      { href: "/contabilidad/estructuras/", label: "Estructuras de reporte", permission: "configuration:read" },
+      { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
+      { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
+      { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
+      { href: "/fiscal/fuentes/", label: "Fuentes fiscales", permission: "configuration:read" },
+      { href: "/fiscal/reglas/", label: "Reglas fiscales", permission: "configuration:read" },
     ],
   },
 ];
@@ -169,11 +177,20 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/produccion/receta/": "/produccion/recetas/",
   "/fiscal/autorizacion/": "/fiscal/autorizaciones/",
   "/ventas/cotizacion/": "/ventas/cotizaciones/",
+  "/contabilidad/estructura/": "/contabilidad/estructuras/",
 };
 
-function isActive(pathname: string, href: string): boolean {
+function matches(pathname: string, href: string): boolean {
   const parent = Object.entries(DETAIL_PARENTS).find(([detail]) => pathname.startsWith(detail))?.[1];
   return pathname.startsWith(href) || parent === href;
+}
+
+/** The item lit for a path: the longest matching href, so "/configuracion/empresa/" does not also light "/configuracion/". */
+function isActive(pathname: string, href: string): boolean {
+  if (!matches(pathname, href)) {
+    return false;
+  }
+  return !NAV.some((g) => g.items.some((i) => i.href.length > href.length && i.href.startsWith(href) && matches(pathname, i.href)));
 }
 
 

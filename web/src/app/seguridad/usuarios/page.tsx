@@ -12,6 +12,7 @@ import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 
 type User = Schemas["UserView"];
+type Role = Schemas["RoleView"];
 
 /** Roles offered in the request form (PROBADOR is for test databases only and is granted by the deployment CLI). */
 const REQUESTABLE = Object.keys(ROLES).filter((code) => code !== "PROBADOR");
@@ -23,12 +24,15 @@ function userText(user: User): string {
 // UI-01 / E-UI01-4/5: users are created with the deployment CLI; here the security administrator requests company-wide role
 // assignments and revocations (role:assign / role:revoke, step-up) and a second approver decides them (Solicitudes de rol).
 // UX1-01b (E-UX1-01-3): people read "Name · e-mail" — the same text in the table and in the user select.
-function RequestForm({ users, onDone }: { users: User[]; onDone: () => void }) {
+function RequestForm({ users, roles, onDone }: { users: User[]; roles: readonly Role[]; onDone: () => void }) {
   const request = useCommand("request-role", "/api/v1/companies/{companyId}/identity/request-role-assignment");
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("");
   const [sent, setSent] = useState(false);
   const fe = useFieldErrors<"userId" | "role">();
+  // UX2-02 (E-UX2-12): the roles people may hold, from Identity.ListRoles, each with what it is for.
+  const offered = roles.length > 0 ? roles.map((r) => r.code) : REQUESTABLE;
+  const description = roles.find((r) => r.code === role)?.description;
   return (
     <form
       className="card"
@@ -63,12 +67,12 @@ function RequestForm({ users, onDone }: { users: User[]; onDone: () => void }) {
             ))}
         </select>
       </Field>
-      <Field label="Rol" required error={fe.errors.role}>
+      <Field label="Rol" required error={fe.errors.role} hint={description ?? undefined}>
         <select value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="">Elegir…</option>
-          {REQUESTABLE.map((code) => (
+          {offered.map((code) => (
             <option key={code} value={code}>
-              {ROLES[code]}
+              {ROLES[code] ?? roles.find((r) => r.code === code)?.name ?? code}
             </option>
           ))}
         </select>
@@ -117,13 +121,16 @@ function RevokeButton({ user, roleCode, plantId, onDone }: { user: User; roleCod
 export default function Page() {
   const { companyId, can, plantName } = useSession();
   const { data, error, reload } = useLoad(can("iam:read") ? () => query("/api/v1/companies/{companyId}/identity/users", { path: { companyId } }) : null, [companyId]);
+  const roles = useLoad(can("iam:read") ? () => query("/api/v1/companies/{companyId}/identity/roles", { path: { companyId } }) : null, [companyId]);
+  const roleItems = roles.data?.items ?? [];
+  const describe = (code: string) => roleItems.find((r) => r.code === code)?.description ?? undefined;
   if (!can("iam:read")) {
     return <NoPermission />;
   }
   return (
     <>
       <h1>Usuarios y roles</h1>
-      {data && can("role:assign") ? <RequestForm users={data.items} onDone={reload} /> : null}
+      {data && can("role:assign") ? <RequestForm users={data.items} roles={roleItems} onDone={reload} /> : null}
       {data === null ? (
         <Loading error={error} />
       ) : (
@@ -152,7 +159,7 @@ export default function Page() {
                   ) : (
                     u.roles.map((r) => (
                       <div key={r.assignmentId} className="inline-form" style={{ marginBottom: 4 }}>
-                        <span>
+                        <span title={describe(r.roleCode)}>
                           {ROLES[r.roleCode] ?? r.roleName}
                           {r.plantId || r.plantCode ? ` (planta ${plantName(r.plantId ?? r.plantCode, r.plantCode ?? undefined)})` : ""}{" "}
                           <span className="muted">desde {formatDateTime(r.validFrom)}</span>
@@ -166,6 +173,29 @@ export default function Page() {
             ))}
           </tbody>
         </table></div>
+      )}
+      <h2>Roles y para qué sirven</h2>
+      {roles.data === null ? (
+        <Loading error={roles.error} />
+      ) : (
+        <div className="table-wrap">
+          <table data-testid="role-catalogue">
+            <thead>
+              <tr>
+                <th>Rol</th>
+                <th>Para qué sirve</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roleItems.map((r) => (
+                <tr key={r.code}>
+                  <td>{ROLES[r.code] ?? r.name}</td>
+                  <td className="wrap">{r.description ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   );

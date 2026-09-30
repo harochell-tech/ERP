@@ -62,6 +62,9 @@ export default function Page() {
     can("iam:read") ? () => query("/api/v1/companies/{companyId}/identity/role-requests", { path: { companyId }, query: { status, limit: 200 } }) : null,
     [companyId, status],
   );
+  // UX2-02 (E-UX2-12): what each role is for, from Identity.ListRoles.
+  const roles = useLoad(can("iam:read") ? () => query("/api/v1/companies/{companyId}/identity/roles", { path: { companyId } }) : null, [companyId]);
+  const describe = (code: string) => roles.data?.items.find((x) => x.code === code)?.description ?? null;
   if (!can("iam:read")) {
     return <NoPermission />;
   }
@@ -98,9 +101,10 @@ export default function Page() {
                 <td className="wrap">
                   <Person name={r.userDisplayName} email={r.userEmail} fallback={r.userId} />
                 </td>
-                <td>
+                <td className="wrap">
                   {r.action === "ASSIGN" ? "Asignar" : "Revocar"} {ROLES[r.roleCode] ?? r.roleName}
                   {r.plantId || r.plantCode ? ` (planta ${plantName(r.plantId ?? r.plantCode, r.plantCode ?? undefined)})` : ""}
+                  {describe(r.roleCode) ? <div className="muted" style={{ fontSize: 13 }}>{describe(r.roleCode)}</div> : null}
                 </td>
                 <td className="wrap">
                   {r.requestedBy ?? "—"} <span className="muted">{formatDateTime(r.requestedAt)}</span>
