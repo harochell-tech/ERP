@@ -167,3 +167,32 @@ public sealed class ListPlantsHandler : IQueryHandler<ListPlants>
         return ApiJson.Serialize(new PlantList(plants.Select(p => p with { Locations = locations[p.PlantId].ToList() }).ToList()));
     }
 }
+
+/// <summary>
+/// E-UX3-11: the units of measure (<c>md.uom</c>): code and dimension (MASS, VOLUME, COUNT); the catalogue has no name column. A
+/// plant-scoped reader passes its plant only to be authorized.
+/// </summary>
+public sealed record ListUoms(Guid CompanyId, Guid SessionId, Guid? PlantId = null) : IPlantScopedQuery;
+
+public sealed record UomView(string Code, string Dimension);
+
+public sealed record UomList(IReadOnlyList<UomView> Items);
+
+[RequiresPermission("master_data:read")]
+public sealed class ListUomsHandler : IQueryHandler<ListUoms>
+{
+    public string QueryType => "MasterData.ListUoms";
+
+    public async Task<string> HandleAsync(ListUoms query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT uom_code, dimension FROM md.uom ORDER BY dimension, uom_code",
+            r => new UomView(r.GetString(0), r.GetString(1)),
+            cancellationToken).ConfigureAwait(false);
+        return ApiJson.Serialize(new UomList(items));
+    }
+}

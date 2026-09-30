@@ -69,6 +69,7 @@ public sealed class ListPurchaseOrdersHandler : IQueryHandler<ListPurchaseOrders
 /// <summary>One purchase order with its lines, receipts and status history.</summary>
 public sealed record GetPurchaseOrder(Guid CompanyId, Guid SessionId, Guid PurchaseOrderId, Guid? PlantId = null) : IPlantScopedQuery;
 
+/// <summary>E-UX3-5: <see cref="OpenQuantity"/> = ordered − received, never below 0.</summary>
 public sealed record PurchaseOrderLineView(
     Guid PoLineId,
     int LineNo,
@@ -82,7 +83,8 @@ public sealed record PurchaseOrderLineView(
     decimal QtyOverReceiptApproved,
     decimal QtyReceived,
     decimal QtyInvoiced,
-    long Version);
+    long Version,
+    decimal OpenQuantity);
 
 public sealed record PurchaseOrderReceiptView(Guid GoodsReceiptId, string GrNo, string DocumentStatus, string AccountingStatus, DateTime OccurredAt);
 
@@ -141,7 +143,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             context.Transaction,
             """
             SELECT l.po_line_id, l.line_no, l.item_id, i.code, i.description, l.uom, l.qty_ordered, l.unit_price, l.receipt_tolerance_pct,
-                   l.qty_over_receipt_approved, l.qty_received, l.qty_invoiced, l.version
+                   l.qty_over_receipt_approved, l.qty_received, l.qty_invoiced, l.version, greatest(l.qty_ordered - l.qty_received, 0)
             FROM pur.purchase_order_line l
             JOIN md.item i ON i.item_id = l.item_id
             WHERE l.company_id = @c AND l.po_id = @id
@@ -149,7 +151,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             """,
             r => new PurchaseOrderLineView(
                 r.GetGuid(0), r.GetInt32(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetDecimal(6), r.GetDecimal(7),
-                r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10), r.GetDecimal(11), r.GetInt64(12)),
+                r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10), r.GetDecimal(11), r.GetInt64(12), r.GetDecimal(13)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.PurchaseOrderId)).ConfigureAwait(false);
@@ -170,5 +172,110 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
 
         var history = await StateHistory.ReadAsync(context, PurchaseOrderStore.Aggregate, query.PurchaseOrderId, cancellationToken).ConfigureAwait(false);
         return ApiJson.Serialize(header with { Lines = lines, GoodsReceipts = receipts, History = history });
+    }
+}
+
+/// <summary>
+/// E-UX3-5: the orders the warehouse can receive against — APPROVED and PARTIALLY_RECEIVED, oldest first, of the company or of one
+/// plant — with each line's open and receivable quantities.
+/// </summary>
+public sealed record ListPurchaseOrdersToReceive(
+    Guid CompanyId,
+    Guid SessionId,
+    Guid? PlantId = null,
+    Guid? SupplierId = null,
+    int Limit = 50,
+    int Offset = 0) : IPlantScopedQuery;
+
+/// <summary>
+/// <see cref="OpenQuantity"/> = ordered − received (not below 0). <see cref="MaxReceivable"/> is what one receipt may still take,
+/// exactly as PostGoodsReceipt validates it: ordered × (1 + receipt tolerance) + approved over-receipt − received, cut to the six
+/// decimals a receipt quantity may have, not below 0.
+/// </summary>
+public sealed record PurchaseOrderLineToReceive(
+    Guid PoLineId,
+    int LineNo,
+    Guid ItemId,
+    string ItemCode,
+    string ItemDescription,
+    string Uom,
+    decimal QtyOrdered,
+    decimal QtyReceived,
+    decimal OpenQuantity,
+    decimal MaxReceivable,
+    long Version);
+
+public sealed record PurchaseOrderToReceive(
+    Guid PurchaseOrderId,
+    string PoNo,
+    Guid SupplierId,
+    string SupplierName,
+    Guid PlantId,
+    string PlantCode,
+    DateOnly OrderDate,
+    DateTime? ApprovedAt,
+    string Status,
+    long Version,
+    IReadOnlyList<PurchaseOrderLineToReceive> Lines);
+
+public sealed record PurchaseOrderToReceiveList(IReadOnlyList<PurchaseOrderToReceive> Items, int Limit, int Offset);
+
+/// <summary>Read with <c>purchase_order:read</c>, the permission the receive screen already needs to open an order (Almacenista holds it).</summary>
+[RequiresPermission("purchase_order:read")]
+public sealed class ListPurchaseOrdersToReceiveHandler : IQueryHandler<ListPurchaseOrdersToReceive>
+{
+    public string QueryType => "Procurement.ListPurchaseOrdersToReceive";
+
+    public async Task<string> HandleAsync(ListPurchaseOrdersToReceive query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        QueryErrors.EnsurePaging(query.Limit, query.Offset);
+        var orders = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT po.po_id, po.po_no, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.approved_at, po.status::text, po.version
+            FROM pur.purchase_order po
+            JOIN md.party p ON p.party_id = po.party_id
+            JOIN md.plant pl ON pl.plant_id = po.plant_id
+            WHERE po.company_id = @c AND po.status::text IN ('APPROVED', 'PARTIALLY_RECEIVED')
+              AND (CAST(@plant AS uuid) IS NULL OR po.plant_id = CAST(@plant AS uuid))
+              AND (CAST(@supplier AS uuid) IS NULL OR po.party_id = CAST(@supplier AS uuid))
+            ORDER BY po.order_date, po.po_no
+            LIMIT @limit OFFSET @offset
+            """,
+            r => new PurchaseOrderToReceive(
+                r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.NullableUtc(7), r.GetString(8), r.GetInt64(9), []),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("plant", query.PlantId),
+            ("supplier", query.SupplierId),
+            ("limit", query.Limit),
+            ("offset", query.Offset)).ConfigureAwait(false);
+
+        var lines = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT l.po_id, l.po_line_id, l.line_no, l.item_id, i.code, i.description, l.uom, l.qty_ordered, l.qty_received,
+                   greatest(l.qty_ordered - l.qty_received, 0),
+                   greatest(trunc(l.qty_ordered * (1 + l.receipt_tolerance_pct) + l.qty_over_receipt_approved - l.qty_received, 6), 0),
+                   l.version
+            FROM pur.purchase_order_line l
+            JOIN md.item i ON i.item_id = l.item_id
+            WHERE l.company_id = @c AND l.po_id = ANY(@ids)
+            ORDER BY l.po_id, l.line_no
+            """,
+            r => (PoId: r.GetGuid(0), Line: new PurchaseOrderLineToReceive(
+                r.GetGuid(1), r.GetInt32(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9),
+                r.GetDecimal(10), r.GetInt64(11))),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("ids", orders.Select(o => o.PurchaseOrderId).ToArray())).ConfigureAwait(false))
+            .ToLookup(l => l.PoId, l => l.Line);
+
+        var items = orders.Select(o => o with { Lines = lines[o.PurchaseOrderId].ToList() }).ToList();
+        return ApiJson.Serialize(new PurchaseOrderToReceiveList(items, query.Limit, query.Offset));
     }
 }

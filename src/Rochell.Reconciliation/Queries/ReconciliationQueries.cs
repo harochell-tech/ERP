@@ -102,10 +102,13 @@ public sealed class ListPeriodsHandler : IQueryHandler<ListPeriods>
 /// <summary>Reconciliation runs, newest first, optionally of one reconciliation.</summary>
 public sealed record ListReconciliationRuns(Guid CompanyId, Guid SessionId, string? ReconCode = null, int Limit = 50, int Offset = 0) : IQuery;
 
+/// <summary>E-UX3-2: <see cref="Name"/> and <see cref="Guidance"/> are the reconciliation's Spanish name and what to do about its findings.</summary>
 public sealed record ReconciliationRunSummary(
     Guid RunId,
     string ReconCode,
     string Description,
+    string Name,
+    string Guidance,
     DateTime AsOf,
     decimal? TotalA,
     decimal? TotalB,
@@ -143,7 +146,7 @@ public sealed class ListReconciliationRunsHandler : IQueryHandler<ListReconcilia
     }
 
     internal const string RunSelect = """
-        SELECT r.run_id, r.recon_code, d.description, r.as_of, r.total_a, r.total_b, r.difference, r.status,
+        SELECT r.run_id, r.recon_code, d.description, d.name, d.guidance, r.as_of, r.total_a, r.total_b, r.difference, r.status,
                (SELECT count(*)::int FROM rec.recon_exception x WHERE x.run_id = r.run_id)
         FROM rec.recon_run r
         JOIN rec.recon_definition d ON d.recon_code = r.recon_code
@@ -151,10 +154,14 @@ public sealed class ListReconciliationRunsHandler : IQueryHandler<ListReconcilia
         """;
 
     internal static ReconciliationRunSummary MapRun(System.Data.Common.DbDataReader r)
-        => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.Utc(3), r.NullableDecimal(4), r.NullableDecimal(5), r.NullableDecimal(6), r.GetString(7), r.GetInt32(8));
+        => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.Utc(5), r.NullableDecimal(6), r.NullableDecimal(7), r.NullableDecimal(8), r.GetString(9), r.GetInt32(10));
 }
 
-/// <summary>One reconciliation run with its exceptions (what differs, how it is classified and which component it blocks).</summary>
+/// <summary>
+/// One reconciliation run with its exceptions (what differs, how it is classified and which component it blocks). E-UX3-2/3: each
+/// exception carries its classification's Spanish name and guidance and, for the key shapes <see cref="MatchLabels"/> recognises, a
+/// readable label (null otherwise: the screen shows the raw key).
+/// </summary>
 public sealed record GetReconciliationRun(Guid CompanyId, Guid SessionId, Guid RunId) : IQuery;
 
 public sealed record ReconciliationExceptionView(
@@ -166,7 +173,10 @@ public sealed record ReconciliationExceptionView(
     string Severity,
     string? Component,
     string Status,
-    string? Resolution);
+    string? Resolution,
+    string? ClassificationName,
+    string? Guidance,
+    string? MatchLabel);
 
 public sealed record ReconciliationRunDetail(ReconciliationRunSummary Run, IReadOnlyList<ReconciliationExceptionView> Exceptions);
 
@@ -193,16 +203,50 @@ public sealed class GetReconciliationRunHandler : IQueryHandler<GetReconciliatio
             context.Connection,
             context.Transaction,
             """
-            SELECT exception_id, match_key, value_a, value_b, classification, severity, component, status, resolution
-            FROM rec.recon_exception
-            WHERE company_id = @c AND run_id = @id
-            ORDER BY severity, match_key
+            SELECT x.exception_id, x.match_key, x.value_a, x.value_b, x.classification, x.severity, x.component, x.status, x.resolution, k.name, k.guidance
+            FROM rec.recon_exception x
+            LEFT JOIN rec.recon_classification k ON k.classification = x.classification
+            WHERE x.company_id = @c AND x.run_id = @id
+            ORDER BY x.severity, x.match_key
             """,
             r => new ReconciliationExceptionView(
-                r.GetGuid(0), r.GetString(1), r.NullableDecimal(2), r.NullableDecimal(3), r.GetString(4), r.GetString(5), r.NullableString(6), r.GetString(7), r.NullableString(8)),
+                r.GetGuid(0), r.GetString(1), r.NullableDecimal(2), r.NullableDecimal(3), r.GetString(4), r.GetString(5), r.NullableString(6), r.GetString(7), r.NullableString(8),
+                r.NullableString(9), r.NullableString(10), null),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.RunId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new ReconciliationRunDetail(run, exceptions));
+        var labels = await MatchLabels.ResolveAsync(context, run.ReconCode, [.. exceptions.Select(x => x.MatchKey).Distinct(StringComparer.Ordinal)], cancellationToken).ConfigureAwait(false);
+        return ApiJson.Serialize(new ReconciliationRunDetail(run, [.. exceptions.Select(x => x with { MatchLabel = labels.GetValueOrDefault(x.MatchKey) })]));
+    }
+}
+
+/// <summary>E-UX3-2: the reconciliations with their Spanish name, what to do about their findings, severity and the components they block.</summary>
+public sealed record ListReconciliationDefinitions(Guid CompanyId, Guid SessionId) : IQuery;
+
+public sealed record ReconciliationDefinitionView(string ReconCode, string Name, string Guidance, string Severity, IReadOnlyList<string> BlockingComponents);
+
+public sealed record ReconciliationDefinitionList(IReadOnlyList<ReconciliationDefinitionView> Items);
+
+[RequiresPermission("reconciliation:read")]
+public sealed class ListReconciliationDefinitionsHandler : IQueryHandler<ListReconciliationDefinitions>
+{
+    public string QueryType => "Reconciliation.ListReconciliationDefinitions";
+
+    public async Task<string> HandleAsync(ListReconciliationDefinitions query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT d.recon_code, d.name, d.guidance, d.severity,
+                   coalesce((SELECT array_agg(b.component ORDER BY b.component) FROM rec.recon_blocking b WHERE b.recon_code = d.recon_code), '{}')
+            FROM rec.recon_definition d
+            ORDER BY d.recon_code
+            """,
+            r => new ReconciliationDefinitionView(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetFieldValue<string[]>(4)),
+            cancellationToken).ConfigureAwait(false);
+        return ApiJson.Serialize(new ReconciliationDefinitionList(items));
     }
 }

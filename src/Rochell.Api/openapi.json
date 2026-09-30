@@ -20385,6 +20385,80 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/master-data/uoms": {
+      "get": {
+        "tags": [
+          "MasterData"
+        ],
+        "operationId": "ListUoms",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "plantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UomList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/master-data/rnc/{rnc}": {
       "get": {
         "tags": [
@@ -20707,6 +20781,104 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/procurement/purchase-orders/to-receive": {
+      "get": {
+        "tags": [
+          "Procurement"
+        ],
+        "operationId": "ListPurchaseOrdersToReceive",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "plantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "supplierId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseOrderToReceiveList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21506,6 +21678,157 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/reconciliation/periods/{periodId}/close-readiness": {
+      "get": {
+        "tags": [
+          "Reconciliation"
+        ],
+        "operationId": "GetCloseReadiness",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "periodId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseReadiness"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/reconciliation/definitions": {
+      "get": {
+        "tags": [
+          "Reconciliation"
+        ],
+        "operationId": "ListReconciliationDefinitions",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationDefinitionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -24152,6 +24475,91 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DeliveryDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/sales/deliveries/{deliveryId}/print": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "operationId": "GetDeliveryPrint",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPrint"
                 }
               }
             }
@@ -30325,6 +30733,126 @@
         },
         "additionalProperties": false
       },
+      "CloseReadiness": {
+        "required": [
+          "periodId",
+          "startsOn",
+          "endsOn",
+          "ended",
+          "sealed",
+          "components"
+        ],
+        "type": "object",
+        "properties": {
+          "periodId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startsOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "endsOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "ended": {
+            "type": "boolean"
+          },
+          "sealed": {
+            "type": "boolean"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CloseReadinessComponent"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CloseReadinessComponent": {
+        "required": [
+          "component",
+          "status",
+          "ended",
+          "sealed",
+          "ready",
+          "reconciliations"
+        ],
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "ended": {
+            "type": "boolean"
+          },
+          "sealed": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "reconciliations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CloseReadinessReconciliation"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CloseReadinessReconciliation": {
+        "required": [
+          "reconCode",
+          "name",
+          "runId",
+          "runStatus",
+          "runAt",
+          "blockingErrors"
+        ],
+        "type": "object",
+        "properties": {
+          "reconCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "runStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "runAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "blockingErrors": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "CloseShortSalesOrder": {
         "required": [
           "salesOrderId",
@@ -31213,7 +31741,8 @@
           "postingEventId",
           "lines",
           "fiscalRecord",
-          "history"
+          "history",
+          "invoiceIssuedById"
         ],
         "type": "object",
         "properties": {
@@ -31260,6 +31789,13 @@
             "items": {
               "$ref": "#/components/schemas/StateChange"
             }
+          },
+          "invoiceIssuedById": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -32344,6 +32880,241 @@
             "format": "uuid"
           },
           "quantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeliveryPrint": {
+        "required": [
+          "issuerName",
+          "issuerRnc",
+          "customerName",
+          "customerRnc",
+          "siteAddress",
+          "plantCode",
+          "plantName",
+          "deliveryNo",
+          "orderNo",
+          "orderDate",
+          "plannedOn",
+          "status",
+          "deliveryTermCode",
+          "gateOutAt",
+          "vehiclePlate",
+          "driverName",
+          "customerVehiclePlate",
+          "customerDriverName",
+          "grossKg",
+          "tareKg",
+          "netKg",
+          "weighTicketRef",
+          "lines",
+          "receivedByName",
+          "receivedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "issuerName": {
+            "type": "string"
+          },
+          "issuerRnc": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerRnc": {
+            "type": "string"
+          },
+          "siteAddress": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plantCode": {
+            "type": "string"
+          },
+          "plantName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deliveryNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "orderDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "plannedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "deliveryTermCode": {
+            "type": "string"
+          },
+          "gateOutAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "vehiclePlate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "driverName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "customerVehiclePlate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "customerDriverName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "grossKg": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "tareKg": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "netKg": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "weighTicketRef": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPrintLine"
+            }
+          },
+          "receivedByName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "receivedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeliveryPrintLine": {
+        "required": [
+          "lineNo",
+          "itemCode",
+          "itemDescription",
+          "uom",
+          "qtyPlanned",
+          "qtyIssued",
+          "qtyDelivered",
+          "lots"
+        ],
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemDescription": {
+            "type": "string"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "qtyPlanned": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "qtyIssued": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "qtyDelivered": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "lots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryPrintLot"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeliveryPrintLot": {
+        "required": [
+          "lotCode",
+          "sourceLocationCode",
+          "baseQuantity"
+        ],
+        "type": "object",
+        "properties": {
+          "lotCode": {
+            "type": "string"
+          },
+          "sourceLocationCode": {
+            "type": "string"
+          },
+          "baseQuantity": {
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
             "format": "decimal"
@@ -37896,6 +38667,70 @@
         },
         "additionalProperties": false
       },
+      "PurchaseOrderLineToReceive": {
+        "required": [
+          "poLineId",
+          "lineNo",
+          "itemId",
+          "itemCode",
+          "itemDescription",
+          "uom",
+          "qtyOrdered",
+          "qtyReceived",
+          "openQuantity",
+          "maxReceivable",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "poLineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lineNo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemDescription": {
+            "type": "string"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "qtyOrdered": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "qtyReceived": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "openQuantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "maxReceivable": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "PurchaseOrderLineView": {
         "required": [
           "poLineId",
@@ -37910,7 +38745,8 @@
           "qtyOverReceiptApproved",
           "qtyReceived",
           "qtyInvoiced",
-          "version"
+          "version",
+          "openQuantity"
         ],
         "type": "object",
         "properties": {
@@ -37968,6 +38804,11 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "openQuantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -38072,6 +38913,95 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PurchaseOrderToReceive": {
+        "required": [
+          "purchaseOrderId",
+          "poNo",
+          "supplierId",
+          "supplierName",
+          "plantId",
+          "plantCode",
+          "orderDate",
+          "approvedAt",
+          "status",
+          "version",
+          "lines"
+        ],
+        "type": "object",
+        "properties": {
+          "purchaseOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "poNo": {
+            "type": "string"
+          },
+          "supplierId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "plantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plantCode": {
+            "type": "string"
+          },
+          "orderDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderLineToReceive"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PurchaseOrderToReceiveList": {
+        "required": [
+          "items",
+          "limit",
+          "offset"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOrderToReceive"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -39225,6 +40155,52 @@
         },
         "additionalProperties": false
       },
+      "ReconciliationDefinitionList": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReconciliationDefinitionView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReconciliationDefinitionView": {
+        "required": [
+          "reconCode",
+          "name",
+          "guidance",
+          "severity",
+          "blockingComponents"
+        ],
+        "type": "object",
+        "properties": {
+          "reconCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "guidance": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "blockingComponents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "ReconciliationExceptionView": {
         "required": [
           "exceptionId",
@@ -39235,7 +40211,10 @@
           "severity",
           "component",
           "status",
-          "resolution"
+          "resolution",
+          "classificationName",
+          "guidance",
+          "matchLabel"
         ],
         "type": "object",
         "properties": {
@@ -39278,6 +40257,24 @@
             "type": "string"
           },
           "resolution": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "classificationName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "guidance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "matchLabel": {
             "type": [
               "null",
               "string"
@@ -39335,6 +40332,8 @@
           "runId",
           "reconCode",
           "description",
+          "name",
+          "guidance",
           "asOf",
           "totalA",
           "totalB",
@@ -39352,6 +40351,12 @@
             "type": "string"
           },
           "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "guidance": {
             "type": "string"
           },
           "asOf": {
@@ -42793,7 +43798,12 @@
           "lines",
           "taxes",
           "apDocument",
-          "history"
+          "history",
+          "itbisTotal",
+          "grossTotal",
+          "openAmount",
+          "paymentStatus",
+          "payments"
         ],
         "type": "object",
         "properties": {
@@ -42886,6 +43896,39 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/StateChange"
+            }
+          },
+          "itbisTotal": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "grossTotal": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "openAmount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "paymentStatus": {
+            "type": "string"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupplierInvoicePaymentView"
             }
           }
         },
@@ -43019,6 +44062,38 @@
         },
         "additionalProperties": false
       },
+      "SupplierInvoicePaymentView": {
+        "required": [
+          "paymentId",
+          "paymentNo",
+          "valueDate",
+          "status",
+          "amountApplied"
+        ],
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentNo": {
+            "type": "string"
+          },
+          "valueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "amountApplied": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
       "SupplierInvoiceSummary": {
         "required": [
           "supplierInvoiceId",
@@ -43030,7 +44105,11 @@
           "documentStatus",
           "accountingStatus",
           "totalAmount",
-          "version"
+          "version",
+          "itbisTotal",
+          "grossTotal",
+          "openAmount",
+          "paymentStatus"
         ],
         "type": "object",
         "properties": {
@@ -43070,6 +44149,33 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "itbisTotal": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "grossTotal": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "openAmount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "paymentStatus": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -43422,6 +44528,37 @@
               "string"
             ],
             "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UomList": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UomView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "UomView": {
+        "required": [
+          "code",
+          "dimension"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "dimension": {
+            "type": "string"
           }
         },
         "additionalProperties": false
