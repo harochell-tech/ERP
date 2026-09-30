@@ -708,6 +708,8 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-QUO1-04-8 | QUO1-04 | Spanish labels for the 6 statuses and the 9 `QUOTE_*` codes. |
 | E-QUO1-04-9 | QUO1-04 | E2E-Q1 over the API (`QuoteAcceptanceTests`) and Playwright (`quote-journey`); matrix `docs/acceptance/quo1.md` with `AcceptanceQuo1TraceabilityTests`. |
 | E-QUO1-04-10 | QUO1-04 | The dev seed adds a SENT sample quote; no staging seed script. |
+| E-QUO1-04-11 | QUO1-04 | The form and the copy propose a validity of 15 days (`DEFAULT_QUOTE_VALIDITY_DAYS`, web); the Vendedor changes it and the server only requires today or later. Approved by the owner 2026-09-29. |
+| E-QUO1-04-12 | QUO1-04 | Inicio also offers the Vendedor the task "Crear una cotización" (`quote:manage`). Approved by the owner 2026-09-29. |
 
 Implementation rules derived from the above (no architectural change):
 
