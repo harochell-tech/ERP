@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { confirmAction, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, signIn, submit } from "./support";
 
 // MFG-1 through the UI (MFG1-07, E-MFG1-07-6): the Gerente de planta creates the machine and the shift, the Supervisor de producción
 // prepares the recipe and the Gerente approves it, the Controller prepares the standard cost from the recipe and the Aprobador de
@@ -115,16 +115,22 @@ test("a production day from the recipe to a released lot (MFG-1)", async ({ brow
   const lotCode = (await manager.getByTestId("lot-code").textContent())?.trim() ?? "";
   expect(lotCode).not.toBe("");
 
-  // Calidad releases the cured lot to the yard.
+  // Calidad sees the lot counted on Inicio and releases it to the yard (UX3-02, E-UX3-12/13): the screen opens on "Listos para
+  // liberar" and the lot's one "Acciones" button opens a dialog (a sheet on a phone) with what Calidad may do.
   const quality = await signIn(browser, "Calidad");
+  await quality.goto("/");
+  await expect(quality.getByTestId("task-count:/produccion/lotes/")).not.toHaveText("0");
   await nav(quality, "Curado y liberación");
+  await expect(quality.getByLabel("Estado", { exact: true })).toHaveValue("READY");
   const lotRow = quality.getByRole("row").filter({ hasText: lotCode });
-  // On a phone the lot's actions fold under "Acciones" (E-UX1-01-2).
-  const actions = lotRow.getByRole("button", { name: "Acciones" });
-  if (await actions.isVisible()) {
-    await actions.click();
-  }
-  await quality.getByLabel(`Liberar ${lotCode} a`).selectOption({ label: "PATIO-A" });
-  await confirmAction(lotRow, "Liberar");
+  await lotRow.getByRole("button", { name: `Acciones del lote ${lotCode}` }).click();
+  const dialog = quality.getByRole("dialog", { name: `Acciones del lote ${lotCode}` });
+  await expect(dialog.getByRole("button", { name: "Bloquear" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Liberar", exact: true }).click();
+  await dialog.getByLabel(`Liberar ${lotCode} a`).selectOption({ label: "PATIO-A" });
+  await expectFits(quality);
+  await dialog.getByRole("button", { name: "Confirmar: Liberar" }).click();
+  await expect(dialog).toBeHidden();
+  await quality.getByLabel("Estado", { exact: true }).selectOption("RELEASED");
   await expect(quality.getByTestId(`lot-status-${lotCode}`)).toHaveText("Liberado");
 });

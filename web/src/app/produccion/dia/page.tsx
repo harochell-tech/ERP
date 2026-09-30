@@ -6,7 +6,7 @@ import { query } from "@/api/client";
 import { PlantSelect, useChosenPlant, usePlants } from "@/components/Production";
 import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
-import { todayInDominicanRepublic } from "@/lib/labels";
+import { formatDate, todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -101,6 +101,34 @@ function StartRun({ plantId, businessDate, onDone }: { plantId: string; business
   );
 }
 
+/**
+ * UX3-02 (E-UX3-13): the plant's shift summaries still in draft, whatever their day — what Inicio's "Resúmenes en borrador" and
+ * "Resúmenes por contabilizar" count (the runs list, IN_PROGRESS with a DRAFT summary).
+ */
+function DraftSummaries({ plantId }: { plantId: string }) {
+  const { companyId } = useSession();
+  const { data } = useLoad(
+    plantId ? () => query("/api/v1/companies/{companyId}/manufacturing/runs", { path: { companyId }, query: { plantId, status: "IN_PROGRESS", limit: 200 } }) : null,
+    [companyId, plantId],
+  );
+  const drafts = (data?.items ?? []).filter((r) => r.summaryStatus === "DRAFT");
+  if (drafts.length === 0) {
+    return null;
+  }
+  return (
+    <section className="card" id="resumenes-borrador" data-testid="draft-summaries">
+      <h2 style={{ marginTop: 0 }}>Resúmenes en borrador</h2>
+      <ul className="plain-list">
+        {drafts.map((r) => (
+          <li key={r.runId}>
+            <Link href={`/produccion/corrida/?id=${r.runId}`}>{r.runNo}</Link> · {formatDate(r.businessDate)} · {r.machineCode} · {r.shiftCode} · {r.itemCode}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function Page() {
   const { companyId, can } = useSession();
   const plants = usePlants();
@@ -137,6 +165,7 @@ export default function Page() {
           <input type="date" value={businessDate} onChange={(e) => setBusinessDate(e.target.value)} />
         </Field>
       </div>
+      <DraftSummaries plantId={plantId} />
       {can("production_run:manage") ? (
         <StartRun
           plantId={plantId}

@@ -18,32 +18,38 @@ type Delivery = Schemas["DeliveryDetail"];
 
 // VS3-10a (E-VS3-10-5, E-VS3-04-1…15): a delivery and the dispatcher's next step. Weigh tickets and PODs are identified by the
 // SHA-256 of their file, computed here; the file is not uploaded (E-VS3-6).
+// UX3-02 (E-UX3-8 (a)): the SHA-256 is no longer an editable field — choosing the file computes it and the form says so.
 
 interface EvidenceValue {
   ref: string;
   sha256: string;
+  fileName: string;
 }
 
-/** Per-field messages of an evidence (reference and SHA-256), or nothing when it is valid. */
+const NO_EVIDENCE: EvidenceValue = { ref: "", sha256: "", fileName: "" };
+
+/** Per-field messages of an evidence (reference and file), or nothing when it is valid. */
 function evidenceErrors(value: EvidenceValue): { ref?: string; sha256?: string } {
   return {
-    ref: value.ref.trim() === "" ? "Elija el archivo o escriba su referencia." : undefined,
-    sha256: /^[0-9a-fA-F]{64}$/.test(value.sha256.trim()) ? undefined : "El SHA-256 tiene 64 caracteres hexadecimales (se calcula al elegir el archivo).",
+    ref: value.ref.trim() === "" ? "Escriba la referencia (se propone el nombre del archivo)." : undefined,
+    sha256: /^[0-9a-fA-F]{64}$/.test(value.sha256) ? undefined : "Elija el archivo: el sistema calcula su huella al elegirlo.",
   };
 }
 
-/** A file picker that fills a reference and its SHA-256. */
+/** A file picker that computes the file's SHA-256 (hidden) and proposes its name as the reference. */
 function Evidence({ label, value, onChange, errors }: { label: string; value: EvidenceValue; onChange: (v: EvidenceValue) => void; errors?: { ref?: string; sha256?: string } }) {
   return (
     <>
-      <Field label={label}>
+      <Field label={label} required error={errors?.sha256} hint="El archivo no se guarda en el sistema; conserve el original.">
         <input
           type="file"
           aria-label={label}
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (file) {
-              onChange({ ref: file.name, sha256: await sha256Hex(file) });
+              onChange({ ref: value.ref.trim() === "" || value.ref === value.fileName ? file.name : value.ref, sha256: await sha256Hex(file), fileName: file.name });
+            } else {
+              onChange({ ...value, sha256: "", fileName: "" });
             }
           }}
         />
@@ -51,9 +57,11 @@ function Evidence({ label, value, onChange, errors }: { label: string; value: Ev
       <Field label="Referencia" required error={errors?.ref}>
         <input value={value.ref} onChange={(e) => onChange({ ...value, ref: e.target.value })} />
       </Field>
-      <Field label="SHA-256" required error={errors?.sha256}>
-        <input className="mono" value={value.sha256} onChange={(e) => onChange({ ...value, sha256: e.target.value })} />
-      </Field>
+      {value.sha256 ? (
+        <p className="evidence-verified" data-testid="evidence-verified" title={`SHA-256 ${value.sha256}`}>
+          <span className="badge tone-done">✓</span> Huella del archivo verificada: {value.fileName}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -220,7 +228,7 @@ function GateOut({ delivery, onDone }: { delivery: Delivery; onDone: () => void 
   const gate = useCommand(`gate-out:${id}`, "/api/v1/companies/{companyId}/sales/record-gate-out", `Conduce ${delivery.header.deliveryNo}: pesada y salida registradas.`);
   const [gross, setGross] = useState("");
   const [tare, setTare] = useState("");
-  const [ticket, setTicket] = useState<EvidenceValue>({ ref: "", sha256: "" });
+  const [ticket, setTicket] = useState<EvidenceValue>(NO_EVIDENCE);
   const fe = useFieldErrors<"gross" | "tare" | "ref" | "sha256">();
   return (
     <form
@@ -239,7 +247,7 @@ function GateOut({ delivery, onDone }: { delivery: Delivery; onDone: () => void 
         ) {
           return;
         }
-        if (await gate.run({ deliveryId: id, expectedVersion: delivery.header.version, grossKg, tareKg, weighTicketRef: ticket.ref.trim(), weighTicketSha256: ticket.sha256.trim() })) {
+        if (await gate.run({ deliveryId: id, expectedVersion: delivery.header.version, grossKg, tareKg, weighTicketRef: ticket.ref.trim(), weighTicketSha256: ticket.sha256 })) {
           onDone();
         }
       }}
@@ -266,7 +274,7 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const pod = useCommand(`pod:${id}`, "/api/v1/companies/{companyId}/sales/record-pod", `Conduce ${delivery.header.deliveryNo}: entrega (POD) registrada.`);
   const [receiver, setReceiver] = useState("");
   const [receivedAt, setReceivedAt] = useState("");
-  const [evidence, setEvidence] = useState<EvidenceValue>({ ref: "", sha256: "" });
+  const [evidence, setEvidence] = useState<EvidenceValue>(NO_EVIDENCE);
   const [received, setReceived] = useState<Record<string, string>>(() => Object.fromEntries(delivery.lines.map((l) => [l.deliveryLineId, l.qtyIssued])));
   const [returned, setReturned] = useState<Record<string, string>>({});
   const [exception, setException] = useState("");
@@ -308,7 +316,7 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
             receivedByName: receiver.trim(),
             receivedAt: new Date(receivedAt).toISOString(),
             evidenceRef: evidence.ref.trim(),
-            evidenceSha256: evidence.sha256.trim(),
+            evidenceSha256: evidence.sha256,
             lines,
             exceptionReason: exception.trim() === "" ? null : exception.trim(),
           })
@@ -412,10 +420,15 @@ function DeliveryDetail() {
         Pedido <Link href={`/ventas/pedido/?id=${h.salesOrderId}`}>{h.orderNo}</Link> · {h.customerName} · planta {plantName(h.plantCode)} ·{" "}
         {DELIVERY_TERMS[h.deliveryTermCode] ?? h.deliveryTermCode}
       </p>
+      <p className="actions">
+        <Link className="button" href={`/despacho/conduce/imprimir/?id=${h.deliveryId}`}>
+          Imprimir conduce
+        </Link>
+      </p>
       <p className="muted">
         {data.vehiclePlate ? `Camión ${data.vehiclePlate} · chofer ${data.driverName ?? "—"}` : null}
         {data.customerVehiclePlate ? `Placa del cliente ${data.customerVehiclePlate} · chofer ${data.customerDriverName ?? "—"}` : null}
-        {data.grossKg ? ` · bruto ${formatQuantity(data.grossKg)} kg, tara ${formatQuantity(data.tareKg)} kg, ticket ${data.weighTicketRef}` : null}
+        {data.grossKg ? ` · bruto ${formatQuantity(data.grossKg)} kg, tara ${formatQuantity(data.tareKg)} kg · Evidencia: ${data.weighTicketRef} (huella verificada)` : null}
         {h.gateOutAt ? ` · salió ${formatDateTime(h.gateOutAt)}` : null}
       </p>
       {data.exceptionReason ? <p className="muted">Excepción: {data.exceptionReason}</p> : null}
@@ -473,7 +486,10 @@ function DeliveryDetail() {
         <>
           <h2>Entrega (POD)</h2>
           <p>
-            Recibió {data.pod.receivedByName} el {formatDateTime(data.pod.receivedAt)} · evidencia {data.pod.evidenceRef} ({data.pod.evidenceSha256.slice(0, 12)}…)
+            Recibió {data.pod.receivedByName} el {formatDateTime(data.pod.receivedAt)} ·{" "}
+            <span data-testid="pod-evidence" title={`SHA-256 ${data.pod.evidenceSha256}`}>
+              Evidencia: {data.pod.evidenceRef} (huella verificada)
+            </span>
           </p>
         </>
       ) : null}

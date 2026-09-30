@@ -5,6 +5,7 @@ import { query } from "@/api/client";
 import { AccountingStatus, Loading, NoPermission } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
 import { formatDate, statusLabel } from "@/lib/labels";
+import { paymentStatusLabel, paymentStatusTone } from "@/lib/payables";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 
@@ -40,14 +41,18 @@ export default function Invoices() {
               <th>Proveedor</th>
               <th>Fecha</th>
               <th>Vence</th>
-              <th className="num">Total (RD$)</th>
+              <th className="num">Neto (RD$)</th>
+              <th className="num">ITBIS (RD$)</th>
+              <th className="num">Total con ITBIS (RD$)</th>
+              <th className="num">Saldo (RD$)</th>
+              <th>Estado de pago</th>
               <th>Estado</th>
               <th>Contabilidad</th>
             </tr>
           </thead>
           <tbody>
             {data.items.map((si) => (
-              <tr key={si.supplierInvoiceId}>
+              <tr key={si.supplierInvoiceId} data-testid={`si-row-${si.supplierFiscalNumber}`}>
                 <td>
                   <Link href={`/cxp/factura/?id=${si.supplierInvoiceId}`}>{si.supplierFiscalNumber}</Link>
                 </td>
@@ -55,6 +60,16 @@ export default function Invoices() {
                 <td>{formatDate(si.docDate)}</td>
                 <td>{formatDate(si.dueDate)}</td>
                 <td className="num">{formatDecimal(si.totalAmount)}</td>
+                <td className="num">{formatDecimal(si.itbisTotal)}</td>
+                <td className="num">{formatDecimal(si.grossTotal)}</td>
+                <td className="num" data-testid="si-open">
+                  {formatDecimal(si.openAmount)}
+                </td>
+                <td>
+                  <span className={`badge tone-${paymentStatusTone(si.paymentStatus)}`} data-testid="si-payment-status">
+                    {paymentStatusLabel(si.paymentStatus)}
+                  </span>
+                </td>
                 <td>{statusLabel(si.documentStatus)}</td>
                 <td>
                   <AccountingStatus status={si.accountingStatus} />

@@ -29,6 +29,13 @@ async function attach(page: Page, label: string, name: string) {
   await expect(page.getByLabel("SHA-256")).toHaveValue(/^[0-9a-f]{64}$/);
 }
 
+/** UX3-02 (E-UX3-8 (a)): weigh tickets and PODs show no SHA-256 field; choosing the file verifies its fingerprint. */
+async function attachEvidence(page: Page, label: string, name: string) {
+  await page.getByLabel(label, { exact: true }).setInputFiles({ name, mimeType: "application/octet-stream", buffer: Buffer.from(`evidencia ${name}`) });
+  await expect(page.getByTestId("evidence-verified")).toHaveText(`✓ Huella del archivo verificada: ${name}`);
+  await expect(page.getByLabel("SHA-256")).toHaveCount(0);
+}
+
 test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", async ({ browser }) => {
   const stamp = String(Date.now());
   const certificate = `CERT-E2E-${stamp}`;
@@ -103,7 +110,7 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await expect(delivery).toHaveText("Cargado");
   await dispatch.getByLabel("Peso bruto (kg)").fill("5000");
   await dispatch.getByLabel("Tara (kg)").fill("4400");
-  await attach(dispatch, "Ticket de báscula", "ticket-e2e-44.jpg");
+  await attachEvidence(dispatch, "Ticket de báscula", "ticket-e2e-44.jpg");
   await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
   await expect(delivery).toHaveText("Entregado");
 

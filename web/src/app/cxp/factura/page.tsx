@@ -6,7 +6,9 @@ import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
 import { AccountingStatus, ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction } from "@/components/ui";
 import { formatDecimal, formatQuantity } from "@/lib/decimal";
+import Link from "next/link";
 import { formatDate, statusLabel } from "@/lib/labels";
+import { paymentStatusLabel, paymentStatusTone } from "@/lib/payables";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -107,9 +109,21 @@ function InvoiceDetail() {
         <dd>
           {formatDate(invoice.docDate)} / {formatDate(invoice.dueDate)}
         </dd>
-        <dt>Total</dt>
+        <dt>Neto</dt>
         <dd>
           <Money value={invoice.totalAmount} currency />
+        </dd>
+        <dt>ITBIS</dt>
+        <dd>{invoice.itbisTotal === null ? <span className="muted">Se determina al contabilizar</span> : <Money value={invoice.itbisTotal} currency />}</dd>
+        <dt>Total con ITBIS</dt>
+        <dd>{invoice.grossTotal === null ? "—" : <Money value={invoice.grossTotal} currency testId="si-gross" />}</dd>
+        <dt>Saldo</dt>
+        <dd>{invoice.openAmount === null ? "—" : <Money value={invoice.openAmount} currency testId="si-open" />}</dd>
+        <dt>Estado de pago</dt>
+        <dd>
+          <span className={`badge tone-${paymentStatusTone(invoice.paymentStatus)}`} data-testid="si-payment-status">
+            {paymentStatusLabel(invoice.paymentStatus)}
+          </span>
         </dd>
         <dt>Estado</dt>
         <dd data-testid="si-status">{statusLabel(invoice.documentStatus)}</dd>
@@ -189,6 +203,33 @@ function InvoiceDetail() {
           {formatDate(invoice.apDocument.dueDate)}.
         </p>
       ) : null}
+      <h2>Pagos</h2>
+      {invoice.payments.length === 0 ? (
+        <p className="muted">Sin pagos aplicados.</p>
+      ) : (
+        <div className="table-wrap">
+          <table data-testid="si-payments">
+            <thead>
+              <tr>
+                <th>Pago</th>
+                <th>Fecha valor</th>
+                <th>Estado</th>
+                <th className="num">Monto aplicado (RD$)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoice.payments.map((p) => (
+                <tr key={p.paymentId}>
+                  <td>{can("payment:read") ? <Link href={`/tesoreria/pago/?id=${p.paymentId}`}>{p.paymentNo}</Link> : p.paymentNo}</td>
+                  <td>{formatDate(p.valueDate)}</td>
+                  <td>{statusLabel(p.status)}</td>
+                  <td className="num">{formatDecimal(p.amountApplied)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <History history={invoice.history} />
     </>
   );

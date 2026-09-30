@@ -56,4 +56,14 @@ test("payment from the proposal to a reconciled bank statement", async ({ browse
 
   await controller.goto(paymentUrl);
   await expect(controller.getByTestId("payment-status")).toHaveText("Compensado");
+
+  // UX3-02 (E-UX3-6): the invoice reads paid in the payables list — ITBIS, total with ITBIS and balance are the server's — and its
+  // detail lists the payment.
+  await nav(controller, "Facturas de proveedor");
+  const invoiceRow = controller.getByTestId("si-row-B0100000001");
+  await expect(invoiceRow.getByTestId("si-payment-status")).toHaveText("Pagada");
+  await expect(invoiceRow.getByTestId("si-open")).toHaveText("0.00");
+  await invoiceRow.getByRole("link", { name: "B0100000001" }).click();
+  await expect(controller.getByTestId("si-payment-status")).toHaveText("Pagada");
+  await expect(controller.getByTestId("si-payments")).toContainText("PAG-000001");
 });

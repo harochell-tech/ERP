@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { query } from "@/api/client";
+import { todayInDominicanRepublic } from "@/lib/labels";
+import { isReadyToRelease } from "@/lib/production";
 import { nextSteps, setupProgress, stepInfo } from "@/lib/setup";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
@@ -20,6 +22,12 @@ interface Task {
   count?: Counter;
 }
 
+/** UX3-02 (E-UX3-13): shift summaries still in draft (runs in progress with a DRAFT summary), any day. */
+const draftSummaries: Counter = async (companyId, plantId) =>
+  (await query("/api/v1/companies/{companyId}/manufacturing/runs", { path: { companyId }, query: { plantId, status: "IN_PROGRESS", limit: COUNT_LIMIT } })).items.filter(
+    (r) => r.summaryStatus === "DRAFT",
+  ).length;
+
 // E-UI01-7: each task's counter comes from an existing list query, only when the user may read it; no API of its own.
 const TASKS: readonly Task[] = [
   { href: "/compras/ordenes/nueva/", label: "Crear una orden de compra", permission: "purchase_order:create" },
@@ -32,12 +40,13 @@ const TASKS: readonly Task[] = [
       (await query("/api/v1/companies/{companyId}/procurement/purchase-orders", { path: { companyId }, query: { plantId, status: "PENDING_APPROVAL", limit: COUNT_LIMIT } })).items.length,
   },
   {
-    href: "/compras/ordenes/?estado=APPROVED",
+    // UX3-02 (E-UX3-5): approved and partially received orders, from the orders to receive.
+    href: "/almacen/por-recibir/",
     label: "Recibir material",
     permission: "goods_receipt:post",
     countPermission: "purchase_order:read",
     count: async (companyId, plantId) =>
-      (await query("/api/v1/companies/{companyId}/procurement/purchase-orders", { path: { companyId }, query: { plantId, status: "APPROVED", limit: COUNT_LIMIT } })).items.length,
+      (await query("/api/v1/companies/{companyId}/procurement/purchase-orders/to-receive", { path: { companyId }, query: { plantId, limit: COUNT_LIMIT } })).items.length,
   },
   {
     href: "/almacen/correcciones/",
@@ -116,6 +125,50 @@ const TASKS: readonly Task[] = [
     countPermission: "sales:read",
     count: async (companyId) =>
       (await query("/api/v1/companies/{companyId}/tax/fiscal-authorizations", { path: { companyId }, query: { status: "PENDING_VERIFICATION" } })).items.length,
+  },
+  // UX3-02 (E-UX3-13): production work, counted from the existing runs, recipes and lots queries.
+  {
+    href: "/produccion/dia/",
+    label: "Corridas de hoy sin resumen",
+    permission: "shift_summary:record",
+    countPermission: "production:read",
+    count: async (companyId, plantId) =>
+      (
+        await query("/api/v1/companies/{companyId}/manufacturing/runs", {
+          path: { companyId },
+          query: { plantId, businessDate: todayInDominicanRepublic(), status: "IN_PROGRESS", limit: COUNT_LIMIT },
+        })
+      ).items.filter((r) => r.summaryStatus === null).length,
+  },
+  {
+    href: "/produccion/dia/#resumenes-borrador",
+    label: "Resúmenes de turno en borrador",
+    permission: "shift_summary:record",
+    countPermission: "production:read",
+    count: draftSummaries,
+  },
+  {
+    href: "/produccion/dia/#resumenes-borrador",
+    label: "Resúmenes de turno por contabilizar",
+    permission: "shift_summary:post",
+    countPermission: "production:read",
+    count: draftSummaries,
+  },
+  {
+    href: "/produccion/recetas/",
+    label: "Recetas por aprobar",
+    permission: "recipe:approve",
+    countPermission: "production:read",
+    count: async (companyId, plantId) => (await query("/api/v1/companies/{companyId}/manufacturing/recipes", { path: { companyId }, query: { plantId, status: "DRAFT" } })).items.length,
+  },
+  {
+    href: "/produccion/lotes/",
+    label: "Lotes listos para liberar",
+    permission: "fg_lot:release",
+    countPermission: "production:read",
+    count: async (companyId, plantId) =>
+      (await query("/api/v1/companies/{companyId}/manufacturing/lots", { path: { companyId }, query: { plantId, status: "CURING", limit: COUNT_LIMIT } })).items.filter(isReadyToRelease)
+        .length,
   },
   { href: "/cierre/conciliaciones/", label: "Ejecutar conciliaciones", permission: "reconciliation:run" },
   { href: "/cierre/periodos/", label: "Cerrar o reabrir períodos", permission: "period:read" },
@@ -198,7 +251,7 @@ export default function Home() {
       ) : (
         <ul>
           {tasks.map((t) => (
-            <TaskItem key={t.href} task={t} />
+            <TaskItem key={`${t.href}|${t.label}`} task={t} />
           ))}
         </ul>
       )}

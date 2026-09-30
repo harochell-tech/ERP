@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AUTHORIZATION_STATUSES, authorizationActions, documentKindLabel, expiredCount, invoiceEncfPrefix } from "@/lib/authorizations";
-import { classificationLabel, RECONCILIATIONS, statusLabel, statusTone } from "@/lib/labels";
+import { statusLabel, statusTone } from "@/lib/labels";
 
 // FIS1-05 (E-FIS1-05-1…12): the fiscal authorization screens' helpers.
 const holding =
@@ -38,12 +38,9 @@ describe("fiscal authorization labels", () => {
     expect(AUTHORIZATION_STATUSES.map(statusTone)).toEqual(["neutral", "progress", "done", "attention", "neutral", "neutral", "error"]);
   });
 
-  it("names the documents, the reconciliations and their classifications", () => {
+  it("names the documents", () => {
     expect(documentKindLabel("CERTIFICADO_DGII")).toBe("Certificado de exención (DGII)");
     expect(documentKindLabel("OTRO")).toBe("OTRO");
-    expect(Object.keys(RECONCILIATIONS)).toEqual(["AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED"]);
-    expect(classificationLabel("PROJECT_TERM_ENDED")).toBe("Terminó el plazo del proyecto");
-    expect(classificationLabel("SOMETHING_ELSE")).toBe("SOMETHING_ELSE");
   });
 });
 

@@ -5,15 +5,18 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
 import { Loading, Money, NoPermission } from "@/components/ui";
+import { Watermark } from "@/components/Watermark";
 import { formatQuantity } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDate } from "@/lib/labels";
+import { quoteWatermark } from "@/lib/print";
 import { quoteStatusLabel } from "@/lib/quotes";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 
 // QUO1-04 (E-QUO1-04-5): the quote the customer receives — issuer, customer, lines, the informative ITBIS of the SALES_ITBIS rule in
-// force at the quote date (the server's, never stored), totals, validity, notes and the general conditions (provisional until X-Q1).
+// force at the quote date (the server's, never stored), totals, validity, notes and the general conditions.
 // The browser prints it (the menu and the buttons are hidden when printing); no PDF is generated.
+// UX3-02 (E-UX3-10): a diagonal watermark by status (BORRADOR, VENCIDA, PERDIDA, CANCELADA), on screen and on paper.
 
 function QuotePrint() {
   const { companyId, can } = useSession();
@@ -30,6 +33,7 @@ function QuotePrint() {
   }
   return (
     <div className="proforma">
+      <Watermark text={quoteWatermark(data.status, data.expired)} />
       <div className="actions no-print">
         <Link href={`/ventas/cotizacion/?id=${id}`}>← Cotización {data.quoteNo}</Link>
         <button type="button" className="primary" onClick={() => window.print()}>
@@ -126,7 +130,7 @@ function QuotePrint() {
       <h2>Condiciones generales</h2>
       <p className="muted" data-testid="print-conditions">
         Precios en pesos dominicanos, sin ITBIS salvo indicación; el ITBIS mostrado es informativo, calculado con las reglas vigentes a la fecha de la
-        cotización. Sujeto a disponibilidad. Condiciones definitivas pendientes (X-Q1). Documento no fiscal.
+        cotización. Sujeto a disponibilidad. Documento no fiscal.
       </p>
       <div className="signature">
         <div>

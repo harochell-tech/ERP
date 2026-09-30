@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { PlantSelect, useChosenPlant, usePlants, type PlantOption } from "@/components/Production";
-import { ConfirmAction, ConfirmDialog, ErrorBox, Field, Loading, NoPermission, ReasonAction, RowActions, StatusBadge, useFieldErrors } from "@/components/ui";
+import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
-import { scrapLocations, stockLocations } from "@/lib/production";
+import {
+  defaultLotFilter,
+  isReadyToRelease,
+  lotActions,
+  lotQueryStatus,
+  READY_TO_RELEASE,
+  scrapLocations,
+  stockLocations,
+  type LotAction,
+} from "@/lib/production";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -15,144 +24,229 @@ type Lot = Schemas["FgLotSummary"];
 
 // MFG1-07 (E-MFG1-07-3): finished-goods lots in curing — Calidad releases a cured lot to a stock location, or blocks / unblocks it
 // with a reason; the Gerente de planta scraps units (step-up, handled by useCommand). The API decides whether curing is done.
+// UX3-02 (E-UX3-12): one "Acciones" button per lot opens a dialog with the actions the user may take on it (a sheet on a phone);
+// Calidad opens the screen on "Listos para liberar".
 
-function Release({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | undefined; onDone: () => void }) {
-  const release = useCommand(`release-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/release-lot");
-  const targets = stockLocations(plant?.locations ?? []);
-  const [toLocationId, setToLocationId] = useState(targets[0]?.locationId ?? "");
-  const target = targets.find((l) => l.locationId === toLocationId);
-  return (
-    <span className="inline-form">
-      <select aria-label={`Liberar ${lot.lotCode} a`} value={toLocationId} onChange={(e) => setToLocationId(e.target.value)}>
-        <option value="">—</option>
-        {targets.map((l) => (
-          <option key={l.locationId} value={l.locationId}>
-            {l.code}
-          </option>
-        ))}
-      </select>
-      <ConfirmAction
-        label="Liberar"
-        title={`¿Liberar el lote ${lot.lotCode}?`}
-        consequence={`Las ${formatQuantity(lot.quantity)} unidades del lote pasan de curado a ${target?.code ?? "la ubicación elegida"} y quedan disponibles para despacho. No se puede deshacer.`}
-        disabled={!toLocationId}
-        busy={release.busy}
-        onConfirm={async () =>
-          (await release.run(
-            { plantId: lot.plantId, lotId: lot.lotId, expectedVersion: lot.version, toLocationId },
-            undefined,
-            `Lote ${lot.lotCode} liberado a ${target?.code ?? "la ubicación elegida"}.`,
-          )) && onDone()
-        }
-      />
-      <ErrorBox error={release.error} />
-    </span>
-  );
-}
+const ACTION_LABELS: Readonly<Record<LotAction, string>> = {
+  release: "Liberar",
+  block: "Bloquear",
+  unblock: "Desbloquear",
+  scrap: "Desechar unidades",
+};
 
-function Scrap({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | undefined; onDone: () => void }) {
-  const scrap = useCommand(`scrap-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/scrap-lot");
-  const sources = scrapLocations(plant?.locations ?? []);
+function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | undefined; onDone: () => void }) {
+  const { can } = useSession();
+  const ref = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
+  const [action, setAction] = useState<LotAction | null>(null);
+  const targets = stockLocations(plant?.locations ?? []);
+  const sources = scrapLocations(plant?.locations ?? []);
   const [form, setForm] = useState(() => ({
-    locationId: sources.find((l) => l.code === lot.locationCode)?.locationId ?? "",
-    quantity: "",
+    toLocationId: targets[0]?.locationId ?? "",
     reason: "",
+    scrapLocationId: sources.find((l) => l.code === lot.locationCode)?.locationId ?? "",
+    quantity: "",
   }));
-  const fe = useFieldErrors<"locationId" | "quantity" | "reason">();
-  const quantity = normalizeInput(form.quantity);
-  return (
-    <>
-      <button type="button" className="danger" disabled={scrap.busy} onClick={() => setOpen(true)}>
-        Desechar unidades
-      </button>
-      <ConfirmDialog
-        open={open}
-        title={`¿Desechar unidades del lote ${lot.lotCode}?`}
-        confirmLabel="Confirmar scrap"
-        danger
-        stepUp
-        busy={scrap.busy}
-        onCancel={() => setOpen(false)}
-        onConfirm={async () => {
-          const valid = fe.check({
-            locationId: !form.locationId && "Elija la ubicación de donde salen las unidades.",
+  const fe = useFieldErrors<"toLocationId" | "reason" | "scrapLocationId" | "quantity">();
+  const release = useCommand(`release-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/release-lot");
+  const block = useCommand(`block-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/block-lot", `Lote ${lot.lotCode} bloqueado.`);
+  const unblock = useCommand(`unblock-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/unblock-lot", `Lote ${lot.lotCode} desbloqueado; vuelve a curado.`);
+  const scrap = useCommand(`scrap-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/scrap-lot");
+  const busy = release.busy || block.busy || unblock.busy || scrap.busy;
+  const available = lotActions(lot.status, can);
+  const target = { plantId: lot.plantId, lotId: lot.lotId, expectedVersion: lot.version };
+  const toLocation = targets.find((l) => l.locationId === form.toLocationId);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) {
+      return;
+    }
+    if (open && !dialog.open) {
+      if (typeof dialog.showModal === "function") {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute("open", "");
+      }
+    } else if (!open && dialog.open) {
+      dialog.close();
+    }
+  }, [open]);
+
+  if (available.length === 0) {
+    return null;
+  }
+  const close = () => {
+    setOpen(false);
+    setAction(null);
+    fe.clear();
+  };
+  const done = (response: unknown) => {
+    if (response) {
+      close();
+      onDone();
+    }
+  };
+  const confirm = async () => {
+    const quantity = normalizeInput(form.quantity);
+    switch (action) {
+      case "release":
+        if (fe.check({ toLocationId: !form.toLocationId && "Elija a dónde se libera el lote." })) {
+          done(
+            await release.run({ ...target, toLocationId: form.toLocationId }, undefined, `Lote ${lot.lotCode} liberado a ${toLocation?.code ?? "la ubicación elegida"}.`),
+          );
+        }
+        return;
+      case "block":
+      case "unblock":
+        if (fe.check({ reason: form.reason.trim() === "" && "Indique el motivo." })) {
+          done(await (action === "block" ? block : unblock).run({ ...target, reason: form.reason.trim() }));
+        }
+        return;
+      case "scrap":
+        if (
+          fe.check({
+            scrapLocationId: !form.scrapLocationId && "Elija la ubicación de donde salen las unidades.",
             quantity: !isPositiveDecimal(quantity, 6) && "Unidades mayores que cero (hasta 6 decimales).",
             reason: form.reason.trim() === "" && "Indique el motivo.",
-          });
-          if (!valid) {
-            return;
-          }
-          setOpen(false);
-          if (
+          })
+        ) {
+          done(
             await scrap.run(
-              { plantId: lot.plantId, lotId: lot.lotId, locationId: form.locationId, quantity, reason: form.reason.trim() },
+              { plantId: lot.plantId, lotId: lot.lotId, locationId: form.scrapLocationId, quantity, reason: form.reason.trim() },
               form,
               `${formatQuantity(quantity)} unidades del lote ${lot.lotCode} desechadas.`,
-            )
-          ) {
-            onDone();
+            ),
+          );
+        }
+        return;
+      default:
+        return;
+    }
+  };
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} aria-label={`Acciones del lote ${lot.lotCode}`}>
+        Acciones
+      </button>
+      <dialog
+        ref={ref}
+        className="confirm-dialog lot-actions"
+        aria-label={`Acciones del lote ${lot.lotCode}`}
+        onCancel={(e) => {
+          e.preventDefault();
+          close();
+        }}
+        onClick={(e) => {
+          if (e.target === ref.current) {
+            close();
           }
         }}
       >
-        <p>Las unidades salen del inventario y se contabiliza la pérdida. No se puede deshacer.</p>
-        <Field label="Ubicación" required error={fe.errors.locationId}>
-          <select aria-label={`Ubicación del scrap ${lot.lotCode}`} value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })}>
-            <option value="">—</option>
-            {sources.map((l) => (
-              <option key={l.locationId} value={l.locationId}>
-                {l.code}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Unidades" required error={fe.errors.quantity}>
-          <input aria-label={`Unidades a desechar ${lot.lotCode}`} inputMode="decimal" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
-        </Field>
-        <Field label="Motivo" required error={fe.errors.reason} wide>
-          <input aria-label={`Motivo del scrap ${lot.lotCode}`} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
-        </Field>
-      </ConfirmDialog>
-      <ErrorBox error={scrap.error} />
+        {open ? (
+          <form
+            method="dialog"
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!busy && action) {
+                void confirm();
+              }
+            }}
+          >
+            <h2>
+              Lote <span className="mono">{lot.lotCode}</span>
+            </h2>
+            <p className="muted">
+              {lot.itemCode} · {formatQuantity(lot.quantity)} unidades · <StatusBadge status={lot.status} />
+              {lot.status === "CURING" ? (lot.curingDone ? " · curado cumplido" : " · en curado mínimo") : ""}
+            </p>
+            {action === null ? (
+              <div className="actions">
+                {available.map((a) => (
+                  <button key={a} type="button" className={a === "release" ? "primary" : a === "scrap" ? "danger" : undefined} onClick={() => setAction(a)}>
+                    {ACTION_LABELS[a]}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <section>
+                <h3>{ACTION_LABELS[action]}</h3>
+                {action === "release" ? (
+                  <>
+                    <p>Las {formatQuantity(lot.quantity)} unidades del lote pasan de curado a la ubicación elegida y quedan disponibles para despacho. No se puede deshacer.</p>
+                    <Field label="Liberar a" required error={fe.errors.toLocationId}>
+                      <select aria-label={`Liberar ${lot.lotCode} a`} value={form.toLocationId} onChange={(e) => setForm({ ...form, toLocationId: e.target.value })}>
+                        <option value="">—</option>
+                        {targets.map((l) => (
+                          <option key={l.locationId} value={l.locationId}>
+                            {l.code}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </>
+                ) : null}
+                {action === "block" ? <p>El lote queda bloqueado: no se libera ni se despacha hasta que Calidad lo desbloquee.</p> : null}
+                {action === "unblock" ? <p>El lote vuelve a curado y se podrá liberar.</p> : null}
+                {action === "scrap" ? (
+                  <>
+                    <p>Las unidades salen del inventario y se contabiliza la pérdida. No se puede deshacer.</p>
+                    <p className="notice">
+                      Esta acción requiere autenticación reciente: si su última autenticación no es reciente, al confirmar el sistema le pedirá entrar de nuevo con su
+                      cuenta y luego deberá pulsar otra vez.
+                    </p>
+                    <Field label="Ubicación" required error={fe.errors.scrapLocationId}>
+                      <select aria-label={`Ubicación del scrap ${lot.lotCode}`} value={form.scrapLocationId} onChange={(e) => setForm({ ...form, scrapLocationId: e.target.value })}>
+                        <option value="">—</option>
+                        {sources.map((l) => (
+                          <option key={l.locationId} value={l.locationId}>
+                            {l.code}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Unidades" required error={fe.errors.quantity}>
+                      <input aria-label={`Unidades a desechar ${lot.lotCode}`} inputMode="decimal" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
+                    </Field>
+                  </>
+                ) : null}
+                {action !== "release" ? (
+                  <Field label="Motivo" required error={fe.errors.reason} wide>
+                    <input aria-label={`Motivo: ${ACTION_LABELS[action]} ${lot.lotCode}`} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+                  </Field>
+                ) : null}
+              </section>
+            )}
+            <ErrorBox error={release.error ?? block.error ?? unblock.error ?? scrap.error} />
+            <div className="dialog-actions">
+              <button type="button" autoFocus onClick={action === null ? close : () => setAction(null)}>
+                {action === null ? "Cerrar" : "Volver"}
+              </button>
+              {action !== null ? (
+                <button type="submit" className={action === "release" || action === "unblock" ? "primary" : "danger-solid"} disabled={busy}>
+                  Confirmar: {ACTION_LABELS[action]}
+                </button>
+              ) : null}
+            </div>
+          </form>
+        ) : null}
+      </dialog>
     </>
   );
 }
 
 function LotRow({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | undefined; onDone: () => void }) {
-  const { can } = useSession();
-  const block = useCommand(`block-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/block-lot", `Lote ${lot.lotCode} bloqueado.`);
-  const unblock = useCommand(`unblock-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/unblock-lot", `Lote ${lot.lotCode} desbloqueado; vuelve a curado.`);
-  const target = { plantId: lot.plantId, lotId: lot.lotId, expectedVersion: lot.version };
-  const busy = block.busy || unblock.busy;
-  const scrappable = lot.status === "CURING" || lot.status === "BLOCKED" || lot.status === "RELEASED";
-  const actions = (
-    <>
-      {lot.status === "CURING" && can("fg_lot:release") ? (
-        <>
-          <Release lot={lot} plant={plant} onDone={onDone} />
-          <ReasonAction
-            label="Bloquear"
-            consequence={`El lote ${lot.lotCode} queda bloqueado: no se libera ni se despacha hasta que Calidad lo desbloquee.`}
-            busy={busy}
-            onConfirm={async (reason) => (await block.run({ ...target, reason })) && onDone()}
-          />
-        </>
-      ) : null}
-      {lot.status === "BLOCKED" && can("fg_lot:release") ? (
-        <ReasonAction
-          label="Desbloquear"
-          consequence={`El lote ${lot.lotCode} vuelve a curado y se podrá liberar.`}
-          busy={busy}
-          onConfirm={async (reason) => (await unblock.run({ ...target, reason })) && onDone()}
-        />
-      ) : null}
-      {scrappable && can("fg_lot:scrap") ? <Scrap lot={lot} plant={plant} onDone={onDone} /> : null}
-    </>
-  );
-  const buttonCount = (lot.status === "CURING" && can("fg_lot:release") ? 2 : 0) + (lot.status === "BLOCKED" && can("fg_lot:release") ? 1 : 0) + (scrappable && can("fg_lot:scrap") ? 1 : 0);
   return (
     <tr>
-      <td className="mono">{lot.lotCode}</td>
+      <td>
+        <span className="mono">{lot.lotCode}</span>
+        {/* On a phone the table scrolls sideways: the lot's one button stays in its first cell, always in view. */}
+        <div>
+          <LotActions lot={lot} plant={plant} onDone={onDone} />
+        </div>
+      </td>
       <td>{lot.itemCode}</td>
       <td className="mono">{lot.runNo}</td>
       <td>{formatDate(lot.businessDate)}</td>
@@ -167,10 +261,6 @@ function LotRow({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | undefin
       <td>{lot.locationCode ?? "—"}</td>
       <td className="num">{formatQuantity(lot.quantity)}</td>
       <td className="num">{lot.racks}</td>
-      <td className="wrap">
-        {buttonCount >= 3 ? <RowActions>{actions}</RowActions> : <div className="actions">{actions}</div>}
-        <ErrorBox error={block.error ?? unblock.error} />
-      </td>
     </tr>
   );
 }
@@ -180,7 +270,8 @@ export default function Page() {
   const plants = usePlants();
   const { plant, setPlant } = useChosenPlant(plants.data);
   const plantId = plant?.plantId ?? "";
-  const [status, setStatus] = useState("");
+  const [filter, setFilter] = useState(() => defaultLotFilter(can("fg_lot:release")));
+  const status = lotQueryStatus(filter);
   const { data, error, reload } = useLoad(
     can("production:read") && plantId
       ? () => query("/api/v1/companies/{companyId}/manufacturing/lots", { path: { companyId }, query: { plantId, status, limit: 200 } })
@@ -193,13 +284,15 @@ export default function Page() {
   if (plants.data === null) {
     return <Loading error={plants.error} />;
   }
+  const lots = data === null ? null : filter === READY_TO_RELEASE ? data.items.filter(isReadyToRelease) : data.items;
   return (
     <>
       <h1>Curado y liberación</h1>
       {plants.data.length === 0 ? <p className="muted">No hay plantas con producción.</p> : <PlantSelect plants={plants.data} value={plantId} onChange={setPlant} />}
       <Field label="Estado">
-        <select aria-label="Estado" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select aria-label="Estado" value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="">Todos</option>
+          <option value={READY_TO_RELEASE}>Listos para liberar</option>
           <option value="CURING">En curado</option>
           <option value="BLOCKED">Bloqueado</option>
           <option value="RELEASED">Liberado</option>
@@ -207,32 +300,33 @@ export default function Page() {
           <option value="VOIDED">Anulado</option>
         </select>
       </Field>
-      {data === null ? (
+      {lots === null ? (
         plantId ? <Loading error={error} /> : null
-      ) : data.items.length === 0 ? (
-        <p className="muted">No hay lotes.</p>
+      ) : lots.length === 0 ? (
+        <p className="muted">{filter === READY_TO_RELEASE ? "No hay lotes con el curado cumplido por liberar." : "No hay lotes."}</p>
       ) : (
-        <div className="table-wrap"><table>
-          <thead>
-            <tr>
-              <th>Lote</th>
-              <th>Producto</th>
-              <th>Corrida</th>
-              <th>Fecha</th>
-              <th>Estado</th>
-              <th>Liberable desde</th>
-              <th>Ubicación</th>
-              <th className="num">Unidades</th>
-              <th className="num">Racks</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.map((l) => (
-              <LotRow key={`${l.lotId}:${l.version}`} lot={l} plant={plant} onDone={reload} />
-            ))}
-          </tbody>
-        </table></div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Lote</th>
+                <th>Producto</th>
+                <th>Corrida</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Liberable desde</th>
+                <th>Ubicación</th>
+                <th className="num">Unidades</th>
+                <th className="num">Racks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lots.map((l) => (
+                <LotRow key={`${l.lotId}:${l.version}`} lot={l} plant={plant} onDone={reload} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   );

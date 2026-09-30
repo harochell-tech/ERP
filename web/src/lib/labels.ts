@@ -151,33 +151,6 @@ export const COMPONENTS: Readonly<Record<string, string>> = {
   "COST-SET": "Liquidación de costos",
 };
 
-/** FIS1-05: the reconciliations of FIS1-04 (and later ones) in Spanish (the others show the server's description). */
-export const RECONCILIATIONS: Readonly<Record<string, string>> = {
-  "AUTH-CONSUMPTION": "Consumo de autorizaciones fiscales",
-  "EXEMPT-WITHOUT-AUTH": "Facturas exentas sin autorización",
-  "AUTH-EXPIRY": "Vencimiento de autorizaciones fiscales",
-  "TAX-606": "Formato 606 contra el ITBIS contabilizado", // FIS2-03 (E-FIS2-03-6)
-  "CONTROLS-WAIVED": "Controles dispensados por un superadministrador", // ADM-2 (E-ADM-2-5)
-};
-
-/** FIS1-05: exception classifications in Spanish; the others are shown as the server sends them. */
-export const EXCEPTION_CLASSIFICATIONS: Readonly<Record<string, string>> = {
-  AUTH_LINE_CONSUMPTION_DIFFERENCE: "Consumido de la línea ≠ consumos − devoluciones",
-  INVOICE_CONSUMPTION_DIFFERENCE: "Consumo de la factura ≠ su neto − notas de crédito",
-  EXEMPT_WITHOUT_AUTHORIZATION: "Factura sin ITBIS que no es e-CF 44",
-  AUTHORIZATION_EXPIRING: "Autorización por vencer",
-  PROJECT_TERM_ENDED: "Terminó el plazo del proyecto",
-  // FIS2-03 (E-FIS2-03-6): TAX-606.
-  TAX606_ITBIS_DIFFERENCE: "ITBIS por adelantar del 606 ≠ ITBIS deducible contabilizado del mes",
-  CLASSIFICATION_MISSING: "Compra sin clasificación del 606 (tipo de bienes y servicios en blanco)",
-  ISR_WITHHOLDING_TYPE_MISSING: "Retención de ISR sin tipo de retención del 606",
-  CONTROL_WAIVED: "Un superadministrador preparó y aprobó solo (ADM-2)",
-};
-
-export function classificationLabel(classification: string): string {
-  return EXCEPTION_CLASSIFICATIONS[classification] ?? classification;
-}
-
 /** E-UX1-01-5: dates read dd/mm/aaaa; a date-time value shows its Dominican calendar day. */
 export function formatDate(value: string | null | undefined): string {
   if (!value) {

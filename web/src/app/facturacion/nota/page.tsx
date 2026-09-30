@@ -7,8 +7,9 @@ import { query } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
 import { History } from "@/components/History";
 import { AccountingStatus, ConfirmAction, ErrorBox, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
-import { formatDecimal } from "@/lib/decimal";
+import { formatDecimal, formatPercent } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
+import { creditNoteReasonLabel } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -36,7 +37,7 @@ function NotePackage({ creditNoteId }: { creditNoteId: string }) {
           <CopyField label="RNC del receptor" value={data.receiverRnc} />
           <CopyField label="Receptor" value={data.receiverName} />
           <CopyField label="Fecha" value={data.creditDate} />
-          <CopyField label="Motivo" value={`${data.reasonCategory}: ${data.reason}`} />
+          <CopyField label="Motivo" value={`${creditNoteReasonLabel(data.reasonCategory)}: ${data.reason}`} />
           <CopyField label="Neto" value={data.netTotal} />
           <CopyField label="ITBIS" value={data.taxTotal} />
           <CopyField label="Total" value={data.total} />
@@ -47,7 +48,7 @@ function NotePackage({ creditNoteId }: { creditNoteId: string }) {
 }
 
 function NoteDetail() {
-  const { companyId, can } = useSession();
+  const { companyId, can, isMyUserId } = useSession();
   const id = useSearchParams().get("id") ?? "";
   const { data, error, reload } = useLoad(
     can("sales:read") && id ? () => query("/api/v1/companies/{companyId}/sales/credit-notes/{creditNoteId}", { path: { companyId, creditNoteId: id } }) : null,
@@ -75,9 +76,15 @@ function NoteDetail() {
         <AccountingStatus status={h.accountingStatus} eventId={data.postingEventId} />
       </p>
       <p className="muted">
-        Motivo: {h.reasonCategory} — {h.reason} · creó {data.createdBy ?? "—"} · emitió {data.issuedBy ?? "—"}
+        Motivo: {creditNoteReasonLabel(h.reasonCategory)} — {h.reason} · creó {data.createdBy ?? "—"} · emitió {data.issuedBy ?? "—"}
       </p>
-      {h.commercialStatus === "DRAFT" && can("credit_note:issue") ? (
+      {/* UX3-02 (E-UX3-9): whoever issued the invoice may not issue its credit note (the server refuses it). */}
+      {h.commercialStatus === "DRAFT" && can("credit_note:issue") && isMyUserId(data.invoiceIssuedById) ? (
+        <p className="notice" data-testid="credit-note-own-invoice">
+          Usted emitió la factura {h.invoiceNo}: otra persona con permiso de emitir notas de crédito debe emitir esta nota.
+        </p>
+      ) : null}
+      {h.commercialStatus === "DRAFT" && can("credit_note:issue") && !isMyUserId(data.invoiceIssuedById) ? (
         <div className="actions">
           <ConfirmAction
             label="Emitir nota de crédito"
@@ -110,7 +117,7 @@ function NoteDetail() {
               <td className="num">
                 <Money value={l.netAmount} />
               </td>
-              <td className="num">{l.rate}</td>
+              <td className="num">{formatPercent(l.rate)}</td>
               <td className="num">
                 <Money value={l.itbis} />
               </td>
