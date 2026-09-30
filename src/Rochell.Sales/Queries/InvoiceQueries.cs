@@ -121,14 +121,14 @@ public sealed class GetInvoiceHandler : IQueryHandler<GetInvoice>
         var extra = (await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT i.void_reason, u.email, i.posting_event_id FROM sal.invoice i LEFT JOIN iam.user u ON u.user_id = i.issued_by WHERE i.invoice_id = @i",
+            "SELECT i.void_reason, coalesce(u.display_name, u.email), i.posting_event_id FROM sal.invoice i LEFT JOIN iam.user u ON u.user_id = i.issued_by WHERE i.invoice_id = @i",
             r => new Extra(r.NullableString(0), r.NullableString(1), r.NullableGuid(2)),
             cancellationToken,
             ("i", query.InvoiceId)).ConfigureAwait(false))!;
         var fiscal = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT f.encf, f.issued_at, f.security_code, f.evidence_ref, encode(f.evidence_sha256, 'hex'), u.email FROM tax.external_fiscal_record f LEFT JOIN iam.user u ON u.user_id = f.recorded_by WHERE f.invoice_id = @i",
+            "SELECT f.encf, f.issued_at, f.security_code, f.evidence_ref, encode(f.evidence_sha256, 'hex'), coalesce(u.display_name, u.email) FROM tax.external_fiscal_record f LEFT JOIN iam.user u ON u.user_id = f.recorded_by WHERE f.invoice_id = @i",
             r => new ExternalFiscalRecordView(r.GetString(0), r.GetFieldValue<DateTime>(1), r.GetString(2), r.GetString(3), r.GetString(4), r.NullableString(5)),
             cancellationToken,
             ("i", query.InvoiceId)).ConfigureAwait(false);

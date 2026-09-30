@@ -64,7 +64,7 @@ public sealed class ListAccountRoleMapsHandler : IQueryHandler<ListAccountRoleMa
             context.Connection,
             context.Transaction,
             """
-            SELECT m.map_id, m.account_role, m.item_category, a.code, a.name, m.effective_from, m.effective_to, m.status, p.email, ap.email
+            SELECT m.map_id, m.account_role, m.item_category, a.code, a.name, m.effective_from, m.effective_to, m.status, coalesce(p.display_name, p.email), coalesce(ap.display_name, ap.email)
             FROM fin.account_role_map m
             JOIN fin.account a ON a.account_id = m.account_id
             JOIN iam.user p ON p.user_id = m.prepared_by
@@ -109,7 +109,7 @@ public sealed class ListPostingRulesHandler : IQueryHandler<ListPostingRules>
             context.Connection,
             context.Transaction,
             """
-            SELECT r.code, r.event_type, v.version, v.status, v.close_component, v.effective_from, v.effective_to, u.email
+            SELECT r.code, r.event_type, v.version, v.status, v.close_component, v.effective_from, v.effective_to, coalesce(u.display_name, u.email)
             FROM fin.posting_rule r
             JOIN fin.posting_rule_version v ON v.posting_rule_id = r.posting_rule_id
             LEFT JOIN iam.user u ON u.user_id = v.approved_by

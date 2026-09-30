@@ -35629,6 +35629,12 @@
             "items": {
               "$ref": "#/components/schemas/LocationView"
             }
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -40466,6 +40472,12 @@
               "null",
               "string"
             ]
+          },
+          "userDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -40936,6 +40948,12 @@
             "items": {
               "$ref": "#/components/schemas/SalesLocationView"
             }
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -41049,6 +41067,15 @@
             "items": {
               "type": "string"
             }
+          },
+          "plants": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SessionPlant"
+            }
           }
         },
         "additionalProperties": false
@@ -41109,6 +41136,36 @@
             }
           },
           "authenticatedEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "SessionPlant": {
+        "required": [
+          "plantId",
+          "code",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "plantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
             "type": [
               "null",
               "string"
@@ -42989,6 +43046,12 @@
             "items": {
               "$ref": "#/components/schemas/UserRoleView"
             }
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false

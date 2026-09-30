@@ -22,7 +22,7 @@ public sealed record SalesOrderList(IReadOnlyList<SalesOrderSummary> Items, int 
 internal static class OrderReading
 {
     public const string Select = """
-        SELECT o.sales_order_id, o.order_no, o.order_date, o.party_id, p.legal_name, pl.code, o.delivery_term_code, o.total_net::numeric(19,2), o.status, u.email, o.version,
+        SELECT o.sales_order_id, o.order_no, o.order_date, o.party_id, p.legal_name, pl.code, o.delivery_term_code, o.total_net::numeric(19,2), o.status, coalesce(u.display_name, u.email), o.version,
                o.quote_id, q.quote_no
         FROM sal.sales_order o
         JOIN md.party p ON p.party_id = o.party_id
@@ -123,7 +123,7 @@ public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
             context.Transaction,
             """
             SELECT k.credit_check_id, k.checked_at, k.order_amount::numeric(19,2), k.exposure_ar::numeric(19,2), k.exposure_orders::numeric(19,2), k.exposure_uninvoiced::numeric(19,2),
-                   k.credit_limit::numeric(19,2), k.credit_hold, k.overdue_days, k.overdue_days_block, k.decision, k.outcome, u.email, k.reason
+                   k.credit_limit::numeric(19,2), k.credit_hold, k.overdue_days, k.overdue_days_block, k.decision, k.outcome, coalesce(u.display_name, u.email), k.reason
             FROM sal.credit_check k LEFT JOIN iam.user u ON u.user_id = k.decided_by
             WHERE k.sales_order_id = @o ORDER BY k.checked_at
             """,

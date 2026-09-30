@@ -133,7 +133,7 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
             context.Transaction,
             """
             SELECT si.si_id, si.party_id, p.legal_name, si.supplier_fiscal_number, si.doc_date, si.due_date, si.document_status::text,
-                   si.accounting_status::text, si.total_amount, cu.email, eu.email, si.tax_determination_id, si.posting_event_id, si.version
+                   si.accounting_status::text, si.total_amount, coalesce(cu.display_name, cu.email), coalesce(eu.display_name, eu.email), si.tax_determination_id, si.posting_event_id, si.version
             FROM pur.supplier_invoice si
             JOIN md.party p ON p.party_id = si.party_id
             LEFT JOIN iam.user cu ON cu.user_id = si.created_by

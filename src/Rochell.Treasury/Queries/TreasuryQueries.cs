@@ -295,7 +295,7 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
             context.Transaction,
             """
             SELECT p.payment_no, p.party_id, s.legal_name, p.bank_account_id, b.bank_code, b.account_number, v.party_bank_account_id, v.bank_code, v.account_number, v.status,
-                   p.amount, p.value_date, p.bank_reference, p.status::text, pu.email, ru.email, p.posting_event_id, p.version
+                   p.amount, p.value_date, p.bank_reference, p.status::text, coalesce(pu.display_name, pu.email), coalesce(ru.display_name, ru.email), p.posting_event_id, p.version
             FROM fin.payment p
             JOIN md.party s ON s.party_id = p.party_id
             JOIN fin.bank_account b ON b.bank_account_id = p.bank_account_id
@@ -420,8 +420,8 @@ public sealed class ListPartyBankAccountsHandler : IQueryHandler<ListPartyBankAc
             context.Connection,
             context.Transaction,
             """
-            SELECT v.party_bank_account_id, v.version, v.bank_code, v.account_number, v.account_holder, v.status, rq.email, v.requested_at,
-                   vf.email, v.verified_at, v.verification_evidence, v.payable_from, rj.email, v.rejected_at, v.rejection_reason
+            SELECT v.party_bank_account_id, v.version, v.bank_code, v.account_number, v.account_holder, v.status, coalesce(rq.display_name, rq.email), v.requested_at,
+                   coalesce(vf.display_name, vf.email), v.verified_at, v.verification_evidence, v.payable_from, coalesce(rj.display_name, rj.email), v.rejected_at, v.rejection_reason
             FROM md.party_bank_account v
             LEFT JOIN iam.user rq ON rq.user_id = v.requested_by
             LEFT JOIN iam.user vf ON vf.user_id = v.verified_by
@@ -465,7 +465,7 @@ public sealed class ListBankStatementsHandler : IQueryHandler<ListBankStatements
             context.Connection,
             context.Transaction,
             """
-            SELECT s.statement_id, s.bank_account_id, b.bank_code, b.account_number, s.period_from, s.period_to, s.opening_balance, s.closing_balance, f.file_name, u.email, s.imported_at,
+            SELECT s.statement_id, s.bank_account_id, b.bank_code, b.account_number, s.period_from, s.period_to, s.opening_balance, s.closing_balance, f.file_name, coalesce(u.display_name, u.email), s.imported_at,
                    (SELECT count(*) FROM fin.bank_statement_line l WHERE l.statement_id = s.statement_id)::int,
                    (SELECT count(*) FROM fin.bank_statement_line l WHERE l.statement_id = s.statement_id AND l.status = 'UNMATCHED')::int
             FROM fin.bank_statement s

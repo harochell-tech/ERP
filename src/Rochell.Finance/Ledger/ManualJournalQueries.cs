@@ -32,7 +32,7 @@ public sealed class ListManualJournalsHandler : IQueryHandler<ListManualJournals
             SELECT m.manual_journal_id, m.journal_no, m.posting_date, m.description, m.close_component, m.auto_reverse, m.status,
                    (SELECT coalesce(sum(l.debit), 0)::numeric(19,2) FROM fin.manual_journal_line l WHERE l.manual_journal_id = m.manual_journal_id AND l.journal_version =
                       (SELECT max(x.journal_version) FROM fin.manual_journal_line x WHERE x.manual_journal_id = m.manual_journal_id)),
-                   pu.email, au.email, m.version
+                   coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email), m.version
             FROM fin.manual_journal m
             JOIN iam.user pu ON pu.user_id = m.prepared_by
             LEFT JOIN iam.user au ON au.user_id = m.approved_by
@@ -79,7 +79,7 @@ public sealed class GetManualJournalHandler : IQueryHandler<GetManualJournal>
             context.Transaction,
             """
             SELECT m.journal_no, m.posting_date, m.description, m.support_ref, encode(m.support_sha256, 'hex'), m.close_component, m.auto_reverse, m.status,
-                   pu.email, m.prepared_by, au.email, ru.email, m.rejection_reason, m.posting_event_id, m.version
+                   coalesce(pu.display_name, pu.email), m.prepared_by, coalesce(au.display_name, au.email), coalesce(ru.display_name, ru.email), m.rejection_reason, m.posting_event_id, m.version
             FROM fin.manual_journal m
             JOIN iam.user pu ON pu.user_id = m.prepared_by
             LEFT JOIN iam.user au ON au.user_id = m.approved_by

@@ -234,7 +234,7 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
                    coalesce(v.close_component, (SELECT m.close_component FROM fin.manual_journal m WHERE m.company_id = e.company_id AND m.posting_event_id = coalesce(
                      (SELECT o.source_event_id FROM fin.gl_journal o WHERE o.journal_id = j.reverses_journal_id), j.source_event_id))),
                    ev.event_id, ev.event_type, ev.occurred_at, ev.recorded_at, ev.business_date, ev.aggregate_type, ev.aggregate_id, ev.payload::text,
-                   cl.command_type, u.email, i.integrity_status, i.ledger_sequence
+                   cl.command_type, coalesce(u.display_name, u.email), i.integrity_status, i.ledger_sequence
             FROM fin.gl_entry e
             JOIN fin.gl_journal j ON j.journal_id = e.journal_id
             JOIN fin.account a ON a.account_id = e.account_id
@@ -271,7 +271,7 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
             context.Connection,
             context.Transaction,
             """
-            SELECT m.journal_no, m.description, m.support_ref, pu.email, au.email
+            SELECT m.journal_no, m.description, m.support_ref, coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email)
             FROM fin.manual_journal m
             JOIN iam.user pu ON pu.user_id = m.prepared_by
             LEFT JOIN iam.user au ON au.user_id = m.approved_by
@@ -349,7 +349,7 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
             context.Connection,
             context.Transaction,
             """
-            SELECT m.map_id, m.account_role, m.item_category, m.effective_from, m.effective_to, u.email
+            SELECT m.map_id, m.account_role, m.item_category, m.effective_from, m.effective_to, coalesce(u.display_name, u.email)
             FROM fin.account_role_map m LEFT JOIN iam.user u ON u.user_id = m.approved_by
             WHERE m.company_id = @c AND m.map_id = @m
             """,

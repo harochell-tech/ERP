@@ -15,7 +15,7 @@ public static class StateHistory
             context.Connection,
             context.Transaction,
             """
-            SELECT h.status_kind, h.from_state, h.to_state, h.command, h.reason, e.recorded_at, u.email
+            SELECT h.status_kind, h.from_state, h.to_state, h.command, h.reason, e.recorded_at, coalesce(u.display_name, u.email)
             FROM core.state_history h
             JOIN core.domain_event e ON e.event_id = h.event_id
             LEFT JOIN iam.session s ON s.session_id = e.session_id

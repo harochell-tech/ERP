@@ -63,7 +63,7 @@ public sealed class ListPeriodsHandler : IQueryHandler<ListPeriods>
             context.Connection,
             context.Transaction,
             """
-            SELECT s.period_id, s.component, s.status, u.email, s.closed_at, s.version
+            SELECT s.period_id, s.component, s.status, coalesce(u.display_name, u.email), s.closed_at, s.version
             FROM fin.close_component_state s
             LEFT JOIN iam.user u ON u.user_id = s.closed_by
             WHERE s.company_id = @c AND s.period_id = ANY(@ids)
@@ -79,7 +79,7 @@ public sealed class ListPeriodsHandler : IQueryHandler<ListPeriods>
             context.Connection,
             context.Transaction,
             """
-            SELECT q.period_id, q.request_id, q.component, q.reason, q.status, ru.email, q.requested_at, au.email, q.second_approved_at, xu.email
+            SELECT q.period_id, q.request_id, q.component, q.reason, q.status, coalesce(ru.display_name, ru.email), q.requested_at, coalesce(au.display_name, au.email), q.second_approved_at, coalesce(xu.display_name, xu.email)
             FROM fin.reopen_request q
             LEFT JOIN iam.user ru ON ru.user_id = q.requested_by
             LEFT JOIN iam.user au ON au.user_id = q.second_approved_by

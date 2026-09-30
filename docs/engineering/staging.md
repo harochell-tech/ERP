@@ -184,3 +184,8 @@ Supervisor de producción, Gerente de planta and Calidad, and the production acc
 `seed/account-map-mfg.csv`: WIP 1340, MATERIAL_PRICE_VARIANCE 5106, CONVERSION_ABSORPTION 5150, PRODUCTION_SCRAP 5160,
 STANDARD_REVALUATION 5190; MATERIAL_USAGE_VARIANCE keeps 5102). Then, as the Controller in the UI: approve the maps and P-08, P-10,
 P-12, P-13 and REVAL, and prepare the PRODUCTION policy (approved by the Aprobador de políticas). Synthetic data only.
+
+## Plant names (UX1-01a, E-UX1-01-4)
+
+Screens show plants as "Name (CODE)". On the VPS: `docker compose run --rm migrate set-plant-name 131925332 <CODE> "Planta Higüey"`
+(new plants: `create-plant <rnc> <CODE> <AREA> "Name"`). Only the name of a plant row can change.

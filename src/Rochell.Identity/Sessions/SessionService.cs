@@ -7,8 +7,11 @@ using Rochell.Platform.Time;
 
 namespace Rochell.Identity.Sessions;
 
-/// <summary>Claims of an ID token already validated by the OIDC middleware (signature, issuer, audience, expiry).</summary>
-public sealed record OidcClaims(string Subject, string? Email, bool EmailVerified, string? HostedDomain);
+/// <summary>
+/// Claims of an ID token already validated by the OIDC middleware (signature, issuer, audience, expiry). <paramref name="Name"/>:
+/// the "name" claim (profile scope), kept as the user's display name (E-UX1-01-3).
+/// </summary>
+public sealed record OidcClaims(string Subject, string? Email, bool EmailVerified, string? HostedDomain, string? Name = null);
 
 /// <summary>
 /// A role the session's user holds now in a company, company-wide (<see cref="PlantId"/> null) or for one plant, with the
@@ -16,8 +19,12 @@ public sealed record OidcClaims(string Subject, string? Email, bool EmailVerifie
 /// </summary>
 public sealed record SessionAssignment(string RoleCode, string RoleName, Guid? PlantId, IReadOnlyList<string> Permissions);
 
-/// <summary>What the user may do in one company: assignments valid now and the permissions they grant.</summary>
-public sealed record SessionCompany(Guid CompanyId, string LegalName, IReadOnlyList<SessionAssignment> Assignments, IReadOnlyList<string> Permissions);
+/// <summary>A plant of the company as screens name it (E-UX1-01-4): its code and, once set, its readable name.</summary>
+public sealed record SessionPlant(Guid PlantId, string Code, string? Name);
+
+/// <summary>What the user may do in one company: assignments valid now, the permissions they grant and the company's plants.</summary>
+public sealed record SessionCompany(
+    Guid CompanyId, string LegalName, IReadOnlyList<SessionAssignment> Assignments, IReadOnlyList<string> Permissions, IReadOnlyList<SessionPlant>? Plants = null);
 
 /// <summary>
 /// An open session as the UI needs it: who, until when, whether a step-up is still fresh, and where the user can act.
@@ -32,7 +39,8 @@ public sealed record SessionDescription(
     DateTime? StepUpValidUntil,
     DateTime ExpiresAt,
     IReadOnlyList<SessionCompany> Companies,
-    string? AuthenticatedEmail = null);
+    string? AuthenticatedEmail = null,
+    string? DisplayName = null);
 
 /// <summary>A synthetic user a tester may act as in one company (E-B03-14), with the roles it holds there.</summary>
 public sealed record TestIdentity(Guid UserId, string Email, IReadOnlyList<string> Roles);
@@ -70,6 +78,7 @@ public sealed class SessionService
         ValidateClaims(claims);
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var userId = await FindActiveHumanAsync(connection, claims.Subject, cancellationToken).ConfigureAwait(false);
+        await RememberNameAsync(connection, userId, claims.Name, cancellationToken).ConfigureAwait(false);
 
         var sessionId = _ids.NewId();
         var now = _clock.UtcNow;
@@ -130,6 +139,7 @@ public sealed class SessionService
         ValidateClaims(claims);
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var userId = await FindActiveHumanAsync(connection, claims.Subject, cancellationToken).ConfigureAwait(false);
+        await RememberNameAsync(connection, userId, claims.Name, cancellationToken).ConfigureAwait(false);
         var now = _clock.UtcNow;
 
         var updated = await Sql.ExecuteAsync(
@@ -160,22 +170,23 @@ public sealed class SessionService
     {
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var now = _clock.UtcNow;
-        var session = await Reading.SingleOrDefaultAsync(
+        var described = await Reading.SingleOrDefaultAsync(
             connection,
             null,
             """
             SELECT s.user_id, u.email, s.login_at, s.last_activity_at, s.last_step_up_at, s.logout_at, u.status, u.kind,
-                   p.session_id, p.user_id, pu.email, p.login_at, p.logout_at, pu.status, pu.kind
+                   p.session_id, p.user_id, pu.email, p.login_at, p.logout_at, pu.status, pu.kind, u.display_name
             FROM iam.session s
             JOIN iam.user u ON u.user_id = s.user_id
             LEFT JOIN iam.session p ON p.session_id = s.authenticated_session_id
             LEFT JOIN iam.user pu ON pu.user_id = p.user_id
             WHERE s.session_id = @session_id
             """,
-            ReadSessionRow,
+            r => Tuple.Create(ReadSessionRow(r), r.NullableString(15)),
             cancellationToken,
             ("session_id", sessionId)).ConfigureAwait(false)
             ?? throw new DomainException(AuthorizationErrors.SessionInvalid, "The session does not exist.");
+        var (session, displayName) = described;
         SessionRules.EnsureUsable(_options, now, session.LoginAt, session.LastActivityAt, session.LogoutAt, session.Status, session.Kind, session.Parent?.Rules);
 
         var companies = await Reading.ListAsync(
@@ -207,11 +218,20 @@ public sealed class SessionService
                 ("c", companyId),
                 ("u", session.UserId),
                 ("now", now)).ConfigureAwait(false);
+            var plants = assignments.Count == 0
+                ? []
+                : await Reading.ListAsync(
+                    connection,
+                    transaction,
+                    "SELECT plant_id, code, name FROM md.plant WHERE company_id = @c ORDER BY code",
+                    r => new SessionPlant(r.GetGuid(0), r.GetString(1), r.NullableString(2)),
+                    cancellationToken,
+                    ("c", companyId)).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             if (assignments.Count > 0)
             {
                 var permissions = assignments.SelectMany(a => a.Permissions).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
-                result.Add(new SessionCompany(companyId, legalName, assignments, permissions));
+                result.Add(new SessionCompany(companyId, legalName, assignments, permissions, plants));
             }
         }
 
@@ -225,8 +245,28 @@ public sealed class SessionService
             stepUpValidUntil > now ? stepUpValidUntil : null,
             SessionRules.ExpiresAt(_options, session.LoginAt, session.LastActivityAt),
             result,
-            session.Parent?.Email);
+            session.Parent?.Email,
+            displayName);
     }
+
+    /// <summary>E-UX1-01-3: keeps the name Google gives (trimmed, at most 200 characters); a sign-in without one leaves it as it was.</summary>
+    private static async Task RememberNameAsync(DbConnection connection, Guid userId, string? name, CancellationToken cancellationToken)
+    {
+        var trimmed = name?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return;
+        }
+
+        await Sql.ExecuteAsync(
+            connection,
+            null,
+            "UPDATE iam.user SET display_name = @n WHERE user_id = @u AND display_name IS DISTINCT FROM @n",
+            cancellationToken,
+            ("n", trimmed.Length <= 200 ? trimmed : trimmed[..200]),
+            ("u", userId)).ConfigureAwait(false);
+    }
+
 
     /// <summary>
     /// The synthetic users the person behind <paramref name="sessionId"/> may act as in <paramref name="companyId"/> (E-B03-14).

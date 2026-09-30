@@ -240,10 +240,10 @@ try
 
         case "create-plant":
             {
-                // E-PR04-2: plants (each with its own valuation area) are created by the deployment role in VS#1.
-                if (args.Length != 4)
+                // E-PR04-2: plants (each with its own valuation area) are created by the deployment role in VS#1; E-UX1-01-4: optional name.
+                if (args.Length is not (4 or 5))
                 {
-                    await Console.Error.WriteLineAsync("Usage: rochell-migrate create-plant <company-rnc> <PLANT_CODE> <VALUATION_AREA_CODE>");
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate create-plant <company-rnc> <PLANT_CODE> <VALUATION_AREA_CODE> [\"Plant name\"]");
                     return 1;
                 }
 
@@ -256,8 +256,8 @@ try
                            INSERT INTO md.valuation_area (company_id, valuation_area_id, code)
                            SELECT company_id, @area_id, upper(@area_code) FROM company
                            RETURNING company_id, valuation_area_id)
-                    INSERT INTO md.plant (plant_id, company_id, code, valuation_area_id)
-                    SELECT @plant_id, company_id, upper(@plant_code), valuation_area_id FROM area
+                    INSERT INTO md.plant (plant_id, company_id, code, valuation_area_id, name)
+                    SELECT @plant_id, company_id, upper(@plant_code), valuation_area_id, nullif(btrim(@plant_name), '') FROM area
                     """,
                     connection);
                 var plantId = Guid.CreateVersion7();
@@ -266,6 +266,7 @@ try
                 create.Parameters.AddWithValue("area_code", args[3]);
                 create.Parameters.AddWithValue("plant_id", plantId);
                 create.Parameters.AddWithValue("plant_code", args[2]);
+                create.Parameters.AddWithValue("plant_name", args.Length == 5 ? args[4] : string.Empty);
                 if (await create.ExecuteNonQueryAsync() != 1)
                 {
                     await Console.Error.WriteLineAsync("Company not found.");
@@ -273,6 +274,36 @@ try
                 }
 
                 Console.WriteLine($"Plant {args[2].ToUpperInvariant()} created: {plantId}.");
+                return 0;
+            }
+
+        case "set-plant-name":
+            {
+                // E-UX1-01-4: the readable name of an existing plant (screens show "Name (CODE)").
+                if (args.Length != 4 || string.IsNullOrWhiteSpace(args[3]) || args[3].Trim().Length > 100)
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate set-plant-name <company-rnc> <PLANT_CODE> \"Plant name (1-100 characters)\"");
+                    return 1;
+                }
+
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                await using var rename = new NpgsqlCommand(
+                    """
+                    UPDATE md.plant p SET name = btrim(@name)
+                    FROM md.company c WHERE c.company_id = p.company_id AND c.rnc = @rnc AND p.code = upper(@code)
+                    """,
+                    connection);
+                rename.Parameters.AddWithValue("rnc", args[1]);
+                rename.Parameters.AddWithValue("code", args[2]);
+                rename.Parameters.AddWithValue("name", args[3]);
+                if (await rename.ExecuteNonQueryAsync() != 1)
+                {
+                    await Console.Error.WriteLineAsync("Company or plant not found.");
+                    return 2;
+                }
+
+                Console.WriteLine($"Plant {args[2].ToUpperInvariant()} is now named \"{args[3].Trim()}\".");
                 return 0;
             }
 

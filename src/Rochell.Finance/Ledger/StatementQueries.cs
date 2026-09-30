@@ -449,7 +449,7 @@ public sealed class ListReportStructuresHandler : IQueryHandler<ListReportStruct
             context.Connection,
             context.Transaction,
             """
-            SELECT v.structure_version_id, v.report, v.version, v.effective_from, v.status, pu.email, v.prepared_by, au.email,
+            SELECT v.structure_version_id, v.report, v.version, v.effective_from, v.status, coalesce(pu.display_name, pu.email), v.prepared_by, coalesce(au.display_name, au.email),
                    (SELECT count(*) FROM fin.report_line l WHERE l.structure_version_id = v.structure_version_id)::int,
                    (SELECT count(*) FROM fin.report_line_account x WHERE x.structure_version_id = v.structure_version_id)::int
             FROM fin.report_structure_version v

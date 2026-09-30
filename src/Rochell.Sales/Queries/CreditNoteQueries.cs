@@ -108,7 +108,7 @@ public sealed class GetCreditNoteHandler : IQueryHandler<GetCreditNote>
             context.Connection,
             context.Transaction,
             """
-            SELECT c.email, u.email, n.posting_event_id FROM sal.credit_note n
+            SELECT coalesce(c.display_name, c.email), coalesce(u.display_name, u.email), n.posting_event_id FROM sal.credit_note n
             LEFT JOIN iam.user c ON c.user_id = n.created_by LEFT JOIN iam.user u ON u.user_id = n.issued_by
             WHERE n.credit_note_id = @n
             """,
@@ -118,7 +118,7 @@ public sealed class GetCreditNoteHandler : IQueryHandler<GetCreditNote>
         var fiscal = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT f.encf, f.issued_at, f.security_code, f.evidence_ref, encode(f.evidence_sha256, 'hex'), u.email FROM tax.external_fiscal_record f LEFT JOIN iam.user u ON u.user_id = f.recorded_by WHERE f.credit_note_id = @n",
+            "SELECT f.encf, f.issued_at, f.security_code, f.evidence_ref, encode(f.evidence_sha256, 'hex'), coalesce(u.display_name, u.email) FROM tax.external_fiscal_record f LEFT JOIN iam.user u ON u.user_id = f.recorded_by WHERE f.credit_note_id = @n",
             r => new ExternalFiscalRecordView(r.GetString(0), r.GetFieldValue<DateTime>(1), r.GetString(2), r.GetString(3), r.GetString(4), r.NullableString(5)),
             cancellationToken,
             ("n", query.CreditNoteId)).ConfigureAwait(false);

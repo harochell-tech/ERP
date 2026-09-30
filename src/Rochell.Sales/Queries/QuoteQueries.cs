@@ -23,7 +23,7 @@ internal static class QuoteReading
         SELECT q.quote_id, q.quote_no, q.quote_date, q.valid_until, q.party_id, p.legal_name, pl.code, q.delivery_term_code, q.total_net::numeric(19,2), q.status,
                q.status = 'SENT' AND q.valid_until < @today,
                EXISTS (SELECT 1 FROM sal.quote_line l WHERE l.quote_id = q.quote_id AND l.lines_version = q.lines_version AND l.unit_price < l.list_price),
-               u.email, q.version
+               coalesce(u.display_name, u.email), q.version
         FROM sal.quote q
         JOIN md.party p ON p.party_id = q.party_id
         JOIN md.plant pl ON pl.plant_id = q.plant_id
@@ -103,7 +103,7 @@ public sealed class GetQuoteHandler : IQueryHandler<GetQuote>
             context.Connection,
             context.Transaction,
             """
-            SELECT q.plant_id, q.site_address, q.customer_ref, q.notes, q.price_list_version_id, u.email, q.price_approved_at, q.approved_lines_version IS NOT DISTINCT FROM q.lines_version,
+            SELECT q.plant_id, q.site_address, q.customer_ref, q.notes, q.price_list_version_id, coalesce(u.display_name, u.email), q.price_approved_at, q.approved_lines_version IS NOT DISTINCT FROM q.lines_version,
                    q.sales_order_id, o.order_no, q.closing_reason, q.copied_from_quote_id
             FROM sal.quote q LEFT JOIN iam.user u ON u.user_id = q.price_approved_by LEFT JOIN sal.sales_order o ON o.sales_order_id = q.sales_order_id
             WHERE q.quote_id = @q

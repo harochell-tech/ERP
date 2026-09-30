@@ -12,8 +12,11 @@ public sealed record ListUsers(Guid CompanyId, Guid SessionId) : IQuery;
 
 public sealed record UserRoleView(Guid AssignmentId, string RoleCode, string RoleName, Guid? PlantId, string? PlantCode, DateTime ValidFrom);
 
-/// <summary>A user with an assignment or a request in the company, or one with no assignment anywhere yet (just created).</summary>
-public sealed record UserView(Guid UserId, string? Email, string Kind, string Status, IReadOnlyList<UserRoleView> Roles);
+/// <summary>
+/// A user with an assignment or a request in the company, or one with no assignment anywhere yet (just created).
+/// <paramref name="DisplayName"/>: the name Google gave at the last sign-in (E-UX1-01-3), null until the first one.
+/// </summary>
+public sealed record UserView(Guid UserId, string? Email, string Kind, string Status, IReadOnlyList<UserRoleView> Roles, string? DisplayName = null);
 
 public sealed record UserList(IReadOnlyList<UserView> Items);
 
@@ -22,7 +25,9 @@ public sealed class ListUsersHandler : IQueryHandler<ListUsers>
 {
     public string QueryType => "Identity.ListUsers";
 
-    private sealed record Row(Guid UserId, string? Email, string Kind, string Status, Guid? AssignmentId, string? RoleCode, string? RoleName, Guid? PlantId, string? PlantCode, DateTime? ValidFrom);
+    private sealed record Row(
+        Guid UserId, string? Email, string Kind, string Status, Guid? AssignmentId, string? RoleCode, string? RoleName, Guid? PlantId, string? PlantCode, DateTime? ValidFrom,
+        string? DisplayName);
 
     public async Task<string> HandleAsync(ListUsers query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -31,7 +36,7 @@ public sealed class ListUsersHandler : IQueryHandler<ListUsers>
             context.Connection,
             context.Transaction,
             """
-            SELECT u.user_id, u.email, u.kind, u.status, ra.assignment_id, r.code, r.name, ra.plant_id, p.code, ra.valid_from
+            SELECT u.user_id, u.email, u.kind, u.status, ra.assignment_id, r.code, r.name, ra.plant_id, p.code, ra.valid_from, u.display_name
             FROM iam.user u
             LEFT JOIN iam.role_assignment ra ON ra.user_id = u.user_id AND ra.company_id = @c AND ra.valid_from <= @now AND (ra.valid_to IS NULL OR ra.valid_to > @now)
             LEFT JOIN iam.role r ON r.role_id = ra.role_id
@@ -42,14 +47,16 @@ public sealed class ListUsersHandler : IQueryHandler<ListUsers>
                 OR NOT EXISTS (SELECT 1 FROM iam.role_assignment y WHERE y.user_id = u.user_id))
             ORDER BY u.kind, u.email, r.code
             """,
-            r => new Row(r.GetGuid(0), r.NullableString(1), r.GetString(2), r.GetString(3), r.NullableGuid(4), r.NullableString(5), r.NullableString(6), r.NullableGuid(7), r.NullableString(8), r.NullableUtc(9)),
+            r => new Row(r.GetGuid(0), r.NullableString(1), r.GetString(2), r.GetString(3), r.NullableGuid(4), r.NullableString(5), r.NullableString(6), r.NullableGuid(7), r.NullableString(8), r.NullableUtc(9),
+                r.NullableString(10)),
             cancellationToken,
             ("c", context.CompanyId),
             ("now", context.Clock.UtcNow)).ConfigureAwait(false);
-        var users = rows.GroupBy(r => (r.UserId, r.Email, r.Kind, r.Status))
+        var users = rows.GroupBy(r => (r.UserId, r.Email, r.Kind, r.Status, r.DisplayName))
             .Select(g => new UserView(
                 g.Key.UserId, g.Key.Email, g.Key.Kind, g.Key.Status,
-                g.Where(r => r.AssignmentId is not null).Select(r => new UserRoleView(r.AssignmentId!.Value, r.RoleCode!, r.RoleName!, r.PlantId, r.PlantCode, r.ValidFrom!.Value)).ToList()))
+                g.Where(r => r.AssignmentId is not null).Select(r => new UserRoleView(r.AssignmentId!.Value, r.RoleCode!, r.RoleName!, r.PlantId, r.PlantCode, r.ValidFrom!.Value)).ToList(),
+                g.Key.DisplayName))
             .ToList();
         return ApiJson.Serialize(new UserList(users));
     }
@@ -59,7 +66,8 @@ public sealed record ListRoleRequests(Guid CompanyId, Guid SessionId, string? St
 
 public sealed record RoleRequestView(
     Guid RequestId, Guid UserId, string? UserEmail, string Action, string RoleCode, string RoleName, Guid? PlantId, string? PlantCode, string Status,
-    Guid RequestedById, string? RequestedBy, DateTime? RequestedAt, string? ApprovedBy, string? RejectedBy, DateTime? RejectedAt, string? RejectionReason);
+    Guid RequestedById, string? RequestedBy, DateTime? RequestedAt, string? ApprovedBy, string? RejectedBy, DateTime? RejectedAt, string? RejectionReason,
+    string? UserDisplayName = null);
 
 public sealed record RoleRequestList(IReadOnlyList<RoleRequestView> Items, int Limit, int Offset);
 
@@ -78,9 +86,9 @@ public sealed class ListRoleRequestsHandler : IQueryHandler<ListRoleRequests>
             context.Transaction,
             """
             SELECT q.request_id, q.user_id, u.email, q.action, r.code, r.name, q.plant_id, p.code, q.status,
-                   q.requested_by, rb.email,
+                   q.requested_by, coalesce(rb.display_name, rb.email),
                    (SELECT min(e.recorded_at) FROM core.domain_event e WHERE e.company_id = q.company_id AND e.aggregate_id = q.request_id AND e.event_type = 'RoleChangeRequested'),
-                   ab.email, xb.email, q.rejected_at, q.rejection_reason
+                   coalesce(ab.display_name, ab.email), coalesce(xb.display_name, xb.email), q.rejected_at, q.rejection_reason, u.display_name
             FROM iam.role_assignment_request q
             JOIN iam.user u ON u.user_id = q.user_id
             JOIN iam.role r ON r.role_id = q.role_id
@@ -94,7 +102,8 @@ public sealed class ListRoleRequestsHandler : IQueryHandler<ListRoleRequests>
             """,
             r => new RoleRequestView(
                 r.GetGuid(0), r.GetGuid(1), r.NullableString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.NullableGuid(6), r.NullableString(7), r.GetString(8),
-                r.GetGuid(9), r.NullableString(10), r.NullableUtc(11), r.NullableString(12), r.NullableString(13), r.NullableUtc(14), r.NullableString(15)),
+                r.GetGuid(9), r.NullableString(10), r.NullableUtc(11), r.NullableString(12), r.NullableString(13), r.NullableUtc(14), r.NullableString(15),
+                r.NullableString(16)),
             cancellationToken,
             ("c", context.CompanyId),
             ("status", query.Status),

@@ -22,7 +22,7 @@ internal static class OpeningReading
         SELECT b.batch_id, b.file_name, encode(b.source_file_sha256, 'hex'), b.cutover_date, b.status,
                (SELECT count(*) FROM mig.opening_inventory_line l WHERE l.batch_id = b.batch_id)::int,
                (SELECT coalesce(sum(l.value), 0) FROM mig.opening_inventory_line l WHERE l.batch_id = b.batch_id)::numeric(19,2),
-               pu.email, qu.email, b.reversal_reason, b.posting_event_id, b.version
+               coalesce(pu.display_name, pu.email), coalesce(qu.display_name, qu.email), b.reversal_reason, b.posting_event_id, b.version
         FROM mig.migration_batch b
         JOIN iam.user pu ON pu.user_id = b.prepared_by
         LEFT JOIN iam.user qu ON qu.user_id = b.posted_by
