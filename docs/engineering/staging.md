@@ -1,8 +1,8 @@
 # Staging (B-03)
 
 Approved errata E-B03-1…9. Staging runs the same image as production on the Hostinger `sistema` VPS (ADR-026, E-B03-11; never the portal VPS, which holds
-real production data), with synthetic data only
-(E-VS1-2, E-VS2-10). B-03 closes when the checklist at the end is done (E-B03-9).
+real production data). Until the parallel run it held synthetic data only (E-VS1-2, E-VS2-10); since E-PAR-1…6 it is the
+parallel-run environment with real data (see "Parallel run" below). B-03 closes when the checklist at the end is done (E-B03-9).
 
 ## Pieces
 
@@ -16,7 +16,7 @@ real production data), with synthetic data only
 | WORM | Backblaze B2 Object Lock (S3 API), COMPLIANCE, 7 days (E-B03-3, E-B03-10) | `Rochell:Audit:S3:*` incl. `ServiceUrl`; see [hash-chain.md](hash-chain.md) |
 | Digest keys | `/opt/rochell-staging/secrets/digest-{signing,public}.pem` (`bootstrap.sh`) | Private key generated on the server, `0400`, uid 1654; `Rochell:Digest:SigningKeyPemFile`, `Rochell:Audit:DigestPublicKeyPemFile` (E-B03-6) |
 | Daily fiscal expiry | `Rochell__FiscalExpiry__Enabled: "true"` in `compose.yaml` (E-FIS1-04-7) | Configuration reaches the container through environment variables only: the API starts with content root `/app`, so the image's `appsettings.*.json` (in `/app/api`) are not read |
-| Deploy | `.github/workflows/deploy-staging.yml` → `deploy/staging/deploy.sh` | Manual, `main` only, refuses a commit without a green `build-test`; migrate → `init-environment TEST` (Patch 1.1) → logins → restart → HTTPS smoke check |
+| Deploy | `.github/workflows/deploy-staging.yml` → `deploy/staging/deploy.sh` | Manual, `main` only, refuses a commit without a green `build-test`; migrate → `init-environment PRODUCTION` (Patch 1.1, E-PAR-3) → logins → restart → HTTPS smoke check |
 | Backup | `deploy/staging/backup.sh` (cron 01:30) | `pg_dump -Fc` → `openssl cms` (AES-256, to `secrets/backup-cert.pem`) → B2 bucket with a 7-day lifecycle rule (E-B03-8, E-B03-10) |
 
 ## One-time setup
@@ -189,3 +189,24 @@ P-12, P-13 and REVAL, and prepare the PRODUCTION policy (approved by the Aprobad
 
 Screens show plants as "Name (CODE)". On the VPS: `docker compose run --rm migrate set-plant-name 131925332 <CODE> "Planta Higüey"`
 (new plants: `create-plant <rnc> <CODE> <AREA> "Name"`). Only the name of a plant row can change.
+
+## Parallel run (E-PAR-1…6)
+
+Staging is the parallel-run environment: Rochell runs next to ADM Cloud with real data and is reconciled at each month's close.
+The database is PRODUCTION (`deploy.sh` writes it once; the CLI refuses to change it), so there are no synthetic users and no
+"Actuar como", and activating a fiscal rule needs an official PRODUCTION source (P-7). `Rochell__EnvironmentBadge: PARALELO`
+(`compose.yaml`) is served at `GET /api/v1/environment` and shown in the top bar. `seed*.sh` are for TEST databases only.
+
+Reset (E-PAR-2, done once, only with the owner's explicit confirmation at the time):
+
+1. `backup.sh`; check the new object in B2 is CMS-encrypted (it starts with a DER `SEQUENCE`, not the `PGDMP` magic).
+2. Restore test (E-PAR-4, criterion E1) on the owner's computer, where the offline key lives: download the object, `openssl cms
+   -decrypt -inform DER -inkey backup-key.pem -in <file> -out rochell.dump`, `pg_restore` into an empty PostgreSQL 17, count rows.
+3. Review SSH access (`~/.ssh/authorized_keys` fingerprints on the VPS).
+4. Note the real people's `iam.user` rows (e-mail, OIDC subject) to recreate them with `create-user`.
+5. Stop `api`; drop and recreate the `rochell` database (owner `rochell_deploy`); run the deploy workflow (migrations,
+   PRODUCTION, logins).
+6. `create-company 131925332 "<legal name>"`, `create-user` for the owner, `grant-role <owner> SUPERADMIN 131925332` (90 days,
+   E-ADM-2-2), `create-plant 131925332 MATILLA <AREA> "<name>"` and its locations (RECEPCION, CURADO, TRANSITO), `open-periods`,
+   `import-rnc-registry`.
+7. Sign in; Configuración › Centro de configuración shows the 19 setup steps pending.

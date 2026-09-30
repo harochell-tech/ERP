@@ -252,7 +252,23 @@ function useEnvironmentBadge(): EnvironmentBadge {
     () => window.location.hostname,
     () => "",
   );
-  return environmentBadge(hostname);
+  // E-PAR-3: the deployment may name itself (staging runs the parallel run: "PARALELO"); otherwise the host name decides.
+  const [configured, setConfigured] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/v1/environment", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { badge?: string | null } | null) => {
+        if (live && body?.badge) {
+          setConfigured(body.badge);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  return configured ? { label: configured, tone: "staging" } : environmentBadge(hostname);
 }
 
 function SideMenu({
