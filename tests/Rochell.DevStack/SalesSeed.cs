@@ -5,6 +5,7 @@ using Rochell.Sales.Customers;
 using Rochell.Sales.Fleet;
 using Rochell.Sales.Opening;
 using Rochell.Sales.Pricing;
+using Rochell.Sales.Quotes;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
 using Rochell.TestInfrastructure;
@@ -108,5 +109,12 @@ internal static class SalesSeed
             new AttachAuthorizationDocumentHandler());
         await h.RunAsync(new SubmitForVerification(h.CompanyId, credit, "dev-auth-sub", authorization, 1), new SubmitForVerificationHandler());
         await h.RunAsync(new VerifyAuthorization(h.CompanyId, actors.Specialist, "dev-auth-ver", authorization, 2), new VerifyAuthorizationHandler());
+
+        // QUO1-04 (E-QUO1-04-10): a SENT sample quote of 300 blocks at the list price, valid 30 days.
+        var quote = (await h.RunAsync(
+            new CreateQuote(h.CompanyId, seller, "dev-quote", customer, plantId, today.AddDays(30), "PICKUP_AT_PLANT", null, "OC-DEV-1", "Cotización de ejemplo (desarrollo)",
+                [new QuoteLineInput(block, "un", 300m)]),
+            new CreateQuoteHandler())).ResultRef;
+        await h.RunAsync(new SendQuote(h.CompanyId, seller, "dev-quote-send", quote, 1), new SendQuoteHandler());
     }
 }

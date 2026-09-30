@@ -39,6 +39,7 @@ export const NAV: readonly NavGroup[] = [
   {
     title: "Ventas",
     items: [
+      { href: "/ventas/cotizaciones/", label: "Cotizaciones", permission: "sales:read" }, // QUO1-04 (E-QUO1-04-1)
       { href: "/ventas/pedidos/", label: "Pedidos", permission: "sales:read" },
       { href: "/ventas/clientes/", label: "Clientes", permission: "sales:read" },
       { href: "/ventas/antiguedad/", label: "Antigüedad de CxC", permission: "sales:read" },
@@ -164,6 +165,7 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/produccion/corrida/": "/produccion/dia/",
   "/produccion/receta/": "/produccion/recetas/",
   "/fiscal/autorizacion/": "/fiscal/autorizaciones/",
+  "/ventas/cotizacion/": "/ventas/cotizaciones/",
 };
 
 function isActive(pathname: string, href: string): boolean {
