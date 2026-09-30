@@ -63,13 +63,13 @@ Lists take `limit` (1–200, default 50) and `offset`.
 
 | Resource | Permission |
 | --- | --- |
-| `master-data/suppliers`, `master-data/items` (with UOM conversions), `master-data/plants` (with locations) | `master_data:read` |
+| `master-data/suppliers`, `master-data/items` (with UOM conversions), `master-data/plants` (with locations), `master-data/uoms` (E-UX3-11) | `master_data:read` |
 | `finance/accounts`, `finance/account-role-maps?status=`, `finance/posting-rules`, `finance/accounting-policies` (definitions, versions, values), `tax/fiscal-sources`, `tax/fiscal-rules` (versions, linked sources, latest test run) — E-B03-15-1 | `configuration:read` |
-| `procurement/purchase-orders`, `…/{id}` (lines, receipts, status history) | `purchase_order:read` |
+| `procurement/purchase-orders`, `…/{id}` (lines, receipts, status history), `procurement/purchase-orders/to-receive` (E-UX3-5) | `purchase_order:read` |
 | `procurement/goods-receipts`, `…/{id}` (lines and lots, reversal, corrections, history), `procurement/receipt-corrections` | `goods_receipt:read` |
 | `procurement/supplier-invoices`, `…/{id}` (lines with match results, determined taxes, AP document, history) | `supplier_invoice:read` |
-| `reconciliation/periods?year=` (component states, reopen requests) | `period:read` |
-| `reconciliation/runs`, `…/{runId}` (exceptions) | `reconciliation:read` |
+| `reconciliation/periods?year=` (component states, reopen requests), `reconciliation/periods/{periodId}/close-readiness` (E-UX3-1) | `period:read` |
+| `reconciliation/runs`, `…/{runId}` (exceptions, with names, guidance and match labels), `reconciliation/definitions` (E-UX3-2/3) | `reconciliation:read` |
 | `finance/events/{sourceEventId}/journals`, `finance/entries/{glEntryId}/explanation` (EX-01, E-PR17-6) | `audit:read` |
 | `treasury/ap-aging`, `treasury/payment-proposal`, `treasury/payments`, `…/{id}` — E-VS2-07-1 | `payment:read` |
 | `treasury/bank-accounts`, `…/{id}/reconciliation`, `treasury/suppliers/{partyId}/bank-accounts`, `treasury/bank-statements`, `treasury/bank-statement-lines`, `treasury/bank-statements/{id}/match-suggestions` (account numbers masked without `bank_account_number:read`, E-VS2-07-3; details in [banks-and-payments.md](banks-and-payments.md#treasury-queries-vs2-07)) | `bank:read` |

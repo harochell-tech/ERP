@@ -39,10 +39,11 @@ public static class QueryEndpoints
 
     public static IReadOnlyList<Type> Handlers { get; } =
     [
-        typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler), typeof(GetCompanyHandler), typeof(GetRncHandler), typeof(GetRncRegistryStatusHandler),
-        typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
+        typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler), typeof(ListUomsHandler), typeof(GetCompanyHandler), typeof(GetRncHandler), typeof(GetRncRegistryStatusHandler),
+        typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
         typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
+        typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
         typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
@@ -52,7 +53,7 @@ public static class QueryEndpoints
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
-        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler),
+        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
@@ -75,6 +76,10 @@ public static class QueryEndpoints
         masterData.MapGet("/plants", (HttpContext http, Guid companyId, Guid? plantId, ListPlantsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPlants(companyId, s, plantId), handler, ct))
             .Describe<PlantList>(nameof(ListPlants));
+        // E-UX3-11: the units of measure.
+        masterData.MapGet("/uoms", (HttpContext http, Guid companyId, Guid? plantId, ListUomsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListUoms(companyId, s, plantId), handler, ct))
+            .Describe<UomList>(nameof(ListUoms));
         // E-RNC-4/7: the DGII registry.
         masterData.MapGet("/rnc/{rnc}", (HttpContext http, Guid companyId, string rnc, GetRncHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetRnc(companyId, s, rnc), handler, ct))
@@ -90,6 +95,10 @@ public static class QueryEndpoints
         procurement.MapGet("/purchase-orders/{purchaseOrderId:guid}", (HttpContext http, Guid companyId, Guid purchaseOrderId, Guid? plantId, GetPurchaseOrderHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetPurchaseOrder(companyId, s, purchaseOrderId, plantId), handler, ct))
             .Describe<PurchaseOrderDetail>(nameof(GetPurchaseOrder), notFound: true);
+        // E-UX3-5: the orders to receive against, with open and receivable quantities.
+        procurement.MapGet("/purchase-orders/to-receive", (HttpContext http, Guid companyId, Guid? plantId, Guid? supplierId, int? limit, int? offset, ListPurchaseOrdersToReceiveHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPurchaseOrdersToReceive(companyId, s, plantId, supplierId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<PurchaseOrderToReceiveList>(nameof(ListPurchaseOrdersToReceive));
         procurement.MapGet("/goods-receipts", (HttpContext http, Guid companyId, Guid? plantId, Guid? purchaseOrderId, string? documentStatus, int? limit, int? offset, ListGoodsReceiptsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListGoodsReceipts(companyId, s, plantId, purchaseOrderId, documentStatus, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<GoodsReceiptList>(nameof(ListGoodsReceipts));
@@ -119,6 +128,13 @@ public static class QueryEndpoints
         reconciliation.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetReconciliationRunHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetReconciliationRun(companyId, s, runId), handler, ct))
             .Describe<ReconciliationRunDetail>(nameof(GetReconciliationRun), notFound: true);
+        // E-UX3-1/2: whether each component of a period can close; the reconciliations in words.
+        reconciliation.MapGet("/periods/{periodId:guid}/close-readiness", (HttpContext http, Guid companyId, Guid periodId, GetCloseReadinessHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetCloseReadiness(companyId, s, periodId), handler, ct))
+            .Describe<CloseReadiness>(nameof(GetCloseReadiness), notFound: true);
+        reconciliation.MapGet("/definitions", (HttpContext http, Guid companyId, ListReconciliationDefinitionsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListReconciliationDefinitions(companyId, s), handler, ct))
+            .Describe<ReconciliationDefinitionList>(nameof(ListReconciliationDefinitions));
 
         // E-MFG1-02-9: production master data (production:read).
         var manufacturing = company.MapGroup("/manufacturing").WithTags("Manufacturing");
@@ -220,6 +236,10 @@ public static class QueryEndpoints
         sales.MapGet("/deliveries/{deliveryId:guid}", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDelivery(companyId, s, deliveryId), handler, ct))
             .Describe<DeliveryDetail>(nameof(GetDelivery), notFound: true);
+        // E-UX3-7: the printable delivery note.
+        sales.MapGet("/deliveries/{deliveryId:guid}/print", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryPrintHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetDeliveryPrint(companyId, s, deliveryId), handler, ct))
+            .Describe<DeliveryPrint>(nameof(GetDeliveryPrint), notFound: true);
         sales.MapGet("/invoices", (HttpContext http, Guid companyId, string? commercialStatus, string? fiscalStatus, Guid? partyId, int? limit, int? offset, bool? openOnly, ListInvoicesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListInvoices(companyId, s, commercialStatus, fiscalStatus, partyId, limit ?? DefaultLimit, offset ?? 0, openOnly ?? false), handler, ct))
             .Describe<InvoiceList>(nameof(ListInvoices));

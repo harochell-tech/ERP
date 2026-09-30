@@ -2843,6 +2843,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/master-data/uoms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListUoms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/master-data/rnc/{rnc}": {
         parameters: {
             query?: never;
@@ -2899,6 +2915,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetPurchaseOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/purchase-orders/to-receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListPurchaseOrdersToReceive"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3043,6 +3075,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetReconciliationRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/reconciliation/periods/{periodId}/close-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCloseReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/reconciliation/definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListReconciliationDefinitions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3539,6 +3603,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetDelivery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/deliveries/{deliveryId}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetDeliveryPrint"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4919,6 +4999,36 @@ export interface components {
             periodId: string;
             component: string;
         };
+        CloseReadiness: {
+            /** Format: uuid */
+            periodId: string;
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            endsOn: string;
+            ended: boolean;
+            sealed: boolean;
+            components: components["schemas"]["CloseReadinessComponent"][];
+        };
+        CloseReadinessComponent: {
+            component: string;
+            status: string;
+            ended: boolean;
+            sealed: boolean;
+            ready: boolean;
+            reconciliations: components["schemas"]["CloseReadinessReconciliation"][];
+        };
+        CloseReadinessReconciliation: {
+            reconCode: string;
+            name: string;
+            /** Format: uuid */
+            runId: null | string;
+            runStatus: null | string;
+            /** Format: date-time */
+            runAt: null | string;
+            /** Format: int32 */
+            blockingErrors: null | number;
+        };
         CloseShortSalesOrder: {
             /** Format: uuid */
             salesOrderId: string;
@@ -5170,6 +5280,8 @@ export interface components {
             lines: components["schemas"]["CreditNoteLineView"][];
             fiscalRecord: null | components["schemas"]["ExternalFiscalRecordView"];
             history: components["schemas"]["StateChange"][];
+            /** Format: uuid */
+            invoiceIssuedById: null | string;
         };
         CreditNoteFiscalPackage: {
             creditNoteNo: string;
@@ -5463,6 +5575,60 @@ export interface components {
             salesOrderLineId: string;
             /** Format: decimal */
             quantity: string;
+        };
+        DeliveryPrint: {
+            issuerName: string;
+            issuerRnc: string;
+            customerName: string;
+            customerRnc: string;
+            siteAddress: null | string;
+            plantCode: string;
+            plantName: null | string;
+            deliveryNo: string;
+            orderNo: string;
+            /** Format: date */
+            orderDate: string;
+            /** Format: date */
+            plannedOn: null | string;
+            status: string;
+            deliveryTermCode: string;
+            /** Format: date-time */
+            gateOutAt: null | string;
+            vehiclePlate: null | string;
+            driverName: null | string;
+            customerVehiclePlate: null | string;
+            customerDriverName: null | string;
+            /** Format: decimal */
+            grossKg: null | string;
+            /** Format: decimal */
+            tareKg: null | string;
+            /** Format: decimal */
+            netKg: null | string;
+            weighTicketRef: null | string;
+            lines: components["schemas"]["DeliveryPrintLine"][];
+            receivedByName: null | string;
+            /** Format: date-time */
+            receivedAt: null | string;
+        };
+        DeliveryPrintLine: {
+            /** Format: int32 */
+            lineNo: number;
+            itemCode: string;
+            itemDescription: string;
+            uom: string;
+            /** Format: decimal */
+            qtyPlanned: string;
+            /** Format: decimal */
+            qtyIssued: string;
+            /** Format: decimal */
+            qtyDelivered: string;
+            lots: components["schemas"]["DeliveryPrintLot"][];
+        };
+        DeliveryPrintLot: {
+            lotCode: string;
+            sourceLocationCode: string;
+            /** Format: decimal */
+            baseQuantity: string;
         };
         DeliverySummary: {
             /** Format: uuid */
@@ -6986,6 +7152,27 @@ export interface components {
             /** Format: decimal */
             unitPrice: string;
         };
+        PurchaseOrderLineToReceive: {
+            /** Format: uuid */
+            poLineId: string;
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemDescription: string;
+            uom: string;
+            /** Format: decimal */
+            qtyOrdered: string;
+            /** Format: decimal */
+            qtyReceived: string;
+            /** Format: decimal */
+            openQuantity: string;
+            /** Format: decimal */
+            maxReceivable: string;
+            /** Format: int64 */
+            version: number;
+        };
         PurchaseOrderLineView: {
             /** Format: uuid */
             poLineId: string;
@@ -7010,6 +7197,8 @@ export interface components {
             qtyInvoiced: string;
             /** Format: int64 */
             version: number;
+            /** Format: decimal */
+            openQuantity: string;
         };
         PurchaseOrderList: {
             items: components["schemas"]["PurchaseOrderSummary"][];
@@ -7042,6 +7231,32 @@ export interface components {
             status: string;
             /** Format: int64 */
             version: number;
+        };
+        PurchaseOrderToReceive: {
+            /** Format: uuid */
+            purchaseOrderId: string;
+            poNo: string;
+            /** Format: uuid */
+            supplierId: string;
+            supplierName: string;
+            /** Format: uuid */
+            plantId: string;
+            plantCode: string;
+            /** Format: date */
+            orderDate: string;
+            /** Format: date-time */
+            approvedAt: null | string;
+            status: string;
+            /** Format: int64 */
+            version: number;
+            lines: components["schemas"]["PurchaseOrderLineToReceive"][];
+        };
+        PurchaseOrderToReceiveList: {
+            items: components["schemas"]["PurchaseOrderToReceive"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
         };
         QuoteDetail: {
             header: components["schemas"]["QuoteSummary"];
@@ -7357,6 +7572,16 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        ReconciliationDefinitionList: {
+            items: components["schemas"]["ReconciliationDefinitionView"][];
+        };
+        ReconciliationDefinitionView: {
+            reconCode: string;
+            name: string;
+            guidance: string;
+            severity: string;
+            blockingComponents: string[];
+        };
         ReconciliationExceptionView: {
             /** Format: uuid */
             exceptionId: string;
@@ -7370,6 +7595,9 @@ export interface components {
             component: null | string;
             status: string;
             resolution: null | string;
+            classificationName: null | string;
+            guidance: null | string;
+            matchLabel: null | string;
         };
         ReconciliationRunDetail: {
             run: components["schemas"]["ReconciliationRunSummary"];
@@ -7387,6 +7615,8 @@ export interface components {
             runId: string;
             reconCode: string;
             description: string;
+            name: string;
+            guidance: string;
             /** Format: date-time */
             asOf: string;
             /** Format: decimal */
@@ -8365,6 +8595,14 @@ export interface components {
             taxes: components["schemas"]["DeterminedTaxView"][];
             apDocument: null | components["schemas"]["ApDocumentView"];
             history: components["schemas"]["StateChange"][];
+            /** Format: decimal */
+            itbisTotal: null | string;
+            /** Format: decimal */
+            grossTotal: null | string;
+            /** Format: decimal */
+            openAmount: null | string;
+            paymentStatus: string;
+            payments: components["schemas"]["SupplierInvoicePaymentView"][];
         };
         SupplierInvoiceLineInput: {
             /** Format: uuid */
@@ -8405,6 +8643,16 @@ export interface components {
             /** Format: int32 */
             offset: number;
         };
+        SupplierInvoicePaymentView: {
+            /** Format: uuid */
+            paymentId: string;
+            paymentNo: string;
+            /** Format: date */
+            valueDate: string;
+            status: string;
+            /** Format: decimal */
+            amountApplied: string;
+        };
         SupplierInvoiceSummary: {
             /** Format: uuid */
             supplierInvoiceId: string;
@@ -8422,6 +8670,13 @@ export interface components {
             totalAmount: string;
             /** Format: int64 */
             version: number;
+            /** Format: decimal */
+            itbisTotal: null | string;
+            /** Format: decimal */
+            grossTotal: null | string;
+            /** Format: decimal */
+            openAmount: null | string;
+            paymentStatus: string;
         };
         SupplierList: {
             items: components["schemas"]["SupplierView"][];
@@ -8524,6 +8779,13 @@ export interface components {
             effectiveFrom: string;
             /** Format: date */
             effectiveTo: null | string;
+        };
+        UomList: {
+            items: components["schemas"]["UomView"][];
+        };
+        UomView: {
+            code: string;
+            dimension: string;
         };
         UpdateAccount: {
             /** Format: uuid */
@@ -21807,6 +22069,57 @@ export interface operations {
             };
         };
     };
+    ListUoms: {
+        parameters: {
+            query?: {
+                plantId?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UomList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetRnc: {
         parameters: {
             query?: never;
@@ -22013,6 +22326,60 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPurchaseOrdersToReceive: {
+        parameters: {
+            query?: {
+                plantId?: string;
+                supplierId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderToReceiveList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -22509,6 +22876,114 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCloseReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                periodId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CloseReadiness"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListReconciliationDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationDefinitionList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -24181,6 +24656,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeliveryDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetDeliveryPrint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryPrint"];
                 };
             };
             /** @description Bad Request */

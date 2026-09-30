@@ -48,6 +48,11 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
                 plantId = entry.PlantId,
                 itemId = entry.ItemId,
                 partyId = entry.PartyId,
+                plantCode = entry.PlantCode, // E-UX3-4: the names beside the ids
+                plantName = entry.PlantName,
+                itemCode = entry.ItemCode,
+                itemDescription = entry.ItemDescription,
+                partyLegalName = entry.PartyLegalName,
                 subledger = entry.SubledgerType is null ? null : new { type = entry.SubledgerType, reference = entry.SubledgerRef },
             },
             journal = new
@@ -218,7 +223,8 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
         Guid JournalId, string JournalType, int Generation, DateOnly PostingDate, bool LateEntry, Guid? ReversesJournalId, Guid? ReversedBy,
         string RuleCode, int RuleVersion, string Templates, string CloseComponent,
         Guid EventId, string EventType, DateTime OccurredAt, DateTime RecordedAt, DateOnly BusinessDate, string AggregateType, Guid AggregateId, string Payload,
-        string? CommandType, string? UserEmail, string? IntegrityStatus, long? LedgerSequence);
+        string? CommandType, string? UserEmail, string? IntegrityStatus, long? LedgerSequence,
+        string? PlantCode, string? PlantName, string? ItemCode, string? ItemDescription, string? PartyLegalName);
 
     private static async Task<EntryRow?> ReadAsync(QueryContext context, Guid glEntryId, CancellationToken cancellationToken)
     {
@@ -234,7 +240,8 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
                    coalesce(v.close_component, (SELECT m.close_component FROM fin.manual_journal m WHERE m.company_id = e.company_id AND m.posting_event_id = coalesce(
                      (SELECT o.source_event_id FROM fin.gl_journal o WHERE o.journal_id = j.reverses_journal_id), j.source_event_id))),
                    ev.event_id, ev.event_type, ev.occurred_at, ev.recorded_at, ev.business_date, ev.aggregate_type, ev.aggregate_id, ev.payload::text,
-                   cl.command_type, coalesce(u.display_name, u.email), i.integrity_status, i.ledger_sequence
+                   cl.command_type, coalesce(u.display_name, u.email), i.integrity_status, i.ledger_sequence,
+                   pl.code, pl.name, it.code, it.description, pa.legal_name
             FROM fin.gl_entry e
             JOIN fin.gl_journal j ON j.journal_id = e.journal_id
             JOIN fin.account a ON a.account_id = e.account_id
@@ -245,6 +252,9 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
             LEFT JOIN iam.session s ON s.session_id = ev.session_id
             LEFT JOIN iam.user u ON u.user_id = s.user_id
             LEFT JOIN audit.integrity_state i ON i.company_id = e.company_id AND i.ledger = 'GL' AND i.group_ref = j.journal_id
+            LEFT JOIN md.plant pl ON pl.plant_id = e.plant_id
+            LEFT JOIN md.item it ON it.item_id = e.item_id
+            LEFT JOIN md.party pa ON pa.party_id = e.party_id
             WHERE e.company_id = @c AND e.gl_entry_id = @id
             """,
             ("c", context.CompanyId),
@@ -261,7 +271,8 @@ public sealed partial class ExplainEntryHandler : IQueryHandler<ExplainEntry>
             r.GetGuid(14), r.GetString(15), r.GetInt32(16), r.GetFieldValue<DateOnly>(17), r.GetBoolean(18), G(r, 19), G(r, 20),
             r.GetString(21), r.GetInt32(22), r.GetString(23), r.GetString(24),
             r.GetGuid(25), r.GetString(26), r.GetDateTime(27), r.GetDateTime(28), r.GetFieldValue<DateOnly>(29), r.GetString(30), r.GetGuid(31), r.GetString(32),
-            S(r, 33), S(r, 34), S(r, 35), r.IsDBNull(36) ? null : r.GetInt64(36));
+            S(r, 33), S(r, 34), S(r, 35), r.IsDBNull(36) ? null : r.GetInt64(36),
+            S(r, 37), S(r, 38), S(r, 39), S(r, 40), S(r, 41));
     }
 
     /// <summary>E-FIN1-01-2: a manual line is explained by its adjustment: number, description, support, preparer and approver.</summary>
