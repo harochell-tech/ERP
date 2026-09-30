@@ -55,8 +55,27 @@ export const WITHHOLDING_BASE_LABELS: Readonly<Record<string, string>> = {
   NET: "Sobre el monto neto (retención de ISR)",
 };
 
-/** E-FIS2-01-4: the 606's ISR withholding types; their official names come from the 606 instructivo (A-02). */
+/** E-FIS2-01-4: the 606's ISR withholding types (field 17). */
 export const ISR_WITHHOLDING_TYPES = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
+
+/** Field 17 of the 606 ("Tipo de retención en ISR"), as the DGII's 606 filling instructions name them (E-UX2-14). */
+export const ISR_WITHHOLDING_TYPE_NAMES: Readonly<Record<(typeof ISR_WITHHOLDING_TYPES)[number], string>> = {
+  "1": "Alquileres",
+  "2": "Honorarios por servicios",
+  "3": "Otras rentas",
+  "4": "Otras rentas (rentas presuntas)",
+  "5": "Intereses pagados a personas jurídicas residentes",
+  "6": "Intereses pagados a personas físicas residentes",
+  "7": "Retención por proveedores del Estado",
+  "8": "Juegos telefónicos",
+  "9": "Retenciones subsector de ganadería de carne bovina",
+};
+
+/** "2 — Honorarios por servicios"; the code as is when unknown. */
+export function isrWithholdingTypeLabel(code: string): string {
+  const name = (ISR_WITHHOLDING_TYPE_NAMES as Readonly<Record<string, string>>)[code];
+  return name ? `${code} — ${name}` : code;
+}
 
 export interface FiscalRuleForm {
   taxCode: string;
@@ -244,7 +263,7 @@ export function describeFiscalDefinition(kind: string, json: string): string[] {
     lines.push(WITHHOLDING_BASE_LABELS[form.base] ?? `Base ${form.base}`);
     lines.push(`Se retiene a: ${form.partyTypes.map((p) => PARTY_TYPE_LABELS[p] ?? p).join(", ") || "—"}`);
     if (form.isrWithholdingType) {
-      lines.push(`Tipo de retención del 606: ${form.isrWithholdingType}`);
+      lines.push(`Tipo de retención del 606: ${isrWithholdingTypeLabel(form.isrWithholdingType)}`);
     }
   } else {
     lines.push(TAX_EFFECT_LABELS[form.effect] ?? form.effect);

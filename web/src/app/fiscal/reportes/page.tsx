@@ -20,6 +20,7 @@ import { formatDate } from "@/lib/labels";
 import { csvUrl } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { isrWithholdingTypeLabel } from "@/lib/fiscalRuleForm";
 
 // FIS2-03 (E-FIS2-03-1…4): the 606 of a month (to paste into the DGII tool) and the informative IT-1 / IR-17 summaries. Every
 // amount, count and total is the server's (fiscal_report:read); the browser only formats them.
@@ -125,7 +126,7 @@ function Report606Rows({ records }: { records: readonly Record606[] }) {
               <td className="num">
                 <Money value={r.itbisPerceived} />
               </td>
-              <td>{r.isrWithholdingType ?? "—"}</td>
+              <td title={r.isrWithholdingType ? isrWithholdingTypeLabel(r.isrWithholdingType) : undefined}>{r.isrWithholdingType ?? "—"}</td>
               <td className="num">
                 <Money value={r.isrWithheld} />
               </td>
@@ -372,7 +373,7 @@ function Ir17View({ companyId, period }: { companyId: string; period: string }) 
                 {data.lines.map((l) => (
                   <tr key={`${l.tax}:${l.isrWithholdingType ?? ""}`}>
                     <td>{WITHHOLDING_TAXES[l.tax] ?? l.tax}</td>
-                    <td>{l.tax === "ISR" ? (l.isrWithholdingType ?? "Sin tipo") : "—"}</td>
+                    <td>{l.tax === "ISR" ? (l.isrWithholdingType ? isrWithholdingTypeLabel(l.isrWithholdingType) : "Sin tipo") : "—"}</td>
                     <td className="num">{l.records}</td>
                     <td className="num">
                       <Money value={l.base} />

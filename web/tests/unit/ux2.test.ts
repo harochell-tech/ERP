@@ -6,6 +6,8 @@ import {
   casesToRows,
   describeFiscalDefinition,
   initialCases,
+  ISR_WITHHOLDING_TYPES,
+  isrWithholdingTypeLabel,
   parseFiscalDefinition,
   rowsToCases,
   validateCases,
@@ -345,5 +347,22 @@ describe("setup steps in Spanish (E-UX2-9/10)", () => {
     const status = { complete: false, steps: [step(3, "USERS", "SEGURIDAD", "WARNING"), step(1, "COMPANY", "EMPRESA", "DONE"), step(2, "PLANTS", "EMPRESA", "PENDING"), step(4, "PERIODS", "CONTABILIDAD", "DONE")] };
     expect(setupProgress(status)).toEqual({ done: 2, total: 4 });
     expect(nextSteps(status, 3).map((s) => s.code)).toEqual(["PLANTS", "USERS"]);
+  });
+});
+
+describe("ISR withholding types (E-UX2-14)", () => {
+  it("names the nine types of field 17 of the 606 as the DGII does", () => {
+    expect(ISR_WITHHOLDING_TYPES.map(isrWithholdingTypeLabel)).toEqual([
+      "1 — Alquileres",
+      "2 — Honorarios por servicios",
+      "3 — Otras rentas",
+      "4 — Otras rentas (rentas presuntas)",
+      "5 — Intereses pagados a personas jurídicas residentes",
+      "6 — Intereses pagados a personas físicas residentes",
+      "7 — Retención por proveedores del Estado",
+      "8 — Juegos telefónicos",
+      "9 — Retenciones subsector de ganadería de carne bovina",
+    ]);
+    expect(isrWithholdingTypeLabel("0")).toBe("0");
   });
 });
