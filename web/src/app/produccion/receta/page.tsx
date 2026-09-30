@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Loading, NoPermission, StatusBadge } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -14,13 +14,18 @@ import { useLoad } from "@/lib/useQuery";
 // MFG1-07 (E-MFG1-07-4): a recipe version with its materials per batch; the Gerente de planta approves a draft (four eyes: not the
 // preparer — the API is the authority).
 
-function Approve({ plantId, recipeVersionId, onDone }: { plantId: string; recipeVersionId: string; onDone: () => void }) {
-  const approve = useCommand(`approve-recipe:${recipeVersionId}`, "/api/v1/companies/{companyId}/manufacturing/approve-recipe");
+function Approve({ plantId, recipeVersionId, name, onDone }: { plantId: string; recipeVersionId: string; name: string; onDone: () => void }) {
+  const approve = useCommand(`approve-recipe:${recipeVersionId}`, "/api/v1/companies/{companyId}/manufacturing/approve-recipe", `Receta ${name} aprobada y activa.`);
   return (
     <div className="actions">
-      <button type="button" disabled={approve.busy} onClick={async () => (await approve.run({ plantId, recipeVersionId })) && onDone()}>
-        Aprobar receta
-      </button>
+      <ConfirmAction
+        label="Aprobar receta"
+        title={`¿Aprobar la receta ${name}?`}
+        consequence="La receta queda activa para producir en esa máquina y reemplaza a la versión activa anterior; las corridas nuevas usan estos materiales. No se puede deshacer: un cambio necesita una nueva versión."
+        className="primary"
+        busy={approve.busy}
+        onConfirm={async () => (await approve.run({ plantId, recipeVersionId })) && onDone()}
+      />
       <ErrorBox error={approve.error} />
     </div>
   );
@@ -74,7 +79,7 @@ function RecipeDetail() {
         </div>
       </dl>
       <h2>Materiales por tanda</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>Material</th>
@@ -93,8 +98,8 @@ function RecipeDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
-      {r.status === "DRAFT" && can("recipe:approve") ? <Approve plantId={r.plantId} recipeVersionId={r.recipeVersionId} onDone={reload} /> : null}
+      </table></div>
+      {r.status === "DRAFT" && can("recipe:approve") ? <Approve plantId={r.plantId} recipeVersionId={r.recipeVersionId} name={`${r.itemCode} en ${r.machineCode} (v${r.version})`} onDone={reload} /> : null}
     </>
   );
 }

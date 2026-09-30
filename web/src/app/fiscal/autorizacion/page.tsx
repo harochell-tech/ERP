@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
-import { ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { AUTHORIZATION_DOCUMENT_KINDS, authorizationActions, documentKindLabel } from "@/lib/authorizations";
 import { formatQuantity } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
@@ -26,12 +26,13 @@ function Actions({ authorization, onDone }: { authorization: Authorization; onDo
   const target = { authorizationId: h.authorizationId, expectedVersion: h.version };
   const userId = state.status === "ready" ? state.session.userId : "";
   const actions = authorizationActions(h.status, can, userId === authorization.registeredBy);
-  const submit = useCommand(`submit-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/submit-for-verification");
-  const verify = useCommand(`verify-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/verify-authorization");
-  const giveBack = useCommand(`return-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/return-authorization-to-draft");
-  const reject = useCommand(`reject-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/reject-authorization");
-  const suspend = useCommand(`suspend-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/suspend-authorization");
-  const reactivate = useCommand(`reactivate-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/reactivate-authorization");
+  const name = `Autorización ${h.certificateNo}`;
+  const submit = useCommand(`submit-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/submit-for-verification", `${name} enviada a verificación.`);
+  const verify = useCommand(`verify-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/verify-authorization", `${name} verificada: ya permite facturar con e-CF 44.`);
+  const giveBack = useCommand(`return-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/return-authorization-to-draft", `${name} devuelta a borrador.`);
+  const reject = useCommand(`reject-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/reject-authorization", `${name} rechazada.`);
+  const suspend = useCommand(`suspend-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/suspend-authorization", `${name} suspendida.`);
+  const reactivate = useCommand(`reactivate-authorization:${h.authorizationId}`, "/api/v1/companies/{companyId}/tax/reactivate-authorization", `${name} reactivada.`);
   const busy = submit.busy || verify.busy || giveBack.busy || reject.busy || suspend.busy || reactivate.busy;
   const after = (response: unknown) => response && onDone();
   return (
@@ -48,14 +49,50 @@ function Actions({ authorization, onDone }: { authorization: Authorization; onDo
           </button>
         ) : null}
         {actions.includes("VERIFY") ? (
-          <button type="button" className="primary" disabled={busy} onClick={async () => after(await verify.run(target))}>
-            Verificar
-          </button>
+          <ConfirmAction
+            label="Verificar"
+            className="primary"
+            title={`¿Verificar la ${name.toLowerCase()}?`}
+            consequence={`Confirma que el certificado coincide con lo registrado. La autorización queda activa y las facturas de ${h.customerName} de los productos cubiertos se emiten con e-CF 44, sin ITBIS, hasta agotar lo autorizado.`}
+            stepUp
+            busy={busy}
+            onConfirm={async () => after(await verify.run(target))}
+          />
         ) : null}
-        {actions.includes("RETURN") ? <ReasonAction label="Devolver a borrador" busy={busy} onConfirm={async (reason) => after(await giveBack.run({ ...target, reason }))} /> : null}
-        {actions.includes("REJECT") ? <ReasonAction label="Rechazar" busy={busy} onConfirm={async (reason) => after(await reject.run({ ...target, reason }))} /> : null}
-        {actions.includes("SUSPEND") ? <ReasonAction label="Suspender" busy={busy} onConfirm={async (reason) => after(await suspend.run({ ...target, reason }))} /> : null}
-        {actions.includes("REACTIVATE") ? <ReasonAction label="Reactivar" busy={busy} onConfirm={async (reason) => after(await reactivate.run({ ...target, reason }))} /> : null}
+        {actions.includes("RETURN") ? (
+          <ReasonAction
+            label="Devolver a borrador"
+            consequence="La autorización vuelve a borrador para que quien la registró la corrija y la envíe de nuevo."
+            busy={busy}
+            onConfirm={async (reason) => after(await giveBack.run({ ...target, reason }))}
+          />
+        ) : null}
+        {actions.includes("REJECT") ? (
+          <ReasonAction
+            label="Rechazar"
+            consequence="La autorización queda rechazada y no se podrá usar para facturar. No se deshace."
+            busy={busy}
+            onConfirm={async (reason) => after(await reject.run({ ...target, reason }))}
+          />
+        ) : null}
+        {actions.includes("SUSPEND") ? (
+          <ReasonAction
+            label="Suspender"
+            consequence="Mientras esté suspendida no se podrá facturar con esta autorización (e-CF 44); se puede reactivar después."
+            stepUp
+            busy={busy}
+            onConfirm={async (reason) => after(await suspend.run({ ...target, reason }))}
+          />
+        ) : null}
+        {actions.includes("REACTIVATE") ? (
+          <ReasonAction
+            label="Reactivar"
+            consequence="La autorización vuelve a permitir facturar con e-CF 44 lo que tenga disponible."
+            stepUp
+            busy={busy}
+            onConfirm={async (reason) => after(await reactivate.run({ ...target, reason }))}
+          />
+        ) : null}
       </div>
       {h.status === "PENDING_VERIFICATION" && can("fiscal_authorization:verify") && !actions.includes("VERIFY") ? (
         <p className="muted">Usted registró esta autorización: la verifica otra persona.</p>
@@ -68,19 +105,29 @@ function Actions({ authorization, onDone }: { authorization: Authorization; onDo
 function AttachDocument({ authorizationId, onDone }: { authorizationId: string; onDone: () => void }) {
   const attach = useCommand(`attach-authorization-document:${authorizationId}`, "/api/v1/companies/{companyId}/tax/attach-authorization-document");
   const [form, setForm] = useState({ kind: "CERTIFICADO_DGII", evidenceRef: "", evidenceSha256: "" });
+  const fe = useFieldErrors<"evidenceRef" | "evidenceSha256">();
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
   return (
     <form
-      className="inline-form"
+      className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await attach.run({ authorizationId, kind: form.kind, evidenceRef: form.evidenceRef.trim(), evidenceSha256: form.evidenceSha256.trim().toLowerCase() })) {
+        const valid = fe.check({
+          evidenceRef: form.evidenceRef.trim() === "" && "Adjunte el archivo o escriba su referencia.",
+          evidenceSha256: !/^[0-9a-fA-F]{64}$/.test(form.evidenceSha256.trim()) && "El SHA-256 tiene 64 caracteres hexadecimales (se calcula al adjuntar el archivo).",
+        });
+        if (!valid) {
+          return;
+        }
+        const message = `Documento adjuntado: ${documentKindLabel(form.kind)} (${form.evidenceRef.trim()}).`;
+        if (await attach.run({ authorizationId, kind: form.kind, evidenceRef: form.evidenceRef.trim(), evidenceSha256: form.evidenceSha256.trim().toLowerCase() }, undefined, message)) {
           setForm({ kind: form.kind, evidenceRef: "", evidenceSha256: "" });
           onDone();
         }
       }}
     >
-      <Field label="Tipo de documento">
+      <Field label="Tipo de documento" required>
         <select aria-label="Tipo de documento" value={form.kind} onChange={set("kind")}>
           {Object.entries(AUTHORIZATION_DOCUMENT_KINDS).map(([kind, label]) => (
             <option key={kind} value={kind}>
@@ -101,15 +148,17 @@ function AttachDocument({ authorizationId, onDone }: { authorizationId: string; 
           }}
         />
       </Field>
-      <Field label="Referencia">
-        <input value={form.evidenceRef} onChange={set("evidenceRef")} required />
+      <Field label="Referencia" required error={fe.errors.evidenceRef}>
+        <input value={form.evidenceRef} onChange={set("evidenceRef")} />
       </Field>
-      <Field label="SHA-256">
-        <input value={form.evidenceSha256} onChange={set("evidenceSha256")} required pattern="[0-9a-fA-F]{64}" size={66} />
+      <Field label="SHA-256" required error={fe.errors.evidenceSha256} wide>
+        <input className="mono" value={form.evidenceSha256} onChange={set("evidenceSha256")} />
       </Field>
-      <button type="submit" disabled={attach.busy}>
-        Adjuntar documento
-      </button>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={attach.busy}>
+          Adjuntar documento
+        </button>
+      </div>
       <ErrorBox error={attach.error} />
     </form>
   );
@@ -163,7 +212,7 @@ function AuthorizationDetail() {
             </dd>
           </>
         ) : null}
-        <dt>Neto autorizado · consumido</dt>
+        <dt>Neto autorizado · consumido (RD$)</dt>
         <dd>
           <Money value={h.netAuthorized} /> · <Money value={h.netConsumed} testId="authorization-net-consumed" />
         </dd>
@@ -171,7 +220,7 @@ function AuthorizationDetail() {
       <Actions authorization={data} onDone={reload} />
 
       <h2>Alcance</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th className="num">#</th>
@@ -180,9 +229,9 @@ function AuthorizationDetail() {
             <th className="num">Autorizado</th>
             <th className="num">Consumido</th>
             <th className="num">Disponible</th>
-            <th className="num">Neto autorizado</th>
-            <th className="num">Neto consumido</th>
-            <th className="num">Neto disponible</th>
+            <th className="num">Neto autorizado (RD$)</th>
+            <th className="num">Neto consumido (RD$)</th>
+            <th className="num">Neto disponible (RD$)</th>
           </tr>
         </thead>
         <tbody>
@@ -208,13 +257,13 @@ function AuthorizationDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
 
       <h2>Documentos</h2>
       {data.documents.length === 0 ? (
         <p className="muted">Sin documentos. El certificado de exención de la DGII es obligatorio para enviar a verificación.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Tipo</th>
@@ -227,7 +276,7 @@ function AuthorizationDetail() {
             {data.documents.map((d) => (
               <tr key={d.documentId}>
                 <td>{documentKindLabel(d.kind)}</td>
-                <td>{d.evidenceRef}</td>
+                <td className="wrap">{d.evidenceRef}</td>
                 <td className="muted mono" title={d.evidenceSha256}>
                   {d.evidenceSha256.slice(0, 12)}…
                 </td>
@@ -235,7 +284,7 @@ function AuthorizationDetail() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       {actions.includes("ATTACH") ? <AttachDocument authorizationId={h.authorizationId} onDone={reload} /> : null}
 
@@ -243,13 +292,13 @@ function AuthorizationDetail() {
       {data.consumptions.length === 0 ? (
         <p className="muted">Ninguna factura la ha consumido.</p>
       ) : (
-        <table data-testid="authorization-consumptions">
+        <div className="table-wrap"><table data-testid="authorization-consumptions">
           <thead>
             <tr>
               <th>Factura</th>
               <th className="num">Línea</th>
               <th className="num">Cantidad</th>
-              <th className="num">Neto</th>
+              <th className="num">Neto (RD$)</th>
               <th>Movimiento</th>
               <th>Fecha</th>
             </tr>
@@ -270,7 +319,7 @@ function AuthorizationDetail() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       <History history={data.history.map((x) => ({ statusKind: "DOCUMENT", command: "", by: null, ...x }))} />
     </>

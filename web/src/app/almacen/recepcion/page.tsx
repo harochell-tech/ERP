@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
-import { AccountingStatus, ErrorBox, Field, Loading, NoPermission, ReasonAction } from "@/components/ui";
+import { AccountingStatus, ErrorBox, Field, Loading, NoPermission, ReasonAction, useFieldErrors } from "@/components/ui";
 import { formatDecimal, formatQuantity, isDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDateTime, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -26,17 +26,22 @@ function CorrectionForm({ receipt, onDone }: { receipt: Receipt; onDone: () => v
   const create = useCommand<"/api/v1/companies/{companyId}/procurement/create-receipt-correction", CorrectionValues>(
     `correct-gr:${receipt.goodsReceiptId}`,
     "/api/v1/companies/{companyId}/procurement/create-receipt-correction",
+    `Corrección de la recepción ${receipt.grNo} registrada.`,
   );
   const [values, setValues] = useState<CorrectionValues>(() => create.restored ?? { lineId: receipt.lines[0]?.grLineId ?? "", delta: "", reason: "", evidence: "" });
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<"lineId" | "delta" | "reason" | "evidence">();
 
   const submit = async () => {
     const delta = normalizeInput(values.delta);
-    if (!values.lineId || !isDecimal(delta, 6) || !/[1-9]/.test(delta) || !values.reason.trim() || !values.evidence.trim()) {
-      setInvalid("Indique la línea, la diferencia (positiva o negativa, distinta de cero), el motivo y la evidencia.");
+    const valid = fe.check({
+      lineId: !values.lineId && "Elija la línea.",
+      delta: (!isDecimal(delta, 6) || !/[1-9]/.test(delta)) && "Indique la diferencia: positiva o negativa, distinta de cero (hasta 6 decimales).",
+      reason: !values.reason.trim() && "Indique el motivo.",
+      evidence: !values.evidence.trim() && "Indique la evidencia.",
+    });
+    if (!valid) {
       return;
     }
-    setInvalid(null);
     const response = await create.run(
       {
         plantId: receipt.plantId,
@@ -57,7 +62,7 @@ function CorrectionForm({ receipt, onDone }: { receipt: Receipt; onDone: () => v
   return (
     <>
       <h2>Corregir cantidad</h2>
-      <Field label="Línea">
+      <Field label="Línea" required error={fe.errors.lineId}>
         <select aria-label="Línea a corregir" value={values.lineId} onChange={(e) => setValues({ ...values, lineId: e.target.value })}>
           {receipt.lines.map((l) => (
             <option key={l.grLineId} value={l.grLineId}>
@@ -66,21 +71,20 @@ function CorrectionForm({ receipt, onDone }: { receipt: Receipt; onDone: () => v
           ))}
         </select>
       </Field>
-      <Field label="Diferencia (+/−)">
+      <Field label="Diferencia (+/−)" required error={fe.errors.delta}>
         <input aria-label="Diferencia" inputMode="decimal" value={values.delta} onChange={(e) => setValues({ ...values, delta: e.target.value })} />
       </Field>
-      <Field label="Motivo">
+      <Field label="Motivo" required error={fe.errors.reason}>
         <input aria-label="Motivo de la corrección" value={values.reason} onChange={(e) => setValues({ ...values, reason: e.target.value })} />
       </Field>
-      <Field label="Evidencia (ticket corregido, foto o registro)">
+      <Field label="Evidencia (ticket corregido, foto o registro)" required error={fe.errors.evidence}>
         <input aria-label="Evidencia" value={values.evidence} onChange={(e) => setValues({ ...values, evidence: e.target.value })} />
       </Field>
-      <div className="actions">
-        <button type="button" disabled={create.busy} onClick={submit}>
+      <div className="actions form-actions">
+        <button type="button" className="primary" disabled={create.busy} onClick={submit}>
           Registrar corrección
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={create.error} />
     </>
   );
@@ -96,7 +100,9 @@ function ReceiptDetail() {
       : null,
     [companyId, id, plantId],
   );
-  const reverse = useCommand(`reverse-gr:${id}`, "/api/v1/companies/{companyId}/procurement/reverse-goods-receipt");
+  const reverse = useCommand(`reverse-gr:${id}`, "/api/v1/companies/{companyId}/procurement/reverse-goods-receipt", () =>
+    receipt ? `Recepción ${receipt.grNo} reversada.` : "Recepción reversada.",
+  );
 
   if (!can("goods_receipt:read")) {
     return <NoPermission />;
@@ -123,14 +129,14 @@ function ReceiptDetail() {
           <AccountingStatus status={receipt.accountingStatus} eventId={receipt.postingEventId} />
         </dd>
       </dl>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>Artículo</th>
             <th>Lote</th>
             <th>Lote del proveedor</th>
             <th className="num">Cantidad</th>
-            <th className="num">Precio</th>
+            <th className="num">Precio (RD$)</th>
           </tr>
         </thead>
         <tbody>
@@ -144,7 +150,7 @@ function ReceiptDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       {receipt.reversal ? (
         <p>
           Reversada: {receipt.reversal.reason} — <AccountingStatus status={receipt.reversal.accountingStatus} eventId={receipt.reversal.postingEventId} />
@@ -154,6 +160,8 @@ function ReceiptDetail() {
         <div className="actions">
           <ReasonAction
             label="Reversar recepción"
+            consequence="Se anulan la entrada al inventario y su asiento contable, y la orden vuelve a quedar pendiente de recibir. No se puede deshacer."
+            stepUp
             busy={reverse.busy}
             onConfirm={async (reason) => {
               if (await reverse.run({ goodsReceiptId: receipt.goodsReceiptId, reason })) {
@@ -168,7 +176,7 @@ function ReceiptDetail() {
       {receipt.corrections.length === 0 ? (
         <p className="muted">Sin correcciones.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th className="num">Diferencia</th>
@@ -182,8 +190,8 @@ function ReceiptDetail() {
             {receipt.corrections.map((c) => (
               <tr key={c.correctionId}>
                 <td className="num">{formatQuantity(c.deltaQty)}</td>
-                <td>{c.reason}</td>
-                <td>{c.evidenceObjectKey}</td>
+                <td className="wrap">{c.reason}</td>
+                <td className="wrap">{c.evidenceObjectKey}</td>
                 <td>{statusLabel(c.documentStatus)}</td>
                 <td>
                   <AccountingStatus status={c.accountingStatus} eventId={c.postingEventId} />
@@ -191,7 +199,7 @@ function ReceiptDetail() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       {receipt.documentStatus !== "REVERSED" && can("receipt_correction:create") ? <CorrectionForm receipt={receipt} onDone={reload} /> : null}
       <History history={receipt.history} />

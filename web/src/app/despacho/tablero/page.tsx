@@ -12,7 +12,7 @@ import { useLoad } from "@/lib/useQuery";
 // with the step it needs.
 
 export default function Page() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const { data, error } = useLoad(
     can("sales:read")
       ? async () => {
@@ -39,7 +39,7 @@ export default function Page() {
       {data.orders.length === 0 ? (
         <p className="muted">No hay pedidos confirmados pendientes.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Pedido</th>
@@ -57,7 +57,7 @@ export default function Page() {
                   <Link href={`/ventas/pedido/?id=${o.salesOrderId}`}>{o.orderNo}</Link>
                 </td>
                 <td>{formatDate(o.orderDate)}</td>
-                <td>{o.customerName}</td>
+                <td className="wrap">{o.customerName}</td>
                 <td>{DELIVERY_TERMS[o.deliveryTermCode] ?? o.deliveryTermCode}</td>
                 <td>
                   <StatusBadge status={o.status} />
@@ -72,7 +72,7 @@ export default function Page() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       {BOARD_COLUMNS.map((column, index) => {
         const items = data.columns[index] ?? [];
@@ -84,7 +84,7 @@ export default function Page() {
             {items.length === 0 ? (
               <p className="muted">Ninguno.</p>
             ) : (
-              <table>
+              <div className="table-wrap"><table>
                 <thead>
                   <tr>
                     <th>Conduce</th>
@@ -102,14 +102,14 @@ export default function Page() {
                         <Link href={`/despacho/conduce/?id=${d.deliveryId}`}>{d.deliveryNo}</Link>
                       </td>
                       <td className="mono">{d.orderNo}</td>
-                      <td>{d.customerName}</td>
-                      <td>{d.plantCode}</td>
+                      <td className="wrap">{d.customerName}</td>
+                      <td>{plantName(d.plantCode)}</td>
                       <td>{DELIVERY_TERMS[d.deliveryTermCode] ?? d.deliveryTermCode}</td>
                       <td>{d.gateOutAt ? formatDateTime(d.gateOutAt) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </section>
         );

@@ -1,4 +1,5 @@
-// E-PR18b-11: errors are shown by code, in Spanish. Unknown codes fall back to the API message and the correlation id.
+// E-PR18b-11 / E-UX1-01-7: errors are shown by code, in Spanish. Every server code (the constants of the *Errors classes and
+// SessionService) has a message: tests/Rochell.ArchitectureTests/ErrorCatalogueTests.cs checks it.
 import { ApiError } from "@/api/client";
 
 export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
@@ -194,20 +195,106 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   QUOTE_EXPIRED: "La cotización está vencida; cópiela con una nueva vigencia.",
   // FIS2-03 (E-FIS2-03-6): the 606 classification has no regression tests.
   FISCAL_RULE_TESTS_NOT_APPLICABLE: "La clasificación del 606 no lleva pruebas de regresión: queda lista para activar con su fuente oficial.",
+  // UX1-01b (E-UX1-01-7): every remaining server code.
+  // Identity and API
+  LOGIN_REJECTED: "No se pudo iniciar sesión: use una cuenta de Google verificada del dominio de la empresa, vinculada a un usuario activo.",
+  TEST_IDENTITY_UNAVAILABLE: "Esa identidad de prueba no existe, está desactivada o no tiene roles en esta empresa.",
+  IDEMPOTENCY_KEY_REQUIRED: "Solicitud incompleta (falta la clave de idempotencia). Cierre el formulario, ábralo de nuevo y vuelva a intentarlo.",
+  // Master data: items and units
+  ITEM_CODE_INVALID: "El código del artículo debe tener de 2 a 40 caracteres: letras A–Z, dígitos, guion o guion bajo.",
+  ITEM_CODE_DUPLICATE: "Ya existe un artículo con ese código en la empresa.",
+  ITEM_CATEGORY_INVALID: "La categoría no es válida para ese tipo de artículo; elija una de la lista.",
+  UOM_UNKNOWN: "La unidad de medida no existe.",
+  CONVERSION_INVALID: "La conversión no es válida: el factor debe ser mayor que cero (hasta 8 decimales) y la unidad de origen distinta de la unidad base.",
+  CONVERSION_RETROACTIVE: "La conversión debe empezar hoy o después, y después del inicio de la conversión vigente; el pasado no se recalcula.",
+  // Inventory
+  LOCATION_NOT_FOUND: "La ubicación no existe en esta empresa.",
+  // Finance: configuration, policies, posting and close
+  CONFIGURATION_NOT_FOUND: "La configuración (mapa de cuentas, versión de regla de posteo o de política) no existe.",
+  CONFIGURATION_NOT_DRAFT: "Solo se puede cambiar o activar una configuración en borrador; cree una nueva versión.",
+  EFFECTIVE_RANGE_OVERLAP: "La vigencia se cruza con una versión activa: la nueva debe empezar después de la fecha de inicio de la vigente.",
+  RULE_DEFINITION_INVALID: "La definición de la regla de posteo no es válida: revise las líneas, los roles de cuenta y los auxiliares (solo las cuentas de control llevan auxiliar).",
+  POLICY_UNKNOWN: "La política contable no existe.",
+  POLICY_PARAMETERS_INVALID: "Los parámetros de la política no son válidos o falta la justificación; revise cada valor.",
+  POSTING_UNBALANCED: "El asiento generado no cuadra (débitos distintos de créditos); revise la regla de posteo y el mapa de cuentas con Contabilidad.",
+  JOURNAL_NOT_FOUND: "El asiento contable no existe.",
+  PERIOD_NOT_FOUND: "El período contable no existe o no tiene ese componente de cierre.",
+  UNKNOWN_COMPONENT: "El componente de cierre no existe.",
+  UNKNOWN_RECONCILIATION: "La conciliación indicada no existe.",
+  // Tax: fiscal rules and sources
+  FISCAL_RULE_INVALID: "La definición de la regla fiscal no es válida: revise el código, la tasa, el efecto, la base y los tipos de contribuyente.",
+  FISCAL_RULE_KIND_MISMATCH: "Ya existe una regla con ese código de otro tipo; use otro código o el tipo correcto.",
+  FISCAL_RULE_VERSION_NOT_FOUND: "La versión de la regla fiscal no existe.",
+  FISCAL_RULE_VERSION_NOT_CONFIGURABLE: "La versión ya está activa o retirada; configure una nueva versión.",
+  FISCAL_RULE_VERSION_NOT_READY: "La versión no está lista para activar: necesita una fuente oficial vigente y una corrida de pruebas aprobada.",
+  ACTIVATOR_IS_CONFIGURER: "Quien configuró la versión de la regla fiscal no puede activarla; otra persona debe hacerlo.",
+  ANOTHER_ITBIS_RULE_ACTIVE: "Ya hay otra regla activa de ese tipo (ITBIS o clasificación del 606) para esa fecha; retírela antes de activar esta.",
+  FISCAL_PRODUCTION_SOURCE_REQUIRED: "En producción la versión solo se activa con al menos una fuente oficial de producción vinculada.",
+  FISCAL_SOURCE_INVALID: "La fuente no es válida: complete los textos, el SHA-256 del documento (64 caracteres), el ambiente, una consulta que no esté en el futuro y una vigencia final posterior a la inicial.",
+  FISCAL_SOURCE_NOT_FOUND: "La fuente fiscal no existe.",
+  FISCAL_SOURCE_NOT_EFFECTIVE: "La fuente no está vigente en la fecha de inicio de la versión; use una fuente vigente para esa fecha.",
+  TEST_CASES_REQUIRED: "Agregue al menos un caso de prueba.",
+  TAX_SUBJECT_INVALID: "No se pudo calcular el impuesto: falta el tercero, las líneas, o un artículo o proveedor no existe.",
+  // Procurement
+  PURCHASE_ORDER_NOT_FOUND: "La orden de compra no existe.",
+  ALREADY_RECEIVED: "La orden ya tiene recepciones; no se puede cancelar.",
+  GOODS_RECEIPT_NOT_FOUND: "La recepción o su línea no existe.",
+  RECEIPT_CORRECTION_NOT_FOUND: "La corrección de recepción no existe.",
+  VALUE_TOO_SMALL: "La cantidad es tan pequeña que no se puede valorar; revise la cantidad o la unidad.",
+  SUPPLIER_INVOICE_NOT_FOUND: "La factura del proveedor no existe.",
+  LINE_KIND_NOT_SUPPORTED: "Ese tipo de línea no se puede facturar: cada línea debe facturar una línea de inventario de una orden de compra.",
+  NOTHING_TO_REPOST: "El evento no tiene un asiento contabilizado de esa regla para recontabilizar.",
+  REPOST_RULE_INCOMPATIBLE: "La versión vigente de la regla de posteo no tiene todas las líneas del asiento original; no se puede recontabilizar tal cual.",
+  NOT_AN_ORPHAN_RESIDUAL: "No hay un valor residual huérfano: la posición todavía tiene cantidad o su valor ya es cero.",
+  // Treasury: supplier bank accounts and statement matching
+  PARTY_BANK_ACCOUNT_REVIEW_PENDING: "El proveedor ya tiene una cuenta bancaria en revisión; verifíquela o recházela primero.",
+  PARTY_BANK_ACCOUNT_NOT_IN_REVIEW: "Solo se verifica o rechaza una cuenta en revisión.",
+  VERIFICATION_EVIDENCE_REQUIRED: "Describa la verificación (al menos 20 caracteres): a quién llamó, a qué número y cuándo.",
+  MATCH_TARGET_REQUIRED: "Elija un recibo o un depósito para conciliar la línea, no ambos.",
+  RECEIPT_NOT_MATCHABLE: "El recibo o depósito no se puede conciliar con esa línea: un crédito va con una transferencia registrada o un depósito pendiente, y un débito solo con un cheque devuelto.",
+  // Sales: invoices
+  DELIVERY_LINE_NOT_BILLABLE: "Cada línea debe ser de un conduce entregado de este cliente y con cantidad pendiente de facturar.",
+  INVOICE_EXCEEDS_DELIVERED: "La cantidad supera lo entregado y aún no facturado del conduce.",
+  ECF_TYPE_INVALID: "El tipo de e-CF debe ser 31 (crédito fiscal) o 32 (consumo); una factura con autorización de exención es e-CF 44.",
+  ENCF_INVALID: "El e-NCF no tiene el formato correcto: E + tipo de e-CF + 10 dígitos (E34 para notas de crédito).",
+  ENCF_DUPLICATE: "Ese e-NCF ya está registrado.",
+  FISCAL_DOCUMENT_MISMATCH: "El e-CF no coincide con el documento (ITBIS o total), falta el código de seguridad o la fecha de emisión está en el futuro; revise los datos del e-CF.",
+  INVOICE_NOT_VOIDABLE: "Solo se anula una factura emitida, sin e-CF aceptado y sin cobros aplicados; si ya está fiscalizada, haga una nota de crédito.",
+  // Sales: credit notes
+  INVOICE_NOT_CREDITABLE: "La nota de crédito requiere una factura fiscalizada (e-CF aceptado) y no anulada.",
+  CREDIT_NOTE_REASON_INVALID: "Elija el motivo (descuento, error de precio u otro) y escriba la explicación.",
+  CREDIT_EXCEEDS_INVOICE_LINE: "El monto supera lo que la línea de la factura aún puede acreditar; si otra nota tomó parte, prepare esta de nuevo.",
+  CREDIT_EXCEEDS_OPEN_RECEIVABLE: "La nota supera el saldo pendiente de la factura; los saldos a favor y devoluciones de dinero no están disponibles.",
+  // Sales: receipts, deposits and withholdings
+  RECEIPT_METHOD_INVALID: "La forma de cobro debe ser transferencia, cheque o efectivo.",
+  RECEIPT_DATE_INVALID: "La fecha no es válida: no puede ser futura (no se aceptan cheques posfechados) y una retención va entre la fecha de la factura y hoy.",
+  APPLICATION_EXCEEDS_UNAPPLIED: "El total aplicado supera el monto del recibo que queda sin aplicar.",
+  APPLICATION_EXCEEDS_OPEN: "El monto aplicado supera el saldo pendiente de la factura.",
+  APPLICATION_NOT_FOUND: "Esa aplicación ya no existe o ya fue deshecha; recargue la página.",
+  INVOICE_OF_ANOTHER_CUSTOMER: "La factura es de otro cliente; solo aplique facturas del cliente del recibo.",
+  INVOICE_NOT_OPEN: "La factura no está pendiente de cobro (debe estar confirmada o parcialmente pagada).",
+  RECEIPT_NOT_DEPOSITABLE: "Solo se depositan recibos en cheque o efectivo que estén en tránsito.",
+  RECEIPT_NOT_BOUNCEABLE: "Solo se marca como devuelto un cheque ya depositado.",
+  RECEIPT_NOT_REVERSIBLE: "Solo se reversa un recibo sin aplicaciones, que no esté depositado ni conciliado con el banco; deshaga eso primero.",
+  WITHHOLDING_KIND_INVALID: "La retención debe ser de ITBIS o de ISR.",
+  WITHHOLDING_EXCEEDS: "La retención supera el saldo pendiente de la factura o, si es de ITBIS, el ITBIS de la factura.",
+  WITHHOLDING_CERTIFICATE_DUPLICATE: "Ese número de certificado de retención ya está registrado para este cliente.",
 };
 
 export interface DescribedError {
   message: string;
+  /** Technical detail (the server's English message), shown folded under "Detalle técnico". */
   detail?: string;
   correlationId?: string;
 }
 
+/** E-UX1-01-7: a known code reads its Spanish message; an unknown one "No se pudo completar (CODE)." with the server's detail. */
 export function describeError(error: unknown): DescribedError {
   if (error instanceof ApiError) {
     const known = ERROR_MESSAGES[error.code];
     return known
       ? { message: known, correlationId: error.correlationId }
-      : { message: `Error ${error.code}`, detail: error.message, correlationId: error.correlationId };
+      : { message: `No se pudo completar (${error.code}).`, detail: error.message, correlationId: error.correlationId };
   }
   return { message: "No se pudo comunicar con el servidor.", detail: error instanceof Error ? error.message : String(error) };
 }

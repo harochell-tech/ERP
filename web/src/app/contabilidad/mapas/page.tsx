@@ -1,7 +1,7 @@
 "use client";
 
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Loading, NoPermission } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Loading, NoPermission } from "@/components/ui";
 import { formatDate, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -14,7 +14,7 @@ type RoleMap = Schemas["AccountRoleMapView"];
 
 function MapRow({ map, onDone }: { map: RoleMap; onDone: () => void }) {
   const { can } = useSession();
-  const approve = useCommand(`approve-map:${map.mapId}`, "/api/v1/companies/{companyId}/finance/approve-account-role-map");
+  const approve = useCommand(`approve-map:${map.mapId}`, "/api/v1/companies/{companyId}/finance/approve-account-role-map", `Mapa ${map.accountRole} → ${map.accountCode} aprobado y activo.`);
   return (
     <tr>
       <td>{map.accountRole}</td>
@@ -27,13 +27,18 @@ function MapRow({ map, onDone }: { map: RoleMap; onDone: () => void }) {
         {map.effectiveTo ? ` – ${formatDate(map.effectiveTo)}` : ""}
       </td>
       <td>{statusLabel(map.status)}</td>
-      <td>{map.preparedBy ?? "Despliegue"}</td>
-      <td>{map.approvedBy ?? "—"}</td>
+      <td className="wrap">{map.preparedBy ?? "Despliegue"}</td>
+      <td className="wrap">{map.approvedBy ?? "—"}</td>
       <td>
         {map.status === "DRAFT" && can("account_role_map:approve") ? (
-          <button type="button" disabled={approve.busy} onClick={async () => (await approve.run({ mapId: map.mapId })) && onDone()}>
-            Aprobar
-          </button>
+          <ConfirmAction
+            label="Aprobar"
+            title={`¿Aprobar el mapa ${map.accountRole}?`}
+            stepUp
+            busy={approve.busy}
+            consequence={`El rol ${map.accountRole}${map.itemCategory ? ` (${map.itemCategory})` : ""} se contabilizará en la cuenta ${map.accountCode} — ${map.accountName} desde ${formatDate(map.effectiveFrom)}. No se puede volver a borrador.`}
+            onConfirm={async () => (await approve.run({ mapId: map.mapId })) && onDone()}
+          />
         ) : null}
         <ErrorBox error={approve.error} />
       </td>
@@ -59,7 +64,7 @@ export default function Page() {
       ) : maps.data.items.length === 0 ? (
         <p className="muted">No hay mapas cargados.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Rol contable</th>
@@ -77,13 +82,13 @@ export default function Page() {
               <MapRow key={`${m.mapId}:${m.status}`} map={m} onDone={maps.reload} />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       <h2>Catálogo de cuentas</h2>
       {accounts.data === null ? (
         <Loading error={accounts.error} />
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Código</th>
@@ -100,7 +105,7 @@ export default function Page() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

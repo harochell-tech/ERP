@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
-import { AccountingStatus, ErrorBox, Loading, NoPermission, ReasonAction } from "@/components/ui";
+import { AccountingStatus, ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction } from "@/components/ui";
 import { formatDecimal, formatQuantity } from "@/lib/decimal";
 import { formatDate, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -18,10 +18,18 @@ function Actions({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) 
   const { can } = useSession();
   const id = invoice.supplierInvoiceId;
   const target = { supplierInvoiceId: id, expectedVersion: invoice.version };
-  const match = useCommand(`match-si:${id}`, "/api/v1/companies/{companyId}/procurement/match-supplier-invoice");
-  const exception = useCommand(`exception-si:${id}`, "/api/v1/companies/{companyId}/procurement/approve-match-exception");
-  const post = useCommand(`post-si:${id}`, "/api/v1/companies/{companyId}/procurement/post-supplier-invoice");
-  const reverse = useCommand(`reverse-si:${id}`, "/api/v1/companies/{companyId}/procurement/reverse-supplier-invoice");
+  const doc = invoice.supplierFiscalNumber;
+  const match = useCommand(`match-si:${id}`, "/api/v1/companies/{companyId}/procurement/match-supplier-invoice", (r) => {
+    const status = (r.result as { status?: string } | null)?.status;
+    return status === "MATCH_EXCEPTION" ? `Factura ${doc} conciliada con excepciones: revise las líneas.` : `Factura ${doc} conciliada con la orden y la recepción.`;
+  });
+  const exception = useCommand(`exception-si:${id}`, "/api/v1/companies/{companyId}/procurement/approve-match-exception", `Excepción de la factura ${doc} aprobada.`);
+  const post = useCommand(`post-si:${id}`, "/api/v1/companies/{companyId}/procurement/post-supplier-invoice", (r) =>
+    (r.result as { accountingStatus?: string } | null)?.accountingStatus === "POSTING_BLOCKED"
+      ? `Factura ${doc}: contabilización bloqueada; revise el detalle.`
+      : `Factura ${doc} contabilizada.`,
+  );
+  const reverse = useCommand(`reverse-si:${id}`, "/api/v1/companies/{companyId}/procurement/reverse-supplier-invoice", `Factura ${doc} reversada.`);
   const busy = match.busy || exception.busy || post.busy || reverse.busy;
   const after = (response: unknown) => {
     if (response) {
@@ -40,15 +48,32 @@ function Actions({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) 
           </button>
         ) : null}
         {document === "MATCH_EXCEPTION" && can("match_exception:approve") ? (
-          <ReasonAction label="Aprobar excepción" busy={busy} onConfirm={async (reason) => after(await exception.run({ ...target, reason }))} />
+          <ReasonAction
+            label="Aprobar excepción"
+            consequence="La diferencia de precio queda aceptada y la factura pasa a conciliada, lista para contabilizar."
+            stepUp
+            busy={busy}
+            onConfirm={async (reason) => after(await exception.run({ ...target, reason }))}
+          />
         ) : null}
         {document === "MATCHED" && (accounting === "NOT_POSTED" || accounting === "POSTING_BLOCKED") && can("supplier_invoice:post") ? (
-          <button type="button" disabled={busy} onClick={async () => after(await post.run(target))}>
-            Contabilizar
-          </button>
+          <ConfirmAction
+            label="Contabilizar"
+            title={`¿Contabilizar la factura ${doc}?`}
+            consequence="Se registran el asiento, los impuestos y la cuenta por pagar al proveedor. Solo se deshace con una reversa."
+            className="primary"
+            busy={busy}
+            onConfirm={async () => after(await post.run(target))}
+          />
         ) : null}
         {accounting === "POSTED" && can("supplier_invoice:reverse") ? (
-          <ReasonAction label="Reversar factura" busy={busy} onConfirm={async (reason) => after(await reverse.run({ ...target, reason }))} />
+          <ReasonAction
+            label="Reversar factura"
+            consequence="Se anulan el asiento y la cuenta por pagar de la factura. No se puede deshacer."
+            stepUp
+            busy={busy}
+            onConfirm={async (reason) => after(await reverse.run({ ...target, reason }))}
+          />
         ) : null}
       </div>
       <ErrorBox error={match.error ?? exception.error ?? post.error ?? reverse.error} />
@@ -83,7 +108,9 @@ function InvoiceDetail() {
           {formatDate(invoice.docDate)} / {formatDate(invoice.dueDate)}
         </dd>
         <dt>Total</dt>
-        <dd>{formatDecimal(invoice.totalAmount)}</dd>
+        <dd>
+          <Money value={invoice.totalAmount} currency />
+        </dd>
         <dt>Estado</dt>
         <dd data-testid="si-status">{statusLabel(invoice.documentStatus)}</dd>
         <dt>Contabilidad</dt>
@@ -97,17 +124,17 @@ function InvoiceDetail() {
       </dl>
       <Actions invoice={invoice} onDone={reload} />
       <h2>Líneas y conciliación</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>#</th>
             <th>Orden</th>
             <th>Artículo</th>
             <th className="num">Cantidad</th>
-            <th className="num">Precio</th>
-            <th className="num">Neto</th>
+            <th className="num">Precio (RD$)</th>
+            <th className="num">Neto (RD$)</th>
             <th className="num">Disponible</th>
-            <th className="num">Dif. precio</th>
+            <th className="num">Dif. precio (RD$)</th>
             <th>Resultado</th>
           </tr>
         </thead>
@@ -126,18 +153,18 @@ function InvoiceDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <h2>Impuestos determinados</h2>
       {invoice.taxes.length === 0 ? (
         <p className="muted">Se determinan al contabilizar.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Impuesto</th>
-              <th className="num">Base</th>
+              <th className="num">Base (RD$)</th>
               <th className="num">Tasa</th>
-              <th className="num">Monto</th>
+              <th className="num">Monto (RD$)</th>
               <th>Efecto</th>
             </tr>
           </thead>
@@ -154,11 +181,11 @@ function InvoiceDetail() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       {invoice.apDocument ? (
         <p>
-          Cuenta por pagar: original {formatDecimal(invoice.apDocument.originalAmount)}, pendiente {formatDecimal(invoice.apDocument.openAmount)}, vence{" "}
+          Cuenta por pagar: original RD$ {formatDecimal(invoice.apDocument.originalAmount)}, pendiente RD$ {formatDecimal(invoice.apDocument.openAmount)}, vence{" "}
           {formatDate(invoice.apDocument.dueDate)}.
         </p>
       ) : null}

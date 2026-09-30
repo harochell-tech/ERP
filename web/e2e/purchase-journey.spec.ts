@@ -1,17 +1,9 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { signIn, submit } from "./support";
 
 // E-PR18b-10: buyer creates and submits a purchase order, the approver approves it, the storekeeper receives it —
 // every actor signs in through the (simulated) Google sign-in and works only through the UI.
 
-async function signIn(browser: Browser, account: string): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto("/");
-  await page.getByRole("link", { name: "Iniciar sesión" }).click();
-  await page.getByRole("link", { name: account, exact: true }).click();
-  await expect(page.getByTestId("user-email")).toBeVisible();
-  return page;
-}
 
 test("purchase order from creation to receipt", async ({ browser }) => {
   const buyer = await signIn(browser, "Comprador");
@@ -22,7 +14,7 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   await buyer.getByLabel("Artículo 1").selectOption({ label: "ARENA-LAVADA — ARENA-LAVADA" });
   await buyer.getByLabel("Cantidad 1").fill("40");
   await buyer.getByLabel("Precio 1").fill("1,000.00");
-  await buyer.getByRole("button", { name: "Crear orden" }).click();
+  await submit(buyer, "Crear orden");
   await expect(buyer.getByTestId("po-status")).toHaveText("Borrador");
   const orderUrl = buyer.url();
   await buyer.getByRole("button", { name: "Enviar a aprobación" }).click();
@@ -40,7 +32,7 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   await storekeeper.getByRole("link", { name: "Recibir material" }).click();
   await storekeeper.getByLabel("Ubicación").selectOption({ index: 1 });
   await storekeeper.getByLabel("Cantidad a recibir ARENA-LAVADA").fill("40");
-  await storekeeper.getByRole("button", { name: "Registrar recepción" }).click();
+  await submit(storekeeper, "Registrar recepción");
   await expect(storekeeper.getByRole("heading", { name: /^Recepción / })).toBeVisible();
   await expect(storekeeper.getByTestId("accounting-status")).toHaveText("Contabilizado");
 

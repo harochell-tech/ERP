@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError, query, type Schemas } from "@/api/client";
+import { plantLabel } from "./plants";
 import { can as canIn, hasPlantScope, queryPlant, scopeOf, type PermissionScope, type SessionCompany } from "./scope";
 
 type SessionDescription = Schemas["SessionDescription"];
@@ -24,6 +25,8 @@ interface SessionContextValue {
   /** plantId to send on a query guarded by `permission` (E-PR18b-8). */
   plantFor: (permission: string) => string | undefined;
   plantScoped: boolean;
+  /** E-UX1-01-4: a plant id or code as "Name (CODE)" (the code when the session has no name for it). */
+  plantName: (key: string | null | undefined, fallback?: string) => string;
   reload: () => void;
 }
 
@@ -101,6 +104,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       scope: (permission) => scopeOf(company, permission),
       plantFor: (permission) => queryPlant(company, permission, plantId),
       plantScoped: hasPlantScope(company),
+      plantName: (key, fallback) => plantLabel(company?.plants, key, fallback),
       reload: () => setGeneration((g) => g + 1),
     }),
     [state, company, selectCompany, plantId, selectPlant],

@@ -31,22 +31,22 @@ const INFORMATIVE = "Informativo: no es el formulario oficial de la DGII.";
 function Report606Rows({ records }: { records: readonly Record606[] }) {
   return (
     <div className="scroll-x">
-      <table data-testid="report-606-table">
+      <div className="table-wrap"><table data-testid="report-606-table">
         <thead>
           <tr>
             <th colSpan={3}>Proveedor</th>
             <th colSpan={5}>Comprobante</th>
             <th colSpan={3} className="num">
-              Montos facturados
+              Montos facturados (RD$)
             </th>
             <th colSpan={6} className="num">
-              ITBIS
+              ITBIS (RD$)
             </th>
             <th colSpan={3} className="num">
-              ISR
+              ISR (RD$)
             </th>
             <th colSpan={4} className="num">
-              Otros
+              Otros (RD$)
             </th>
             <th />
           </tr>
@@ -81,7 +81,7 @@ function Report606Rows({ records }: { records: readonly Record606[] }) {
         <tbody>
           {records.map((r) => (
             <tr key={`${r.recordKind}:${r.supplierInvoiceId}`} data-testid="report-606-row">
-              <td>
+              <td className="wrap">
                 {r.supplierName}
                 {r.recordKind === "PAYMENT" ? (
                   <div>
@@ -158,7 +158,7 @@ function Report606Rows({ records }: { records: readonly Record606[] }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </div>
   );
 }
@@ -197,7 +197,7 @@ function Report606View({ companyId, period }: { companyId: string; period: strin
             <div className="stat">
               <span>Total facturado</span>
               <span className="value">
-                <Money value={data.totalAmount} testId="report-606-total" />
+                <Money value={data.totalAmount} testId="report-606-total" currency />
               </span>
             </div>
           </div>
@@ -236,14 +236,14 @@ function It1View({ companyId, period }: { companyId: string; period: string }) {
           {data.sales.length === 0 ? (
             <p className="muted">No hay facturas emitidas en el período.</p>
           ) : (
-            <table data-testid="it1-sales">
+            <div className="table-wrap"><table data-testid="it1-sales">
               <thead>
                 <tr>
                   <th>Tipo de e-CF</th>
                   <th className="num">Facturas</th>
-                  <th className="num">Neto gravado</th>
-                  <th className="num">Neto exento</th>
-                  <th className="num">ITBIS</th>
+                  <th className="num">Neto gravado (RD$)</th>
+                  <th className="num">Neto exento (RD$)</th>
+                  <th className="num">ITBIS (RD$)</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,10 +263,10 @@ function It1View({ companyId, period }: { companyId: string; period: string }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
           <h2>Notas de crédito</h2>
-          <table>
+          <div className="table-wrap"><table>
             <tbody>
               <tr>
                 <th>Notas de crédito emitidas</th>
@@ -275,52 +275,52 @@ function It1View({ companyId, period }: { companyId: string; period: string }) {
                 </td>
               </tr>
               <tr>
-                <th>Neto</th>
+                <th>Neto (RD$)</th>
                 <td className="num">
                   <Money value={data.creditNotesNet} />
                 </td>
               </tr>
               <tr>
-                <th>ITBIS</th>
+                <th>ITBIS (RD$)</th>
                 <td className="num">
                   <Money value={data.creditNotesItbis} />
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
           <h2>ITBIS en compras (del 606)</h2>
-          <table>
+          <div className="table-wrap"><table>
             <tbody>
               <tr>
-                <th>ITBIS facturado</th>
+                <th>ITBIS facturado (RD$)</th>
                 <td className="num">
                   <Money value={data.purchaseItbisBilled} testId="it1-purchase-itbis" />
                 </td>
               </tr>
               <tr>
-                <th>ITBIS llevado al costo</th>
+                <th>ITBIS llevado al costo (RD$)</th>
                 <td className="num">
                   <Money value={data.purchaseItbisToCost} />
                 </td>
               </tr>
               <tr>
-                <th>ITBIS por adelantar</th>
+                <th>ITBIS por adelantar (RD$)</th>
                 <td className="num">
                   <Money value={data.purchaseItbisToAdvance} />
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
           <h2>Retenciones que nos hicieron los clientes</h2>
           {data.customerWithholdings.length === 0 ? (
             <p className="muted">No hay retenciones de clientes en el período.</p>
           ) : (
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th>Impuesto</th>
                   <th className="num">Certificados</th>
-                  <th className="num">Monto</th>
+                  <th className="num">Monto (RD$)</th>
                 </tr>
               </thead>
               <tbody>
@@ -334,7 +334,7 @@ function It1View({ companyId, period }: { companyId: string; period: string }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </>
       )}
@@ -358,14 +358,14 @@ function Ir17View({ companyId, period }: { companyId: string; period: string }) 
           {data.lines.length === 0 ? (
             <p className="muted">No hay retenciones a proveedores en el período.</p>
           ) : (
-            <table data-testid="ir17-lines">
+            <div className="table-wrap"><table data-testid="ir17-lines">
               <thead>
                 <tr>
                   <th>Impuesto</th>
                   <th>Tipo de retención (ISR)</th>
                   <th className="num">Registros</th>
-                  <th className="num">Base</th>
-                  <th className="num">Retenido</th>
+                  <th className="num">Base (RD$)</th>
+                  <th className="num">Retenido (RD$)</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,24 +383,24 @@ function Ir17View({ companyId, period }: { companyId: string; period: string }) 
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
-          <table>
+          <div className="table-wrap"><table>
             <tbody>
               <tr>
-                <th>Total ITBIS retenido</th>
+                <th>Total ITBIS retenido (RD$)</th>
                 <td className="num">
                   <Money value={data.itbisWithheld} testId="ir17-itbis" />
                 </td>
               </tr>
               <tr>
-                <th>Total ISR retenido</th>
+                <th>Total ISR retenido (RD$)</th>
                 <td className="num">
                   <Money value={data.isrWithheld} testId="ir17-isr" />
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         </>
       )}
     </>
@@ -421,11 +421,10 @@ export default function Page() {
     <>
       <h1>Reportes fiscales</h1>
       <div className="inline-form">
-        <Field label="Período (AAAAMM)">
+        <Field label="Período (AAAAMM)" required error={valid ? null : "Escriba el período como AAAAMM, por ejemplo 202609."}>
           <input value={typed} onChange={(e) => setTyped(e.target.value)} inputMode="numeric" maxLength={6} placeholder="202609" />
         </Field>
       </div>
-      {valid ? null : <p className="error">Escriba el período como AAAAMM, por ejemplo 202609.</p>}
       <div className="tabs" role="tablist">
         {FISCAL_REPORT_TABS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={t.id === tab} onClick={() => setTab(t.id)}>

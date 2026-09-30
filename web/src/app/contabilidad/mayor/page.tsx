@@ -77,19 +77,19 @@ function Ledger() {
             <div>
               <dt>Saldo inicial</dt>
               <dd>
-                <Money value={data.opening} />
+                <Money value={data.opening} currency />
               </dd>
             </div>
             <div>
               <dt>Débitos / créditos</dt>
               <dd>
-                <Money value={data.totalDebit} /> / <Money value={data.totalCredit} />
+                <Money value={data.totalDebit} currency /> / <Money value={data.totalCredit} currency />
               </dd>
             </div>
             <div>
               <dt>Saldo final</dt>
               <dd>
-                <Money value={data.closing} testId="ledger-closing" />
+                <Money value={data.closing} testId="ledger-closing" currency />
               </dd>
             </div>
           </dl>
@@ -98,15 +98,15 @@ function Ledger() {
               Descargar CSV
             </a>
           </div>
-          <table>
+          <div className="table-wrap"><table>
             <thead>
               <tr>
                 <th>Fecha</th>
                 <th>Documento</th>
                 <th>Evento</th>
-                <th className="num">Débito</th>
-                <th className="num">Crédito</th>
-                <th className="num">Saldo</th>
+                <th className="num">Débito (RD$)</th>
+                <th className="num">Crédito (RD$)</th>
+                <th className="num">Saldo (RD$)</th>
                 <th />
               </tr>
             </thead>
@@ -128,7 +128,7 @@ function Ledger() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <div className="actions">
             <button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>
               Anteriores

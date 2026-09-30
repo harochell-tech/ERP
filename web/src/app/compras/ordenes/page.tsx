@@ -12,7 +12,7 @@ import { useLoad } from "@/lib/useQuery";
 const STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] as const;
 
 function Orders() {
-  const { companyId, can, plantFor } = useSession();
+  const { companyId, can, plantFor, plantName } = useSession();
   const router = useRouter();
   const status = useSearchParams().get("estado") ?? "";
   const plantId = plantFor("purchase_order:read");
@@ -52,7 +52,7 @@ function Orders() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay órdenes.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
@@ -68,14 +68,14 @@ function Orders() {
                 <td>
                   <Link href={`/compras/orden/?id=${po.purchaseOrderId}`}>{po.poNo}</Link>
                 </td>
-                <td>{po.supplierName}</td>
-                <td>{po.plantCode}</td>
+                <td className="wrap">{po.supplierName}</td>
+                <td>{plantName(po.plantId, po.plantCode)}</td>
                 <td>{formatDate(po.orderDate)}</td>
                 <td>{statusLabel(po.status)}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

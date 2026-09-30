@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
-import { ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { orderCancellable, orderDispatchable } from "@/lib/sales";
@@ -23,11 +23,11 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
   const { can } = useSession();
   const h = order.header;
   const target = { salesOrderId: h.salesOrderId, expectedVersion: h.version };
-  const submit = useCommand(`submit-order:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/submit-for-credit");
-  const approve = useCommand(`approve-credit:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/approve-credit");
-  const reject = useCommand(`reject-credit:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/reject-credit");
-  const cancel = useCommand(`cancel-order:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/cancel-sales-order");
-  const close = useCommand(`close-order:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/close-short-sales-order");
+  const submit = useCommand(`submit-order:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/submit-for-credit", `Pedido ${h.orderNo} enviado a crédito.`);
+  const approve = useCommand(`approve-credit:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/approve-credit", `Crédito del pedido ${h.orderNo} aprobado.`);
+  const reject = useCommand(`reject-credit:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/reject-credit", `Crédito del pedido ${h.orderNo} rechazado.`);
+  const cancel = useCommand(`cancel-order:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/cancel-sales-order", `Pedido ${h.orderNo} cancelado.`);
+  const close = useCommand(`close-order:${h.salesOrderId}`, "/api/v1/companies/{companyId}/sales/close-short-sales-order", `Pedido ${h.orderNo} cerrado con faltante.`);
   const busy = submit.busy || approve.busy || reject.busy || cancel.busy || close.busy;
   const after = (response: unknown) => response && onDone();
   return (
@@ -45,10 +45,20 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
         ) : null}
         {h.status === "PENDING_CREDIT" && can("credit:approve") ? (
           <>
-            <button type="button" className="primary" disabled={busy} onClick={async () => after(await approve.run(target))}>
-              Aprobar crédito
-            </button>
-            <ReasonAction label="Rechazar crédito" busy={busy} onConfirm={async (reason) => after(await reject.run({ ...target, reason }))} />
+            <ConfirmAction
+              label="Aprobar crédito"
+              className="primary"
+              busy={busy}
+              stepUp
+              consequence={`El pedido ${h.orderNo} queda confirmado aunque supere las condiciones de crédito del cliente, y Despacho podrá planificar sus conduces.`}
+              onConfirm={async () => after(await approve.run(target))}
+            />
+            <ReasonAction
+              label="Rechazar crédito"
+              busy={busy}
+              consequence={`El pedido ${h.orderNo} vuelve a borrador; el Vendedor puede corregirlo y enviarlo de nuevo.`}
+              onConfirm={async (reason) => after(await reject.run({ ...target, reason }))}
+            />
           </>
         ) : null}
         {/* FIS1-05 (E-FIS1-05-7): the proforma the customer takes to the DGII for a CONFOTUR exemption. */}
@@ -61,10 +71,20 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
           </Link>
         ) : null}
         {h.status === "PARTIALLY_DELIVERED" && can("sales_order:close") ? (
-          <ReasonAction label="Cerrar con faltante" busy={busy} onConfirm={async (reason) => after(await close.run({ ...target, reason }))} />
+          <ReasonAction
+            label="Cerrar con faltante"
+            busy={busy}
+            consequence={`Lo pendiente de entregar del pedido ${h.orderNo} se da por cerrado; no se podrán planificar más conduces. No se puede deshacer.`}
+            onConfirm={async (reason) => after(await close.run({ ...target, reason }))}
+          />
         ) : null}
         {orderCancellable(h.status) && can("sales_order:cancel") ? (
-          <ReasonAction label="Cancelar pedido" busy={busy} onConfirm={async (reason) => after(await cancel.run({ ...target, reason }))} />
+          <ReasonAction
+            label="Cancelar pedido"
+            busy={busy}
+            consequence={`El pedido ${h.orderNo} queda cancelado y deja de contar en la exposición de crédito del cliente. No se puede deshacer.`}
+            onConfirm={async (reason) => after(await cancel.run({ ...target, reason }))}
+          />
         ) : null}
       </div>
       <ErrorBox error={submit.error ?? approve.error ?? reject.error ?? cancel.error ?? close.error} />
@@ -73,7 +93,7 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
 }
 
 function OrderDetail() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const id = useSearchParams().get("id") ?? "";
   const { data, error, reload } = useLoad(
     can("sales:read") && id
@@ -105,7 +125,7 @@ function OrderDetail() {
         Pedido {h.orderNo} <StatusBadge status={h.status} testId="order-status" />
       </h1>
       <p>
-        {h.customerName} · {formatDate(h.orderDate)} · planta {h.plantCode} · {DELIVERY_TERMS[h.deliveryTermCode] ?? h.deliveryTermCode}
+        {h.customerName} · {formatDate(h.orderDate)} · planta {plantName(h.plantCode)} · {DELIVERY_TERMS[h.deliveryTermCode] ?? h.deliveryTermCode}
         {order.siteAddress ? ` · obra: ${order.siteAddress}` : ""}
         {order.requestedDate ? ` · solicitado para ${formatDate(order.requestedDate)}` : ""}
         {order.customerPoRef ? ` · OC del cliente ${order.customerPoRef}` : ""}
@@ -118,15 +138,15 @@ function OrderDetail() {
       ) : null}
       {order.cancelReason ? <p className="muted">Motivo: {order.cancelReason}</p> : null}
       <Actions order={order} onDone={reload} />
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th className="num">#</th>
             <th>Producto</th>
             <th>Unidad</th>
             <th className="num">Pedido</th>
-            <th className="num">Precio</th>
-            <th className="num">Neto</th>
+            <th className="num">Precio (RD$)</th>
+            <th className="num">Neto (RD$)</th>
             <th className="num">Entregado</th>
             <th className="num">Facturado</th>
           </tr>
@@ -151,32 +171,33 @@ function OrderDetail() {
             </tr>
           ))}
           <tr>
-            <th colSpan={5}>Total neto (sin ITBIS)</th>
+            <th colSpan={5}>Total neto (sin ITBIS, RD$)</th>
             <td className="num">
               <Money value={h.totalNet} testId="order-total" />
             </td>
             <td colSpan={2} />
           </tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h2>Crédito</h2>
       <p>
-        Exposición actual <Money value={exposure.exposure} /> de un límite <Money value={exposure.creditLimit} /> · disponible <Money value={exposure.available} />
+        Exposición actual <Money value={exposure.exposure} currency /> de un límite <Money value={exposure.creditLimit} currency /> · disponible{" "}
+        <Money value={exposure.available} currency />
         {exposure.overdueDays > 0 ? ` · ${exposure.overdueDays} días de atraso` : ""}
       </p>
       {order.creditChecks.length === 0 ? (
         <p className="muted">Todavía no se ha evaluado el crédito.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Fecha</th>
-              <th className="num">Pedido</th>
-              <th className="num">CxC</th>
-              <th className="num">Pedidos</th>
-              <th className="num">Sin facturar</th>
-              <th className="num">Límite</th>
+              <th className="num">Pedido (RD$)</th>
+              <th className="num">CxC (RD$)</th>
+              <th className="num">Pedidos (RD$)</th>
+              <th className="num">Sin facturar (RD$)</th>
+              <th className="num">Límite (RD$)</th>
               <th>Decisión</th>
               <th>Resultado</th>
               <th>Por</th>
@@ -205,11 +226,11 @@ function OrderDetail() {
                   <StatusBadge status={c.decision} />
                 </td>
                 <td>{c.outcome ? statusLabel(c.outcome) : "—"}</td>
-                <td>{c.decidedBy ?? "—"}</td>
+                <td className="wrap">{c.decidedBy ?? "—"}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
 
       <h2>Conduces</h2>

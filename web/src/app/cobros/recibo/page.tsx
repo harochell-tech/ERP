@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
-import { ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ErrorBox, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import { METHODS, applicationGroups } from "@/lib/sales";
@@ -21,9 +21,10 @@ type Receipt = Schemas["ReceiptDetail"];
 function Apply({ receipt, onDone }: { receipt: Receipt; onDone: () => void }) {
   const { companyId } = useSession();
   const h = receipt.header;
-  const apply = useCommand<"/api/v1/companies/{companyId}/sales/apply-receipt", Record<string, string>>(`apply-receipt:${h.receiptId}`, "/api/v1/companies/{companyId}/sales/apply-receipt");
+  const apply = useCommand<"/api/v1/companies/{companyId}/sales/apply-receipt", Record<string, string>>(`apply-receipt:${h.receiptId}`, "/api/v1/companies/{companyId}/sales/apply-receipt", `Cobro ${h.receiptNo} aplicado.`);
   const [amounts, setAmounts] = useState<Record<string, string>>(() => apply.restored ?? {});
   const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   const { data, error } = useLoad(
     () => query("/api/v1/companies/{companyId}/sales/invoices", { path: { companyId }, query: { partyId: h.partyId, openOnly: "true", limit: 200 } }),
     [companyId, h.partyId],
@@ -37,66 +38,87 @@ function Apply({ receipt, onDone }: { receipt: Receipt; onDone: () => void }) {
   return (
     <>
       <h2>Aplicar a facturas</h2>
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Factura</th>
             <th>e-NCF</th>
             <th>Vence</th>
-            <th className="num">Abierto</th>
-            <th className="num">Aplicar</th>
+            <th className="num">Abierto (RD$)</th>
+            <th className="num">Aplicar (RD$)</th>
           </tr>
         </thead>
         <tbody>
-          {data.items.map((i) => (
-            <tr key={i.invoiceId}>
-              <td className="mono">
-                <Link href={`/facturacion/factura/?id=${i.invoiceId}`}>{i.invoiceNo}</Link>
-              </td>
-              <td className="mono">{i.encf ?? "—"}</td>
-              <td>{formatDate(i.dueDate)}</td>
-              <td className="num">
-                <Money value={i.openAmount} />
-              </td>
-              <td className="num">
-                <input aria-label={`Aplicar a ${i.invoiceNo}`} inputMode="decimal" value={amounts[i.invoiceId] ?? ""} onChange={(e) => setAmounts({ ...amounts, [i.invoiceId]: e.target.value })} />
-              </td>
-            </tr>
-          ))}
+          {data.items.map((i) => {
+            const lineError = fe.errors[i.invoiceId];
+            return (
+              <tr key={i.invoiceId}>
+                <td className="mono">
+                  <Link href={`/facturacion/factura/?id=${i.invoiceId}`}>{i.invoiceNo}</Link>
+                </td>
+                <td className="mono">{i.encf ?? "—"}</td>
+                <td>{formatDate(i.dueDate)}</td>
+                <td className="num">
+                  <Money value={i.openAmount} />
+                </td>
+                <td className="num">
+                  <input
+                    aria-label={`Aplicar a ${i.invoiceNo}`}
+                    inputMode="decimal"
+                    value={amounts[i.invoiceId] ?? ""}
+                    onChange={(e) => setAmounts({ ...amounts, [i.invoiceId]: e.target.value })}
+                    {...fieldAria(lineError, `apply-${i.invoiceId}`)}
+                  />
+                  <FieldMessage id={`apply-${i.invoiceId}`} error={lineError} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
-      </table>
-      <button
-        type="button"
-        className="primary"
-        disabled={apply.busy}
-        onClick={async () => {
-          const applications = Object.entries(amounts)
-            .map(([invoiceId, a]) => ({ invoiceId, amount: normalizeInput(a) }))
-            .filter((a) => a.amount !== "");
-          if (applications.length === 0 || applications.some((a) => !isPositiveDecimal(a.amount, 2))) {
-            setInvalid("Indique al menos un monto a aplicar (hasta 2 decimales).");
-            return;
-          }
-          setInvalid(null);
-          if (await apply.run({ receiptId: h.receiptId, expectedVersion: h.version, applications }, amounts)) {
-            setAmounts({});
-            onDone();
-          }
-        }}
-      >
-        Aplicar cobro
-      </button>
-      {invalid ? <div className="error">{invalid}</div> : null}
+      </LineTable>
+      <div className="actions form-actions">
+        <button
+          type="button"
+          className="primary"
+          disabled={apply.busy}
+          onClick={async () => {
+            const applications = Object.entries(amounts)
+              .map(([invoiceId, a]) => ({ invoiceId, amount: normalizeInput(a) }))
+              .filter((a) => a.amount !== "");
+            if (!fe.check(Object.fromEntries(applications.filter((a) => !isPositiveDecimal(a.amount, 2)).map((a) => [a.invoiceId, "Monto mayor que cero, hasta 2 decimales."])))) {
+              setInvalid(null);
+              return;
+            }
+            if (applications.length === 0) {
+              setInvalid("Indique al menos un monto a aplicar.");
+              return;
+            }
+            setInvalid(null);
+            const invoices = data.items.filter((i) => applications.some((a) => a.invoiceId === i.invoiceId)).map((i) => i.invoiceNo);
+            if (await apply.run({ receiptId: h.receiptId, expectedVersion: h.version, applications }, amounts, `Cobro ${h.receiptNo} aplicado a ${invoices.join(", ")}.`)) {
+              setAmounts({});
+              onDone();
+            }
+          }}
+        >
+          Aplicar cobro
+        </button>
+        {invalid ? (
+          <span className="error" role="alert">
+            {invalid}
+          </span>
+        ) : null}
+      </div>
       <ErrorBox error={apply.error} />
     </>
   );
 }
 
-function Unapply({ receiptId, eventId, onDone }: { receiptId: string; eventId: string; onDone: () => void }) {
-  const unapply = useCommand(`unapply:${eventId}`, "/api/v1/companies/{companyId}/sales/unapply-receipt");
+function Unapply({ receiptId, eventId, invoices, onDone }: { receiptId: string; eventId: string; invoices?: string; onDone: () => void }) {
+  const unapply = useCommand(`unapply:${eventId}`, "/api/v1/companies/{companyId}/sales/unapply-receipt", `Aplicación deshecha${invoices ? ` (${invoices})` : ""}: el monto vuelve a quedar sin aplicar.`);
   return (
     <>
-      <ReasonAction label="Desaplicar" busy={unapply.busy} onConfirm={async (reason) => (await unapply.run({ receiptId, applicationEventId: eventId, reason })) && onDone()} />
+      <ReasonAction label="Desaplicar" consequence="La aplicación se deshace con un asiento contrario: las facturas vuelven a quedar abiertas por ese monto y el cobro queda sin aplicar." busy={unapply.busy} onConfirm={async (reason) => (await unapply.run({ receiptId, applicationEventId: eventId, reason })) && onDone()} />
       <ErrorBox error={unapply.error} />
     </>
   );
@@ -109,7 +131,7 @@ function ReceiptDetail() {
     can("sales:read") && id ? () => query("/api/v1/companies/{companyId}/sales/receipts/{receiptId}", { path: { companyId, receiptId: id } }) : null,
     [companyId, id],
   );
-  const reverse = useCommand(`reverse-receipt:${id}`, "/api/v1/companies/{companyId}/sales/reverse-receipt");
+  const reverse = useCommand(`reverse-receipt:${id}`, "/api/v1/companies/{companyId}/sales/reverse-receipt", (_r, doc) => `Recibo ${doc ?? data?.header.receiptNo ?? ""} anulado.`);
   if (!can("sales:read")) {
     return <NoPermission />;
   }
@@ -129,7 +151,7 @@ function ReceiptDetail() {
         <StatusBadge status={h.bankStatus} />
       </h1>
       <p>
-        {h.customerName} · {METHODS[h.method] ?? h.method} · <Money value={h.amount} /> · fecha {formatDate(h.receiptDate)}
+        {h.customerName} · {METHODS[h.method] ?? h.method} · <Money value={h.amount} currency /> · fecha {formatDate(h.receiptDate)}
         {h.method === "TRANSFER" ? ` · fecha valor ${formatDate(h.valueDate)}` : ""}
         {h.chequeNo ? ` · cheque ${h.chequeNo} del ${h.chequeBank} (${formatDate(h.chequeDate)})` : ""}
         {h.reference ? ` · ref. ${h.reference}` : ""}
@@ -137,12 +159,12 @@ function ReceiptDetail() {
         {h.depositNo && h.depositId ? <Link href={`/cobros/deposito/?id=${h.depositId}`}>{h.depositNo}</Link> : null}
       </p>
       <p>
-        Sin aplicar: <Money value={h.unapplied} testId="receipt-unapplied" /> · registró {data.recordedBy ?? "—"}
+        Sin aplicar: <Money value={h.unapplied} testId="receipt-unapplied" currency /> · registró {data.recordedBy ?? "—"}
       </p>
       {data.closingReason ? <p className="muted">Motivo: {data.closingReason}</p> : null}
       {reversible && can("receipt:reverse") ? (
         <div className="actions">
-          <ReasonAction label="Anular recibo" busy={reverse.busy} onConfirm={async (reason) => (await reverse.run({ receiptId: h.receiptId, expectedVersion: h.version, reason })) && reload()} />
+          <ReasonAction label="Anular recibo" stepUp consequence="El recibo se reversa con un asiento contrario y deja de contar como cobrado. No se puede deshacer." busy={reverse.busy} onConfirm={async (reason) => (await reverse.run({ receiptId: h.receiptId, expectedVersion: h.version, reason })) && reload()} />
           <ErrorBox error={reverse.error} />
         </div>
       ) : null}
@@ -152,12 +174,12 @@ function ReceiptDetail() {
       {data.applications.length === 0 ? (
         <p className="muted">Sin aplicaciones.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Fecha</th>
               <th>Factura</th>
-              <th className="num">Monto</th>
+              <th className="num">Monto (RD$)</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -175,13 +197,13 @@ function ReceiptDetail() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       {h.status === "RECORDED" && can("receipt:apply")
         ? groups.map((g) => (
             <div key={g.eventId} className="inline-form">
               <span>Aplicación a {g.items.map((i) => i.invoiceNo).join(", ")}</span>
-              <Unapply receiptId={h.receiptId} eventId={g.eventId} onDone={reload} />
+              <Unapply receiptId={h.receiptId} eventId={g.eventId} invoices={g.items.map((i) => i.invoiceNo).join(", ")} onDone={reload} />
             </div>
           ))
         : null}

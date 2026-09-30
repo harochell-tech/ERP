@@ -33,8 +33,8 @@ describe("Spanish error messages (E-PR18b-11)", () => {
     expect(unknown).toEqual([]);
   });
 
-  it("fall back to the API message and correlation id", () => {
+  it("fall back to \"No se pudo completar (CODE).\" with the technical detail and the correlation id (E-UX1-01-7)", () => {
     expect(describeError(new ApiError(422, "APPROVER_IS_CREATOR", "x", "c1"))).toEqual({ message: "No puede aprobar un documento que usted creó.", correlationId: "c1" });
-    expect(describeError(new ApiError(422, "SOMETHING_NEW", "Detail.", "c2"))).toEqual({ message: "Error SOMETHING_NEW", detail: "Detail.", correlationId: "c2" });
+    expect(describeError(new ApiError(422, "SOMETHING_NEW", "Detail.", "c2"))).toEqual({ message: "No se pudo completar (SOMETHING_NEW).", detail: "Detail.", correlationId: "c2" });
   });
 });

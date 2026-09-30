@@ -147,13 +147,14 @@ function TaskItem({ task }: { task: Task }) {
 }
 
 export default function Home() {
-  const { company, can } = useSession();
+  const { company, can, plantName } = useSession();
   const tasks = TASKS.filter((t) => can(t.permission));
   return (
     <>
       <h1>Inicio</h1>
       <p>
-        Roles en {company?.legalName}: {company?.assignments.map((a) => a.roleName).join(", ")}
+        Roles en {company?.legalName}:{" "}
+        {company?.assignments.map((a) => (a.plantId ? `${a.roleName} (planta ${plantName(a.plantId, a.plantId.slice(0, 8))})` : a.roleName)).join(", ")}
       </p>
       <h2>Tareas</h2>
       {tasks.length === 0 ? (

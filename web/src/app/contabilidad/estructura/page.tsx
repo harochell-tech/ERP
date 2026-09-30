@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Loading, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDate } from "@/lib/labels";
 import { accountClassLabel, REPORTS } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
@@ -16,7 +16,7 @@ import { useLoad } from "@/lib/useQuery";
 function StructureDetail() {
   const { companyId, can, state } = useSession();
   const id = useSearchParams().get("id") ?? "";
-  const approve = useCommand(`approve-report-structure:${id}`, "/api/v1/companies/{companyId}/finance/approve-report-structure");
+  const approve = useCommand(`approve-report-structure:${id}`, "/api/v1/companies/{companyId}/finance/approve-report-structure", "Estructura de reporte aprobada y activa.");
   const { data, error, reload } = useLoad(
     can("configuration:read") && id ? () => query("/api/v1/companies/{companyId}/finance/report-structures/{structureVersionId}", { path: { companyId, structureVersionId: id } }) : null,
     [companyId, id],
@@ -28,7 +28,8 @@ function StructureDetail() {
     return <Loading error={error} />;
   }
   const h = data.header;
-  const email = state.status === "ready" ? state.session.email : null;
+  // UX1-01b: the API returns the preparer's display name (its e-mail until the first sign-in brings a name, E-UX1-01-3).
+  const me = state.status === "ready" ? [state.session.email, state.session.displayName?.trim()].filter((v): v is string => !!v) : [];
   const depth = (code: string | null | undefined): number => {
     let d = 0;
     for (let c = code; c; c = data.lines.find((l) => l.lineCode === c)?.parentLineCode ?? null) {
@@ -39,7 +40,7 @@ function StructureDetail() {
   return (
     <>
       <div className="actions">
-        <h1 style={{ margin: 0 }}>
+        <h1 style={{ margin: 0, overflowWrap: "anywhere" }}>
           {REPORTS[h.report] ?? h.report} · versión {h.version}
         </h1>
         <StatusBadge status={h.status} testId="structure-status" />
@@ -48,19 +49,20 @@ function StructureDetail() {
         Vigente desde {formatDate(h.effectiveFrom)} · preparó {h.preparedBy ?? "—"} · aprobó {h.approvedBy ?? "—"}
       </p>
       <div className="actions">
-        {h.status === "DRAFT" && can("report_structure:approve") && h.preparedBy !== email ? (
-          <button
-            type="button"
+        {h.status === "DRAFT" && can("report_structure:approve") && !(h.preparedBy && me.includes(h.preparedBy)) ? (
+          <ConfirmAction
+            label="Aprobar estructura"
             className="primary"
-            disabled={approve.busy || data.missingAccounts.length > 0}
-            onClick={async () => {
+            stepUp
+            busy={approve.busy}
+            disabled={data.missingAccounts.length > 0}
+            consequence={`La versión ${h.version} de ${REPORTS[h.report] ?? h.report} queda activa desde ${formatDate(h.effectiveFrom)} y reemplaza a la anterior en los estados financieros; no se puede volver a borrador.`}
+            onConfirm={async () => {
               if (await approve.run({ structureVersionId: id })) {
                 reload();
               }
             }}
-          >
-            Aprobar estructura
-          </button>
+          />
         ) : null}
         {can("account:manage") ? (
           <Link className="button" href={`/contabilidad/estructuras/nueva/?reporte=${h.report}&desde=${id}`}>
@@ -76,7 +78,7 @@ function StructureDetail() {
           {h.status === "DRAFT" ? " — no se puede aprobar hasta ubicarlas." : " — la conciliación STRUCT-COVERAGE lo advierte."}
         </div>
       ) : null}
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>Línea</th>
@@ -101,7 +103,7 @@ function StructureDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </>
   );
 }

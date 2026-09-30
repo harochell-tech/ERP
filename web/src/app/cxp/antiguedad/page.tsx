@@ -32,26 +32,26 @@ export default function Page() {
       ) : data.suppliers.length === 0 ? (
         <p className="muted">No hay facturas con saldo abierto.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Proveedor</th>
-              <th className="num">Por vencer</th>
-              <th className="num">1–{b.bucket1Days} días</th>
+              <th className="num">Por vencer (RD$)</th>
+              <th className="num">1–{b.bucket1Days} días (RD$)</th>
               <th className="num">
-                {b.bucket1Days + 1}–{b.bucket2Days} días
+                {b.bucket1Days + 1}–{b.bucket2Days} días (RD$)
               </th>
               <th className="num">
-                {b.bucket2Days + 1}–{b.bucket3Days} días
+                {b.bucket2Days + 1}–{b.bucket3Days} días (RD$)
               </th>
-              <th className="num">Más de {b.bucket3Days}</th>
-              <th className="num">Total</th>
+              <th className="num">Más de {b.bucket3Days} (RD$)</th>
+              <th className="num">Total (RD$)</th>
             </tr>
           </thead>
           <tbody>
             {data.suppliers.map((s) => (
               <tr key={s.supplierId}>
-                <td>{s.supplierName}</td>
+                <td className="wrap">{s.supplierName}</td>
                 <td className="num">
                   <Money value={s.current} />
                 </td>
@@ -86,7 +86,7 @@ export default function Page() {
               </td>
             </tr>
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

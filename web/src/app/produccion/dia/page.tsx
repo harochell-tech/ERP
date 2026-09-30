@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { query } from "@/api/client";
 import { PlantSelect, useChosenPlant, usePlants } from "@/components/Production";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -16,7 +16,9 @@ import { useLoad } from "@/lib/useQuery";
 
 function StartRun({ plantId, businessDate, onDone }: { plantId: string; businessDate: string; onDone: (runId: string) => void }) {
   const { companyId } = useSession();
-  const start = useCommand("start-production-run", "/api/v1/companies/{companyId}/manufacturing/start-production-run");
+  const start = useCommand("start-production-run", "/api/v1/companies/{companyId}/manufacturing/start-production-run", (_, doc) =>
+    doc ? `Corrida ${doc} iniciada.` : "Corrida iniciada.",
+  );
   const { data, error } = useLoad(async () => {
     const [machines, shifts, recipes] = await Promise.all([
       query("/api/v1/companies/{companyId}/manufacturing/machines", { path: { companyId }, query: { plantId, status: "ACTIVE" } }),
@@ -26,7 +28,7 @@ function StartRun({ plantId, businessDate, onDone }: { plantId: string; business
     return { machines: machines.items, shifts: shifts.items, recipes: recipes.items };
   }, [companyId, plantId]);
   const [form, setForm] = useState({ machineId: "", shiftId: "", itemId: "", date: "" });
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<"machineId" | "shiftId" | "itemId" | "date">();
   if (data === null) {
     return <Loading error={error} />;
   }
@@ -35,13 +37,18 @@ function StartRun({ plantId, businessDate, onDone }: { plantId: string; business
   return (
     <form
       className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!form.machineId || !form.shiftId || !form.itemId || !date) {
-          setInvalid("Elija máquina, turno, producto y fecha.");
+        const valid = fe.check({
+          machineId: !form.machineId && "Elija la máquina.",
+          shiftId: !form.shiftId && "Elija el turno.",
+          itemId: !form.itemId && (form.machineId ? "Elija el producto." : "Elija la máquina y luego el producto."),
+          date: !date && "Indique la fecha de producción.",
+        });
+        if (!valid) {
           return;
         }
-        setInvalid(null);
         const response = await start.run({ plantId, machineId: form.machineId, shiftId: form.shiftId, itemId: form.itemId, businessDate: date });
         if (response) {
           setForm({ machineId: "", shiftId: "", itemId: "", date: "" });
@@ -50,7 +57,7 @@ function StartRun({ plantId, businessDate, onDone }: { plantId: string; business
       }}
     >
       <h2>Iniciar corrida</h2>
-      <Field label="Máquina">
+      <Field label="Máquina" required error={fe.errors.machineId}>
         <select aria-label="Máquina" value={form.machineId} onChange={(e) => setForm({ ...form, machineId: e.target.value, itemId: "" })}>
           <option value="">—</option>
           {data.machines.map((m) => (
@@ -60,7 +67,7 @@ function StartRun({ plantId, businessDate, onDone }: { plantId: string; business
           ))}
         </select>
       </Field>
-      <Field label="Turno">
+      <Field label="Turno" required error={fe.errors.shiftId}>
         <select aria-label="Turno" value={form.shiftId} onChange={(e) => setForm({ ...form, shiftId: e.target.value })}>
           <option value="">—</option>
           {data.shifts.map((s) => (
@@ -70,7 +77,7 @@ function StartRun({ plantId, businessDate, onDone }: { plantId: string; business
           ))}
         </select>
       </Field>
-      <Field label="Producto">
+      <Field label="Producto" required error={fe.errors.itemId}>
         <select aria-label="Producto" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
           <option value="">{form.machineId ? "—" : "Elija la máquina primero"}</option>
           {products.map((r) => (
@@ -80,15 +87,16 @@ function StartRun({ plantId, businessDate, onDone }: { plantId: string; business
           ))}
         </select>
       </Field>
-      <Field label="Fecha de producción">
+      <Field label="Fecha de producción" required error={fe.errors.date}>
         <input type="date" value={date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
       </Field>
-      <button type="submit" disabled={start.busy}>
-        Iniciar corrida
-      </button>
       {form.machineId && products.length === 0 ? <p className="muted">La máquina no tiene recetas activas.</p> : null}
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={start.error} />
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={start.busy}>
+          Iniciar corrida
+        </button>
+      </div>
     </form>
   );
 }
@@ -152,7 +160,7 @@ export default function Page() {
           {data.runs.length === 0 ? (
             <p className="muted">No hay corridas ese día.</p>
           ) : (
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th>Corrida</th>
@@ -175,7 +183,7 @@ export default function Page() {
                     </td>
                     <td className="mono">{r.machineCode}</td>
                     <td className="mono">{r.shiftCode}</td>
-                    <td>{r.itemCode}</td>
+                    <td className="wrap">{r.itemCode}</td>
                     <td>
                       <StatusBadge status={r.status} />
                     </td>
@@ -195,7 +203,7 @@ export default function Page() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
           <p>
             Unidades buenas del día: <span className="mono" data-testid="day-good-units">{formatQuantity(data.goodUnits)}</span>
@@ -204,7 +212,7 @@ export default function Page() {
           {data.materials.length === 0 ? (
             <p className="muted">Sin consumos registrados.</p>
           ) : (
-            <table>
+            <div className="table-wrap"><table>
               <thead>
                 <tr>
                   <th>Material</th>
@@ -225,7 +233,7 @@ export default function Page() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </>
       )}

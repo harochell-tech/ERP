@@ -48,14 +48,14 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay ajustes.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
               <th>Fecha</th>
               <th>Descripción</th>
               <th>Componente</th>
-              <th className="num">Total</th>
+              <th className="num">Total (RD$)</th>
               <th>Estado</th>
               <th>Preparó</th>
             </tr>
@@ -67,7 +67,7 @@ export default function Page() {
                   <Link href={`/contabilidad/ajuste/?id=${j.manualJournalId}`}>{j.journalNo}</Link>
                 </td>
                 <td>{formatDate(j.postingDate)}</td>
-                <td>
+                <td className="wrap">
                   {j.description}
                   {j.autoReverse ? <span className="muted"> · reversa automática</span> : null}
                 </td>
@@ -75,14 +75,14 @@ export default function Page() {
                 <td className="num">
                   <Money value={j.total} />
                 </td>
-                <td>
+                <td className="wrap">
                   <StatusBadge status={j.status} />
                 </td>
-                <td>{j.preparedBy ?? "—"}</td>
+                <td className="wrap">{j.preparedBy ?? "—"}</td>
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

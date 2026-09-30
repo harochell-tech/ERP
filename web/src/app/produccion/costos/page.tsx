@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { PlantSelect, useChosenPlant, usePlants } from "@/components/Production";
-import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -13,23 +13,29 @@ import { useLoad } from "@/lib/useQuery";
 // collector (P-13: usage and price variances). Amounts are shown as the API sends them.
 
 function Settle({ collector, onDone }: { collector: Schemas["CostCollectorView"]; onDone: () => void }) {
-  const settle = useCommand(`settle-cost-collector:${collector.collectorId}`, "/api/v1/companies/{companyId}/manufacturing/settle-cost-collector");
+  const month = collector.periodMonth.slice(0, 7);
+  const settle = useCommand(
+    `settle-cost-collector:${collector.collectorId}`,
+    "/api/v1/companies/{companyId}/manufacturing/settle-cost-collector",
+    `Costos de ${collector.itemCode} de ${month} liquidados.`,
+  );
   return (
     <>
-      <button
-        type="button"
-        disabled={settle.busy}
-        onClick={async () => (await settle.run({ plantId: collector.plantId, collectorId: collector.collectorId, expectedVersion: collector.version })) && onDone()}
-      >
-        Liquidar
-      </button>
+      <ConfirmAction
+        label="Liquidar"
+        title={`¿Liquidar los costos de ${collector.itemCode} de ${month}?`}
+        consequence="Se cierra el colector del mes: el saldo en proceso se liquida contra las variaciones de uso y de precio y se contabiliza el asiento. No se puede deshacer."
+        stepUp
+        busy={settle.busy}
+        onConfirm={async () => (await settle.run({ plantId: collector.plantId, collectorId: collector.collectorId, expectedVersion: collector.version })) && onDone()}
+      />
       <ErrorBox error={settle.error} />
     </>
   );
 }
 
 export default function Page() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const plants = usePlants();
   const { plant, setPlant } = useChosenPlant(plants.data);
   const plantId = plant?.plantId ?? "";
@@ -70,7 +76,7 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay colectores de costos.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Planta</th>
@@ -78,16 +84,16 @@ export default function Page() {
               <th>Mes</th>
               <th>Estado</th>
               <th className="num">Corridas</th>
-              <th className="num">Saldo en proceso</th>
-              <th className="num">Variación de uso</th>
-              <th className="num">Variación de precio</th>
+              <th className="num">Saldo en proceso (RD$)</th>
+              <th className="num">Variación de uso (RD$)</th>
+              <th className="num">Variación de precio (RD$)</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {data.items.map((c) => (
               <tr key={`${c.collectorId}:${c.version}`}>
-                <td>{c.plantCode}</td>
+                <td>{plantName(c.plantId, c.plantCode)}</td>
                 <td>{c.itemCode}</td>
                 <td className="mono">{c.periodMonth.slice(0, 7)}</td>
                 <td>
@@ -107,7 +113,7 @@ export default function Page() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

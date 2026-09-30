@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { confirmAction, nav, signIn, submit } from "./support";
 
 // QUO1-04 (E-QUO1-04-9): a quote with a special price through the UI. The Vendedor quotes Constructora Uno 37 BLOQUE-6 at 45.00
 // (the list is 50.00) and submits it for price approval; the Aprobador de políticas sees it counted on Inicio and approves (step-up:
@@ -7,20 +8,11 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 // opens its own quote by URL and uses a quantity no other journey uses, so other journeys' data (and the seeded sample quote) never
 // matters.
 
-async function signIn(browser: Browser, account: string): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto("/");
-  await page.getByRole("link", { name: "Iniciar sesión" }).click();
-  await page.getByRole("link", { name: account, exact: true }).click();
-  await expect(page.getByTestId("user-email")).toBeVisible();
-  return page;
-}
 
 test("a quote with a special price approved, sent, printed and converted into an order", async ({ browser }) => {
   // The Vendedor creates the quote below the list price and submits it for approval.
   const seller = await signIn(browser, "Vendedor");
-  await seller.getByRole("link", { name: "Cotizaciones", exact: true }).click();
+  await nav(seller, "Cotizaciones");
   await expect(seller.getByRole("heading", { name: "Cotizaciones" })).toBeVisible();
   await seller.getByRole("link", { name: "Nueva cotización" }).click();
   // The list has a "Cliente" filter too: wait for the form before choosing the customer.
@@ -32,7 +24,7 @@ test("a quote with a special price approved, sent, printed and converted into an
   await seller.getByLabel("Cantidad 1").fill("37");
   await seller.getByLabel("Precio 1").fill("45.00");
   await expect(seller.getByTestId("special-price:1")).toHaveText("Precio especial: requiere aprobación");
-  await seller.getByRole("button", { name: "Crear cotización" }).click();
+  await submit(seller, "Crear cotización");
   const status = seller.getByTestId("quote-status");
   await expect(status).toHaveText("Borrador");
   await expect(seller.getByTestId("quote-total")).toHaveText("1,665.00");
@@ -53,7 +45,7 @@ test("a quote with a special price approved, sent, printed and converted into an
   await task.click();
   await expect(approver.getByRole("link", { name: quoteNo })).toBeVisible();
   await approver.goto(quoteUrl);
-  await approver.getByRole("button", { name: "Aprobar precios" }).click();
+  await confirmAction(approver, "Aprobar precios");
   await expect(approver.getByTestId("quote-status")).toHaveText("Borrador");
   await expect(approver.getByTestId("quote-approval")).toContainText("cubre las líneas actuales");
 
@@ -73,7 +65,7 @@ test("a quote with a special price approved, sent, printed and converted into an
 
   // Converted into an order at the quoted price; the credit check confirms it.
   await seller.goto(quoteUrl);
-  await seller.getByRole("button", { name: "Convertir en pedido" }).click();
+  await confirmAction(seller, "Convertir en pedido");
   await expect(seller.getByTestId("order-status")).toHaveText("Borrador");
   await expect(seller.getByTestId("order-quote")).toHaveText(`Desde cotización ${quoteNo}`);
   await expect(seller.locator("tr", { hasText: "BLOQUE-6" })).toContainText("45.00");

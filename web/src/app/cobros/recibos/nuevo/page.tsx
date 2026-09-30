@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
+import { ErrorBox, Field, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { METHODS } from "@/lib/sales";
@@ -29,12 +29,12 @@ interface Values {
 export default function Page() {
   const { companyId, can } = useSession();
   const router = useRouter();
-  const record = useCommand<"/api/v1/companies/{companyId}/sales/record-receipt", Values>("record-receipt", "/api/v1/companies/{companyId}/sales/record-receipt");
+  const record = useCommand<"/api/v1/companies/{companyId}/sales/record-receipt", Values>("record-receipt", "/api/v1/companies/{companyId}/sales/record-receipt", (_r, doc) => (doc ? `Cobro ${doc} registrado; aplíquelo a las facturas.` : "Cobro registrado."));
   const today = todayInDominicanRepublic();
   const [values, setValues] = useState<Values>(
     () => record.restored ?? { partyId: "", method: "TRANSFER", amount: "", valueDate: today, bankAccountId: "", reference: "", chequeBank: "", chequeNo: "", chequeDate: today },
   );
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors<"partyId" | "amount" | "bankAccountId" | "valueDate" | "chequeBank" | "chequeNo" | "chequeDate">();
   const allowed = can("receipt:record");
   const { data, error } = useLoad(
     allowed
@@ -60,18 +60,25 @@ export default function Page() {
     <>
       <h1>Registrar cobro</h1>
       <form
+        noValidate
         onSubmit={async (e) => {
           e.preventDefault();
           const amount = normalizeInput(values.amount);
-          if (!values.partyId || !isPositiveDecimal(amount, 2)) {
-            setInvalid("Elija el cliente y un monto mayor que cero (hasta 2 decimales).");
+          const transfer = values.method === "TRANSFER";
+          const cheque = values.method === "CHEQUE";
+          if (
+            !fe.check({
+              partyId: !values.partyId && "Elija el cliente.",
+              amount: !isPositiveDecimal(amount, 2) && "Indique un monto mayor que cero (hasta 2 decimales).",
+              bankAccountId: transfer && !bank && "Una transferencia necesita la cuenta bancaria a la que llegó.",
+              valueDate: transfer && !values.valueDate && "Indique la fecha valor de la transferencia.",
+              chequeBank: cheque && values.chequeBank.trim() === "" && "Indique el banco del cheque.",
+              chequeNo: cheque && values.chequeNo.trim() === "" && "Indique el número del cheque.",
+              chequeDate: cheque && !values.chequeDate && "Indique la fecha del cheque.",
+            })
+          ) {
             return;
           }
-          if (values.method === "TRANSFER" && !bank) {
-            setInvalid("Una transferencia necesita la cuenta bancaria a la que llegó.");
-            return;
-          }
-          setInvalid(null);
           const optional = (v: string) => (v.trim() === "" ? null : v.trim());
           const response = await record.run(
             {
@@ -92,7 +99,7 @@ export default function Page() {
           }
         }}
       >
-        <Field label="Cliente">
+        <Field label="Cliente" required error={fe.errors.partyId}>
           <select aria-label="Cliente" value={values.partyId} onChange={set("partyId")}>
             <option value="">—</option>
             {data.customers.map((c) => (
@@ -102,7 +109,7 @@ export default function Page() {
             ))}
           </select>
         </Field>
-        <Field label="Medio">
+        <Field label="Medio" required>
           <select aria-label="Medio de cobro" value={values.method} onChange={set("method")}>
             {Object.entries(METHODS).map(([code, label]) => (
               <option key={code} value={code}>
@@ -111,12 +118,12 @@ export default function Page() {
             ))}
           </select>
         </Field>
-        <Field label="Monto">
+        <Field label="Monto (RD$)" required error={fe.errors.amount}>
           <input aria-label="Monto del cobro" inputMode="decimal" value={values.amount} onChange={set("amount")} />
         </Field>
         {values.method === "TRANSFER" ? (
           <>
-            <Field label="Cuenta de la empresa">
+            <Field label="Cuenta de la empresa" required error={fe.errors.bankAccountId}>
               <select aria-label="Cuenta bancaria" value={bank} onChange={set("bankAccountId")}>
                 {data.banks.map((b) => (
                   <option key={b.bankAccountId} value={b.bankAccountId}>
@@ -125,20 +132,20 @@ export default function Page() {
                 ))}
               </select>
             </Field>
-            <Field label="Fecha valor">
+            <Field label="Fecha valor" required error={fe.errors.valueDate}>
               <input type="date" value={values.valueDate} max={today} onChange={set("valueDate")} />
             </Field>
           </>
         ) : null}
         {values.method === "CHEQUE" ? (
           <>
-            <Field label="Banco del cheque">
-              <input value={values.chequeBank} onChange={set("chequeBank")} required />
+            <Field label="Banco del cheque" required error={fe.errors.chequeBank}>
+              <input value={values.chequeBank} onChange={set("chequeBank")} />
             </Field>
-            <Field label="Número del cheque">
-              <input value={values.chequeNo} onChange={set("chequeNo")} required />
+            <Field label="Número del cheque" required error={fe.errors.chequeNo}>
+              <input value={values.chequeNo} onChange={set("chequeNo")} />
             </Field>
-            <Field label="Fecha del cheque">
+            <Field label="Fecha del cheque" required error={fe.errors.chequeDate}>
               <input type="date" value={values.chequeDate} max={today} onChange={set("chequeDate")} />
             </Field>
           </>
@@ -146,10 +153,11 @@ export default function Page() {
         <Field label="Referencia (opcional)">
           <input value={values.reference} onChange={set("reference")} />
         </Field>
-        <button type="submit" className="primary" disabled={record.busy}>
-          Registrar cobro
-        </button>
-        {invalid ? <div className="error">{invalid}</div> : null}
+        <div className="actions form-actions">
+          <button type="submit" className="primary" disabled={record.busy}>
+            Registrar cobro
+          </button>
+        </div>
         <ErrorBox error={record.error} />
       </form>
     </>

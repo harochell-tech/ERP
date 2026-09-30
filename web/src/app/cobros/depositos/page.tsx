@@ -16,7 +16,7 @@ import { useLoad } from "@/lib/useQuery";
 
 function NewDeposit({ onDone }: { onDone: (depositId: string) => void }) {
   const { companyId } = useSession();
-  const deposit = useCommand("deposit-receipts", "/api/v1/companies/{companyId}/sales/deposit-receipts");
+  const deposit = useCommand("deposit-receipts", "/api/v1/companies/{companyId}/sales/deposit-receipts", (_r, doc) => (doc ? `Depósito ${doc} registrado.` : "Depósito registrado."));
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [bankAccountId, setBankAccountId] = useState("");
   const { data, error } = useLoad(
@@ -40,14 +40,14 @@ function NewDeposit({ onDone }: { onDone: (depositId: string) => void }) {
   return (
     <>
       <h2>Nuevo depósito</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th />
             <th>Recibo</th>
             <th>Cliente</th>
             <th>Medio</th>
-            <th className="num">Monto</th>
+            <th className="num">Monto (RD$)</th>
           </tr>
         </thead>
         <tbody>
@@ -57,7 +57,7 @@ function NewDeposit({ onDone }: { onDone: (depositId: string) => void }) {
                 <input type="checkbox" aria-label={`Depositar ${r.receiptNo}`} checked={picked[r.receiptId] ?? false} onChange={(e) => setPicked({ ...picked, [r.receiptId]: e.target.checked })} />
               </td>
               <td className="mono">{r.receiptNo}</td>
-              <td>{r.customerName}</td>
+              <td className="wrap">{r.customerName}</td>
               <td>
                 {METHODS[r.method] ?? r.method}
                 {r.chequeNo ? ` ${r.chequeNo}` : ""}
@@ -68,8 +68,8 @@ function NewDeposit({ onDone }: { onDone: (depositId: string) => void }) {
             </tr>
           ))}
         </tbody>
-      </table>
-      <div className="inline-form">
+      </table></div>
+      <div className="actions form-actions">
         <Field label="Cuenta">
           <select aria-label="Cuenta del depósito" value={bank} onChange={(e) => setBankAccountId(e.target.value)}>
             {data.banks.map((b) => (
@@ -115,14 +115,14 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay depósitos.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
               <th>Fecha</th>
               <th>Cuenta</th>
               <th className="num">Recibos</th>
-              <th className="num">Total</th>
+              <th className="num">Total (RD$)</th>
               <th>Estado</th>
             </tr>
           </thead>
@@ -146,7 +146,7 @@ export default function Page() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

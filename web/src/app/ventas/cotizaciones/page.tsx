@@ -95,14 +95,14 @@ function Quotes() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay cotizaciones con ese filtro.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
               <th>Cliente</th>
               <th>Fecha</th>
               <th>Vigente hasta</th>
-              <th className="num">Total neto</th>
+              <th className="num">Total neto (RD$)</th>
               <th>Estado</th>
               <th>Precios</th>
             </tr>
@@ -113,7 +113,7 @@ function Quotes() {
                 <td className="mono">
                   <Link href={`/ventas/cotizacion/?id=${q.quoteId}`}>{q.quoteNo}</Link>
                 </td>
-                <td>{q.customerName}</td>
+                <td className="wrap">{q.customerName}</td>
                 <td>{formatDate(q.quoteDate)}</td>
                 <td>{formatDate(q.validUntil)}</td>
                 <td className="num">
@@ -126,7 +126,7 @@ function Quotes() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

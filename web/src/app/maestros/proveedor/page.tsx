@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatDateTime } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -23,12 +23,29 @@ function RequestForm({ partyId, onDone }: { partyId: string; onDone: () => void 
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountHolder, setAccountHolder] = useState("");
+  const fe = useFieldErrors<"bankCode" | "accountNumber" | "accountHolder">();
   return (
     <form
       className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await request.run({ partyId, bankCode: bankCode.trim(), accountNumber: accountNumber.trim(), accountHolder: accountHolder.trim() })) {
+        if (
+          !fe.check({
+            bankCode: bankCode.trim() === "" && "Indique el código del banco.",
+            accountNumber: accountNumber.trim() === "" && "Indique el número de cuenta.",
+            accountHolder: accountHolder.trim() === "" && "Indique el titular de la cuenta.",
+          })
+        ) {
+          return;
+        }
+        if (
+          await request.run(
+            { partyId, bankCode: bankCode.trim(), accountNumber: accountNumber.trim(), accountHolder: accountHolder.trim() },
+            undefined,
+            `Cuenta ${bankCode.trim()} solicitada: queda en revisión hasta que otra persona la verifique.`,
+          )
+        ) {
           setBankCode("");
           setAccountNumber("");
           setAccountHolder("");
@@ -36,17 +53,17 @@ function RequestForm({ partyId, onDone }: { partyId: string; onDone: () => void 
         }
       }}
     >
-      <h2 style={{ marginTop: 0 }}>Solicitar cuenta nueva</h2>
-      <Field label="Banco (código)">
-        <input value={bankCode} onChange={(e) => setBankCode(e.target.value)} required />
+      <h2>Solicitar cuenta nueva</h2>
+      <Field label="Banco (código)" required error={fe.errors.bankCode}>
+        <input value={bankCode} onChange={(e) => setBankCode(e.target.value)} />
       </Field>
-      <Field label="Número de cuenta">
-        <input className="mono" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} required />
+      <Field label="Número de cuenta" required error={fe.errors.accountNumber}>
+        <input className="mono" inputMode="numeric" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
       </Field>
-      <Field label="Titular">
-        <input value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} required />
+      <Field label="Titular" required error={fe.errors.accountHolder}>
+        <input value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} />
       </Field>
-      <div className="actions">
+      <div className="actions form-actions">
         <button type="submit" className="primary" disabled={request.busy}>
           Solicitar
         </button>
@@ -58,32 +75,35 @@ function RequestForm({ partyId, onDone }: { partyId: string; onDone: () => void 
 
 function VerifyForm({ version, onDone }: { version: Version; onDone: () => void }) {
   const id = version.partyBankAccountId;
-  const verify = useCommand(`verify-party-bank:${id}`, "/api/v1/companies/{companyId}/master-data/verify-party-bank-account");
-  const reject = useCommand(`reject-party-bank:${id}`, "/api/v1/companies/{companyId}/master-data/reject-party-bank-account");
+  const account = `${version.bankCode} ${version.accountNumber}`;
+  const verify = useCommand(`verify-party-bank:${id}`, "/api/v1/companies/{companyId}/master-data/verify-party-bank-account", `Cuenta ${account} verificada: se podrá pagar 72 horas después.`);
+  const reject = useCommand(`reject-party-bank:${id}`, "/api/v1/companies/{companyId}/master-data/reject-party-bank-account", `Cuenta ${account} rechazada.`);
   const [evidence, setEvidence] = useState("");
   const busy = verify.busy || reject.busy;
   return (
     <div className="card">
-      <h2 style={{ marginTop: 0 }}>Verificar versión {version.version}</h2>
+      <h2>Verificar versión {version.version}</h2>
       <p className="muted">Solicitada por {version.requestedBy ?? "—"}. Al verificarla, la versión vigente queda reemplazada y la nueva se puede pagar 72 horas después.</p>
-      <Field label={`Evidencia de la verificación (mínimo ${EVIDENCE_MIN} caracteres)`}>
-        <textarea rows={3} style={{ width: 420 }} value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="Quién confirmó, a qué número se llamó y cuándo" />
+      <Field label="Evidencia de la verificación" required wide hint={`Mínimo ${EVIDENCE_MIN} caracteres: quién confirmó, a qué número se llamó y cuándo.`}>
+        <textarea rows={3} value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="Quién confirmó, a qué número se llamó y cuándo" />
       </Field>
-      <div className="actions">
-        <button
-          type="button"
+      <div className="actions form-actions">
+        <ConfirmAction
+          label="Verificar cuenta"
           className="primary"
-          disabled={busy || evidence.trim().length < EVIDENCE_MIN}
-          onClick={async () => {
+          stepUp
+          busy={busy}
+          disabled={evidence.trim().length < EVIDENCE_MIN}
+          consequence={`La cuenta ${account} pasa a ser la cuenta de pago del proveedor (la vigente queda reemplazada) y se podrá pagar 72 horas después. No se puede deshacer.`}
+          onConfirm={async () => {
             if (await verify.run({ partyBankAccountId: id, evidence: evidence.trim() })) {
               onDone();
             }
           }}
-        >
-          Verificar cuenta
-        </button>
+        />
         <ReasonAction
           label="Rechazar"
+          consequence={`La solicitud de la cuenta ${account} quedará rechazada; habrá que solicitar otra.`}
           busy={busy}
           onConfirm={async (reason) => {
             if (await reject.run({ partyBankAccountId: id, reason })) {
@@ -106,7 +126,8 @@ function BankAccounts({ partyId }: { partyId: string }) {
   if (data === null) {
     return <Loading error={error} />;
   }
-  const email = state.status === "ready" ? state.session.email : null;
+  // UX1-01a: requestedBy is the display name (the e-mail until the first sign-in brings one); either identifies the requester.
+  const me = state.status === "ready" ? [state.session.email, state.session.displayName?.trim()].filter((v): v is string => !!v) : [];
   const current = data.items.find((v) => v.status === "VERIFIED");
   const review = data.items.find((v) => v.status === "REVIEW");
   return (
@@ -122,9 +143,9 @@ function BankAccounts({ partyId }: { partyId: string }) {
       ) : (
         <p className="notice">El proveedor no tiene una cuenta verificada: no se le puede pagar.</p>
       )}
-      {review && can("party_bank_account:verify") && review.requestedBy !== email ? <VerifyForm version={review} onDone={reload} /> : null}
+      {review && can("party_bank_account:verify") && !me.includes(review.requestedBy ?? "") ? <VerifyForm version={review} onDone={reload} /> : null}
       {!review && can("party_bank_account:request") ? <RequestForm partyId={partyId} onDone={reload} /> : null}
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>Versión</th>
@@ -142,20 +163,20 @@ function BankAccounts({ partyId }: { partyId: string }) {
               <td className="mono">
                 {v.bankCode} {v.accountNumber}
               </td>
-              <td>{v.accountHolder}</td>
+              <td className="wrap">{v.accountHolder}</td>
               <td>
                 <StatusBadge status={v.status} />
               </td>
-              <td>
+              <td className="wrap">
                 {v.requestedBy ?? "—"} <span className="muted">{formatDateTime(v.requestedAt)}</span>
               </td>
-              <td>
+              <td className="wrap">
                 {v.verifiedBy ?? v.rejectedBy ?? "—"} <span className="muted">{v.verificationEvidence ?? v.rejectionReason ?? ""}</span>
               </td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </>
   );
 }
@@ -194,7 +215,7 @@ function Supplier() {
         <div>
           <dt>CxP abierta</dt>
           <dd>
-            <Money value={supplier.openApAmount} />
+            <Money value={supplier.openApAmount} currency />
           </dd>
         </div>
         <div>

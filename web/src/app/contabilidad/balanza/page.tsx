@@ -13,7 +13,7 @@ const PATH = "/api/v1/companies/{companyId}/finance/trial-balance";
 
 // FIN1-04 (E-FIN1-04-7, E-FIN1-03-4/6): the trial balance of a range, optionally filtered; an account opens its ledger.
 export default function Page() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const today = todayInDominicanRepublic();
   const [from, setFrom] = useState(monthStart(today));
   const [to, setTo] = useState(today);
@@ -55,7 +55,7 @@ export default function Page() {
               <option value="">Todas</option>
               {filters.plants.map((p) => (
                 <option key={p.plantId} value={p.plantId}>
-                  {p.code}
+                  {plantName(p.plantId, p.code)}
                 </option>
               ))}
             </select>
@@ -102,16 +102,16 @@ export default function Page() {
               Descargar CSV
             </a>
           </div>
-          <table>
+          <div className="table-wrap"><table>
             <thead>
               <tr>
                 <th>Código</th>
                 <th>Cuenta</th>
                 <th>Clase</th>
-                <th className="num">Saldo inicial</th>
-                <th className="num">Débitos</th>
-                <th className="num">Créditos</th>
-                <th className="num">Saldo final</th>
+                <th className="num">Saldo inicial (RD$)</th>
+                <th className="num">Débitos (RD$)</th>
+                <th className="num">Créditos (RD$)</th>
+                <th className="num">Saldo final (RD$)</th>
               </tr>
             </thead>
             <tbody>
@@ -154,7 +154,7 @@ export default function Page() {
                 </td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
         </>
       )}
     </>

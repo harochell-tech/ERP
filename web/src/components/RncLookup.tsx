@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
+import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 
 type Lookup = Schemas["RncLookup"];
@@ -38,14 +39,14 @@ export function RncHint({ result }: { result: Lookup | null }) {
   if (!result.found) {
     return (
       <p className="warning" data-testid="rnc-hint">
-        El número no aparece en el padrón de la DGII del {result.registryDate}. Verifíquelo antes de continuar.
+        El número no aparece en el padrón de la DGII del {formatDate(result.registryDate)}. Verifíquelo antes de continuar.
       </p>
     );
   }
   const active = result.status === "ACTIVO";
   return (
     <p className={active ? "muted" : "warning"} data-testid="rnc-hint">
-      DGII ({result.registryDate}): {result.legalName}
+      DGII ({formatDate(result.registryDate)}): {result.legalName}
       {result.tradeName ? ` — ${result.tradeName}` : ""} · {result.status}
       {result.regime ? ` · ${result.regime}` : ""}
       {active ? "" : ". El contribuyente no está activo."}

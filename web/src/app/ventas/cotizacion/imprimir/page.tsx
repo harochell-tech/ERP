@@ -68,17 +68,17 @@ function QuotePrint() {
           {data.siteAddress ? ` · obra: ${data.siteAddress}` : ""}
         </dd>
       </dl>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th className="num">#</th>
             <th>Producto</th>
             <th>Unidad</th>
             <th className="num">Cantidad</th>
-            <th className="num">Precio</th>
-            <th className="num">Neto</th>
-            <th className="num">ITBIS</th>
-            <th className="num">Total</th>
+            <th className="num">Precio (RD$)</th>
+            <th className="num">Neto (RD$)</th>
+            <th className="num">ITBIS (RD$)</th>
+            <th className="num">Total (RD$)</th>
           </tr>
         </thead>
         <tbody>
@@ -105,7 +105,7 @@ function QuotePrint() {
             </tr>
           ))}
           <tr>
-            <th colSpan={5}>Totales</th>
+            <th colSpan={5}>Totales (RD$)</th>
             <td className="num">
               <Money value={data.netTotal} testId="print-net" />
             </td>
@@ -117,7 +117,7 @@ function QuotePrint() {
             </td>
           </tr>
         </tbody>
-      </table>
+      </table></div>
       {data.notes ? (
         <p>
           <strong>Notas:</strong> {data.notes}

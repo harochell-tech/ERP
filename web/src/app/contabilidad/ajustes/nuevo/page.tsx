@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
@@ -53,11 +53,11 @@ function fromDetail(j: Schemas["ManualJournalDetail"]): Values {
 // FIN1-04 (E-FIN1-04-4…6): prepare an adjustment, or change a DRAFT (?id=). The form never adds amounts: the adjustment's page
 // shows the server's totals and "Enviar" waits for a difference of 0.00.
 function AdjustmentForm() {
-  const { companyId, can } = useSession();
+  const { companyId, can, plantName } = useSession();
   const router = useRouter();
   const id = useSearchParams().get("id");
-  const prepare = useCommand<"/api/v1/companies/{companyId}/finance/prepare-manual-journal", Values>("prepare-manual-journal", "/api/v1/companies/{companyId}/finance/prepare-manual-journal");
-  const update = useCommand<"/api/v1/companies/{companyId}/finance/update-manual-journal", Values>(`update-manual-journal:${id}`, "/api/v1/companies/{companyId}/finance/update-manual-journal");
+  const prepare = useCommand<"/api/v1/companies/{companyId}/finance/prepare-manual-journal", Values>("prepare-manual-journal", "/api/v1/companies/{companyId}/finance/prepare-manual-journal", (_, doc) => `Ajuste ${doc ?? ""} guardado en borrador.`);
+  const update = useCommand<"/api/v1/companies/{companyId}/finance/update-manual-journal", Values>(`update-manual-journal:${id}`, "/api/v1/companies/{companyId}/finance/update-manual-journal", "Borrador del ajuste actualizado.");
   const restored = id ? update.restored : prepare.restored;
   const [values, setValues] = useState<Values | null>(
     () =>
@@ -66,7 +66,7 @@ function AdjustmentForm() {
         ? null
         : { postingDate: todayInDominicanRepublic(), description: "", supportRef: "", supportSha256: "", supportFile: "", tax: false, autoReverse: false, lines: [{ ...EMPTY_LINE }, { ...EMPTY_LINE, side: "credit" }] }),
   );
-  const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
   const allowed = can("manual_journal:prepare") && can("configuration:read");
 
   const { data, error } = useLoad(
@@ -107,15 +107,19 @@ function AdjustmentForm() {
 
   const submit = async () => {
     const lines = values.lines.map((l) => ({ ...l, amount: normalizeInput(l.amount) }));
-    if (!values.postingDate || !values.description.trim() || !values.supportRef.trim() || values.supportSha256.length !== 64) {
-      setInvalid("Indique fecha, descripción, referencia del soporte y elija el archivo del soporte.");
+    const found: Record<string, string | false> = {
+      postingDate: !values.postingDate && "Indique la fecha contable.",
+      description: !values.description.trim() && "Describa el ajuste.",
+      supportFile: values.supportSha256.length !== 64 && "Elija el archivo del soporte.",
+      supportRef: !values.supportRef.trim() && "Indique la referencia del soporte.",
+    };
+    lines.forEach((l, index) => {
+      found[`line-${index}-account`] = !l.accountId && "Elija la cuenta.";
+      found[`line-${index}-amount`] = !isPositiveDecimal(l.amount, SCALE) && "Monto mayor que cero, hasta 2 decimales.";
+    });
+    if (!fe.check(found)) {
       return;
     }
-    if (lines.length < 2 || lines.some((l) => !l.accountId || !isPositiveDecimal(l.amount, SCALE))) {
-      setInvalid("Cada línea necesita cuenta y un monto mayor que cero con hasta 2 decimales; un ajuste tiene al menos dos líneas.");
-      return;
-    }
-    setInvalid(null);
     const body = {
       postingDate: values.postingDate,
       description: values.description.trim(),
@@ -134,7 +138,7 @@ function AdjustmentForm() {
     };
     const response =
       id && data.journal
-        ? await update.run({ ...body, manualJournalId: id, expectedVersion: data.journal.version }, values)
+        ? await update.run({ ...body, manualJournalId: id, expectedVersion: data.journal.version }, values, `Ajuste ${data.journal.journalNo} actualizado.`)
         : await prepare.run(body, values);
     if (response) {
       router.push(`/contabilidad/ajuste/?id=${id ?? response.resultRef}`);
@@ -145,18 +149,18 @@ function AdjustmentForm() {
     <>
       <h1>{id ? `Modificar ${data.journal?.journalNo ?? "ajuste"}` : "Nuevo ajuste"}</h1>
       <div>
-        <Field label="Fecha contable">
+        <Field label="Fecha contable" required error={fe.errors.postingDate}>
           <input type="date" aria-label="Fecha contable" value={values.postingDate} max={todayInDominicanRepublic()} onChange={(e) => set({ postingDate: e.target.value })} />
         </Field>
-        <Field label="Descripción">
-          <input aria-label="Descripción" maxLength={500} size={50} value={values.description} onChange={(e) => set({ description: e.target.value })} />
+        <Field label="Descripción" required error={fe.errors.description}>
+          <input aria-label="Descripción" maxLength={500} style={{ width: "min(32rem, 100%)" }} value={values.description} onChange={(e) => set({ description: e.target.value })} />
         </Field>
       </div>
       <div>
-        <Field label="Archivo del soporte">
+        <Field label="Archivo del soporte" required error={fe.errors.supportFile}>
           <input type="file" aria-label="Archivo del soporte" onChange={(e) => void chooseFile(e.target.files?.[0])} />
         </Field>
-        <Field label="Referencia del soporte">
+        <Field label="Referencia del soporte" required error={fe.errors.supportRef}>
           <input aria-label="Referencia del soporte" maxLength={200} value={values.supportRef} onChange={(e) => set({ supportRef: e.target.value })} />
         </Field>
       </div>
@@ -171,12 +175,12 @@ function AdjustmentForm() {
           <input type="checkbox" checked={values.autoReverse} onChange={(e) => set({ autoReverse: e.target.checked })} /> Reversar el día 1 del mes siguiente
         </label>
       </div>
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Cuenta</th>
             <th>Lado</th>
-            <th className="num">Monto</th>
+            <th className="num">Monto (RD$)</th>
             {data.plants ? <th>Planta</th> : null}
             <th>Memo</th>
             <th />
@@ -186,7 +190,12 @@ function AdjustmentForm() {
           {values.lines.map((line, index) => (
             <tr key={index}>
               <td>
-                <select aria-label={`Cuenta ${index + 1}`} value={line.accountId} onChange={(e) => setLine(index, { accountId: e.target.value })}>
+                <select
+                  aria-label={`Cuenta ${index + 1}`}
+                  value={line.accountId}
+                  onChange={(e) => setLine(index, { accountId: e.target.value })}
+                  {...fieldAria(fe.errors[`line-${index}-account`], `line-${index}-account-message`, true)}
+                >
                   <option value="">—</option>
                   {data.accounts.map((a) => (
                     <option key={a.accountId} value={a.accountId}>
@@ -194,6 +203,7 @@ function AdjustmentForm() {
                     </option>
                   ))}
                 </select>
+                <FieldMessage id={`line-${index}-account-message`} error={fe.errors[`line-${index}-account`]} />
               </td>
               <td>
                 <select aria-label={`Lado ${index + 1}`} value={line.side} onChange={(e) => setLine(index, { side: e.target.value === "credit" ? "credit" : "debit" })}>
@@ -202,7 +212,14 @@ function AdjustmentForm() {
                 </select>
               </td>
               <td className="num">
-                <input aria-label={`Monto ${index + 1}`} inputMode="decimal" value={line.amount} onChange={(e) => setLine(index, { amount: e.target.value })} />
+                <input
+                  aria-label={`Monto ${index + 1}`}
+                  inputMode="decimal"
+                  value={line.amount}
+                  onChange={(e) => setLine(index, { amount: e.target.value })}
+                  {...fieldAria(fe.errors[`line-${index}-amount`], `line-${index}-amount-message`, true)}
+                />
+                <FieldMessage id={`line-${index}-amount-message`} error={fe.errors[`line-${index}-amount`]} />
               </td>
               {data.plants ? (
                 <td>
@@ -210,7 +227,7 @@ function AdjustmentForm() {
                     <option value="">—</option>
                     {data.plants.map((p) => (
                       <option key={p.plantId} value={p.plantId}>
-                        {p.code}
+                        {plantName(p.plantId, p.code)}
                       </option>
                     ))}
                   </select>
@@ -229,9 +246,9 @@ function AdjustmentForm() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </LineTable>
       <p className="muted">Solo cuentas activas que no son de control. Los totales y la diferencia los calcula el sistema al guardar.</p>
-      <div className="actions">
+      <div className="actions form-actions">
         <button type="button" onClick={() => set({ lines: [...values.lines, { ...EMPTY_LINE }] })}>
           Agregar línea
         </button>
@@ -239,7 +256,6 @@ function AdjustmentForm() {
           Guardar borrador
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={prepare.error ?? update.error} />
     </>
   );

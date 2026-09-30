@@ -36,7 +36,7 @@ function Run() {
       {exceptions.length === 0 ? (
         <p>Sin excepciones.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Clave</th>
@@ -51,7 +51,7 @@ function Run() {
           <tbody>
             {exceptions.map((x) => (
               <tr key={x.exceptionId}>
-                <td>{x.matchKey}</td>
+                <td className="wrap">{x.matchKey}</td>
                 <td className="num">{formatDecimal(x.valueA)}</td>
                 <td className="num">{formatDecimal(x.valueB)}</td>
                 <td>{classificationLabel(x.classification)}</td>
@@ -61,7 +61,7 @@ function Run() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

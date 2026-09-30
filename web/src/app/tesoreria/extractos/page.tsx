@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { query, type CommandResponse } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission } from "@/components/ui";
+import { ErrorBox, Field, Loading, Money, NoPermission, useFieldErrors } from "@/components/ui";
 import { isDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -32,7 +32,10 @@ interface ImportResult {
 // unreadable row rejects the whole file; a repeated file is refused and an overlapping one reports its duplicates.
 function ImportForm({ onDone }: { onDone: () => void }) {
   const { companyId } = useSession();
-  const importStatement = useCommand("import-statement", "/api/v1/companies/{companyId}/treasury/import-bank-statement");
+  const importStatement = useCommand("import-statement", "/api/v1/companies/{companyId}/treasury/import-bank-statement", (response) => {
+    const summary = response.result as unknown as ImportResult;
+    return `Extracto importado: ${summary.inserted} de ${summary.linesInFile} líneas.`;
+  });
   const { data: banks } = useLoad(() => query("/api/v1/companies/{companyId}/treasury/bank-accounts", { path: { companyId } }), [companyId]);
   const active = (banks?.items ?? []).filter((b) => b.status === "ACTIVE");
   const [bankAccountId, setBankAccountId] = useState("");
@@ -42,17 +45,24 @@ function ImportForm({ onDone }: { onDone: () => void }) {
   const [opening, setOpening] = useState("");
   const [closing, setClosing] = useState("");
   const [result, setResult] = useState<{ statementId: string; summary: ImportResult } | null>(null);
+  const fe = useFieldErrors<"bank" | "file" | "opening" | "closing">();
   const bank = bankAccountId || active[0]?.bankAccountId || "";
   const balance = (value: string) => (value.trim() === "" ? null : normalizeInput(value));
-  const badBalance = [opening, closing].some((v) => v.trim() !== "" && !isDecimal(normalizeInput(v), 2));
-  const tooLarge = file !== null && file.size > MAX_FILE_BYTES;
+  const badBalance = (value: string) => value.trim() !== "" && !isDecimal(normalizeInput(value), 2) && "Saldo con máximo 2 decimales (ej. -10770.00).";
 
   return (
     <form
       className="card"
+      noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!file) {
+        const valid = fe.check({
+          bank: bank === "" && "Elija la cuenta bancaria.",
+          file: file === null ? "Elija el archivo CSV del banco." : file.size > MAX_FILE_BYTES && "El archivo supera 5 MB.",
+          opening: badBalance(opening),
+          closing: badBalance(closing),
+        });
+        if (!valid || !file) {
           return;
         }
         const response: CommandResponse | undefined = await importStatement.run({
@@ -72,8 +82,8 @@ function ImportForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <h2 style={{ marginTop: 0 }}>Importar extracto (CSV)</h2>
-      <Field label="Cuenta bancaria">
-        <select value={bank} onChange={(e) => setBankAccountId(e.target.value)} required>
+      <Field label="Cuenta bancaria" required error={fe.errors.bank}>
+        <select value={bank} onChange={(e) => setBankAccountId(e.target.value)}>
           {active.map((b) => (
             <option key={b.bankAccountId} value={b.bankAccountId}>
               {b.bankCode} {b.accountNumber}
@@ -81,8 +91,8 @@ function ImportForm({ onDone }: { onDone: () => void }) {
           ))}
         </select>
       </Field>
-      <Field label="Archivo del banco">
-        <input type="file" accept=".csv,text/csv,text/plain" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required />
+      <Field label="Archivo del banco" required error={fe.errors.file} hint="CSV, máximo 5 MB.">
+        <input type="file" accept=".csv,text/csv,text/plain" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </Field>
       <div>
         <p className="muted">Solo si el formato del banco no trae período o saldos:</p>
@@ -92,21 +102,19 @@ function ImportForm({ onDone }: { onDone: () => void }) {
         <Field label="Hasta">
           <input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} />
         </Field>
-        <Field label="Saldo inicial">
-          <input className="mono" value={opening} onChange={(e) => setOpening(e.target.value)} />
+        <Field label="Saldo inicial" error={fe.errors.opening}>
+          <input className="mono" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} />
         </Field>
-        <Field label="Saldo final">
-          <input className="mono" value={closing} onChange={(e) => setClosing(e.target.value)} />
+        <Field label="Saldo final" error={fe.errors.closing}>
+          <input className="mono" inputMode="decimal" value={closing} onChange={(e) => setClosing(e.target.value)} />
         </Field>
-      </div>
-      <div className="actions">
-        <button type="submit" className="primary" disabled={importStatement.busy || !file || bank === "" || badBalance || tooLarge}>
-          Importar
-        </button>
-        {tooLarge ? <span className="muted">El archivo supera 5 MB.</span> : null}
-        {badBalance ? <span className="muted">Saldos con máximo 2 decimales.</span> : null}
       </div>
       <ErrorBox error={importStatement.error} />
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={importStatement.busy}>
+          Importar
+        </button>
+      </div>
       {result ? (
         <div className="notice" data-testid="import-result">
           Importadas {result.summary.inserted} de {result.summary.linesInFile} líneas
@@ -136,13 +144,13 @@ export default function Page() {
       ) : data.items.length === 0 ? (
         <p className="muted">Todavía no hay extractos importados.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Cuenta</th>
               <th>Período</th>
-              <th className="num">Saldo inicial</th>
-              <th className="num">Saldo final</th>
+              <th className="num">Saldo inicial (RD$)</th>
+              <th className="num">Saldo final (RD$)</th>
               <th>Archivo</th>
               <th>Importado</th>
               <th className="num">Sin conciliar</th>
@@ -164,7 +172,7 @@ export default function Page() {
                 <td className="num">
                   <Money value={s.closingBalance} />
                 </td>
-                <td>{s.fileName}</td>
+                <td className="wrap">{s.fileName}</td>
                 <td>
                   {formatDateTime(s.importedAt)} <span className="muted">{s.importedBy ?? ""}</span>
                 </td>
@@ -177,7 +185,7 @@ export default function Page() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

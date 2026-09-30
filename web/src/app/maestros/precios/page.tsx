@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -23,6 +23,8 @@ function PrepareList({ current, onDone }: { current: Schemas["PriceListLineView"
   const prepare = useCommand<"/api/v1/companies/{companyId}/sales/prepare-price-list", Line[]>("prepare-price-list", "/api/v1/companies/{companyId}/sales/prepare-price-list");
   const [lines, setLines] = useState<Line[]>(() => prepare.restored ?? current.map((l) => ({ itemId: l.itemId, uom: l.uom, unitPrice: l.unitPrice })));
   const [invalid, setInvalid] = useState<string | null>(null);
+  const fe = useFieldErrors();
+  const messageId = useId();
   const { data } = useLoad(
     can("master_data:read") ? () => query("/api/v1/companies/{companyId}/master-data/items", { path: { companyId }, query: { status: "ACTIVE", limit: 200 } }) : null,
     [companyId],
@@ -37,39 +39,50 @@ function PrepareList({ current, onDone }: { current: Schemas["PriceListLineView"
   return (
     <>
       <h2>Nueva lista de precios</h2>
-      <table>
+      <LineTable>
         <thead>
           <tr>
             <th>Producto</th>
             <th>Unidad</th>
-            <th className="num">Precio (sin ITBIS)</th>
+            <th className="num">Precio sin ITBIS (RD$)</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {lines.map((line, index) => (
             <tr key={index}>
-              <td>
+              <td className="wrap">
                 {line.itemId && current.some((c) => c.itemId === line.itemId) ? (
                   currentLabel(line.itemId)
                 ) : (
-                  <select
-                    aria-label={`Producto ${index + 1}`}
-                    value={line.itemId}
-                    onChange={(e) => setLine(index, { itemId: e.target.value, uom: goods.find((g) => g.itemId === e.target.value)?.baseUom ?? "" })}
-                  >
-                    <option value="">—</option>
-                    {goods.map((g) => (
-                      <option key={g.itemId} value={g.itemId}>
-                        {g.code} — {g.description}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      aria-label={`Producto ${index + 1}`}
+                      value={line.itemId}
+                      onChange={(e) => setLine(index, { itemId: e.target.value, uom: goods.find((g) => g.itemId === e.target.value)?.baseUom ?? "" })}
+                      {...fieldAria(fe.errors[`line-${index}-item`], `${messageId}-${index}-item`, true)}
+                    >
+                      <option value="">—</option>
+                      {goods.map((g) => (
+                        <option key={g.itemId} value={g.itemId}>
+                          {g.code} — {g.description}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldMessage id={`${messageId}-${index}-item`} error={fe.errors[`line-${index}-item`]} />
+                  </>
                 )}
               </td>
               <td>{line.uom}</td>
               <td className="num">
-                <input aria-label={`Precio ${index + 1}`} inputMode="decimal" value={line.unitPrice} onChange={(e) => setLine(index, { unitPrice: e.target.value })} />
+                <input
+                  aria-label={`Precio ${index + 1}`}
+                  inputMode="decimal"
+                  value={line.unitPrice}
+                  onChange={(e) => setLine(index, { unitPrice: e.target.value })}
+                  {...fieldAria(fe.errors[`line-${index}-price`], `${messageId}-${index}-price`, true)}
+                />
+                <FieldMessage id={`${messageId}-${index}-price`} error={fe.errors[`line-${index}-price`]} />
               </td>
               <td>
                 <button type="button" onClick={() => setLines(lines.filter((_, i) => i !== index))}>
@@ -79,8 +92,9 @@ function PrepareList({ current, onDone }: { current: Schemas["PriceListLineView"
             </tr>
           ))}
         </tbody>
-      </table>
-      <div className="actions">
+      </LineTable>
+      {invalid ? <div className="error">{invalid}</div> : null}
+      <div className="actions form-actions">
         {goods.length > 0 ? (
           <button type="button" onClick={() => setLines([...lines, { itemId: "", uom: "", unitPrice: "" }])}>
             Agregar producto
@@ -88,15 +102,20 @@ function PrepareList({ current, onDone }: { current: Schemas["PriceListLineView"
         ) : null}
         <button
           type="button"
+          className="primary"
           disabled={prepare.busy}
           onClick={async () => {
             const body = lines.map((l) => ({ ...l, unitPrice: normalizeInput(l.unitPrice) }));
-            if (body.length === 0 || body.some((l) => !l.itemId || !l.uom || !isPositiveDecimal(l.unitPrice, 4))) {
-              setInvalid("Cada línea necesita producto y un precio mayor que cero (hasta 4 decimales).");
+            setInvalid(body.length === 0 ? "Agregue al menos un producto." : null);
+            const found: Record<string, string | false> = {};
+            body.forEach((l, i) => {
+              found[`line-${i}-item`] = (!l.itemId || !l.uom) && "Elija el producto.";
+              found[`line-${i}-price`] = !isPositiveDecimal(l.unitPrice, 4) && "Indique un precio mayor que cero (hasta 4 decimales).";
+            });
+            if (!fe.check(found) || body.length === 0) {
               return;
             }
-            setInvalid(null);
-            if (await prepare.run({ lines: body }, lines)) {
+            if (await prepare.run({ lines: body }, lines, `Lista de precios con ${body.length} producto(s) preparada; falta su aprobación.`)) {
               onDone();
             }
           }}
@@ -104,7 +123,6 @@ function PrepareList({ current, onDone }: { current: Schemas["PriceListLineView"
           Preparar lista
         </button>
       </div>
-      {invalid ? <div className="error">{invalid}</div> : null}
       <ErrorBox error={prepare.error} />
     </>
   );
@@ -112,7 +130,7 @@ function PrepareList({ current, onDone }: { current: Schemas["PriceListLineView"
 
 function Version({ version, onDone }: { version: Schemas["PriceListSummary"]; onDone: () => void }) {
   const { companyId, can } = useSession();
-  const approve = useCommand(`approve-price-list:${version.priceListVersionId}`, "/api/v1/companies/{companyId}/sales/approve-price-list");
+  const approve = useCommand(`approve-price-list:${version.priceListVersionId}`, "/api/v1/companies/{companyId}/sales/approve-price-list", `Lista de precios versión ${version.version} aprobada: rige desde hoy.`);
   const [open, setOpen] = useState(false);
   const { data, error } = useLoad(
     open ? () => query("/api/v1/companies/{companyId}/sales/price-lists/{priceListVersionId}", { path: { companyId, priceListVersionId: version.priceListVersionId } }) : null,
@@ -127,16 +145,22 @@ function Version({ version, onDone }: { version: Schemas["PriceListSummary"]; on
           <StatusBadge status={version.status} />
         </td>
         <td className="num">{version.lines}</td>
-        <td>{version.preparedBy ?? "—"}</td>
-        <td>{version.approvedBy ?? "—"}</td>
+        <td className="wrap">{version.preparedBy ?? "—"}</td>
+        <td className="wrap">{version.approvedBy ?? "—"}</td>
         <td className="actions">
           <button type="button" onClick={() => setOpen(!open)}>
             {open ? "Ocultar" : "Ver precios"}
           </button>
           {version.status === "DRAFT" && can("price_list:approve") ? (
-            <button type="button" disabled={approve.busy} onClick={async () => (await approve.run({ priceListVersionId: version.priceListVersionId })) && onDone()}>
-              Aprobar
-            </button>
+            <ConfirmAction
+              label="Aprobar"
+              className="primary"
+              stepUp
+              busy={approve.busy}
+              title={`¿Aprobar la lista de precios versión ${version.version}?`}
+              consequence="La lista rige desde hoy y reemplaza a la vigente: los pedidos y cotizaciones nuevos usarán estos precios. No se puede deshacer."
+              onConfirm={async () => (await approve.run({ priceListVersionId: version.priceListVersionId })) && onDone()}
+            />
           ) : null}
           <ErrorBox error={approve.error} />
         </td>
@@ -147,7 +171,7 @@ function Version({ version, onDone }: { version: Schemas["PriceListSummary"]; on
             {data === null ? (
               <Loading error={error} />
             ) : (
-              <table>
+              <div className="table-wrap"><table>
                 <tbody>
                   {data.lines.map((l) => (
                     <tr key={`${l.itemId}:${l.uom}`}>
@@ -161,7 +185,7 @@ function Version({ version, onDone }: { version: Schemas["PriceListSummary"]; on
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </td>
         </tr>
@@ -215,7 +239,7 @@ export default function Page() {
       {data.lists.length === 0 ? (
         <p className="muted">No hay listas de precios.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th className="num">Versión</th>
@@ -232,7 +256,7 @@ export default function Page() {
               <Version key={`${l.priceListVersionId}:${l.status}`} version={l} onDone={reload} />
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

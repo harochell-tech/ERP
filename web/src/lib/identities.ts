@@ -16,6 +16,18 @@ export function identityLabel(identity: TestIdentityOption): string {
 }
 
 /**
+ * E-UX1-01-3: a person as "Name · e-mail" (the Google name first); the e-mail alone until a sign-in brings the name, the fallback
+ * (e.g. the user id) when there is neither. Lists and selects use the same text so a row and its option read alike.
+ */
+export function personLabel(displayName: string | null | undefined, email: string | null | undefined, fallback = "—"): string {
+  const name = displayName?.trim();
+  if (name && email && name !== email) {
+    return `${name} · ${email}`;
+  }
+  return name || email || fallback;
+}
+
+/**
  * Whether to show the selector: while acting (to switch or return), or when the signed-in person holds identity:act_as in the
  * selected company.
  */

@@ -15,7 +15,7 @@ export default function Reconciliations() {
     can("reconciliation:read") ? () => query("/api/v1/companies/{companyId}/reconciliation/runs", { path: { companyId }, query: { limit: 100 } }) : null,
     [companyId],
   );
-  const run = useCommand("run-reconciliation", "/api/v1/companies/{companyId}/reconciliation/run-reconciliation");
+  const run = useCommand("run-reconciliation", "/api/v1/companies/{companyId}/reconciliation/run-reconciliation", "Conciliaciones ejecutadas: revise el resultado de cada una.");
 
   if (!can("reconciliation:read")) {
     return <NoPermission />;
@@ -44,7 +44,7 @@ export default function Reconciliations() {
       ) : data.items.length === 0 ? (
         <p className="muted">No se han ejecutado conciliaciones.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Conciliación</th>
@@ -59,7 +59,7 @@ export default function Reconciliations() {
           <tbody>
             {data.items.map((r) => (
               <tr key={r.runId}>
-                <td>
+                <td className="wrap">
                   <Link href={`/cierre/conciliacion/?id=${r.runId}`}>{r.reconCode}</Link> <span className="muted">{RECONCILIATIONS[r.reconCode] ?? r.description}</span>
                 </td>
                 <td>{formatDateTime(r.asOf)}</td>
@@ -71,7 +71,7 @@ export default function Reconciliations() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

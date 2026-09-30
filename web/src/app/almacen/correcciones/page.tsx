@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query, type Schemas } from "@/api/client";
-import { AccountingStatus, ErrorBox, Loading, NoPermission, ReasonAction } from "@/components/ui";
+import { AccountingStatus, ConfirmAction, ErrorBox, Loading, NoPermission, ReasonAction } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
 import { statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -15,26 +15,35 @@ type Correction = Schemas["ReceiptCorrectionView"];
 
 /** T-05 / E-PR11-4: the Controller approves (and thereby posts) a DRAFT or pending correction; only a pending one can be rejected. */
 function Decision({ correction, onDone }: { correction: Correction; onDone: () => void }) {
-  const approve = useCommand(`approve-rc:${correction.correctionId}`, "/api/v1/companies/{companyId}/procurement/approve-receipt-correction");
-  const reject = useCommand(`reject-rc:${correction.correctionId}`, "/api/v1/companies/{companyId}/procurement/reject-receipt-correction");
+  const approve = useCommand(
+    `approve-rc:${correction.correctionId}`,
+    "/api/v1/companies/{companyId}/procurement/approve-receipt-correction",
+    `Corrección de la recepción ${correction.grNo} aprobada y contabilizada.`,
+  );
+  const reject = useCommand(
+    `reject-rc:${correction.correctionId}`,
+    "/api/v1/companies/{companyId}/procurement/reject-receipt-correction",
+    `Corrección de la recepción ${correction.grNo} rechazada.`,
+  );
   const busy = approve.busy || reject.busy;
   return (
     <>
       <span className="actions">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={async () => {
+        <ConfirmAction
+          label="Aprobar"
+          title={`¿Aprobar la corrección de ${correction.grNo}?`}
+          consequence="La corrección se contabiliza: ajusta la cantidad recibida, el inventario y su asiento. No se puede deshacer."
+          busy={busy}
+          onConfirm={async () => {
             if (await approve.run({ correctionId: correction.correctionId })) {
               onDone();
             }
           }}
-        >
-          Aprobar
-        </button>
+        />
         {correction.documentStatus === "PENDING_APPROVAL" ? (
           <ReasonAction
             label="Rechazar"
+            consequence="La corrección queda rechazada y no se contabiliza."
             busy={busy}
             onConfirm={async (reason) => {
               if (await reject.run({ correctionId: correction.correctionId, reason })) {
@@ -74,7 +83,7 @@ function Corrections() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay correcciones.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Recepción</th>
@@ -94,9 +103,9 @@ function Corrections() {
                   <Link href={`/almacen/recepcion/?id=${c.goodsReceiptId}`}>{c.grNo}</Link>
                 </td>
                 <td className="num">{formatQuantity(c.deltaQty)}</td>
-                <td>{c.reason}</td>
-                <td>{c.evidenceObjectKey}</td>
-                <td>{c.createdBy ?? "—"}</td>
+                <td className="wrap">{c.reason}</td>
+                <td className="wrap">{c.evidenceObjectKey}</td>
+                <td className="wrap">{c.createdBy ?? "—"}</td>
                 <td>{statusLabel(c.documentStatus)}</td>
                 <td>
                   <AccountingStatus status={c.accountingStatus} eventId={c.postingEventId} />
@@ -105,7 +114,7 @@ function Corrections() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

@@ -53,7 +53,7 @@ function Invoices() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay facturas.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
@@ -61,8 +61,8 @@ function Invoices() {
               <th>Fecha</th>
               <th>Vence</th>
               <th>Cliente</th>
-              <th className="num">Total</th>
-              <th className="num">Abierto</th>
+              <th className="num">Total (RD$)</th>
+              <th className="num">Abierto (RD$)</th>
               <th>Estado</th>
               <th>Fiscal</th>
             </tr>
@@ -76,7 +76,7 @@ function Invoices() {
                 <td className="mono">{i.encf ?? "—"}</td>
                 <td>{formatDate(i.invoiceDate)}</td>
                 <td>{formatDate(i.dueDate)}</td>
-                <td>{i.customerName}</td>
+                <td className="wrap">{i.customerName}</td>
                 <td className="num">
                   <Money value={i.total ?? i.netTotal} />
                 </td>
@@ -92,7 +92,7 @@ function Invoices() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

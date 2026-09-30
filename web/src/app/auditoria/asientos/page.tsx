@@ -38,14 +38,14 @@ function Journals() {
             {j.lateEntry ? " (registro tardío)" : ""}
           </h2>
           {j.reversesJournalId ? <p>Reversa del asiento {j.reversesJournalId}.</p> : null}
-          <table>
+          <div className="table-wrap"><table>
             <thead>
               <tr>
                 <th>#</th>
                 <th>Cuenta</th>
                 <th>Rol</th>
-                <th className="num">Débito</th>
-                <th className="num">Crédito</th>
+                <th className="num">Débito (RD$)</th>
+                <th className="num">Crédito (RD$)</th>
                 <th />
               </tr>
             </thead>
@@ -65,7 +65,7 @@ function Journals() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </section>
       ))}
     </>

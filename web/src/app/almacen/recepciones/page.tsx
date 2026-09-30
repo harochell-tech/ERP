@@ -27,7 +27,7 @@ export default function Receipts() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay recepciones.</p>
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Número</th>
@@ -54,7 +54,7 @@ export default function Receipts() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
     </>
   );

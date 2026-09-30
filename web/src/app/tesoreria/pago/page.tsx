@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
-import { ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { formatDecimal } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -22,12 +23,13 @@ function Actions({ payment, onDone }: { payment: Payment; onDone: () => void }) 
   const { can, state } = useSession();
   const id = payment.paymentId;
   const target = { paymentId: id, expectedVersion: payment.version };
-  const release = useCommand(`release-payment:${id}`, "/api/v1/companies/{companyId}/treasury/release-supplier-payment");
-  const voidPayment = useCommand(`void-payment:${id}`, "/api/v1/companies/{companyId}/treasury/void-payment");
-  const reverse = useCommand(`reverse-payment:${id}`, "/api/v1/companies/{companyId}/treasury/reverse-payment");
+  const release = useCommand(`release-payment:${id}`, "/api/v1/companies/{companyId}/treasury/release-supplier-payment", `Pago ${payment.paymentNo} liberado.`);
+  const voidPayment = useCommand(`void-payment:${id}`, "/api/v1/companies/{companyId}/treasury/void-payment", `Pago ${payment.paymentNo} anulado.`);
+  const reverse = useCommand(`reverse-payment:${id}`, "/api/v1/companies/{companyId}/treasury/reverse-payment", `Pago ${payment.paymentNo} revertido.`);
   const busy = release.busy || voidPayment.busy || reverse.busy;
-  const email = state.status === "ready" ? state.session.email : null;
-  const preparedByMe = payment.preparedBy !== null && payment.preparedBy === email;
+  // UX1-01b (E-UX1-01-3): preparedBy is the preparer's display name (the e-mail until the first sign-in brings one).
+  const me = state.status === "ready" ? [state.session.email, state.session.displayName?.trim()].filter((v): v is string => !!v) : [];
+  const preparedByMe = payment.preparedBy !== null && me.includes(payment.preparedBy);
   const after = (response: unknown) => {
     if (response) {
       onDone();
@@ -38,19 +40,32 @@ function Actions({ payment, onDone }: { payment: Payment; onDone: () => void }) 
     <>
       <div className="actions">
         {payment.status === "PREPARED" && can("payment:release") && !preparedByMe ? (
-          <button type="button" className="primary" disabled={busy} onClick={async () => after(await release.run(target))}>
-            Liberar pago
-          </button>
+          <ConfirmAction
+            label="Liberar pago"
+            title={`¿Liberar el pago ${payment.paymentNo}?`}
+            consequence={`Se transfieren RD$ ${formatDecimal(payment.amount)} a ${payment.supplierName} y se contabiliza el pago. Después solo se deshace con una reversa.`}
+            stepUp
+            className="primary"
+            busy={busy}
+            onConfirm={async () => after(await release.run(target))}
+          />
         ) : null}
         {payment.status === "PREPARED" && can("payment:release") && preparedByMe ? (
           <span className="muted">Lo libera alguien distinto de quien lo preparó.</span>
         ) : null}
         {payment.status === "PREPARED" && can("payment:void") ? (
-          <ReasonAction label="Anular pago" busy={busy} onConfirm={async (reason) => after(await voidPayment.run({ ...target, reason }))} />
+          <ReasonAction
+            label="Anular pago"
+            consequence="El pago preparado queda anulado y las facturas vuelven a estar pendientes de pago."
+            busy={busy}
+            onConfirm={async (reason) => after(await voidPayment.run({ ...target, reason }))}
+          />
         ) : null}
         {(payment.status === "RELEASED" || payment.status === "CLEARED") && can("payment:reverse") ? (
           <ReasonAction
             label="Revertir pago"
+            consequence="Se contabiliza la reversa del pago y las facturas vuelven a quedar abiertas. No se puede deshacer."
+            stepUp
             busy={busy}
             minLength={REVERSAL_REASON_MIN}
             onConfirm={async (reason) => after(await reverse.run({ ...target, reason }))}
@@ -94,7 +109,7 @@ function PaymentDetail() {
         <div>
           <dt>Monto</dt>
           <dd>
-            <Money value={payment.amount} testId="payment-amount" />
+            <Money value={payment.amount} testId="payment-amount" currency />
           </dd>
         </div>
         <div>
@@ -128,12 +143,12 @@ function PaymentDetail() {
       </dl>
       <Actions payment={payment} onDone={reload} />
       <h2>{payment.status === "PREPARED" ? "Facturas que pagará" : "Facturas pagadas"}</h2>
-      <table>
+      <div className="table-wrap"><table>
         <thead>
           <tr>
             <th>NCF</th>
             <th>Vence</th>
-            <th className="num">Monto</th>
+            <th className="num">Monto (RD$)</th>
             <th></th>
           </tr>
         </thead>
@@ -151,7 +166,7 @@ function PaymentDetail() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <h2>Conciliación bancaria</h2>
       {payment.statementLines.length === 0 ? (
         payment.status === "RELEASED" ? (
@@ -160,13 +175,13 @@ function PaymentDetail() {
           <p className="muted">Sin líneas del extracto.</p>
         )
       ) : (
-        <table>
+        <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Fecha</th>
               <th>Tipo</th>
               <th>Descripción</th>
-              <th className="num">Monto</th>
+              <th className="num">Monto (RD$)</th>
             </tr>
           </thead>
           <tbody>
@@ -174,7 +189,7 @@ function PaymentDetail() {
               <tr key={l.lineId}>
                 <td>{formatDate(l.valueDate)}</td>
                 <td>{l.direction === "DEBIT" ? "Débito (transferencia)" : "Crédito (devolución)"}</td>
-                <td>
+                <td className="wrap">
                   {l.description} {l.bankReference ? <span className="muted">· {l.bankReference}</span> : null}
                 </td>
                 <td className="num">
@@ -183,7 +198,7 @@ function PaymentDetail() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
       <History history={payment.history} />
     </>
