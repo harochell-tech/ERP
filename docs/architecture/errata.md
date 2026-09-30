@@ -710,6 +710,20 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-QUO1-04-10 | QUO1-04 | The dev seed adds a SENT sample quote; no staging seed script. |
 | E-QUO1-04-11 | QUO1-04 | The form and the copy propose a validity of 15 days (`DEFAULT_QUOTE_VALIDITY_DAYS`, web); the Vendedor changes it and the server only requires today or later. Approved by the owner 2026-09-29. |
 | E-QUO1-04-12 | QUO1-04 | Inicio also offers the Vendedor the task "Crear una cotización" (`quote:manage`). Approved by the owner 2026-09-29. |
+| E-FIS2-1 | FIS-2 | 607 y 608 → **No se generan**: la empresa es emisor electrónico y factura solo con e-CF desde el sistema (DGII). Si alguna vez vuelve a emitir serie B (contingencia fuera del sistema), el contador la reporta con la herramienta de la DGII. Confirmación del contador en X-1 |
+| E-FIS2-2 | FIS-2 | Qué entra al 606 → Facturas de proveedor contabilizadas cuyo NCF es del mes; las revertidas no entran |
+| E-FIS2-3 | FIS-2 | Período y pagos → Un registro por factura en el mes de su NCF, con la fecha de pago si ya está pagada al generar. Una retención pagada en un mes posterior se reporta en el mes del pago con su fecha de pago (el instructivo lo permite para NCF anteriores). **Confirmar con el contador (X-1)** |
+| E-FIS2-4 | FIS-2 | Tipo de bien o servicio → Mapa por categoría de ítem que configura el Analista fiscal y activa el Especialista (como las reglas); valor inicial materias primas → 09 |
+| E-FIS2-5 | FIS-2 | Bienes / servicios → Por tipo de línea: hoy todas las líneas son de inventario → bienes |
+| E-FIS2-6 | FIS-2 | ITBIS al costo → La parte no recuperable de la determinación (efecto NON_RECOVERABLE_INPUT) |
+| E-FIS2-7 | FIS-2 | Proporcionalidad → 0: todas las ventas cuentan como gravadas (incluidas las exentas CONFOTUR por destino, CA3833) |
+| E-FIS2-8 | FIS-2 | Código de retención ISR → Nuevo campo `isr_withholding_type` (1–9) en la definición de las reglas PURCHASE_WITHHOLDING de ISR; lo configura el Analista y lo activa el Especialista (nueva versión de la regla) |
+| E-FIS2-9 | FIS-2 | Forma de pago → De los pagos aplicados: transferencia / cheque → 2; más de un método → 7; sin pagar → 4 |
+| E-FIS2-10 | FIS-2 | Formato de salida → Pantalla y **CSV en el orden de columnas de la herramienta de Excel de la DGII**, para pegarlo, validarlo y generar el TXT con la herramienta oficial. No generamos el TXT directamente hasta tener la especificación oficial del archivo |
+| E-FIS2-11 | FIS-2 | Gastos fuera del sistema → El 606 del sistema cubre solo las compras registradas; la pantalla lo advierte y el contador agrega el resto en la herramienta de la DGII |
+| E-FIS2-12 | FIS-2 | IT-1 e IR-17 → Resúmenes informativos del mes (no el formulario): ventas gravadas / exentas por tipo de e-CF, ITBIS facturado y de notas de crédito, ITBIS de compras (606), retenciones practicadas por tipo |
+| E-FIS2-13 | FIS-2 | Conciliación → Nueva TAX-606 (advertencia): ITBIS del 606 del mes = ITBIS de compras en el GL; bloquea nada |
+| E-FIS2-14 | FIS-2 | Permisos → Nuevo `fiscal_report:read` (READ) para Especialista fiscal, Analista fiscal, Contador, Controller, Auditor y Director |
 
 Implementation rules derived from the above (no architectural change):
 
