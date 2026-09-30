@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { History } from "@/components/History";
-import { ErrorBox, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
+import { MoneyText, SalesHistory } from "@/components/SalesUx4";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { ErrorBox, FieldMessage, fieldAria, LineTable, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import { METHODS, applicationGroups } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel, suggestionAmounts } from "@/lib/ux4bSales";
 
 type Receipt = Schemas["ReceiptDetail"];
 
@@ -22,22 +24,31 @@ function Apply({ receipt, onDone }: { receipt: Receipt; onDone: () => void }) {
   const { companyId } = useSession();
   const h = receipt.header;
   const apply = useCommand<"/api/v1/companies/{companyId}/sales/apply-receipt", Record<string, string>>(`apply-receipt:${h.receiptId}`, "/api/v1/companies/{companyId}/sales/apply-receipt", `Cobro ${h.receiptNo} aplicado.`);
-  const [amounts, setAmounts] = useState<Record<string, string>>(() => apply.restored ?? {});
+  const [typed, setAmounts] = useState<Record<string, string> | null>(() => apply.restored ?? null);
   const [invalid, setInvalid] = useState<string | null>(null);
   const fe = useFieldErrors();
   const { data, error } = useLoad(
-    () => query("/api/v1/companies/{companyId}/sales/invoices", { path: { companyId }, query: { partyId: h.partyId, openOnly: "true", limit: 200 } }),
-    [companyId, h.partyId],
+    async () => {
+      const [invoices, suggestion] = await Promise.all([
+        query("/api/v1/companies/{companyId}/sales/invoices", { path: { companyId }, query: { partyId: h.partyId, openOnly: "true", limit: 200 } }),
+        query("/api/v1/companies/{companyId}/sales/customers/{partyId}/receipt-application-suggestion", { path: { companyId, partyId: h.partyId }, query: { amount: h.unapplied } }),
+      ]);
+      return { items: invoices.items, suggested: suggestionAmounts(suggestion.invoices) };
+    },
+    [companyId, h.partyId, h.unapplied],
   );
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   if (data.items.length === 0) {
-    return <p className="muted">El cliente no tiene facturas abiertas: el cobro queda como anticipo sin aplicar.</p>;
+    return <p className="muted">El cliente no tiene facturas pendientes: el cobro queda sin aplicar, como saldo a su favor.</p>;
   }
+  // UX4-03 (V-34, E-UX4-10): the amounts start at the server's suggestion for what is still unapplied (oldest invoices first).
+  const amounts = typed ?? data.suggested;
   return (
     <>
       <h2>Aplicar a facturas</h2>
+      <p className="muted">Montos sugeridos por el sistema (las facturas más antiguas primero); puede cambiarlos.</p>
       <LineTable>
         <thead>
           <tr>
@@ -96,7 +107,7 @@ function Apply({ receipt, onDone }: { receipt: Receipt; onDone: () => void }) {
             setInvalid(null);
             const invoices = data.items.filter((i) => applications.some((a) => a.invoiceId === i.invoiceId)).map((i) => i.invoiceNo);
             if (await apply.run({ receiptId: h.receiptId, expectedVersion: h.version, applications }, amounts, `Cobro ${h.receiptNo} aplicado a ${invoices.join(", ")}.`)) {
-              setAmounts({});
+              setAmounts(null);
               onDone();
             }
           }}
@@ -136,7 +147,7 @@ function ReceiptDetail() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const h = data.header;
   const groups = applicationGroups(data.applications);
@@ -151,15 +162,16 @@ function ReceiptDetail() {
         <StatusBadge status={h.bankStatus} />
       </h1>
       <p>
-        {h.customerName} · {METHODS[h.method] ?? h.method} · <Money value={h.amount} currency /> · fecha {formatDate(h.receiptDate)}
-        {h.method === "TRANSFER" ? ` · fecha valor ${formatDate(h.valueDate)}` : ""}
+        {h.customerName} · {METHODS[h.method] ?? h.method} · <MoneyText value={h.amount} /> · fecha {formatDate(h.receiptDate)}
+        {h.method === "TRANSFER" ? ` · el banco lo acreditó el ${formatDate(h.valueDate)} (fecha valor)` : ""}
+        {h.bankCode || h.bankAccountAlias ? ` · cuenta ${bankAccountLabel({ alias: h.bankAccountAlias, bankCode: h.bankCode, accountNumber: h.bankAccountNumber })}` : ""}
         {h.chequeNo ? ` · cheque ${h.chequeNo} del ${h.chequeBank} (${formatDate(h.chequeDate)})` : ""}
         {h.reference ? ` · ref. ${h.reference}` : ""}
         {h.depositNo ? " · depósito " : ""}
         {h.depositNo && h.depositId ? <Link href={`/cobros/deposito/?id=${h.depositId}`}>{h.depositNo}</Link> : null}
       </p>
       <p>
-        Sin aplicar: <Money value={h.unapplied} testId="receipt-unapplied" currency /> · registró {data.recordedBy ?? "—"}
+        Sin aplicar: <MoneyText value={h.unapplied} testId="receipt-unapplied" /> · registró {data.recordedBy ?? "—"}
       </p>
       {data.closingReason ? <p className="muted">Motivo: {data.closingReason}</p> : null}
       {reversible && can("receipt:reverse") ? (
@@ -219,7 +231,7 @@ function ReceiptDetail() {
           </ul>
         </>
       ) : null}
-      <History history={data.history} />
+      <SalesHistory history={data.history} />
     </>
   );
 }

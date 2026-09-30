@@ -73,6 +73,9 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await specialist.goto(authorizationUrl);
   await confirmAction(specialist, "Verificar");
   await expect(specialist.getByTestId("authorization-status")).toHaveText("Activo");
+  // UX4-02 (G-26): valid for 180 more days, from the server's daysToExpiry; the history has no empty "Por" column.
+  await expect(specialist.getByTestId("expiry")).toHaveText(/^Vence en \d+ días$/);
+  await expect(specialist.getByTestId("authorization-history").getByRole("columnheader", { name: "Por" })).toHaveCount(0);
 
   // The Vendedor creates the order (40 blocks at 50.00) and opens its proforma.
   const seller = await signIn(browser, "Vendedor");
@@ -124,7 +127,7 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await expect(billing.getByText(/e-CF 44/).first()).toBeVisible();
   await expect(billing.getByTestId("invoice-exemption")).toContainText("Exenta — CONFOTUR");
   await confirmAction(billing, "Emitir factura");
-  await expect(billing.getByTestId("invoice-status")).toHaveText("Confirmado");
+  await expect(billing.getByTestId("invoice-status")).toHaveText("Emitida");
   await expect(billing.getByTestId("invoice-total")).toHaveText("2,000.00");
   await expect(billing.getByTestId("invoice-exemption")).toContainText(certificate);
   await expect(billing.locator("tr", { hasText: "Indicador de facturación" }).locator("td").first()).toHaveText("4");

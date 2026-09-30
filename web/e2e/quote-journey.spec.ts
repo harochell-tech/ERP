@@ -24,6 +24,11 @@ test("a quote with a special price approved, sent, printed and converted into an
   await seller.getByLabel("Cantidad 1").fill("37");
   await seller.getByLabel("Precio 1").fill("45.00");
   await expect(seller.getByTestId("special-price:1")).toHaveText("Precio especial: requiere aprobación");
+  // UX4-03 (V-11, E-UX4-3): the server prices the draft at the quoted 45.00 while it is typed (37 × 45.00, ITBIS 18 %).
+  await expect(seller.getByTestId("preview-line-net:1")).toHaveText("1,665.00");
+  await expect(seller.getByTestId("preview-net")).toHaveText("1,665.00");
+  await expect(seller.getByTestId("preview-itbis")).toHaveText("299.70");
+  await expect(seller.getByTestId("preview-total")).toHaveText("1,964.70");
   await submit(seller, "Crear cotización");
   const status = seller.getByTestId("quote-status");
   await expect(status).toHaveText("Borrador");
@@ -76,6 +81,7 @@ test("a quote with a special price approved, sent, printed and converted into an
   await expect(seller.getByTestId("order-quote")).toHaveText(`Desde cotización ${quoteNo}`);
   await expect(seller.locator("tr", { hasText: "BLOQUE-6" })).toContainText("45.00");
   await expect(seller.getByTestId("order-total")).toHaveText("1,665.00");
+  await expect(seller.getByTestId("credit-preview-headline")).toContainText("Cabe en el crédito disponible");
   await seller.getByRole("button", { name: "Enviar a crédito" }).click();
   await expect(seller.getByTestId("order-status")).toHaveText("Confirmado");
   const orderNo = ((await seller.getByRole("heading", { level: 1 }).innerText()).match(/PV-\d+/) ?? [""])[0];

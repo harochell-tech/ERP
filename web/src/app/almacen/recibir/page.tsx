@@ -9,6 +9,7 @@ import { prefillQuantity } from "@/lib/receiving";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { isReceivableLocation, uomLabel } from "@/lib/ux4a-compras";
 
 interface Values {
   locationId: string;
@@ -55,6 +56,8 @@ function Receive() {
             order,
             locations: plants.items.find((p) => p.plantId === order.plantId)?.locations ?? [],
             maximum: new Map((receivable?.lines ?? []).map((l) => [l.poLineId, l.maxReceivable])),
+            // C-15 (E-UX4-8): the plant's receiving location (RECEPCION, or its only stock location), or none — then the user picks.
+            defaultLocationId: receivable?.defaultLocationId ?? "",
           };
         }
       : null,
@@ -67,7 +70,9 @@ function Receive() {
   if (data === null) {
     return <Loading error={error} />;
   }
-  const { order, locations, maximum } = data;
+  const { order, locations, maximum, defaultLocationId } = data;
+  const locationId = values.locationId || defaultLocationId;
+  const chosen = locations.find((l) => l.locationId === locationId);
   // E-UX3-5: each line starts with its open quantity (the server's); the user may change or clear it.
   const quantityOf = (line: (typeof order.lines)[number]) => values.lines[line.poLineId]?.quantity ?? prefillQuantity(line.openQuantity);
 
@@ -81,7 +86,7 @@ function Receive() {
         supplierLotNumber: x.lot.trim() || null,
       }));
     const found: Record<string, string | false> = {
-      locationId: !values.locationId && "Elija la ubicación.",
+      locationId: !locationId ? "Elija la ubicación." : !!chosen && !isReceivableLocation(chosen.code) && "La materia prima no se recibe en CURADO ni en TRÁNSITO; elija la ubicación de recepción.",
       occurredAt: !values.occurredAt && "Indique la fecha y hora de la recepción.",
       lines: lines.length === 0 && "Indique al menos una cantidad a recibir.",
     };
@@ -95,7 +100,7 @@ function Receive() {
       {
         plantId: order.plantId,
         purchaseOrderId: order.purchaseOrderId,
-        locationId: values.locationId,
+        locationId,
         occurredAt: new Date(values.occurredAt).toISOString(),
         lines,
         weighTicketRef: values.weighTicketRef.trim() || null,
@@ -125,12 +130,17 @@ function Receive() {
         recepción). Deje vacía una línea que no llegó.
       </p>
       <div>
-        <Field label="Ubicación" required error={fe.errors.locationId}>
-          <select aria-label="Ubicación" value={values.locationId} onChange={(e) => setValues({ ...values, locationId: e.target.value })}>
+        <Field
+          label="Ubicación"
+          required
+          error={fe.errors.locationId}
+          hint={defaultLocationId && locationId === defaultLocationId ? "Ubicación de recepción de la planta." : "CURADO y TRÁNSITO no reciben materia prima."}
+        >
+          <select aria-label="Ubicación" value={locationId} onChange={(e) => setValues({ ...values, locationId: e.target.value })}>
             <option value="">—</option>
             {locations.map((l) => (
-              <option key={l.locationId} value={l.locationId}>
-                {l.code}
+              <option key={l.locationId} value={l.locationId} disabled={!isReceivableLocation(l.code)}>
+                {isReceivableLocation(l.code) ? l.code : `${l.code} (no recibe materia prima)`}
               </option>
             ))}
           </select>
@@ -159,7 +169,7 @@ function Receive() {
           {order.lines.map((l) => (
             <tr key={l.poLineId}>
               <td>{l.itemCode}</td>
-              <td>{l.uom}</td>
+              <td>{uomLabel(l.uom)}</td>
               <td className="num">{formatQuantity(l.qtyOrdered)}</td>
               <td className="num">{formatQuantity(l.qtyReceived)}</td>
               <td className="num" data-testid={`open-${l.itemCode}`}>

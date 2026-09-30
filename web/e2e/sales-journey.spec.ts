@@ -44,16 +44,28 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await seller.getByLabel("Dirección de la obra").fill("Obra Punta Cana");
   await seller.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
   await seller.getByLabel("Cantidad 1").fill("100");
+  // UX4-03 (V-11, E-UX4-3/4): the server prices the draft while it is typed — net per line, total, ITBIS 18 % — and the customer's
+  // credit (limit 1,000,000.00) takes it.
+  await expect(seller.getByTestId("preview-line-net:1")).toHaveText("5,000.00");
+  await expect(seller.getByTestId("preview-net")).toHaveText("5,000.00");
+  await expect(seller.getByTestId("preview-itbis")).toHaveText("900.00");
+  await expect(seller.getByTestId("preview-total")).toHaveText("5,900.00");
+  await expect(seller.getByTestId("credit-preview-headline")).toContainText("Cabe en el crédito disponible");
   await submit(seller, "Crear pedido");
   await expect(seller.getByTestId("order-total")).toHaveText("5,000.00");
+  // V-14: before sending it to credit the order says what will happen and whether it fits.
+  await expect(seller.getByTestId("submit-explanation")).toContainText("queda confirmado");
+  await expect(seller.getByTestId("credit-preview-headline")).toContainText("Cabe en el crédito disponible");
   await seller.getByRole("button", { name: "Enviar a crédito" }).click();
   await expect(seller.getByTestId("order-status")).toHaveText("Confirmado");
 
-  // Dispatch: plan, load on our truck, weigh and gate out, POD.
+  // Dispatch: plan, load on our truck, weigh and gate out, delivery to the customer.
   const dispatch = await signIn(browser, "Despacho");
   await nav(dispatch, "Tablero de despacho");
   await dispatch.getByRole("link", { name: "Planificar conduce" }).first().click();
-  await dispatch.getByLabel("A despachar BLOQUE-6").fill("100");
+  // V-25: nothing delivered or planned yet, so "A despachar" starts at the pending 100.
+  await expect(dispatch.getByTestId("pending:BLOQUE-6")).toHaveText("100");
+  await expect(dispatch.getByLabel("A despachar BLOQUE-6")).toHaveValue("100");
   await submit(dispatch, "Planificar conduce");
   const status = dispatch.getByTestId("delivery-status");
   await expect(status).toHaveText("Planificado");
@@ -81,10 +93,12 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await dispatch.goto(deliveryUrl);
   await dispatch.getByLabel("Recibió (nombre)").fill("Ing. María Gómez");
   await dispatch.getByLabel("Fecha y hora de recepción").fill(dominicanNow(-1).dateTime);
-  await attachEvidence(dispatch, "Evidencia del POD (foto o firma)", "pod-firma.jpg");
-  await dispatch.getByRole("button", { name: "Registrar entrega (POD)" }).click();
+  await attachEvidence(dispatch, "Constancia de entrega firmada (foto o firma)", "pod-firma.jpg");
+  await dispatch.getByRole("button", { name: "Registrar entrega al cliente" }).click();
   await expect(status).toHaveText("Entregado");
   await expect(dispatch.getByTestId("pod-evidence")).toHaveText("Evidencia: pod-firma.jpg (huella verificada)");
+  // E-UX4-11 (V-23): when the goods became the customer's is the books' matter — Despacho does not see it.
+  await expect(dispatch.getByTestId("control-transfer")).toHaveCount(0);
 
   // Billing: invoice what was delivered (5,000.00 + 18 % ITBIS), then the e-CF from the provider's portal.
   const billing = await signIn(browser, "Facturación");
@@ -92,8 +106,12 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await billing.getByRole("checkbox", { name: /^Facturar CD-\d+ BLOQUE-6$/ }).first().check();
   await billing.getByRole("button", { name: "Crear factura con 1 línea(s)" }).click();
   await confirmAction(billing, "Emitir factura");
-  await expect(billing.getByTestId("invoice-status")).toHaveText("Confirmado");
+  // V-06: an issued invoice reads "Emitida"; V-05 (E-UX4-11): Facturación does not see its accounting status.
+  await expect(billing.getByTestId("invoice-status")).toHaveText("Emitida");
   await expect(billing.getByTestId("invoice-total")).toHaveText("5,900.00");
+  await expect(billing.getByTestId("accounting-status")).toHaveCount(0);
+  const invoiceNo = ((await billing.getByRole("heading", { level: 1 }).innerText()).match(/FA-\d+/) ?? [""])[0];
+  expect(invoiceNo).not.toBe("");
   await billing.getByLabel("e-NCF", { exact: true }).fill("E310000000001");
   await billing.getByLabel("Emitido el").fill(dominicanNow(-1).dateTime);
   await billing.getByLabel("Código de seguridad").fill("A1B2C3");
@@ -107,6 +125,9 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   // UX3-02 (E-UX3-9): a credit note drafted on the invoice cannot be issued by who issued the invoice — the button is not offered.
   // It stays a draft (no accounting effect), so the receipt below still pays the full invoice.
   const invoiceUrl = billing.url();
+  // V-31: the credit note form is folded behind its button.
+  await expect(billing.getByLabel("Acreditar línea 1")).toHaveCount(0);
+  await billing.getByRole("button", { name: "Nueva nota de crédito" }).click();
   await billing.getByLabel("Acreditar línea 1").fill("100.00");
   await billing.getByLabel("Explicación").fill("Descuento por volumen (E2E)");
   await submit(billing, "Crear nota de crédito");
@@ -115,18 +136,25 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await expect(billing.getByRole("button", { name: "Emitir nota de crédito" })).toHaveCount(0);
   await expect(billing.getByText("Motivo: Descuento")).toBeVisible();
   await billing.goto(invoiceUrl);
+  // V-18 (E-UX4-2): the AR aging carries the server's totals per bucket and links each invoice.
+  await billing.goto("/ventas/antiguedad/");
+  await expect(billing.getByRole("heading", { name: "Cuentas por cobrar por antigüedad" })).toBeVisible();
+  await expect(billing.getByTestId("aging-total")).not.toHaveText("0.00");
+  await expect(billing.getByRole("link", { name: invoiceNo })).toBeVisible();
+  await expectFits(billing);
 
-  // Cobros: the customer's transfer to the receipts' account, applied to the invoice.
+  // Cobros: the customer's transfer to the receipts' account. V-34 (E-UX4-10): one flow — the server suggests the application,
+  // oldest invoice first (the journey's invoice is the newest), and "Registrar cobro" records and applies it.
   const cobros = await signIn(browser, "Cobros");
   await nav(cobros, "Recibos");
   await cobros.getByRole("link", { name: "Registrar cobro" }).click();
   await cobros.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
   await cobros.getByLabel("Monto del cobro").fill("5900.00");
   await cobros.getByLabel("Cuenta bancaria").selectOption({ label: "TEST_BANK ••••4321" });
+  await expect(cobros.getByTestId("suggestion-applied")).toHaveText("5,900.00");
+  await expect(cobros.getByTestId("suggestion-unapplied")).toHaveText("0.00");
+  await expect(cobros.getByTestId("suggested-application").locator("tbody tr").last()).toContainText(invoiceNo);
   await submit(cobros, "Registrar cobro");
-  await expect(cobros.getByTestId("receipt-application")).toHaveText("Sin aplicar");
-  await cobros.getByLabel(/^Aplicar a FA-/).first().fill("5900.00");
-  await submit(cobros, "Aplicar cobro");
   await expect(cobros.getByTestId("receipt-application")).toHaveText("Aplicado");
   await expect(cobros.getByTestId("receipt-unapplied")).toHaveText("0.00");
 
@@ -136,6 +164,7 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   const csv = `Fecha,Referencia,Descripcion,Debito,Credito\n${dd}/${month}/${year},TRF-77,Transferencia Constructora Uno,,5900.00\n`;
   const treasurer = await signIn(browser, "Tesorero");
   await nav(treasurer, "Extractos bancarios");
+  await treasurer.getByRole("button", { name: "Importar extracto" }).click();
   await treasurer.getByLabel("Cuenta bancaria").selectOption({ label: "TEST_BANK ••••4321" });
   await treasurer.getByLabel("Archivo del banco").setInputFiles({ name: "extracto-cobros.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
   await treasurer.getByLabel("Desde").fill(day);

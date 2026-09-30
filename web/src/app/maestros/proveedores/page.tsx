@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { RncHint, useRncLookup } from "@/components/RncLookup";
-import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { ErrorBox, Field, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { matchesSearch } from "@/lib/ux4b";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -84,7 +86,9 @@ function SupplierRow({ supplier, onDone }: { supplier: Supplier; onDone: () => v
       <td className="num">
         <Money value={supplier.openApAmount} />
       </td>
-      <td className="actions">
+      <td>
+        {/* UX4-03 (C-33): the row's buttons side by side in one aligned group; the error under them. */}
+        <div className="actions row-buttons">
         {editing ? (
           <>
             <button
@@ -117,6 +121,7 @@ function SupplierRow({ supplier, onDone }: { supplier: Supplier; onDone: () => v
             ) : null}
           </>
         )}
+        </div>
         <ErrorBox error={update.error ?? activate.error} />
       </td>
     </tr>
@@ -130,17 +135,46 @@ export default function Page() {
     [companyId],
   );
 
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
   if (!can("master_data:read")) {
     return <NoPermission />;
   }
+  const shown = data?.items.filter((s) => matchesSearch(search, s.legalName, s.rnc)) ?? [];
   return (
     <>
       <h1>Proveedores</h1>
-      {can("supplier:create") ? <CreateSupplier onDone={reload} /> : null}
+      {can("supplier:create") ? (
+        creating ? (
+          <CreateSupplier
+            onDone={() => {
+              setCreating(false);
+              reload();
+            }}
+          />
+        ) : (
+          <div className="actions">
+            <button type="button" className="primary" onClick={() => setCreating(true)}>
+              Nuevo proveedor
+            </button>
+          </div>
+        )
+      ) : null}
+      <div className="inline-form" role="search">
+        <Field label="Buscar proveedor">
+          <input type="search" placeholder="Razón social o RNC" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </Field>
+      </div>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay proveedores.</p>
+        <EmptyState title="Aún no hay proveedores.">
+          <p>{can("supplier:create") ? "Registre el primero con «Nuevo proveedor»: el RNC se busca en el padrón de la DGII." : "Quien tenga el permiso de crear proveedores los registra aquí."}</p>
+        </EmptyState>
+      ) : shown.length === 0 ? (
+        <EmptyState title="Ningún proveedor coincide con la búsqueda.">
+          <p>Pruebe con otra parte de la razón social o con el RNC.</p>
+        </EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -149,12 +183,12 @@ export default function Page() {
               <th>Razón social</th>
               <th>Estado</th>
               <th>Cuenta bancaria</th>
-              <th className="num">CxP abierta (RD$)</th>
+              <th className="num">Saldo por pagar (RD$)</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {data.items.map((s) => (
+            {shown.map((s) => (
               <SupplierRow key={`${s.supplierId}:${s.version}`} supplier={s} onDone={reload} />
             ))}
           </tbody>

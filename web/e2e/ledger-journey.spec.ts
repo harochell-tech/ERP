@@ -11,7 +11,11 @@ test("an adjustment from the Contador to the trial balance and the statements", 
   await contador.getByRole("link", { name: "Nuevo ajuste" }).click();
   await contador.getByLabel("Descripción").fill("Provisión de energía de septiembre");
   await contador.getByLabel("Archivo del soporte").setInputFiles({ name: "factura-ede.pdf", mimeType: "application/pdf", buffer: Buffer.from("factura EDE septiembre") });
-  await expect(contador.getByTestId("support-hash")).toContainText("SHA-256");
+  // UX4-02 (A-13, E-UX3-8 (a)): the fingerprint is computed and hidden; the reference is proposed from the file name; no jargon.
+  await expect(contador.getByTestId("support-hash")).toContainText("Huella del archivo verificada: factura-ede.pdf");
+  await expect(contador.getByLabel("Referencia del soporte")).toHaveValue("factura-ede.pdf");
+  await expect(contador.getByText(/ACR-TAX/)).toHaveCount(0);
+  await expect(contador.getByTestId("totals-on-save")).toBeVisible();
   await contador.getByLabel("Cuenta 1").selectOption({ label: "6200 — Energía eléctrica" });
   await contador.getByLabel("Monto 1").fill("1,250.00");
   await contador.getByLabel("Cuenta 2").selectOption({ label: "2200 — Gastos acumulados por pagar" });
@@ -20,6 +24,10 @@ test("an adjustment from the Contador to the trial balance and the statements", 
   await contador.getByRole("button", { name: "Guardar borrador" }).click();
   await expect(contador.getByTestId("journal-status")).toHaveText("Borrador");
   await expect(contador.getByTestId("journal-difference")).toHaveText("0.00");
+  // UX4-02 (A-14): nobody approved yet, so no "Aprobó"; who must approve it; the fingerprint short.
+  await expect(contador.getByText("Aprobó", { exact: true })).toHaveCount(0);
+  await expect(contador.getByTestId("journal-approver")).toContainText("Controller");
+  await expect(contador.getByTestId("support-fingerprint")).toContainText("Huella verificada");
   await contador.getByRole("button", { name: "Enviar a aprobación" }).click();
   await expect(contador.getByTestId("journal-status")).toHaveText("Pendiente de aprobación");
   await expect(contador.getByRole("button", { name: "Aprobar y contabilizar" })).toHaveCount(0);
@@ -33,6 +41,12 @@ test("an adjustment from the Contador to the trial balance and the statements", 
   await nav(contador, "Balanza");
   await expect(contador.getByTestId("trial-balance-status")).toHaveText("Cuadra");
   await expect(contador.getByRole("link", { name: "Energía eléctrica" })).toBeVisible();
+  // UX4-02 (A-11): the closing balance split into debit and credit balances, whose totals are equal when it balances.
+  await expect(contador.getByRole("columnheader", { name: "Saldo deudor (RD$)" })).toBeVisible();
+  await expect(contador.getByRole("columnheader", { name: "Saldo acreedor (RD$)" })).toBeVisible();
+  const debitBalance = await contador.getByTestId("trial-balance-debit-balance").textContent();
+  expect(debitBalance).toMatch(/^[\d,]+\.\d{2}$/);
+  await expect(contador.getByTestId("trial-balance-credit-balance")).toHaveText(debitBalance ?? "");
   const download = contador.waitForEvent("download");
   await contador.getByRole("link", { name: "Descargar CSV" }).click();
   expect((await download).suggestedFilename()).toMatch(/^balanza-\d{8}-\d{8}\.csv$/);
@@ -40,10 +54,18 @@ test("an adjustment from the Contador to the trial balance and the statements", 
   await contador.getByRole("link", { name: "Energía eléctrica" }).click();
   await expect(contador.getByRole("heading", { name: "Mayor por cuenta" })).toBeVisible();
   await expect(contador.getByRole("cell", { name: /Ajuste AJ-/ })).toBeVisible();
+  // UX4-02 (A-12): the account selector narrowed by a search; the adjustment's credit shows on the other account.
+  await contador.getByLabel("Buscar cuenta").fill("gastos acum");
+  await contador.getByLabel("Cuenta", { exact: true }).selectOption({ label: "2200 — Gastos acumulados por pagar" });
+  await expect(contador.getByRole("cell", { name: /Ajuste AJ-/ }).first()).toBeVisible();
 
   await nav(contador, "Estados financieros");
   await expect(contador.getByTestId("balance-status")).toHaveText("Cuadra");
-  await expect(contador.getByTestId("balance-difference")).toHaveText("0.00");
+  // UX4-02 (A-10): results inside Patrimonio, "Total pasivo + patrimonio" equal to the assets; no difference line when it balances.
+  await expect(contador.getByTestId("balance-difference")).toHaveCount(0);
+  await expect(contador.getByRole("rowheader", { name: "Total pasivo + patrimonio" })).toBeVisible();
+  await expect(contador.getByTestId("total-liabilities-and-equity")).toHaveText((await contador.getByTestId("total-assets").textContent()) ?? "");
+  await expect(contador.getByText(/Estructura versión/)).toHaveCount(0);
   await contador.getByRole("tab", { name: "Estado de resultados" }).click();
   await expect(contador.getByTestId("net-income")).toBeVisible();
 

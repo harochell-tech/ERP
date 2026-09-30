@@ -10,9 +10,11 @@ import { accountClassLabel, REPORTS } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { effectiveFromLabel, lineOptionLabel, STRUCTURE_NEXT_STEP } from "@/lib/ux4a-contabilidad";
 
 // FIN1-04 (E-FIN1-04-10, E-FIN1-03-2): a structure version, its lines and accounts, the active accounts still missing, and
 // "Aprobar" for the Aprobador de políticas (never the preparer).
+// UX4-02 (A-17): a draft "regirá desde" (not "vigente desde"), says what follows and who approves; no "aprobó —".
 function StructureDetail() {
   const { companyId, can, isMine } = useSession();
   const id = useSearchParams().get("id") ?? "";
@@ -45,8 +47,14 @@ function StructureDetail() {
         <StatusBadge status={h.status} testId="structure-status" />
       </div>
       <p className="muted">
-        Vigente desde {formatDate(h.effectiveFrom)} · preparó {h.preparedBy ?? "—"} · aprobó {h.approvedBy ?? "—"}
+        {effectiveFromLabel(h.status)} {formatDate(h.effectiveFrom)} · preparó {h.preparedBy ?? "—"}
+        {h.approvedBy ? ` · aprobó ${h.approvedBy}` : ""}
       </p>
+      {h.status === "DRAFT" ? (
+        <p className="notice" data-testid="structure-next-step">
+          <strong>Qué sigue:</strong> {STRUCTURE_NEXT_STEP}
+        </p>
+      ) : null}
       <div className="actions">
         {h.status === "DRAFT" && can("report_structure:approve") && !isMine(h.preparedBy) ? (
           <ConfirmAction
@@ -74,14 +82,14 @@ function StructureDetail() {
         <div className="notice" role="alert">
           <strong>Cuentas activas sin línea ({data.missingAccounts.length}):</strong>{" "}
           {data.missingAccounts.map((a) => `${a.code} ${a.name}`).join(" · ")}
-          {h.status === "DRAFT" ? " — no se puede aprobar hasta ubicarlas." : " — la conciliación STRUCT-COVERAGE lo advierte."}
+          {h.status === "DRAFT" ? " — no se puede aprobar hasta ubicarlas." : " — la verificación de cobertura de las estructuras lo advierte en el cierre."}
         </div>
       ) : null}
       <div className="table-wrap"><table>
         <thead>
           <tr>
-            <th>Línea</th>
             <th>Concepto</th>
+            <th>Agrupada bajo</th>
             <th>Signo</th>
             <th>Cuentas</th>
           </tr>
@@ -89,8 +97,10 @@ function StructureDetail() {
         <tbody>
           {data.lines.map((l) => (
             <tr key={l.lineCode}>
-              <td className="mono">{l.lineCode}</td>
-              <td style={{ paddingLeft: 12 + depth(l.lineCode) * 20 }}>{l.caption}</td>
+              <td style={{ paddingLeft: 12 + depth(l.lineCode) * 20 }}>
+                {l.caption} <span className="muted mono">({l.lineCode})</span>
+              </td>
+              <td>{l.parentLineCode ? lineOptionLabel(l.parentLineCode, data.lines.find((p) => p.lineCode === l.parentLineCode)?.caption ?? "") : "—"}</td>
               <td>{l.sign === 1 ? "Deudor (+)" : "Acreedor (−)"}</td>
               <td>
                 {l.accounts.map((a) => (

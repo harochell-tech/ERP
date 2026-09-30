@@ -5,14 +5,16 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
-import { History } from "@/components/History";
-import { AccountingStatus, ConfirmAction, ErrorBox, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { SalesHistory } from "@/components/SalesUx4";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { AccountingStatus, ConfirmAction, ErrorBox, Money, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDecimal, formatPercent } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import { creditNoteReasonLabel } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { canSeeAccounting, creditNoteStatusLabel } from "@/lib/ux4bSales";
 
 // VS3-10b (E-VS3-06-1…10): a credit note — issued (P-22, step-up) by someone other than who issued the invoice, then its e-CF 34
 // with the modified e-NCF from the package.
@@ -24,7 +26,7 @@ function NotePackage({ creditNoteId }: { creditNoteId: string }) {
     [companyId, creditNoteId],
   );
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   return (
     <>
@@ -60,7 +62,7 @@ function NoteDetail() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const h = data.header;
   return (
@@ -69,11 +71,17 @@ function NoteDetail() {
         <Link href="/facturacion/notas/">← Notas de crédito</Link>
       </p>
       <h1>
-        Nota de crédito {h.creditNoteNo} <StatusBadge status={h.commercialStatus} /> <StatusBadge status={h.fiscalStatus} />
+        Nota de crédito {h.creditNoteNo} <StatusBadge status={h.commercialStatus} label={creditNoteStatusLabel(h.commercialStatus)} testId="credit-note-status" />{" "}
+        <StatusBadge status={h.fiscalStatus} />
       </h1>
       <p>
-        Factura <Link href={`/facturacion/factura/?id=${h.invoiceId}`}>{h.invoiceNo}</Link> (e-NCF {h.invoiceEncf ?? "—"}) · {h.customerName} · fecha {formatDate(h.creditDate)} · contabilidad{" "}
-        <AccountingStatus status={h.accountingStatus} eventId={data.postingEventId} />
+        Factura <Link href={`/facturacion/factura/?id=${h.invoiceId}`}>{h.invoiceNo}</Link> (e-NCF {h.invoiceEncf ?? "—"}) · {h.customerName} · fecha {formatDate(h.creditDate)}
+        {canSeeAccounting(can) ? (
+          <>
+            {" "}
+            · contabilidad <AccountingStatus status={h.accountingStatus} eventId={data.postingEventId} />
+          </>
+        ) : null}
       </p>
       <p className="muted">
         Motivo: {creditNoteReasonLabel(h.reasonCategory)} — {h.reason} · creó {data.createdBy ?? "—"} · emitió {data.issuedBy ?? "—"}
@@ -153,7 +161,7 @@ function NoteDetail() {
           e-CF {data.fiscalRecord.encf} emitido {formatDateTime(data.fiscalRecord.issuedAt)} · código {data.fiscalRecord.securityCode} · {data.fiscalRecord.evidenceRef}
         </p>
       ) : null}
-      <History history={data.history} />
+      <SalesHistory history={data.history} label={creditNoteStatusLabel} />
     </>
   );
 }

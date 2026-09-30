@@ -19,10 +19,11 @@ test("the 606, its CSV for the DGII tool and the IT-1 / IR-17 summaries", async 
   const specialist = await signIn(browser, "Especialista fiscal");
   await nav(specialist, "Reportes fiscales");
   await expect(specialist.getByRole("heading", { name: "Reportes fiscales" })).toBeVisible();
-  await expect(specialist.getByLabel("Período (AAAAMM)")).toHaveValue(/^\d{6}$/);
+  // UX4-02 (G-24): the period is a month picker (yyyy-MM); the report still shows AAAAMM.
+  await expect(specialist.getByLabel("Período", { exact: true })).toHaveValue(/^\d{4}-\d{2}$/);
   await expect(specialist.getByText("Solo incluye las compras registradas en el sistema")).toBeVisible();
 
-  await specialist.getByLabel("Período (AAAAMM)").fill(period);
+  await specialist.getByLabel("Período", { exact: true }).fill(`${period.slice(0, 4)}-${period.slice(4)}`);
   await expect(specialist.getByTestId("report-606-period")).toHaveText(period);
   await expect(specialist.getByTestId("report-606-rnc")).not.toHaveText("—"); // the dev company's RNC is a test fixture value
   await expect(specialist.getByTestId("report-606-count")).not.toHaveText("0");
@@ -47,7 +48,7 @@ test("the 606, its CSV for the DGII tool and the IT-1 / IR-17 summaries", async 
   await rows.first().getByRole("link").click();
   await expect(specialist).toHaveURL(/\/cxp\/factura\/\?id=/);
   await specialist.goBack();
-  await specialist.getByLabel("Período (AAAAMM)").fill(period);
+  await specialist.getByLabel("Período", { exact: true }).fill(`${period.slice(0, 4)}-${period.slice(4)}`);
 
   await specialist.getByRole("tab", { name: "IT-1" }).click();
   await expect(specialist.getByText("Informativo: no es el formulario oficial de la DGII.")).toBeVisible();

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { query } from "@/api/client";
-import { Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { Money, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { creditNoteStatusLabel } from "@/lib/ux4bSales";
 
 // VS3-10b: commercial credit notes NC-… (sales:read); they are created from the invoice's page.
 
@@ -18,11 +20,11 @@ export default function Page() {
   return (
     <>
       <h1>Notas de crédito</h1>
-      <p className="muted">Se crean desde el detalle de la factura.</p>
+      <p className="muted">Se crean desde la factura («Nueva nota de crédito»), mientras tenga saldo pendiente de cobro.</p>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay notas de crédito.</p>
+        <EmptyState title="Todavía no hay notas de crédito." steps={[{ href: "/facturacion/facturas/?filtro=open", label: "Ver facturas por cobrar" }]}><p>Para acreditar un descuento o un error de precio, abra la factura y use «Nueva nota de crédito».</p></EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -53,7 +55,7 @@ export default function Page() {
                   <Money value={n.total} />
                 </td>
                 <td>
-                  <StatusBadge status={n.commercialStatus} />
+                  <StatusBadge status={n.commercialStatus} label={creditNoteStatusLabel(n.commercialStatus)} />
                 </td>
                 <td>
                   <StatusBadge status={n.fiscalStatus} />

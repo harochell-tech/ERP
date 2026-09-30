@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { Loading, NoPermission } from "@/components/ui";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { NoPermission } from "@/components/ui";
 import { Watermark } from "@/components/Watermark";
 import { formatQuantity } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDate, formatDateTime, statusLabel } from "@/lib/labels";
@@ -27,7 +28,7 @@ function DeliveryPrint() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const plate = data.vehiclePlate ?? data.customerVehiclePlate;
   const driver = data.driverName ?? data.customerDriverName;

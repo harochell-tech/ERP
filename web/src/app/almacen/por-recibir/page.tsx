@@ -8,6 +8,7 @@ import { formatDate, formatDateTime } from "@/lib/labels";
 import { canReceiveMore } from "@/lib/receiving";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { uomLabel } from "@/lib/ux4a-compras";
 
 /**
  * UX3-02 (E-UX3-5): Almacén › Por recibir — the approved and partially received orders of the plant, oldest first, with what is
@@ -60,7 +61,7 @@ export default function ToReceive() {
                       <td className="wrap">
                         {l.itemCode} <span className="muted">{l.itemDescription}</span>
                       </td>
-                      <td>{l.uom}</td>
+                      <td>{uomLabel(l.uom)}</td>
                       <td className="num">{formatQuantity(l.qtyOrdered)}</td>
                       <td className="num">{formatQuantity(l.qtyReceived)}</td>
                       <td className="num">{formatQuantity(l.openQuantity)}</td>

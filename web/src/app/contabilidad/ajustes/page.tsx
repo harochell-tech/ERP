@@ -4,16 +4,19 @@ import Link from "next/link";
 import { useState } from "react";
 import { query } from "@/api/client";
 import { Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
-import { COMPONENTS, formatDate, statusLabel } from "@/lib/labels";
+import { formatDate, statusLabel } from "@/lib/labels";
+import { inMonth } from "@/lib/ux4a-contabilidad";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 
 const STATUSES = ["", "DRAFT", "PENDING_APPROVAL", "POSTED", "REJECTED", "REVERSED"];
 
 // FIN1-04: the adjustment journal (E-FIN1-1…10). The total is the server's.
+// UX4-02 (A-15): no Componente column (a fiscal adjustment says so in its description cell) and a month filter on the posting date.
 export default function Page() {
   const { companyId, can } = useSession();
   const [status, setStatus] = useState("");
+  const [month, setMonth] = useState("");
   const allowed = can("ledger:read");
   const { data, error } = useLoad(
     allowed ? () => query("/api/v1/companies/{companyId}/finance/manual-journals", { path: { companyId }, query: { status, limit: 200 } }) : null,
@@ -43,10 +46,19 @@ export default function Page() {
           ))}
         </select>
       </label>
+      <label className="field">
+        <span>Mes</span>
+        <input type="month" aria-label="Mes" value={month} onChange={(e) => setMonth(e.target.value)} />
+      </label>
+      {month ? (
+        <button type="button" className="link" onClick={() => setMonth("")}>
+          Ver todos los meses
+        </button>
+      ) : null}
       {data === null ? (
         <Loading error={error} />
-      ) : data.items.length === 0 ? (
-        <p className="muted">No hay ajustes.</p>
+      ) : data.items.filter((j) => inMonth(j.postingDate, month)).length === 0 ? (
+        <p className="muted">{month || status ? "No hay ajustes con estos filtros." : "No hay ajustes."}</p>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -54,14 +66,13 @@ export default function Page() {
               <th>Número</th>
               <th>Fecha</th>
               <th>Descripción</th>
-              <th>Componente</th>
               <th className="num">Total (RD$)</th>
               <th>Estado</th>
               <th>Preparó</th>
             </tr>
           </thead>
           <tbody>
-            {data.items.map((j) => (
+            {data.items.filter((j) => inMonth(j.postingDate, month)).map((j) => (
               <tr key={j.manualJournalId}>
                 <td className="mono">
                   <Link href={`/contabilidad/ajuste/?id=${j.manualJournalId}`}>{j.journalNo}</Link>
@@ -70,8 +81,8 @@ export default function Page() {
                 <td className="wrap">
                   {j.description}
                   {j.autoReverse ? <span className="muted"> · reversa automática</span> : null}
+                  {j.closeComponent === "ACR-TAX" ? <span className="muted"> · con efecto fiscal</span> : null}
                 </td>
-                <td>{COMPONENTS[j.closeComponent] ?? j.closeComponent}</td>
                 <td className="num">
                   <Money value={j.total} />
                 </td>

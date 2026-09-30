@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { ErrorBox, Field, Money, NoPermission } from "@/components/ui";
 import { formatDecimal, formatQuantity } from "@/lib/decimal";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -48,13 +49,13 @@ export default function Page() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const customers = [...new Map(data.items.map((l) => [l.partyId, l.customerName])).entries()];
   return (
     <>
       <h1>Por facturar</h1>
-      {customers.length === 0 ? <p className="muted">No hay entregas pendientes de facturar.</p> : null}
+      {customers.length === 0 ? <EmptyState title="No hay entregas pendientes de facturar." steps={[{ href: "/facturacion/facturas/?filtro=draft", label: "Ver facturas en borrador" }, { href: "/despacho/tablero/", label: "Ver el tablero de despacho" }]}><p>Una entrega aparece aquí cuando el cliente la recibe (o sale por el portón si la retira en planta).</p></EmptyState> : null}
       {customers.map(([partyId, name]) => {
         const lines = data.items.filter((l) => l.partyId === partyId);
         const chosen = lines.filter((l) => picked[l.deliveryLineId]).map((l) => l.deliveryLineId);

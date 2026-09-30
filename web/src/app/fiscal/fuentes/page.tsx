@@ -8,10 +8,13 @@ import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { shortHash, sourceEnvironmentHint, sourceEnvironmentLabel } from "@/lib/ux4a-auditoria";
 
 // E-B03-15-3: an official source is registered with the SHA-256 of the document consulted, computed here from the chosen file;
 // the file itself is not uploaded (document storage comes with WORM for documents). TEST sources never activate a rule in a
 // PRODUCTION database (P-7).
+// UX4-02 (G-20): the SHA-256 is no longer an editable field (the E-UX3-8 (a) pattern): choosing the file computes it and the form
+// says "Huella del archivo verificada"; the list shows a short fingerprint (full as tooltip) and what TEST and Oficial mean.
 
 type SourceField =
   | "officialSource"
@@ -40,6 +43,7 @@ function RegisterSource({ onDone }: { onDone: () => void }) {
     fileSha256: "",
     environment: "TEST",
   });
+  const [fileName, setFileName] = useState("");
   const fe = useFieldErrors<SourceField>();
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
   const blank = (value: string) => value.trim() === "";
@@ -59,7 +63,7 @@ function RegisterSource({ onDone }: { onDone: () => void }) {
           effectiveTo: form.effectiveTo !== "" && form.effectiveFrom !== "" && form.effectiveTo < form.effectiveFrom && "El fin de la vigencia es posterior a su inicio.",
           urlOrReference: blank(form.urlOrReference) && "Indique la URL o la referencia.",
           fileReference: blank(form.fileReference) && "Adjunte el documento o escriba su referencia.",
-          fileSha256: !/^[0-9a-fA-F]{64}$/.test(form.fileSha256.trim()) && "El SHA-256 tiene 64 caracteres hexadecimales (se calcula al adjuntar el documento).",
+          fileSha256: !/^[0-9a-fA-F]{64}$/.test(form.fileSha256.trim()) && "Elija el documento consultado: el sistema calcula su huella al elegirlo.",
         });
         if (!valid) {
           return;
@@ -102,14 +106,19 @@ function RegisterSource({ onDone }: { onDone: () => void }) {
       <Field label="URL o referencia" required error={fe.errors.urlOrReference}>
         <input value={form.urlOrReference} onChange={set("urlOrReference")} />
       </Field>
-      <Field label="Documento consultado">
+      <Field label="Documento consultado" required error={fe.errors.fileSha256} hint="El archivo no se guarda en el sistema; conserve el original.">
         <input
           type="file"
           aria-label="Documento consultado"
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (file) {
-              setForm({ ...form, fileReference: file.name, fileSha256: await sha256Hex(await file.arrayBuffer()) });
+              const reference = form.fileReference.trim() === "" || form.fileReference === fileName ? file.name : form.fileReference;
+              setForm({ ...form, fileReference: reference, fileSha256: await sha256Hex(await file.arrayBuffer()) });
+              setFileName(file.name);
+            } else {
+              setForm({ ...form, fileSha256: "" });
+              setFileName("");
             }
           }}
         />
@@ -117,13 +126,15 @@ function RegisterSource({ onDone }: { onDone: () => void }) {
       <Field label="Referencia del archivo" required error={fe.errors.fileReference}>
         <input value={form.fileReference} onChange={set("fileReference")} />
       </Field>
-      <Field label="SHA-256" required error={fe.errors.fileSha256} wide>
-        <input className="mono" value={form.fileSha256} onChange={set("fileSha256")} />
-      </Field>
-      <Field label="Tipo de fuente" required>
+      {form.fileSha256 ? (
+        <p className="evidence-verified" data-testid="evidence-verified" title={`SHA-256 ${form.fileSha256}`}>
+          <span className="badge tone-done">✓</span> Huella del archivo verificada: {fileName}
+        </p>
+      ) : null}
+      <Field label="Tipo de fuente" required hint={sourceEnvironmentHint(form.environment)}>
         <select value={form.environment} onChange={set("environment")}>
-          <option value="TEST">Prueba (TEST)</option>
-          <option value="PRODUCTION">Oficial (PRODUCTION)</option>
+          <option value="TEST">Prueba</option>
+          <option value="PRODUCTION">Oficial (DGII)</option>
         </select>
       </Field>
       <div className="actions form-actions">
@@ -147,6 +158,10 @@ export default function Page() {
   return (
     <>
       <h1>Fuentes fiscales</h1>
+      <p className="muted">
+        Cada regla fiscal se apoya en un documento de la DGII. Una fuente <strong>Oficial</strong> puede activar reglas en producción; una fuente de{" "}
+        <strong>Prueba</strong> solo sirve en ambientes de prueba y nunca activa una regla en producción.
+      </p>
       {can("fiscal_rule_source:register") ? (
         <details>
           <summary>Registrar una fuente</summary>
@@ -166,26 +181,32 @@ export default function Page() {
               <th>Publicación</th>
               <th>Vigencia</th>
               <th>Tipo</th>
-              <th>SHA-256</th>
+              <th>Huella</th>
             </tr>
           </thead>
           <tbody>
             {data.items.map((s) => (
-              <tr key={s.sourceId}>
-                <td>
-                  {s.documentTitle} ({s.documentVersion})
+              <tr key={s.sourceId} data-testid="fiscal-source">
+                <td className="wrap">
+                  <strong>{s.documentTitle}</strong>
+                  <br />
+                  <span className="muted">Versión {s.documentVersion}</span>
                 </td>
-                <td>
-                  {s.officialSource} — {s.urlOrReference}
+                <td className="wrap">
+                  {s.officialSource}
+                  <br />
+                  <span className="muted">{s.urlOrReference}</span>
                 </td>
                 <td>{formatDate(s.publicationDate)}</td>
                 <td>
                   {formatDate(s.effectiveFrom)}
                   {s.effectiveTo ? ` – ${formatDate(s.effectiveTo)}` : ""}
                 </td>
-                <td>{s.environment === "PRODUCTION" ? "Oficial" : "Prueba"}</td>
-                <td className="muted mono" title={s.fileSha256}>
-                  {s.fileSha256.slice(0, 12)}…
+                <td title={sourceEnvironmentHint(s.environment)}>
+                  <span className={`badge tone-${s.environment === "PRODUCTION" ? "done" : "neutral"}`}>{sourceEnvironmentLabel(s.environment)}</span>
+                </td>
+                <td className="muted" title={`SHA-256 ${s.fileSha256}`}>
+                  ✓ verificada <span className="mono">{shortHash(s.fileSha256)}</span>
                 </td>
               </tr>
             ))}

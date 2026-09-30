@@ -5,12 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
-import { ErrorBox, Loading, NoPermission, ReasonAction } from "@/components/ui";
+import { ErrorBox, Loading, Money, NoPermission, ReasonAction } from "@/components/ui";
 import { formatDecimal, formatQuantity } from "@/lib/decimal";
 import { formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { itemLabel, uomLabel } from "@/lib/ux4a-compras";
 
 type Order = Schemas["PurchaseOrderDetail"];
 
@@ -60,6 +61,75 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
   );
 }
 
+/** C-13: the order's receipts as a table, one row per received line with its quantity (each receipt's detail, goods_receipt:read). */
+function Receipts({ order }: { order: Order }) {
+  const { companyId, can, plantFor } = useSession();
+  const detailed = can("goods_receipt:read");
+  const ids = order.goodsReceipts.map((gr) => gr.goodsReceiptId).join(",");
+  const { data } = useLoad(
+    detailed && order.goodsReceipts.length > 0
+      ? () =>
+          Promise.all(
+            order.goodsReceipts.map((gr) =>
+              query("/api/v1/companies/{companyId}/procurement/goods-receipts/{goodsReceiptId}", {
+                path: { companyId, goodsReceiptId: gr.goodsReceiptId },
+                query: { plantId: plantFor("goods_receipt:read") },
+              }),
+            ),
+          )
+      : null,
+    [companyId, ids, detailed],
+  );
+  if (order.goodsReceipts.length === 0) {
+    return <p className="muted">Sin recepciones todavía.</p>;
+  }
+  const byId = new Map((data ?? []).map((r) => [r.goodsReceiptId, r]));
+  return (
+    <div className="table-wrap">
+      <table data-testid="po-receipts">
+        <thead>
+          <tr>
+            <th>Recepción</th>
+            <th>Fecha y hora</th>
+            <th>Ubicación</th>
+            <th>Artículo</th>
+            <th className="num">Cantidad</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {order.goodsReceipts.flatMap((gr) => {
+            const detail = byId.get(gr.goodsReceiptId);
+            const number = detailed ? <Link href={`/almacen/recepcion/?id=${gr.goodsReceiptId}`}>{gr.grNo}</Link> : gr.grNo;
+            if (!detail || detail.lines.length === 0) {
+              return [
+                <tr key={gr.goodsReceiptId}>
+                  <td>{number}</td>
+                  <td>{formatDateTime(gr.occurredAt)}</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td className="num">—</td>
+                  <td>{statusLabel(gr.documentStatus)}</td>
+                </tr>,
+              ];
+            }
+            return detail.lines.map((l) => (
+              <tr key={l.grLineId}>
+                <td>{number}</td>
+                <td>{formatDateTime(gr.occurredAt)}</td>
+                <td>{detail.locationCode}</td>
+                <td>{l.itemCode}</td>
+                <td className="num">{formatQuantity(l.qty)}</td>
+                <td>{statusLabel(gr.documentStatus)}</td>
+              </tr>
+            ));
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function OrderDetail() {
   const { companyId, can, plantFor, plantName } = useSession();
   const id = useSearchParams().get("id") ?? "";
@@ -92,53 +162,69 @@ function OrderDetail() {
         <dt>Creada por</dt>
         <dd>{order.createdBy ?? "—"}</dd>
         <dt>Aprobada por</dt>
-        <dd>{order.approvedBy ? `${order.approvedBy} (${formatDateTime(order.approvedAt)})` : "—"}</dd>
+        <dd>{order.approvedBy ? `${order.approvedBy} (${formatDateTime(order.approvedAt)})` : order.status === "PENDING_APPROVAL" ? "Pendiente" : "—"}</dd>
+        <dt>Total (sin ITBIS)</dt>
+        <dd>
+          <Money value={order.total} currency testId="po-detail-total" />
+        </dd>
       </dl>
+      {order.status === "DRAFT" ? (
+        <p className="notice" data-testid="po-not-sent">
+          Aún no enviada a aprobación: nadie la puede aprobar hasta que se envíe
+          {can("purchase_order:submit") ? " con «Enviar a aprobación»." : "."}
+        </p>
+      ) : null}
       <Actions order={order} onDone={reload} />
       <h2>Líneas</h2>
-      <div className="table-wrap"><table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Artículo</th>
-            <th>Unidad</th>
-            <th className="num">Pedido</th>
-            <th className="num">Precio (RD$)</th>
-            <th className="num">Recibido</th>
-            <th className="num">Facturado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.lines.map((l) => (
-            <tr key={l.poLineId}>
-              <td>{l.lineNo}</td>
-              <td>
-                {l.itemCode} — {l.itemDescription}
-              </td>
-              <td>{l.uom}</td>
-              <td className="num">{formatQuantity(l.qtyOrdered)}</td>
-              <td className="num">{formatDecimal(l.unitPrice)}</td>
-              <td className="num" data-testid="qty-received">
-                {formatQuantity(l.qtyReceived)}
-              </td>
-              <td className="num">{formatQuantity(l.qtyInvoiced)}</td>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Artículo</th>
+              <th>Unidad</th>
+              <th className="num">Pedido</th>
+              <th className="num">Precio (RD$)</th>
+              <th className="num">Neto (RD$)</th>
+              <th className="num">Recibido</th>
+              <th className="num">Pendiente</th>
+              <th className="num">Facturado</th>
             </tr>
-          ))}
-        </tbody>
-      </table></div>
+          </thead>
+          <tbody>
+            {order.lines.map((l) => (
+              <tr key={l.poLineId}>
+                <td>{l.lineNo}</td>
+                <td className="wrap">{itemLabel(l.itemCode, l.itemDescription)}</td>
+                <td>{uomLabel(l.uom)}</td>
+                <td className="num">{formatQuantity(l.qtyOrdered)}</td>
+                <td className="num">{formatDecimal(l.unitPrice)}</td>
+                <td className="num">{formatDecimal(l.netAmount)}</td>
+                <td className="num" data-testid="qty-received">
+                  {formatQuantity(l.qtyReceived)}
+                </td>
+                <td className="num" data-testid="qty-open">
+                  {formatQuantity(l.openQuantity)}
+                </td>
+                <td className="num">{formatQuantity(l.qtyInvoiced)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={5}>
+                <strong>Total</strong>
+              </td>
+              <td className="num">
+                <strong>{formatDecimal(order.total)}</strong>
+              </td>
+              <td colSpan={3} />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
       <h2>Recepciones</h2>
-      {order.goodsReceipts.length === 0 ? (
-        <p className="muted">Sin recepciones.</p>
-      ) : (
-        <ul>
-          {order.goodsReceipts.map((gr) => (
-            <li key={gr.goodsReceiptId}>
-              {can("goods_receipt:read") ? <Link href={`/almacen/recepcion/?id=${gr.goodsReceiptId}`}>{gr.grNo}</Link> : gr.grNo} — {formatDateTime(gr.occurredAt)} —{" "}
-              {statusLabel(gr.documentStatus)}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Receipts order={order} />
       <History history={order.history} />
     </>
   );

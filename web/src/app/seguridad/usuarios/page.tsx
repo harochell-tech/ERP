@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { Person } from "@/components/Person";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { matchesSearch } from "@/lib/ux4b";
 import { personLabel } from "@/lib/identities";
 import { formatDateTime, ROLES } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -87,32 +89,39 @@ function RequestForm({ users, roles, onDone }: { users: User[]; roles: readonly 
           </span>
         ) : null}
       </div>
-      <p className="muted">Las asignaciones por planta y el alta de usuarios se hacen con la herramienta de despliegue.</p>
+      <p className="muted">Para dar de alta a una persona nueva o darle un rol en una sola planta, pídalo al equipo de sistemas.</p>
       <ErrorBox error={request.error} />
     </form>
   );
 }
 
+/**
+ * UX4-03 (A-19): the revocation of one role, a quiet button beside that role (not a red button on every line) confirmed in a
+ * dialog that says what follows: the second approver decides it in Solicitudes de rol.
+ */
 function RevokeButton({ user, roleCode, plantId, onDone }: { user: User; roleCode: string; plantId: string | null; onDone: () => void }) {
+  const roleName = ROLES[roleCode] ?? roleCode;
   const revoke = useCommand(
     `revoke-role:${user.userId}:${roleCode}:${plantId ?? ""}`,
     "/api/v1/companies/{companyId}/identity/request-role-revocation",
-    `Revocación del rol ${ROLES[roleCode] ?? roleCode} de ${userText(user)} solicitada.`,
+    `Revocación del rol ${roleName} de ${userText(user)} solicitada.`,
   );
   return (
     <>
-      <button
-        type="button"
-        className="danger"
-        disabled={revoke.busy}
-        onClick={async () => {
+      <ConfirmAction
+        label="Solicitar revocación"
+        className="link"
+        title={`¿Solicitar que se revoque el rol ${roleName} a ${userText(user)}?`}
+        consequence="La solicitud queda pendiente: el segundo aprobador la decide en Solicitudes de rol, y hasta entonces la persona conserva el rol."
+        stepUp
+        busy={revoke.busy}
+        testId={`revoke:${user.userId}:${roleCode}`}
+        onConfirm={async () => {
           if (await revoke.run({ targetUserId: user.userId, roleCode, plantId })) {
             onDone();
           }
         }}
-      >
-        Solicitar revocación
-      </button>
+      />
       <ErrorBox error={revoke.error} />
     </>
   );
@@ -124,15 +133,44 @@ export default function Page() {
   const roles = useLoad(can("iam:read") ? () => query("/api/v1/companies/{companyId}/identity/roles", { path: { companyId } }) : null, [companyId]);
   const roleItems = roles.data?.items ?? [];
   const describe = (code: string) => roleItems.find((r) => r.code === code)?.description ?? undefined;
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
   if (!can("iam:read")) {
     return <NoPermission />;
   }
+  // UX4-03 (A-19): search by name or e-mail and filter by role ("Sin roles" finds the people still waiting for one).
+  const heldRoles = [...new Set((data?.items ?? []).flatMap((u) => u.roles.map((r) => r.roleCode)))].sort((a, b) => (ROLES[a] ?? a).localeCompare(ROLES[b] ?? b, "es"));
+  const shown = (data?.items ?? []).filter(
+    (u) =>
+      matchesSearch(search, u.displayName, u.email) &&
+      (roleFilter === "" || (roleFilter === "NONE" ? u.roles.length === 0 : u.roles.some((r) => r.roleCode === roleFilter))),
+  );
   return (
     <>
       <h1>Usuarios y roles</h1>
       {data && can("role:assign") ? <RequestForm users={data.items} roles={roleItems} onDone={reload} /> : null}
+      <div className="inline-form" role="search">
+        <Field label="Buscar persona">
+          <input type="search" placeholder="Nombre o correo" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </Field>
+        <Field label="Con el rol">
+          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="NONE">Sin roles</option>
+            {heldRoles.map((code) => (
+              <option key={code} value={code}>
+                {ROLES[code] ?? code}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
+      ) : shown.length === 0 ? (
+        <EmptyState title="Nadie coincide con la búsqueda.">
+          <p>Pruebe con otra parte del nombre o del correo, o elija «Todos» los roles.</p>
+        </EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -144,7 +182,7 @@ export default function Page() {
             </tr>
           </thead>
           <tbody>
-            {data.items.map((u) => (
+            {shown.map((u) => (
               <tr key={u.userId}>
                 <td className="wrap">
                   <Person name={u.displayName} email={u.email} fallback={u.userId} />
@@ -176,7 +214,7 @@ export default function Page() {
       )}
       <h2>Roles y para qué sirven</h2>
       {roles.data === null ? (
-        <Loading error={roles.error} />
+        <LoadingIndicator error={roles.error} />
       ) : (
         <div className="table-wrap">
           <table data-testid="role-catalogue">

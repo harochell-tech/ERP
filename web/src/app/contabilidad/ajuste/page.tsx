@@ -7,7 +7,8 @@ import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
 import { ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
-import { COMPONENTS, formatDate } from "@/lib/labels";
+import { formatDate } from "@/lib/labels";
+import { approverPending, MANUAL_JOURNAL_APPROVER, shortHash } from "@/lib/ux4a-contabilidad";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -16,6 +17,7 @@ type Journal = Schemas["ManualJournalDetail"];
 
 // FIN1-04 (E-FIN1-04-4, E-FIN1-04-6): an adjustment and what can be done with it now. Totals and difference are the server's;
 // the preparer never sees "Aprobar" (four eyes, GL-03).
+// UX4-02 (A-14): no "Aprobó: —" before an approval, the support's fingerprint short (full as tooltip), who must approve it.
 function Actions({ journal, onDone }: { journal: Journal; onDone: () => void }) {
   const { can, isMine } = useSession();
   const id = journal.manualJournalId;
@@ -124,8 +126,8 @@ function AdjustmentDetail() {
           <dd>{formatDate(journal.postingDate)}</dd>
         </div>
         <div>
-          <dt>Componente de cierre</dt>
-          <dd>{COMPONENTS[journal.closeComponent] ?? journal.closeComponent}</dd>
+          <dt>Efecto fiscal</dt>
+          <dd>{journal.closeComponent === "ACR-TAX" ? "Sí (se cierra con los ajustes con efecto fiscal)" : "No"}</dd>
         </div>
         <div>
           <dt>Reversa automática</dt>
@@ -135,8 +137,8 @@ function AdjustmentDetail() {
           <dt>Soporte</dt>
           <dd>
             {journal.supportRef}
-            <div className="muted mono" style={{ fontSize: 11, wordBreak: "break-all" }}>
-              {journal.supportSha256}
+            <div className="muted" data-testid="support-fingerprint" title={`SHA-256 ${journal.supportSha256}`}>
+              Huella verificada <span className="mono">{shortHash(journal.supportSha256)}</span>
             </div>
           </dd>
         </div>
@@ -144,10 +146,18 @@ function AdjustmentDetail() {
           <dt>Preparó</dt>
           <dd>{journal.preparedBy ?? "—"}</dd>
         </div>
-        <div>
-          <dt>Aprobó</dt>
-          <dd>{journal.approvedBy ?? "—"}</dd>
-        </div>
+        {journal.approvedBy ? (
+          <div>
+            <dt>Aprobó</dt>
+            <dd>{journal.approvedBy}</dd>
+          </div>
+        ) : null}
+        {approverPending(journal.status) ? (
+          <div>
+            <dt>Debe aprobarlo</dt>
+            <dd data-testid="journal-approver">{MANUAL_JOURNAL_APPROVER}, una persona distinta de quien lo preparó</dd>
+          </div>
+        ) : null}
         {journal.rejectionReason ? (
           <div>
             <dt>Motivo del rechazo</dt>

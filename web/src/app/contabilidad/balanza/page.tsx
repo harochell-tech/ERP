@@ -8,10 +8,13 @@ import { todayInDominicanRepublic } from "@/lib/labels";
 import { accountClassLabel, csvUrl, monthStart } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel } from "@/lib/ux4a";
+import { balanceCell } from "@/lib/ux4a-contabilidad";
 
 const PATH = "/api/v1/companies/{companyId}/finance/trial-balance";
 
 // FIN1-04 (E-FIN1-04-7, E-FIN1-03-4/6): the trial balance of a range, optionally filtered; an account opens its ledger.
+// UX4-02 (A-11, E-UX4-2): the closing balance reads as "Saldo deudor" / "Saldo acreedor" (the server's split and totals).
 export default function Page() {
   const { companyId, can, plantName } = useSession();
   const today = todayInDominicanRepublic();
@@ -79,7 +82,7 @@ export default function Page() {
               <option value="">Todas</option>
               {filters.banks.map((b) => (
                 <option key={b.bankAccountId} value={b.bankAccountId}>
-                  {b.bankCode} {b.accountNumber}
+                  {bankAccountLabel(b)}
                 </option>
               ))}
             </select>
@@ -111,7 +114,8 @@ export default function Page() {
                 <th className="num">Saldo inicial (RD$)</th>
                 <th className="num">Débitos (RD$)</th>
                 <th className="num">Créditos (RD$)</th>
-                <th className="num">Saldo final (RD$)</th>
+                <th className="num">Saldo deudor (RD$)</th>
+                <th className="num">Saldo acreedor (RD$)</th>
               </tr>
             </thead>
             <tbody>
@@ -130,7 +134,10 @@ export default function Page() {
                     <Money value={r.credit} />
                   </td>
                   <td className="num">
-                    <Money value={r.closing} />
+                    <Money value={balanceCell(r.debitBalance)} />
+                  </td>
+                  <td className="num">
+                    <Money value={balanceCell(r.creditBalance)} />
                   </td>
                 </tr>
               ))}
@@ -150,7 +157,10 @@ export default function Page() {
                   <Money value={data.totalCredit} testId="trial-balance-credit" />
                 </td>
                 <td className="num">
-                  <Money value={data.totalClosing} />
+                  <Money value={data.totalDebitBalance} testId="trial-balance-debit-balance" />
+                </td>
+                <td className="num">
+                  <Money value={data.totalCreditBalance} testId="trial-balance-credit-balance" />
                 </td>
               </tr>
             </tbody>

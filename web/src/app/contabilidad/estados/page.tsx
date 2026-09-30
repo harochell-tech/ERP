@@ -18,7 +18,7 @@ function Blocked({ error }: { error: unknown }) {
   if (error instanceof ApiError && error.code === "ACCOUNT_CLASS_MISSING") {
     return (
       <div className="notice" role="alert">
-        Hay cuentas activas sin clase: {error.message.replace(/^.*?:\s*/, "")} Asígnela en el <Link href="/contabilidad/cuentas/">catálogo de cuentas</Link>.
+        Hay cuentas activas sin clasificar (sin clase): {error.message.replace(/^.*?:\s*/, "")} Asígnela en el <Link href="/contabilidad/cuentas/">catálogo de cuentas</Link>.
       </div>
     );
   }
@@ -87,6 +87,15 @@ function Lines({ lines, unassigned }: { lines: Schemas["StatementLine"][]; unass
   );
 }
 
+/** UX4-02 (A-10): plain wording for the report structure the statement follows (the version number only as a tooltip). */
+function StructureNote({ version }: { version: number }) {
+  return (
+    <span className="muted" title={`Versión ${version} de la estructura de reporte`}>
+      Agrupado según el formato de reporte aprobado (<Link href="/contabilidad/estructuras/">ver formatos</Link>)
+    </span>
+  );
+}
+
 function Total({ label, value, testId }: { label: string; value: string; testId?: string }) {
   return (
     <div className="stat">
@@ -99,6 +108,8 @@ function Total({ label, value, testId }: { label: string; value: string; testId?
 }
 
 // FIN1-04 (E-FIN1-04-9, E-FIN1-03-3/5): balance sheet at a date and income statement of a range, from the approved structures.
+// UX4-02 (A-10, E-UX4-2): the results of the year and of prior years read inside Patrimonio and the sheet ends with "Total pasivo
+// + patrimonio" (the server's totals); the difference shows only when it does not balance.
 export default function Page() {
   const { companyId, can } = useSession();
   const today = todayInDominicanRepublic();
@@ -136,19 +147,76 @@ export default function Page() {
             <>
               <div className="actions">
                 <StatusBadge status={balance.data.balanced ? "MATCHED" : "EXCEPTIONS"} label={balance.data.balanced ? "Cuadra" : `Diferencia ${formatDecimal(balance.data.difference)}`} testId="balance-status" />
-                <span className="muted">Estructura versión {balance.data.structureVersion}</span>
+                <StructureNote version={balance.data.structureVersion} />
                 <a className="button" href={csvUrl(BALANCE, balanceParams)} download>
                   Descargar CSV
                 </a>
               </div>
               <Lines lines={balance.data.lines} unassigned={balance.data.unassignedAccounts} />
-              <div className="cards">
-                <Total label="Total activo" value={balance.data.totalAssets} testId="total-assets" />
-                <Total label="Total pasivo" value={balance.data.totalLiabilities} />
-                <Total label="Total patrimonio" value={balance.data.totalEquity} />
-                <Total label="Resultado del ejercicio" value={balance.data.currentYearResult} testId="current-year-result" />
-                <Total label="Resultados de ejercicios anteriores" value={balance.data.priorYearsResult} />
-                <Total label="Diferencia" value={balance.data.difference} testId="balance-difference" />
+              <div className="table-wrap">
+                <table data-testid="balance-summary">
+                  <caption className="muted" style={{ textAlign: "left" }}>
+                    Resumen
+                  </caption>
+                  <tbody>
+                    <tr>
+                      <th scope="row">Total activo</th>
+                      <td className="num">
+                        <Money value={balance.data.totalAssets} testId="total-assets" currency />
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Total pasivo</th>
+                      <td className="num">
+                        <Money value={balance.data.totalLiabilities} testId="total-liabilities" currency />
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Patrimonio</th>
+                      <td />
+                    </tr>
+                    <tr>
+                      <td style={{ paddingLeft: 32 }}>Capital, reservas y otras cuentas de patrimonio</td>
+                      <td className="num">
+                        <Money value={balance.data.totalEquity} />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ paddingLeft: 32 }}>Resultado del ejercicio</td>
+                      <td className="num">
+                        <Money value={balance.data.currentYearResult} testId="current-year-result" />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ paddingLeft: 32 }}>Resultados de ejercicios anteriores</td>
+                      <td className="num">
+                        <Money value={balance.data.priorYearsResult} />
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Total patrimonio</th>
+                      <td className="num">
+                        <Money value={balance.data.totalEquityWithResults} testId="total-equity" currency />
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Total pasivo + patrimonio</th>
+                      <td className="num">
+                        <strong>
+                          <Money value={balance.data.totalLiabilitiesAndEquity} testId="total-liabilities-and-equity" currency />
+                        </strong>
+                      </td>
+                    </tr>
+                    {balance.data.balanced ? null : (
+                      <tr>
+                        <th scope="row">Diferencia (activo − pasivo y patrimonio)</th>
+                        <td className="num">
+                          <Money value={balance.data.difference} testId="balance-difference" currency />
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </>
           )}
@@ -166,7 +234,7 @@ export default function Page() {
           ) : (
             <>
               <div className="actions">
-                <span className="muted">Estructura versión {income.data.structureVersion}</span>
+                <StructureNote version={income.data.structureVersion} />
                 <a className="button" href={csvUrl(INCOME, incomeParams)} download>
                   Descargar CSV
                 </a>

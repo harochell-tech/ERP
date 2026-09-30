@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { Money, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { invoiceStatusLabel } from "@/lib/ux4bSales";
 
 // VS3-10b: sales invoices with their three statuses (commercial, accounting, fiscal — E-1), newest first (sales:read).
 const FILTERS: readonly { value: string; label: string; commercial?: string; fiscal?: string }[] = [
@@ -49,9 +51,9 @@ function Invoices() {
         </select>
       </label>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay facturas.</p>
+        <EmptyState title={filter.value ? "No hay facturas con ese filtro." : "Todavía no hay facturas."} steps={[filter.value && { href: "/facturacion/facturas/", label: "Ver todas las facturas" }, { href: "/facturacion/por-facturar/", label: "Ver entregas por facturar" }]}><p>Las facturas se crean desde Por facturar, con las entregas ya hechas al cliente.</p></EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -84,7 +86,7 @@ function Invoices() {
                   <Money value={i.openAmount} />
                 </td>
                 <td>
-                  <StatusBadge status={i.commercialStatus} />
+                  <StatusBadge status={i.commercialStatus} label={invoiceStatusLabel(i.commercialStatus)} />
                 </td>
                 <td>
                   <StatusBadge status={i.fiscalStatus} />
