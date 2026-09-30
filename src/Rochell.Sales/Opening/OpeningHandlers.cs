@@ -272,7 +272,7 @@ public sealed class PostOpeningInventoryHandler : ICommandHandler<PostOpeningInv
         }
 
         var poster = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (poster == batch.PreparedBy)
+        if (poster == batch.PreparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(SalesErrors.FourEyes, "An opening batch is posted by someone other than who prepared it (E-VS3-02b-2).");
         }

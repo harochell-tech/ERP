@@ -180,7 +180,7 @@ public sealed class ApproveReportStructureHandler : ICommandHandler<ApproveRepor
         }
 
         var approver = await LedgerSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == row.PreparedBy)
+        if (approver == row.PreparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(LedgerErrors.FourEyes, "A report structure is approved by someone other than who prepared it (E-FIN1-5).");
         }

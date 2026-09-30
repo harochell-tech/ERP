@@ -394,7 +394,7 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
         }
 
         var activator = await FiscalRuleStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (activator == version.ConfiguredBy)
+        if (activator == version.ConfiguredBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(TaxErrors.ActivatorIsConfigurer, "The person who configured the version cannot activate it.");
         }

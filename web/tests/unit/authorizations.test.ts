@@ -41,7 +41,7 @@ describe("fiscal authorization labels", () => {
   it("names the documents, the reconciliations and their classifications", () => {
     expect(documentKindLabel("CERTIFICADO_DGII")).toBe("Certificado de exención (DGII)");
     expect(documentKindLabel("OTRO")).toBe("OTRO");
-    expect(Object.keys(RECONCILIATIONS)).toEqual(["AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606"]);
+    expect(Object.keys(RECONCILIATIONS)).toEqual(["AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED"]);
     expect(classificationLabel("PROJECT_TERM_ENDED")).toBe("Terminó el plazo del proyecto");
     expect(classificationLabel("SOMETHING_ELSE")).toBe("SOMETHING_ELSE");
   });

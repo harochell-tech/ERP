@@ -22,14 +22,14 @@ internal static class Pricing
 
     public sealed record Approval(string Status, Guid PreparedBy);
 
-    public static void EnsureApprovable(Approval row, Guid approver, string what)
+    public static async Task EnsureApprovableAsync(CommandContext context, Approval row, Guid approver, string what, CancellationToken cancellationToken)
     {
         if (row.Status != "DRAFT")
         {
             throw new DomainException(SalesErrors.InvalidState, $"The {what} is {row.Status}.");
         }
 
-        if (approver == row.PreparedBy)
+        if (approver == row.PreparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(SalesErrors.FourEyes, $"The {what} is approved by someone other than who prepared it.");
         }
@@ -274,7 +274,7 @@ public sealed class ApproveStandardCostHandler : ICommandHandler<ApproveStandard
             cancellationToken,
             ("id", command.CostVersionId)).ConfigureAwait(false))!;
         var approver = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        Pricing.EnsureApprovable(new Pricing.Approval(row.Status, row.PreparedBy), approver, "standard cost");
+        await Pricing.EnsureApprovableAsync(context, new Pricing.Approval(row.Status, row.PreparedBy), approver, "standard cost", cancellationToken).ConfigureAwait(false);
 
         var previous = await SalesSql.ScalarAsync<Guid?>(
             context,
@@ -505,7 +505,7 @@ public sealed class ApprovePriceListHandler : ICommandHandler<ApprovePriceList>
             ("id", command.PriceListVersionId)).ConfigureAwait(false)
             ?? throw new DomainException(SalesErrors.NotFound, "The price list does not exist.");
         var approver = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        Pricing.EnsureApprovable(row, approver, "price list");
+        await Pricing.EnsureApprovableAsync(context, row, approver, "price list", cancellationToken).ConfigureAwait(false);
         var previous = await SalesSql.ScalarAsync<Guid?>(
             context, "SELECT price_list_version_id FROM sal.price_list_version WHERE company_id = @c AND status = 'ACTIVE'", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false);
         var today = SalesSql.Today(context);

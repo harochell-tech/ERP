@@ -338,7 +338,7 @@ public sealed class ApproveCustomerTermsHandler : ICommandHandler<ApproveCustome
         }
 
         var approver = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == row.PreparedBy)
+        if (approver == row.PreparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(SalesErrors.FourEyes, "Customer terms are approved by someone other than who prepared them.");
         }

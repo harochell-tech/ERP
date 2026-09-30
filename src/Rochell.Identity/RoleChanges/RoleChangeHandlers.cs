@@ -44,13 +44,14 @@ internal static class RoleChangeSql
             context.Transaction,
             """
             SELECT assignment_id FROM iam.role_assignment
-            WHERE company_id = @company_id AND user_id = @user_id AND role_id = @role_id AND valid_to IS NULL
+            WHERE company_id = @company_id AND user_id = @user_id AND role_id = @role_id AND (valid_to IS NULL OR valid_to > @now)
               AND plant_id IS NOT DISTINCT FROM CAST(@plant_id AS uuid)
             """ + (forUpdate ? " FOR UPDATE" : string.Empty),
             ("company_id", context.CompanyId),
             ("user_id", userId),
             ("role_id", roleId),
-            ("plant_id", plantId));
+            ("plant_id", plantId),
+            ("now", context.Clock.UtcNow));
         return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as Guid?;
     }
 
@@ -152,7 +153,7 @@ public sealed class ApproveRoleChangeHandler : ICommandHandler<ApproveRoleChange
             throw new DomainException(RoleChangeErrors.RequestNotPending, $"The request is already {request.Status}.");
         }
 
-        if (approver == request.RequestedBy || approver == request.UserId)
+        if (approver == request.UserId || (approver == request.RequestedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false)))
         {
             throw new DomainException(RoleChangeErrors.SecondApproverRequired, "The approver must be different from the requester and from the affected user.");
         }
@@ -302,7 +303,7 @@ public sealed class RejectRoleChangeHandler : ICommandHandler<RejectRoleChange>
             throw new DomainException(RoleChangeErrors.RequestNotPending, $"The request is already {request.Status}.");
         }
 
-        if (rejecter == request.RequestedBy || rejecter == request.UserId)
+        if (rejecter == request.UserId || (rejecter == request.RequestedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false)))
         {
             throw new DomainException(RoleChangeErrors.SecondApproverRequired, "The rejecter must be different from the requester and from the affected user.");
         }

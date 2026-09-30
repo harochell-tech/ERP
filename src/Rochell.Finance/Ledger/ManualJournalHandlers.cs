@@ -361,7 +361,7 @@ public sealed class ApproveManualJournalHandler : ICommandHandler<ApproveManualJ
         }
 
         var approver = await LedgerSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == row.PreparedBy)
+        if (approver == row.PreparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(LedgerErrors.FourEyes, "An adjustment is approved by someone other than who prepared it (E-FIN1-1).");
         }
@@ -448,7 +448,7 @@ public sealed class RejectManualJournalHandler : ICommandHandler<RejectManualJou
         }
 
         var rejecter = await LedgerSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (rejecter == row.PreparedBy)
+        if (rejecter == row.PreparedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(LedgerErrors.FourEyes, "An adjustment is rejected by someone other than who prepared it.");
         }

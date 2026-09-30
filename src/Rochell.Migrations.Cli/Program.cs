@@ -221,6 +221,7 @@ try
                     SELECT @id, c.company_id, u.user_id, r.role_id, @plant, now(), '00000000-0000-7000-8000-00000000d001'
                     FROM iam.user u, iam.role r, md.company c
                     WHERE u.email = lower(@email) AND r.code = @role AND c.rnc = @rnc
+                    RETURNING valid_to
                     """,
                     connection);
                 grant.Parameters.AddWithValue("id", Guid.CreateVersion7());
@@ -228,13 +229,16 @@ try
                 grant.Parameters.AddWithValue("email", args[1]);
                 grant.Parameters.AddWithValue("role", args[2]);
                 grant.Parameters.AddWithValue("rnc", args[3]);
-                if (await grant.ExecuteNonQueryAsync() != 1)
+                var validTo = await grant.ExecuteScalarAsync();
+                if (validTo is null)
                 {
                     await Console.Error.WriteLineAsync("User, role or company not found.");
                     return 2;
                 }
 
-                Console.WriteLine($"Role {args[2]} granted to {args[1].ToLowerInvariant()} in company {args[3]}.");
+                // E-ADM-2-2: SUPERADMIN ends 90 days after the grant (database trigger); renewed with a new grant or request.
+                var until = validTo is DateTime end ? $" until {end:yyyy-MM-dd HH:mm} UTC" : string.Empty;
+                Console.WriteLine($"Role {args[2]} granted to {args[1].ToLowerInvariant()} in company {args[3]}{until}.");
                 return 0;
             }
 

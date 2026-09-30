@@ -356,7 +356,7 @@ public sealed class ApproveQuotePricesHandler : ICommandHandler<ApproveQuotePric
         var row = await Quotes.LockAsync(context, command.QuoteId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         Quotes.RequireStatus(row, "PENDING_APPROVAL");
         var approver = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == row.CreatedBy)
+        if (approver == row.CreatedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(QuoteErrors.SamePerson, "The author of a quote does not approve its prices (E-QUO1-11).");
         }

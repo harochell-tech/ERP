@@ -395,7 +395,7 @@ public sealed class VerifyAuthorizationHandler : ICommandHandler<VerifyAuthoriza
         var row = await AuthorizationStore.LockAsync(context, command.AuthorizationId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         AuthorizationStore.RequireStatus(row, "PENDING_VERIFICATION");
         var verifier = await AuthorizationStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (verifier == row.RegisteredBy)
+        if (verifier == row.RegisteredBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(TaxErrors.AuthorizationSamePerson, "An authorization is verified by someone other than who registered it (E-FIS1-3).");
         }

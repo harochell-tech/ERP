@@ -93,7 +93,7 @@ public sealed class ApproveReopenHandler : ICommandHandler<ApproveReopen>
         ArgumentNullException.ThrowIfNull(context);
         var (periodId, component, requestedBy) = await ReopenSql.RequestedAsync(context, command.RequestId, cancellationToken).ConfigureAwait(false);
         var approver = await CloseSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == requestedBy)
+        if (approver == requestedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(ReconciliationErrors.SamePerson, "The person who asked to reopen cannot approve it.");
         }
@@ -144,7 +144,7 @@ public sealed class RejectReopenHandler : ICommandHandler<RejectReopen>
         var reason = CloseSql.RequireReason(command.Reason);
         var (periodId, component, requestedBy) = await ReopenSql.RequestedAsync(context, command.RequestId, cancellationToken).ConfigureAwait(false);
         var rejecter = await CloseSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (rejecter == requestedBy)
+        if (rejecter == requestedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(ReconciliationErrors.SamePerson, "The person who asked to reopen cannot decide on it.");
         }

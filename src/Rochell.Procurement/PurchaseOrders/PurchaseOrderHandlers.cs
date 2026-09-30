@@ -126,7 +126,7 @@ public sealed class ApprovePurchaseOrderHandler : ICommandHandler<ApprovePurchas
         var header = await PurchaseOrderStore.LockAsync(context, command.PurchaseOrderId, command.PlantId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         PurchaseOrderStore.RequireStatus(header, PurchaseOrderStatus.PendingApproval);
         var approver = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (approver == header.CreatedBy)
+        if (approver == header.CreatedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(ProcurementErrors.ApproverIsCreator, "The person who created the purchase order cannot approve it (SC-01).");
         }
