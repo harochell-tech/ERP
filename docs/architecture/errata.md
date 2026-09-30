@@ -724,6 +724,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS2-12 | FIS-2 | IT-1 e IR-17 → Resúmenes informativos del mes (no el formulario): ventas gravadas / exentas por tipo de e-CF, ITBIS facturado y de notas de crédito, ITBIS de compras (606), retenciones practicadas por tipo |
 | E-FIS2-13 | FIS-2 | Conciliación → Nueva TAX-606 (advertencia): ITBIS del 606 del mes = ITBIS de compras en el GL; bloquea nada |
 | E-FIS2-14 | FIS-2 | Permisos → Nuevo `fiscal_report:read` (READ) para Especialista fiscal, Analista fiscal, Contador, Controller, Auditor y Director |
+| E-FIS2-01-1 | FIS2-01 | The 606 classification is a fiscal rule kind `REPORT_606_CLASSIFICATION` with the rules' lifecycle; definition `{"classes": {…}}`. |
+| E-FIS2-01-2 | FIS2-01 | It covers the 4 raw-material categories, each with a code "01"…"11". |
+| E-FIS2-01-3 | FIS2-01 | The Tax Engine never applies it; only the reports read it. |
+| E-FIS2-01-4 | FIS2-01 | Optional `isr_withholding_type` ("1"…"9") on PURCHASE_WITHHOLDING; missing → blank type in the 606 and a TAX-606 warning. |
+| E-FIS2-01-5 | FIS2-01 | The 606 instructivo (DGII, 2026-02-12) is registered as a source with the existing command, not seeded. |
+| E-FIS2-01-6 | FIS2-01 | `fiscal_report:read` (READ) for ESPECIALISTA_FISCAL, ANALISTA_FISCAL, CONTADOR, CONTROLLER, AUDITOR, DIRECTOR; 114 permissions. |
+| E-FIS2-01-7 | FIS2-01 | Migration 0058: the rule kind CHECK and the permission; no tables. |
+| E-FIS2-01-8 | FIS2-01 | The dev seed activates the classification (every raw material → 09). |
+| E-FIS2-01-9 | FIS2-01 | A classification is READY with its source alone; test runs on it are refused (`FISCAL_RULE_TESTS_NOT_APPLICABLE`); the activation gate is replaced accordingly. |
+| E-FIS2-01-10 | FIS2-01 | One classification active at a time (`ANOTHER_ITBIS_RULE_ACTIVE` with its own message). |
 
 Implementation rules derived from the above (no architectural change):
 

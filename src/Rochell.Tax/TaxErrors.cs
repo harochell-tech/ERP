@@ -14,6 +14,9 @@ public static class TaxErrors
     public const string AnotherItbisRuleActive = "ANOTHER_ITBIS_RULE_ACTIVE";
     public const string ProductionSourceRequired = "FISCAL_PRODUCTION_SOURCE_REQUIRED";
     public const string CasesRequired = "TEST_CASES_REQUIRED";
+
+    /// <summary>E-FIS2-01-9: a report classification has no tax to compute, so it has no test runs.</summary>
+    public const string TestsNotApplicable = "FISCAL_RULE_TESTS_NOT_APPLICABLE";
     public const string FiscalGateClosed = "FISCAL_GATE_CLOSED";
     public const string SubjectInvalid = "TAX_SUBJECT_INVALID";
 
@@ -42,7 +45,13 @@ public static class FiscalRuleKinds
     /// <summary>E-VS3-05-1: output ITBIS of sales invoices.</summary>
     public const string SalesItbis = "SALES_ITBIS";
 
+    /// <summary>E-FIS2-01-1: the 606 goods-and-services classification; read by the reports, never applied by the Tax Engine.</summary>
+    public const string Report606Classification = "REPORT_606_CLASSIFICATION";
+
     public static bool IsSales(string kind) => kind == SalesItbis;
+
+    /// <summary>E-FIS2-01-3: a rule kind that only the reports read.</summary>
+    public static bool IsReport(string kind) => kind == Report606Classification;
 }
 
 public static class TaxEffects

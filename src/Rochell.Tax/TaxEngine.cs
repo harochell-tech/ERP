@@ -158,6 +158,11 @@ public sealed class TaxEngine
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var code = reader.GetString(0);
+            if (FiscalRuleKinds.IsReport(reader.GetString(1)))
+            {
+                continue; // E-FIS2-01-3: read by the reports only; it neither applies nor closes the gate
+            }
+
             if (FiscalRuleKinds.IsSales(reader.GetString(1)) != sale)
             {
                 continue; // the other direction's rules neither apply nor close this gate
