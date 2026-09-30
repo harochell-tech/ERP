@@ -15,6 +15,14 @@ internal static class SalesSql
         return value is null or DBNull ? default : (T)value;
     }
 
+    public static async Task<T?> ScalarAsync<T>(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters)
+    {
+        await using var command = Sql.Command(connection, transaction, sql, parameters);
+        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        return value is null or DBNull ? default : (T)value;
+    }
+
     public static async Task<Guid> SessionUserAsync(CommandContext context, CancellationToken cancellationToken)
         => (await ScalarAsync<Guid?>(context, "SELECT user_id FROM iam.session WHERE session_id = @s", cancellationToken, ("s", context.SessionId)).ConfigureAwait(false))!.Value;
 

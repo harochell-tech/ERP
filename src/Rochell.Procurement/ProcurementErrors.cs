@@ -19,6 +19,7 @@ public static class ProcurementErrors
     public const string LineNotFound = "LINE_NOT_FOUND";
     public const string NotReceivable = "PURCHASE_ORDER_NOT_RECEIVABLE";
     public const string LocationNotInPlant = "LOCATION_NOT_IN_PLANT";
+    public const string LocationNotReceivable = "LOCATION_NOT_RECEIVABLE";
     public const string ReceiptToleranceExceeded = "RECEIPT_TOLERANCE_EXCEEDED";
     public const string DuplicateLine = "DUPLICATE_LINE";
     public const string WeighTicketUsed = "WEIGH_TICKET_USED";
@@ -35,6 +36,7 @@ public static class ProcurementErrors
     public const string LineKindNotSupported = "LINE_KIND_NOT_SUPPORTED";
     public const string FiscalNumberInvalid = "FISCAL_NUMBER_INVALID";
     public const string FiscalNumberUsed = "FISCAL_NUMBER_USED";
+    public const string PrintedTotalInvalid = "PRINTED_TOTAL_INVALID";
     public const string DateInvalid = "DATE_INVALID";
     public const string PoLineNotInvoiceable = "PO_LINE_NOT_INVOICEABLE";
     public const string QtyExceptionNotApprovable = "QTY_EXCEPTION_NOT_APPROVABLE";

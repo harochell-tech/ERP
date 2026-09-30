@@ -42,7 +42,7 @@ public sealed class PurchaseOrderTests(PostgresFixture postgres)
         await Approve(h, p, po, 2, "po-1-a");
 
         Assert.Equal("APPROVED:3", await Status(h, po));
-        Assert.Matches("^OC-[0-9]{4}-[0-9A-F]{8}$", (await h.ScalarAsync<string>("SELECT po_no FROM pur.purchase_order WHERE po_id = @p", ("p", po)))!);
+        Assert.Matches("^OC-[0-9]{4}-000001$", (await h.ScalarAsync<string>("SELECT po_no FROM pur.purchase_order WHERE po_id = @p", ("p", po)))!); // E-UX4-5
         Assert.Equal("0.020000;0.020000", await h.ScalarAsync<string>("SELECT string_agg(receipt_tolerance_pct::text, ';' ORDER BY line_no) FROM pur.purchase_order_line WHERE po_id = @p", ("p", po)));
         Assert.Equal(p.PolicyVersionId, await h.ScalarAsync<Guid>("SELECT policy_version_id FROM pur.purchase_order WHERE po_id = @p", ("p", po)));
         Assert.Equal("->DRAFT,DRAFT->PENDING_APPROVAL,PENDING_APPROVAL->APPROVED", await h.ScalarAsync<string>(

@@ -16,6 +16,12 @@ public sealed record TaxLineInput(Guid SubjectLineId, Guid ItemId, decimal NetAm
 public sealed record TaxRequest(
     string SubjectType, Guid SubjectId, DateOnly Date, Guid PartyId, IReadOnlyList<TaxLineInput> Lines, string Direction = TaxDirections.Purchase, TaxExemption? Exemption = null);
 
+/// <summary>
+/// E-UX4-3: the estimated ITBIS of a draft, per line id and in total (2 decimals); both null when the fiscal gate is closed, with
+/// <see cref="UnavailableCode"/> (FISCAL_GATE_CLOSED) and <see cref="UnavailableReason"/> saying why.
+/// </summary>
+public sealed record ItbisEstimate(IReadOnlyDictionary<Guid, decimal>? ByLine, decimal? Total, string? UnavailableCode, string? UnavailableReason);
+
 /// <summary>E-FIS1-03-3: a sale covered by an ACTIVE fiscal authorization carries no ITBIS; the determination records why.</summary>
 public sealed record TaxExemption(Guid AuthorizationId, string Regime, string CertificateNo);
 
@@ -130,6 +136,47 @@ public sealed class TaxEngine
     {
         var rules = await ApplicableRulesAsync(connection, transaction, companyId, date, sale: true, cancellationToken).ConfigureAwait(false);
         return TaxCalculator.Determine(PartyTaxTypes.Company, lines, rules);
+    }
+
+    /// <summary>
+    /// E-UX4-3: the ITBIS a draft purchase or sale would carry on <paramref name="date"/> — the rules in force applied by the same
+    /// calculator, per line and in total — without writing anything. A closed fiscal gate is not an error here: the estimate is null
+    /// and says why (the code and message the posting or invoicing would give).
+    /// </summary>
+    public static async Task<ItbisEstimate> EstimateItbisAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly date, bool sale, IReadOnlyList<TaxLineInput> lines,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        IReadOnlyList<ApplicableRule> rules;
+        try
+        {
+            rules = await ApplicableRulesAsync(connection, transaction, companyId, date, sale, cancellationToken).ConfigureAwait(false);
+        }
+        catch (DomainException ex) when (ex.Code == TaxErrors.FiscalGateClosed)
+        {
+            return new ItbisEstimate(null, null, ex.Code, ex.Message);
+        }
+
+        var categories = new Dictionary<Guid, string>();
+        await using (var command = Sql.Command(
+            connection, transaction, "SELECT item_id, item_category FROM md.item WHERE company_id = @c AND item_id = ANY(@ids)", ("c", companyId), ("ids", lines.Select(l => l.ItemId).Distinct().ToArray())))
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+        {
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                categories[reader.GetGuid(0)] = reader.GetString(1);
+            }
+        }
+
+        var taxable = lines.Select(l => new TaxableLine(
+            l.SubjectLineId,
+            categories.TryGetValue(l.ItemId, out var category) ? category : throw new DomainException(TaxErrors.SubjectInvalid, "An item of the estimate does not exist."),
+            l.NetAmount)).ToList();
+        var itbis = TaxCalculator.Determine(PartyTaxTypes.Company, taxable, rules).Where(t => t.Effect != TaxEffects.Withholding).ToList();
+        var zero = new decimal(0, 0, 0, false, 2);
+        var byLine = lines.ToDictionary(l => l.SubjectLineId, l => zero + itbis.Where(t => t.LineId == l.SubjectLineId).Sum(t => t.Amount));
+        return new ItbisEstimate(byLine, zero + byLine.Values.Sum(), null, null);
     }
 
     private static async Task<IReadOnlyList<ApplicableRule>> ApplicableRulesAsync(

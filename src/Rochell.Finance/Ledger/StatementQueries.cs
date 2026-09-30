@@ -184,12 +184,21 @@ public sealed record StatementLine(string LineCode, string Caption, string? Pare
 public sealed record GetTrialBalance(
     Guid CompanyId, Guid SessionId, DateOnly From, DateOnly To, Guid? PlantId = null, Guid? PartyId = null, Guid? BankAccountId = null) : IQuery;
 
-/// <summary>A row per account; the row without account is the result of prior years (E-FIN1-03-4).</summary>
-public sealed record TrialBalanceRow(Guid? AccountId, string Code, string Name, string? AccountClass, decimal Opening, decimal Debit, decimal Credit, decimal Closing);
+/// <summary>
+/// A row per account; the row without account is the result of prior years (E-FIN1-03-4). E-UX4-2: the closing balance split by
+/// side — <see cref="DebitBalance"/> is the closing when positive, <see cref="CreditBalance"/> its absolute value when negative, the
+/// other 0.00.
+/// </summary>
+public sealed record TrialBalanceRow(
+    Guid? AccountId, string Code, string Name, string? AccountClass, decimal Opening, decimal Debit, decimal Credit, decimal Closing, decimal DebitBalance, decimal CreditBalance);
 
-/// <summary>E-FIN1-03-6: <see cref="Balanced"/> (debits = credits and Σ closing = 0) is only required when not <see cref="Filtered"/>.</summary>
+/// <summary>
+/// E-FIN1-03-6: <see cref="Balanced"/> (debits = credits and Σ closing = 0) is only required when not <see cref="Filtered"/>.
+/// E-UX4-2: <see cref="TotalDebitBalance"/> and <see cref="TotalCreditBalance"/> add the split closing balances (equal when balanced).
+/// </summary>
 public sealed record TrialBalance(
-    DateOnly From, DateOnly To, bool Filtered, IReadOnlyList<TrialBalanceRow> Rows, decimal TotalOpening, decimal TotalDebit, decimal TotalCredit, decimal TotalClosing, bool Balanced);
+    DateOnly From, DateOnly To, bool Filtered, IReadOnlyList<TrialBalanceRow> Rows, decimal TotalOpening, decimal TotalDebit, decimal TotalCredit, decimal TotalClosing, bool Balanced,
+    decimal TotalDebitBalance, decimal TotalCreditBalance);
 
 [RequiresPermission("ledger:read")]
 public sealed class GetTrialBalanceHandler : IQueryHandler<GetTrialBalance>
@@ -244,16 +253,25 @@ public sealed class GetTrialBalanceHandler : IQueryHandler<GetTrialBalance>
 
         var result = rows
             .Where(r => r.Item5 != 0m || r.Item6 != 0m || r.Item7 != 0m)
-            .Select(r => new TrialBalanceRow(r.Item1, r.Item2, r.Item3, r.Item4, r.Item5, r.Item6, r.Item7, r.Item5 + r.Item6 - r.Item7))
+            .Select(r => Row(r.Item1, r.Item2, r.Item3, r.Item4, r.Item5, r.Item6, r.Item7))
             .ToList();
         if (prior != 0m)
         {
-            result.Add(new TrialBalanceRow(null, string.Empty, PriorYearsCaption, "EQUITY", prior, Statements.Zero, Statements.Zero, prior));
+            result.Add(Row(null, string.Empty, PriorYearsCaption, "EQUITY", prior, Statements.Zero, Statements.Zero));
         }
 
         var filtered = query.PlantId is not null || query.PartyId is not null || query.BankAccountId is not null;
         var (opening, debit, credit, closing) = (Statements.Zero + result.Sum(r => r.Opening), Statements.Zero + result.Sum(r => r.Debit), Statements.Zero + result.Sum(r => r.Credit), Statements.Zero + result.Sum(r => r.Closing));
-        return ApiJson.Serialize(new TrialBalance(query.From, query.To, filtered, result, opening, debit, credit, closing, debit == credit && closing == 0m && opening == 0m));
+        return ApiJson.Serialize(new TrialBalance(
+            query.From, query.To, filtered, result, opening, debit, credit, closing, debit == credit && closing == 0m && opening == 0m,
+            Statements.Zero + result.Sum(r => r.DebitBalance), Statements.Zero + result.Sum(r => r.CreditBalance)));
+    }
+
+    private static TrialBalanceRow Row(Guid? accountId, string code, string name, string? accountClass, decimal opening, decimal debit, decimal credit)
+    {
+        var closing = opening + debit - credit;
+        return new TrialBalanceRow(
+            accountId, code, name, accountClass, opening, debit, credit, closing, Statements.Zero + Math.Max(closing, 0m), Statements.Zero + Math.Max(-closing, 0m));
     }
 }
 
@@ -369,10 +387,13 @@ public sealed record GetBalanceSheet(Guid CompanyId, Guid SessionId, DateOnly As
 /// <summary>
 /// E-FIN1-03-3/5: assets = liabilities + equity + result of the year + result of prior years; <see cref="Difference"/> is 0.00
 /// whenever the ledger balances. Accounts with a balance that the structure does not place are listed apart and still count.
+/// E-UX4-2: <see cref="TotalEquityWithResults"/> = equity + result of the year + result of prior years (the results shown inside
+/// equity) and <see cref="TotalLiabilitiesAndEquity"/> = liabilities + that ("Total pasivo + patrimonio").
 /// </summary>
 public sealed record BalanceSheet(
     DateOnly AsOf, int StructureVersion, IReadOnlyList<StatementLine> Lines, IReadOnlyList<StatementAccount> UnassignedAccounts,
-    decimal TotalAssets, decimal TotalLiabilities, decimal TotalEquity, decimal CurrentYearResult, decimal PriorYearsResult, decimal Difference, bool Balanced);
+    decimal TotalAssets, decimal TotalLiabilities, decimal TotalEquity, decimal CurrentYearResult, decimal PriorYearsResult, decimal Difference, bool Balanced,
+    decimal TotalEquityWithResults, decimal TotalLiabilitiesAndEquity);
 
 [RequiresPermission("ledger:read")]
 public sealed class GetBalanceSheetHandler : IQueryHandler<GetBalanceSheet>
@@ -394,7 +415,9 @@ public sealed class GetBalanceSheetHandler : IQueryHandler<GetBalanceSheet>
         var liabilities = Statements.Zero - amounts.Where(a => a.AccountClass == "LIABILITY").Sum(a => a.Balance);
         var equity = Statements.Zero - amounts.Where(a => a.AccountClass == "EQUITY").Sum(a => a.Balance);
         var difference = assets - liabilities - equity - current - prior;
-        return ApiJson.Serialize(new BalanceSheet(query.AsOf, structure.Version, lines, unassigned, assets, liabilities, equity, current, prior, difference, difference == 0m));
+        var equityWithResults = equity + current + prior;
+        return ApiJson.Serialize(new BalanceSheet(
+            query.AsOf, structure.Version, lines, unassigned, assets, liabilities, equity, current, prior, difference, difference == 0m, equityWithResults, liabilities + equityWithResults));
     }
 }
 

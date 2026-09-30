@@ -16,6 +16,7 @@ public sealed record ListPurchaseOrders(
     int Limit = 50,
     int Offset = 0) : IPlantScopedQuery;
 
+/// <summary>E-UX4-2: <see cref="Total"/> is the order's net, Σ of each line's quantity × unit price rounded to 2 decimals.</summary>
 public sealed record PurchaseOrderSummary(
     Guid PurchaseOrderId,
     string PoNo,
@@ -25,7 +26,8 @@ public sealed record PurchaseOrderSummary(
     string PlantCode,
     DateOnly OrderDate,
     string Status,
-    long Version);
+    long Version,
+    decimal Total);
 
 public sealed record PurchaseOrderList(IReadOnlyList<PurchaseOrderSummary> Items, int Limit, int Offset);
 
@@ -43,7 +45,8 @@ public sealed class ListPurchaseOrdersHandler : IQueryHandler<ListPurchaseOrders
             context.Connection,
             context.Transaction,
             """
-            SELECT po.po_id, po.po_no, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.status::text, po.version
+            SELECT po.po_id, po.po_no, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.status::text, po.version,
+                   (SELECT coalesce(sum(round(l.qty_ordered * l.unit_price, 2)), 0)::numeric(19,2) FROM pur.purchase_order_line l WHERE l.po_id = po.po_id)
             FROM pur.purchase_order po
             JOIN md.party p ON p.party_id = po.party_id
             JOIN md.plant pl ON pl.plant_id = po.plant_id
@@ -54,7 +57,7 @@ public sealed class ListPurchaseOrdersHandler : IQueryHandler<ListPurchaseOrders
             ORDER BY po.order_date DESC, po.po_no DESC
             LIMIT @limit OFFSET @offset
             """,
-            r => new PurchaseOrderSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.GetString(7), r.GetInt64(8)),
+            r => new PurchaseOrderSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.GetString(7), r.GetInt64(8), r.GetDecimal(9)),
             cancellationToken,
             ("c", context.CompanyId),
             ("plant", query.PlantId),
@@ -69,7 +72,7 @@ public sealed class ListPurchaseOrdersHandler : IQueryHandler<ListPurchaseOrders
 /// <summary>One purchase order with its lines, receipts and status history.</summary>
 public sealed record GetPurchaseOrder(Guid CompanyId, Guid SessionId, Guid PurchaseOrderId, Guid? PlantId = null) : IPlantScopedQuery;
 
-/// <summary>E-UX3-5: <see cref="OpenQuantity"/> = ordered − received, never below 0.</summary>
+/// <summary>E-UX3-5: <see cref="OpenQuantity"/> = ordered − received, never below 0. E-UX4-2: <see cref="NetAmount"/> = ordered × price, 2 decimals.</summary>
 public sealed record PurchaseOrderLineView(
     Guid PoLineId,
     int LineNo,
@@ -84,7 +87,8 @@ public sealed record PurchaseOrderLineView(
     decimal QtyReceived,
     decimal QtyInvoiced,
     long Version,
-    decimal OpenQuantity);
+    decimal OpenQuantity,
+    decimal NetAmount);
 
 public sealed record PurchaseOrderReceiptView(Guid GoodsReceiptId, string GrNo, string DocumentStatus, string AccountingStatus, DateTime OccurredAt);
 
@@ -105,7 +109,8 @@ public sealed record PurchaseOrderDetail(
     long Version,
     IReadOnlyList<PurchaseOrderLineView> Lines,
     IReadOnlyList<PurchaseOrderReceiptView> GoodsReceipts,
-    IReadOnlyList<StateChange> History);
+    IReadOnlyList<StateChange> History,
+    decimal Total);
 
 [RequiresPermission("purchase_order:read")]
 public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
@@ -131,7 +136,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             """,
             r => new PurchaseOrderDetail(
                 r.GetGuid(0), r.GetString(1), r.GetInt32(2), r.GetGuid(3), r.GetString(4), r.GetGuid(5), r.GetString(6), r.Date(7), r.GetString(8),
-                r.NullableString(9), r.NullableString(10), r.NullableUtc(11), r.NullableGuid(12), r.GetInt64(13), [], [], []),
+                r.NullableString(9), r.NullableString(10), r.NullableUtc(11), r.NullableGuid(12), r.GetInt64(13), [], [], [], 0m),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.PurchaseOrderId),
@@ -143,7 +148,8 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             context.Transaction,
             """
             SELECT l.po_line_id, l.line_no, l.item_id, i.code, i.description, l.uom, l.qty_ordered, l.unit_price, l.receipt_tolerance_pct,
-                   l.qty_over_receipt_approved, l.qty_received, l.qty_invoiced, l.version, greatest(l.qty_ordered - l.qty_received, 0)
+                   l.qty_over_receipt_approved, l.qty_received, l.qty_invoiced, l.version, greatest(l.qty_ordered - l.qty_received, 0),
+                   round(l.qty_ordered * l.unit_price, 2)::numeric(19,2)
             FROM pur.purchase_order_line l
             JOIN md.item i ON i.item_id = l.item_id
             WHERE l.company_id = @c AND l.po_id = @id
@@ -151,7 +157,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             """,
             r => new PurchaseOrderLineView(
                 r.GetGuid(0), r.GetInt32(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetDecimal(6), r.GetDecimal(7),
-                r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10), r.GetDecimal(11), r.GetInt64(12), r.GetDecimal(13)),
+                r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10), r.GetDecimal(11), r.GetInt64(12), r.GetDecimal(13), r.GetDecimal(14)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.PurchaseOrderId)).ConfigureAwait(false);
@@ -171,7 +177,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             ("id", query.PurchaseOrderId)).ConfigureAwait(false);
 
         var history = await StateHistory.ReadAsync(context, PurchaseOrderStore.Aggregate, query.PurchaseOrderId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(header with { Lines = lines, GoodsReceipts = receipts, History = history });
+        return ApiJson.Serialize(header with { Lines = lines, GoodsReceipts = receipts, History = history, Total = Money.Zero + lines.Sum(l => l.NetAmount) });
     }
 }
 
@@ -205,6 +211,10 @@ public sealed record PurchaseOrderLineToReceive(
     decimal MaxReceivable,
     long Version);
 
+/// <summary>
+/// E-UX4-8: <see cref="DefaultLocationId"/> / <see cref="DefaultLocationCode"/> are where the plant receives raw material: its
+/// location coded RECEPCION, otherwise its only location that is neither CURADO nor TRANSITO; null when neither applies.
+/// </summary>
 public sealed record PurchaseOrderToReceive(
     Guid PurchaseOrderId,
     string PoNo,
@@ -216,7 +226,9 @@ public sealed record PurchaseOrderToReceive(
     DateTime? ApprovedAt,
     string Status,
     long Version,
-    IReadOnlyList<PurchaseOrderLineToReceive> Lines);
+    IReadOnlyList<PurchaseOrderLineToReceive> Lines,
+    Guid? DefaultLocationId,
+    string? DefaultLocationCode);
 
 public sealed record PurchaseOrderToReceiveList(IReadOnlyList<PurchaseOrderToReceive> Items, int Limit, int Offset);
 
@@ -224,6 +236,9 @@ public sealed record PurchaseOrderToReceiveList(IReadOnlyList<PurchaseOrderToRec
 [RequiresPermission("purchase_order:read")]
 public sealed class ListPurchaseOrdersToReceiveHandler : IQueryHandler<ListPurchaseOrdersToReceive>
 {
+    /// <summary>E-UX4-8: the receiving location's code in the staging runbook and the test fixtures.</summary>
+    public const string DefaultReceivingLocationCode = "RECEPCION";
+
     public string QueryType => "Procurement.ListPurchaseOrdersToReceive";
 
     public async Task<string> HandleAsync(ListPurchaseOrdersToReceive query, QueryContext context, CancellationToken cancellationToken)
@@ -235,10 +250,18 @@ public sealed class ListPurchaseOrdersToReceiveHandler : IQueryHandler<ListPurch
             context.Connection,
             context.Transaction,
             """
-            SELECT po.po_id, po.po_no, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.approved_at, po.status::text, po.version
+            SELECT po.po_id, po.po_no, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.approved_at, po.status::text, po.version,
+                   dl.location_id, dl.code
             FROM pur.purchase_order po
             JOIN md.party p ON p.party_id = po.party_id
             JOIN md.plant pl ON pl.plant_id = po.plant_id
+            LEFT JOIN LATERAL (
+              SELECT l.location_id, l.code FROM md.location l
+              WHERE l.plant_id = po.plant_id AND NOT l.is_curing AND NOT l.is_transit
+                AND (l.code = @receiving
+                     OR (SELECT count(*) FROM md.location x WHERE x.plant_id = po.plant_id AND NOT x.is_curing AND NOT x.is_transit) = 1)
+              ORDER BY l.code = @receiving DESC
+              LIMIT 1) dl ON true
             WHERE po.company_id = @c AND po.status::text IN ('APPROVED', 'PARTIALLY_RECEIVED')
               AND (CAST(@plant AS uuid) IS NULL OR po.plant_id = CAST(@plant AS uuid))
               AND (CAST(@supplier AS uuid) IS NULL OR po.party_id = CAST(@supplier AS uuid))
@@ -246,9 +269,11 @@ public sealed class ListPurchaseOrdersToReceiveHandler : IQueryHandler<ListPurch
             LIMIT @limit OFFSET @offset
             """,
             r => new PurchaseOrderToReceive(
-                r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.NullableUtc(7), r.GetString(8), r.GetInt64(9), []),
+                r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.NullableUtc(7), r.GetString(8), r.GetInt64(9), [],
+                r.NullableGuid(10), r.NullableString(11)),
             cancellationToken,
             ("c", context.CompanyId),
+            ("receiving", DefaultReceivingLocationCode),
             ("plant", query.PlantId),
             ("supplier", query.SupplierId),
             ("limit", query.Limit),

@@ -109,6 +109,34 @@ public sealed class QueryRunner(QueryPipeline pipeline, SessionCookie cookie, IL
     }
 
     /// <summary>
+    /// E-UX4-3: a query whose input is a JSON body (a draft's lines do not fit a query string), sent with POST like a command but run
+    /// on the query pipeline — READ ONLY, no idempotency key, no command_log. The anti-CSRF header is required as for any POST.
+    /// </summary>
+    public async Task<IResult> RunBodyAsync<TBody, TQuery>(HttpContext http, Func<Guid, TBody, TQuery> query, IQueryHandler<TQuery> handler, CancellationToken cancellationToken)
+        where TQuery : IQuery
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(query);
+        if (cookie.Read(http) is null)
+        {
+            return ApiProblems.Problem(http, AuthorizationErrors.SessionInvalid, "Sign in first.", isQuery: true);
+        }
+
+        TBody body;
+        try
+        {
+            body = await JsonSerializer.DeserializeAsync<TBody>(http.Request.Body, ApiJson.Options, cancellationToken).ConfigureAwait(false)
+                ?? throw new JsonException("The body must be a JSON object.");
+        }
+        catch (JsonException ex)
+        {
+            return ApiProblems.Problem(http, ApiErrors.InvalidRequest, "Invalid request body: " + ex.Message, isQuery: true);
+        }
+
+        return await RunAsync(http, s => query(s, body), handler, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// E-FIN1-03-10: a report as JSON, or with <c>?format=csv</c> as a UTF-8 CSV file (with BOM, so a spreadsheet reads the accents)
     /// built from that same JSON. <paramref name="byteOrderMark"/> false: without BOM (E-FIS2-02-5, rows pasted into the DGII tool).
     /// </summary>

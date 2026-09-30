@@ -10,9 +10,14 @@ namespace Rochell.Sales.Queries;
 public sealed record ListReceipts(
     Guid CompanyId, Guid SessionId, Guid? PartyId = null, string? Status = null, string? ApplicationStatus = null, string? BankStatus = null, int Limit = 50, int Offset = 0) : IQuery;
 
+/// <summary>
+/// E-UX4-6: the bank account of a transfer (or of the deposit that took a cheque or cash) as the screen shows it: alias, bank code and the
+/// number masked (sales:read never unmasks it); null without one.
+/// </summary>
 public sealed record ReceiptSummary(
     Guid ReceiptId, string ReceiptNo, Guid PartyId, string CustomerName, string Method, decimal Amount, DateOnly ReceiptDate, DateOnly ValueDate, Guid? BankAccountId, string? Reference,
-    string? ChequeBank, string? ChequeNo, DateOnly? ChequeDate, string Status, string ApplicationStatus, string BankStatus, decimal Unapplied, Guid? DepositId, string? DepositNo, long Version);
+    string? ChequeBank, string? ChequeNo, DateOnly? ChequeDate, string Status, string ApplicationStatus, string BankStatus, decimal Unapplied, Guid? DepositId, string? DepositNo, long Version,
+    string? BankAccountAlias, string? BankCode, string? BankAccountNumber);
 
 public sealed record ReceiptList(IReadOnlyList<ReceiptSummary> Items, int Limit, int Offset);
 
@@ -20,16 +25,18 @@ internal static class ReceiptReading
 {
     public const string Select = """
         SELECT r.receipt_id, r.receipt_no, r.party_id, p.legal_name, r.method, r.amount::numeric(19,2), r.receipt_date, r.value_date, r.bank_account_id, r.reference,
-               r.cheque_bank, r.cheque_no, r.cheque_date, r.status, r.application_status, r.bank_status, r.unapplied_amount::numeric(19,2), r.deposit_id, d.deposit_no, r.version
+               r.cheque_bank, r.cheque_no, r.cheque_date, r.status, r.application_status, r.bank_status, r.unapplied_amount::numeric(19,2), r.deposit_id, d.deposit_no, r.version,
+               b.alias, b.bank_code, b.account_number
         FROM fin.receipt r
         JOIN md.party p ON p.party_id = r.party_id
         LEFT JOIN fin.receipt_deposit d ON d.deposit_id = r.deposit_id
+        LEFT JOIN fin.bank_account b ON b.bank_account_id = coalesce(r.bank_account_id, d.bank_account_id)
         """;
 
     public static ReceiptSummary Map(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.Date(6), r.Date(7), r.NullableGuid(8), r.NullableString(9),
             r.NullableString(10), r.NullableString(11), r.IsDBNull(12) ? null : r.Date(12), r.GetString(13), r.GetString(14), r.GetString(15), r.GetDecimal(16), r.NullableGuid(17),
-            r.NullableString(18), r.GetInt64(19));
+            r.NullableString(18), r.GetInt64(19), r.NullableString(20), r.NullableString(21), r.IsDBNull(22) ? null : AccountNumbers.Show(r.GetString(22), full: false));
 }
 
 [RequiresPermission("sales:read")]
@@ -130,7 +137,9 @@ public sealed class GetReceiptHandler : IQueryHandler<GetReceipt>
 
 public sealed record ListDeposits(Guid CompanyId, Guid SessionId, Guid? BankAccountId = null, string? Status = null, int Limit = 50, int Offset = 0) : IQuery;
 
-public sealed record DepositSummary(Guid DepositId, string DepositNo, Guid BankAccountId, string BankCode, string AccountNumber, DateOnly DepositDate, decimal Total, string Status, int Receipts, long Version);
+public sealed record DepositSummary(
+    Guid DepositId, string DepositNo, Guid BankAccountId, string BankCode, string AccountNumber, DateOnly DepositDate, decimal Total, string Status, int Receipts, long Version,
+    string? BankAccountAlias);
 
 public sealed record DepositList(IReadOnlyList<DepositSummary> Items, int Limit, int Offset);
 
@@ -138,14 +147,14 @@ internal static class DepositReading
 {
     public const string Select = """
         SELECT d.deposit_id, d.deposit_no, d.bank_account_id, b.bank_code, b.account_number, d.deposit_date, d.total::numeric(19,2), d.status,
-               (SELECT count(*)::int FROM fin.receipt r WHERE r.deposit_id = d.deposit_id), d.version
+               (SELECT count(*)::int FROM fin.receipt r WHERE r.deposit_id = d.deposit_id), d.version, b.alias
         FROM fin.receipt_deposit d JOIN fin.bank_account b ON b.bank_account_id = d.bank_account_id
         """;
 
     /// <summary>The account number always masked here: sales:read does not carry bank_account_number:read.</summary>
     public static DepositSummary Map(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), AccountNumbers.Show(r.GetString(4), full: false), r.Date(5), r.GetDecimal(6), r.GetString(7), r.GetInt32(8),
-            r.GetInt64(9));
+            r.GetInt64(9), r.NullableString(10));
 }
 
 [RequiresPermission("sales:read")]

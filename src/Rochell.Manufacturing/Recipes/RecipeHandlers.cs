@@ -26,9 +26,9 @@ public sealed class PrepareRecipeHandler : ICommandHandler<PrepareRecipe>
         var perBatch = MfgSql.Quantity(command.UnitsPerBatch, "The units per batch");
         var perCycle = MfgSql.Quantity(command.UnitsPerCycle, "The units per cycle");
         var perRack = MfgSql.Quantity(command.UnitsPerRack, "The units per rack");
-        if (command.MinCuringHours < 0 || command.MaxCuringHours <= command.MinCuringHours)
+        if (command.MinCuringHours < 1 || command.MaxCuringHours <= command.MinCuringHours)
         {
-            throw new DomainException(ManufacturingErrors.FieldInvalid, "The curing window needs 0 ≤ minimum hours < maximum hours.");
+            throw new DomainException(ManufacturingErrors.FieldInvalid, "The curing window needs 1 ≤ minimum hours < maximum hours (E-UX4-9).");
         }
 
         var lines = command.Lines ?? [];

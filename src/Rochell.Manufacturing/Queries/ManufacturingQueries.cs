@@ -1,3 +1,4 @@
+using Rochell.Finance.Policies;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Json;
@@ -220,11 +221,45 @@ public sealed record GetProductionRun(Guid CompanyId, Guid SessionId, Guid RunId
 
 public sealed record ShiftSummaryView(Guid SummaryId, int Batches, decimal GoodUnits, decimal MixScrapUnits, decimal FreshScrapUnits, string Status, Guid RecordedBy, Guid? PostedBy, long Version);
 
-public sealed record ConsumptionView(Guid MaterialItemId, string MaterialCode, string BaseUom, string LocationCode, decimal EnteredQty, string EnteredUom, decimal Qty, decimal TheoreticalQty, decimal Difference);
+/// <summary>
+/// E-UX4-2: <see cref="QtyPerBatch"/> is the run's recipe version's quantity per batch (<see cref="TheoreticalQty"/> = it × the batches
+/// recorded); <see cref="Difference"/> = real − theoretical, with its sign; <see cref="DifferencePct"/> = difference ÷ theoretical × 100
+/// (2 decimals, null when the theoretical is 0); <see cref="OutOfTolerance"/> is USAGE-TOLERANCE's test (|difference| &gt;
+/// usage_tolerance_pct × theoretical), null when no PRODUCTION policy is in force on the run's date.
+/// </summary>
+public sealed record ConsumptionView(
+    Guid MaterialItemId, string MaterialCode, string BaseUom, string LocationCode, decimal EnteredQty, string EnteredUom, decimal Qty, decimal TheoreticalQty, decimal Difference,
+    decimal QtyPerBatch, decimal? DifferencePct, bool? OutOfTolerance);
 
-public sealed record FgLotView(Guid LotId, string LotCode, string Status, DateTime CuringFrom, DateTime ReleasableAt, int Racks);
+/// <summary>E-UX4-2: <see cref="CuringHoursRemaining"/> = whole hours until the lot may be released (rounded up), 0 once it may.</summary>
+public sealed record FgLotView(Guid LotId, string LotCode, string Status, DateTime CuringFrom, DateTime ReleasableAt, int Racks, int CuringHoursRemaining);
 
-public sealed record ProductionRunDetail(ProductionRunSummary Run, ShiftSummaryView? Summary, IReadOnlyList<ConsumptionView> Consumption, FgLotView? Lot);
+/// <summary>
+/// E-UX4-9: <see cref="RecipeVersionId"/> / <see cref="RecipeVersion"/> are the recipe version the run started with — the one its
+/// summary's theoretical consumption and its lot's curing window use, even after a newer version is approved.
+/// <see cref="UsageTolerancePct"/> is the PRODUCTION policy's usage_tolerance_pct on the run's date (a fraction, e.g. 0.05), null without one.
+/// </summary>
+public sealed record ProductionRunDetail(
+    ProductionRunSummary Run, ShiftSummaryView? Summary, IReadOnlyList<ConsumptionView> Consumption, FgLotView? Lot, Guid RecipeVersionId, int RecipeVersion, decimal? UsageTolerancePct);
+
+/// <summary>E-UX4-2: the usage tolerance in force and the variance of a real consumption against its theoretical.</summary>
+internal static class UsageVariance
+{
+    public const string Policy = "PRODUCTION";
+    public const string Parameter = "usage_tolerance_pct";
+
+    public static async Task<decimal?> ToleranceAsync(QueryContext context, DateOnly date, CancellationToken cancellationToken)
+        => await PolicyResolver.TryResolveAsync(context.Connection, context.Transaction, context.CompanyId, Policy, date, cancellationToken).ConfigureAwait(false) is { } policy
+           && policy.Has(Parameter)
+            ? policy.Decimal(Parameter)
+            : null;
+
+    public static decimal? Pct(decimal qty, decimal theoretical)
+        => theoretical == 0m ? null : new decimal(0, 0, 0, false, 2) + decimal.Round((qty - theoretical) / theoretical * 100m, 2, MidpointRounding.AwayFromZero);
+
+    public static bool? Out(decimal qty, decimal theoretical, decimal? tolerance)
+        => tolerance is { } t ? theoretical > 0m && Math.Abs(qty - theoretical) > t * theoretical : null;
+}
 
 [RequiresPermission("production:read")]
 public sealed class GetProductionRunHandler : IQueryHandler<GetProductionRun>
@@ -257,6 +292,14 @@ public sealed class GetProductionRunHandler : IQueryHandler<GetProductionRun>
             ("c", context.CompanyId),
             ("r", query.RunId)).ConfigureAwait(false)
             ?? throw new DomainException(QueryErrors.NotFound, "The production run does not exist.");
+        var recipe = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT v.recipe_version_id, v.version FROM mfg.production_run r JOIN mfg.recipe_version v ON v.recipe_version_id = r.recipe_version_id WHERE r.run_id = @r",
+            r => (Id: r.GetGuid(0), Version: r.GetInt32(1)),
+            cancellationToken,
+            ("r", query.RunId)).ConfigureAwait(false)).Single();
+        var tolerance = await UsageVariance.ToleranceAsync(context, run.BusinessDate, cancellationToken).ConfigureAwait(false);
         var summary = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
@@ -273,26 +316,34 @@ public sealed class GetProductionRunHandler : IQueryHandler<GetProductionRun>
                 context.Connection,
                 context.Transaction,
                 """
-                SELECT c.material_item_id, i.code, i.base_uom, l.code, c.entered_qty, c.entered_uom, c.qty, c.theoretical_qty, c.qty - c.theoretical_qty
+                SELECT c.material_item_id, i.code, i.base_uom, l.code, c.entered_qty, c.entered_uom, c.qty, c.theoretical_qty, c.qty - c.theoretical_qty,
+                       coalesce(rl.qty_per_batch, 0)
                 FROM mfg.material_consumption c JOIN md.item i ON i.item_id = c.material_item_id JOIN md.location l ON l.location_id = c.location_id
+                LEFT JOIN mfg.recipe_line rl ON rl.recipe_version_id = @v AND rl.material_item_id = c.material_item_id
                 WHERE c.summary_id = @s ORDER BY i.code
                 """,
-                r => new ConsumptionView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetDecimal(4), r.GetString(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8)),
+                r => new ConsumptionView(
+                    r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetDecimal(4), r.GetString(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9),
+                    UsageVariance.Pct(r.GetDecimal(6), r.GetDecimal(7)), UsageVariance.Out(r.GetDecimal(6), r.GetDecimal(7), tolerance)),
                 cancellationToken,
-                ("s", summary.SummaryId)).ConfigureAwait(false);
+                ("s", summary.SummaryId),
+                ("v", recipe.Id)).ConfigureAwait(false);
         var lot = summary is null
             ? null
             : await Reading.SingleOrDefaultAsync(
                 context.Connection,
                 context.Transaction,
                 """
-                SELECT f.lot_id, l.lot_code, f.status, f.curing_from, f.releasable_at, (SELECT count(*)::int FROM mfg.rack k WHERE k.lot_id = f.lot_id)
+                SELECT f.lot_id, l.lot_code, f.status, f.curing_from, f.releasable_at, (SELECT count(*)::int FROM mfg.rack k WHERE k.lot_id = f.lot_id),
+                """ + CuringSql.HoursRemaining + """
+
                 FROM mfg.fg_lot f JOIN inv.lot l ON l.lot_id = f.lot_id WHERE f.summary_id = @s
                 """,
-                r => new FgLotView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetFieldValue<DateTime>(3), r.GetFieldValue<DateTime>(4), r.GetInt32(5)),
+                r => new FgLotView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetFieldValue<DateTime>(3), r.GetFieldValue<DateTime>(4), r.GetInt32(5), r.GetInt32(6)),
                 cancellationToken,
-                ("s", summary.SummaryId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new ProductionRunDetail(run, summary, consumption, lot));
+                ("s", summary.SummaryId),
+                ("now", context.Clock.UtcNow)).ConfigureAwait(false);
+        return ApiJson.Serialize(new ProductionRunDetail(run, summary, consumption, lot, recipe.Id, recipe.Version, tolerance));
     }
 }
 
@@ -300,10 +351,19 @@ public sealed class GetProductionRunHandler : IQueryHandler<GetProductionRun>
 
 public sealed record ListFgLots(Guid CompanyId, Guid SessionId, Guid? PlantId = null, string? Status = null, int Limit = 50, int Offset = 0) : IQuery;
 
-/// <summary><c>CuringDone</c>: the minimum curing hours have passed (at the query's time).</summary>
+/// <summary>
+/// <c>CuringDone</c>: the minimum curing hours have passed (at the query's time). E-UX4-2: <c>CuringHoursRemaining</c> = whole hours
+/// until then, rounded up; 0 once done.
+/// </summary>
 public sealed record FgLotSummary(
     Guid LotId, string LotCode, Guid PlantId, string PlantCode, Guid ItemId, string ItemCode, string RunNo, DateOnly BusinessDate, string Status, DateTime CuringFrom, DateTime ReleasableAt,
-    bool CuringDone, string? LocationCode, decimal Quantity, int Racks, string? BlockReason, long Version);
+    bool CuringDone, string? LocationCode, decimal Quantity, int Racks, string? BlockReason, long Version, int CuringHoursRemaining);
+
+internal static class CuringSql
+{
+    /// <summary>Whole hours from <c>@now</c> to the lot's release time, rounded up, never below 0.</summary>
+    public const string HoursRemaining = "greatest(ceil(extract(epoch FROM f.releasable_at - @now) / 3600), 0)::int";
+}
 
 public sealed record FgLotList(IReadOnlyList<FgLotSummary> Items, int Limit, int Offset);
 
@@ -326,7 +386,9 @@ public sealed class ListFgLotsHandler : IQueryHandler<ListFgLots>
                    (SELECT string_agg(loc.code, ', ' ORDER BY loc.code) FROM inv.inv_stock_balance b JOIN md.location loc ON loc.location_id = b.location_id
                      WHERE b.lot_id = f.lot_id AND b.quantity > 0),
                    (SELECT coalesce(sum(b.quantity), 0) FROM inv.inv_stock_balance b WHERE b.lot_id = f.lot_id),
-                   (SELECT count(*)::int FROM mfg.rack k WHERE k.lot_id = f.lot_id), f.block_reason, f.version
+                   (SELECT count(*)::int FROM mfg.rack k WHERE k.lot_id = f.lot_id), f.block_reason, f.version,
+            """ + CuringSql.HoursRemaining + """
+
             FROM mfg.fg_lot f
             JOIN inv.lot l ON l.lot_id = f.lot_id
             JOIN mfg.production_run r ON r.run_id = f.run_id
@@ -337,7 +399,8 @@ public sealed class ListFgLotsHandler : IQueryHandler<ListFgLots>
             LIMIT @limit OFFSET @offset
             """,
             r => new FgLotSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.GetString(6), r.Date(7), r.GetString(8),
-                r.GetFieldValue<DateTime>(9), r.GetFieldValue<DateTime>(10), r.GetBoolean(11), r.NullableString(12), r.GetDecimal(13), r.GetInt32(14), r.NullableString(15), r.GetInt64(16)),
+                r.GetFieldValue<DateTime>(9), r.GetFieldValue<DateTime>(10), r.GetBoolean(11), r.NullableString(12), r.GetDecimal(13), r.GetInt32(14), r.NullableString(15), r.GetInt64(16),
+                r.GetInt32(17)),
             cancellationToken,
             ("c", context.CompanyId),
             ("now", context.Clock.UtcNow),
@@ -401,9 +464,17 @@ public sealed record ProductionDayRun(
     Guid RunId, string RunNo, string MachineCode, string ShiftCode, string ItemCode, string Status, string? SummaryStatus, decimal? GoodUnits, decimal? MixScrapUnits,
     decimal? FreshScrapUnits, string? LotCode, string? LotStatus);
 
-public sealed record ProductionDayMaterial(Guid MaterialItemId, string MaterialCode, string BaseUom, decimal Qty, decimal TheoreticalQty, decimal Difference);
+/// <summary>E-UX4-2: <see cref="DifferencePct"/> and <see cref="OutOfTolerance"/> as for a run's consumption (<see cref="ConsumptionView"/>), on the day's sums.</summary>
+public sealed record ProductionDayMaterial(
+    Guid MaterialItemId, string MaterialCode, string BaseUom, decimal Qty, decimal TheoreticalQty, decimal Difference, decimal? DifferencePct, bool? OutOfTolerance);
 
-public sealed record ProductionDay(Guid PlantId, DateOnly BusinessDate, IReadOnlyList<ProductionDayRun> Runs, decimal GoodUnits, IReadOnlyList<ProductionDayMaterial> Materials);
+/// <summary>
+/// E-UX4-2: the day's totals of the runs' live summaries — <see cref="GoodUnits"/>, <see cref="MixScrapUnits"/>, <see cref="FreshScrapUnits"/>
+/// and <see cref="ScrapUnits"/> (both scraps) — and the PRODUCTION usage tolerance in force that day (null without one).
+/// </summary>
+public sealed record ProductionDay(
+    Guid PlantId, DateOnly BusinessDate, IReadOnlyList<ProductionDayRun> Runs, decimal GoodUnits, IReadOnlyList<ProductionDayMaterial> Materials, decimal MixScrapUnits,
+    decimal FreshScrapUnits, decimal ScrapUnits, decimal? UsageTolerancePct);
 
 [RequiresPermission("production:read")]
 public sealed class GetProductionDayHandler : IQueryHandler<GetProductionDay>
@@ -435,6 +506,7 @@ public sealed class GetProductionDayHandler : IQueryHandler<GetProductionDay>
             ("c", context.CompanyId),
             ("p", query.PlantId),
             ("d", query.BusinessDate)).ConfigureAwait(false);
+        var tolerance = await UsageVariance.ToleranceAsync(context, query.BusinessDate, cancellationToken).ConfigureAwait(false);
         var materials = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
@@ -447,11 +519,15 @@ public sealed class GetProductionDayHandler : IQueryHandler<GetProductionDay>
             WHERE r.company_id = @c AND r.plant_id = @p AND r.business_date = @d
             GROUP BY c.material_item_id, i.code, i.base_uom ORDER BY i.code
             """,
-            r => new ProductionDayMaterial(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5)),
+            r => new ProductionDayMaterial(
+                r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), UsageVariance.Pct(r.GetDecimal(3), r.GetDecimal(4)),
+                UsageVariance.Out(r.GetDecimal(3), r.GetDecimal(4), tolerance)),
             cancellationToken,
             ("c", context.CompanyId),
             ("p", query.PlantId),
             ("d", query.BusinessDate)).ConfigureAwait(false);
-        return ApiJson.Serialize(new ProductionDay(query.PlantId, query.BusinessDate, runs, runs.Sum(r => r.GoodUnits ?? 0m), materials));
+        var mix = runs.Sum(r => r.MixScrapUnits ?? 0m);
+        var fresh = runs.Sum(r => r.FreshScrapUnits ?? 0m);
+        return ApiJson.Serialize(new ProductionDay(query.PlantId, query.BusinessDate, runs, runs.Sum(r => r.GoodUnits ?? 0m), materials, mix, fresh, mix + fresh, tolerance));
     }
 }

@@ -62,8 +62,14 @@ internal static class Quotes
     /// E-QUO1-02-2: the list price in force for (item, unit) — missing refuses the line with PRICE_MISSING — and the quoted price, the
     /// list's when none is given. Nets are rounded to 2 decimals like the order's.
     /// </summary>
-    public static async Task<(Guid PriceListVersionId, List<PricedLine> Lines, decimal Total)> PriceAsync(
+    public static Task<(Guid PriceListVersionId, List<PricedLine> Lines, decimal Total)> PriceAsync(
         CommandContext context, Guid plantId, IReadOnlyList<QuoteLineInput>? input, CancellationToken cancellationToken)
+        => PriceAsync(context.Connection, context.Transaction, context.CompanyId, plantId, input, cancellationToken);
+
+    /// <summary>The same pricing on any connection (E-UX4-3: the read-only preview of a quote runs it too).</summary>
+    public static async Task<(Guid PriceListVersionId, List<PricedLine> Lines, decimal Total)> PriceAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid companyId, Guid plantId, IReadOnlyList<QuoteLineInput>? input,
+        CancellationToken cancellationToken)
     {
         var lines = input ?? [];
         if (lines.Count == 0)
@@ -71,13 +77,13 @@ internal static class Quotes
             throw new DomainException(SalesErrors.LinesRequired, "A quote has at least one line.");
         }
 
-        if (await SalesSql.ScalarAsync<Guid?>(context, "SELECT plant_id FROM md.plant WHERE company_id = @c AND plant_id = @p", cancellationToken, ("c", context.CompanyId), ("p", plantId)).ConfigureAwait(false) is null)
+        if (await SalesSql.ScalarAsync<Guid?>(connection, transaction, "SELECT plant_id FROM md.plant WHERE company_id = @c AND plant_id = @p", cancellationToken, ("c", companyId), ("p", plantId)).ConfigureAwait(false) is null)
         {
             throw new DomainException(SalesErrors.NotFound, "The plant does not exist.");
         }
 
         var list = await SalesSql.ScalarAsync<Guid?>(
-            context, "SELECT price_list_version_id FROM sal.price_list_version WHERE company_id = @c AND status = 'ACTIVE'", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false)
+            connection, transaction, "SELECT price_list_version_id FROM sal.price_list_version WHERE company_id = @c AND status = 'ACTIVE'", cancellationToken, ("c", companyId)).ConfigureAwait(false)
             ?? throw new DomainException(OrderErrors.PriceListMissing, "There is no approved price list.");
         var seen = new HashSet<(Guid, string)>();
         var priced = new List<PricedLine>();
@@ -91,7 +97,7 @@ internal static class Quotes
 
             var quantity = SalesSql.Positive(line.Quantity, 6, "The quantity");
             var listPrice = await SalesSql.ScalarAsync<decimal?>(
-                context, "SELECT unit_price FROM sal.price_list_line WHERE price_list_version_id = @l AND item_id = @i AND uom = @u", cancellationToken,
+                connection, transaction, "SELECT unit_price FROM sal.price_list_line WHERE price_list_version_id = @l AND item_id = @i AND uom = @u", cancellationToken,
                 ("l", list), ("i", line.ItemId), ("u", uom)).ConfigureAwait(false)
                 ?? throw new DomainException(OrderErrors.PriceMissing, $"The price list in force has no price for item {line.ItemId} in {uom}.");
             var unitPrice = line.UnitPrice is { } given ? SalesSql.Positive(given, 4, "The unit price") : listPrice;

@@ -363,6 +363,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/treasury/set-bank-account-alias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetBankAccountAlias"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/treasury/prepare-supplier-payment": {
         parameters: {
             query?: never;
@@ -2939,6 +2955,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/procurement/purchase-orders/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PreviewPurchaseOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/goods-receipts": {
         parameters: {
             query?: never;
@@ -3059,6 +3091,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["ListReconciliationRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/reconciliation/runs/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListLatestReconciliationRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3523,6 +3571,70 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetQuotePrint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/orders/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PreviewSalesOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/quotes/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PreviewQuote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/customers/{partyId}/credit-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCreditPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/customers/{partyId}/receipt-application-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SuggestReceiptApplication"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4411,6 +4523,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/audit/journals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SearchJournals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/audit/integrity-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetIntegrityStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4482,6 +4626,9 @@ export interface components {
             isControl: boolean;
             accountClass: null | string;
             status: string;
+            /** Format: decimal */
+            balance: string;
+            hasEntries: boolean;
         };
         AccountingPolicyList: {
             items: components["schemas"]["AccountingPolicyView"][];
@@ -4540,6 +4687,20 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        AgingBucketTotals: {
+            /** Format: decimal */
+            current: string;
+            /** Format: decimal */
+            bucket1: string;
+            /** Format: decimal */
+            bucket2: string;
+            /** Format: decimal */
+            bucket3: string;
+            /** Format: decimal */
+            over: string;
+            /** Format: decimal */
+            total: string;
+        };
         AgingBuckets: {
             /** Format: int32 */
             bucket1Days: number;
@@ -4589,6 +4750,7 @@ export interface components {
             suppliers: components["schemas"]["AgingSupplier"][];
             /** Format: decimal */
             total: string;
+            bucketTotals: components["schemas"]["AgingBucketTotals"];
         };
         ApDocumentView: {
             /** Format: uuid */
@@ -4717,6 +4879,21 @@ export interface components {
             unapplied: string;
             /** Format: decimal */
             net: string;
+            bucketTotals: components["schemas"]["ArAgingBucketTotals"];
+        };
+        ArAgingBucketTotals: {
+            /** Format: decimal */
+            current: string;
+            /** Format: decimal */
+            bucket1: string;
+            /** Format: decimal */
+            bucket2: string;
+            /** Format: decimal */
+            bucket3: string;
+            /** Format: decimal */
+            over: string;
+            /** Format: decimal */
+            total: string;
         };
         ArAgingBuckets: {
             /** Format: int32 */
@@ -4801,6 +4978,10 @@ export interface components {
             /** Format: decimal */
             difference: string;
             balanced: boolean;
+            /** Format: decimal */
+            totalEquityWithResults: string;
+            /** Format: decimal */
+            totalLiabilitiesAndEquity: string;
         };
         BankAccountList: {
             items: components["schemas"]["BankAccountView"][];
@@ -4816,6 +4997,7 @@ export interface components {
             status: string;
             /** Format: int64 */
             version: number;
+            alias: null | string;
         };
         BankItem: {
             kind: string;
@@ -4849,6 +5031,10 @@ export interface components {
             glItems: components["schemas"]["BankItem"][];
             lineItems: components["schemas"]["BankItem"][];
             findings: components["schemas"]["BankReconciliationFinding"][];
+            /** Format: decimal */
+            glItemsTotal: string;
+            /** Format: decimal */
+            lineItemsTotal: string;
         };
         BankStatementLineList: {
             items: components["schemas"]["BankStatementLineView"][];
@@ -4912,6 +5098,7 @@ export interface components {
             lines: number;
             /** Format: int32 */
             unmatched: number;
+            bankAccountAlias: null | string;
         };
         BillableDeliveryLine: {
             /** Format: uuid */
@@ -4986,6 +5173,17 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             reason: string;
+        };
+        ChainState: {
+            ledger: string;
+            /** Format: date */
+            lastDigestDate: null | string;
+            /** Format: int64 */
+            lastSequence: number;
+            /** Format: int32 */
+            pendingSeal: number;
+            /** Format: int32 */
+            sealErrors: number;
         };
         CloseBankAccount: {
             /** Format: uuid */
@@ -5104,6 +5302,11 @@ export interface components {
             theoreticalQty: string;
             /** Format: decimal */
             difference: string;
+            /** Format: decimal */
+            qtyPerBatch: string;
+            /** Format: decimal */
+            differencePct: null | string;
+            outOfTolerance: null | boolean;
         };
         ControlAssessmentView: {
             triggerPoint: string;
@@ -5363,6 +5566,27 @@ export interface components {
             total: string;
             /** Format: int64 */
             version: number;
+        };
+        CreditPreview: {
+            /** Format: uuid */
+            partyId: string;
+            /** Format: decimal */
+            amount: string;
+            /** Format: decimal */
+            creditLimit: null | string;
+            creditHold: null | boolean;
+            /** Format: decimal */
+            exposure: string;
+            /** Format: decimal */
+            available: null | string;
+            /** Format: decimal */
+            availableAfter: null | string;
+            /** Format: int32 */
+            overdueDays: number;
+            /** Format: int32 */
+            overdueDaysBlock: number;
+            fits: boolean;
+            reasons: string[];
         };
         CreditableLine: {
             /** Format: uuid */
@@ -5681,6 +5905,7 @@ export interface components {
             receipts: number;
             /** Format: int64 */
             version: number;
+            bankAccountAlias: null | string;
         };
         DeterminedTaxView: {
             /** Format: uuid */
@@ -5763,6 +5988,8 @@ export interface components {
             blockReason: null | string;
             /** Format: int64 */
             version: number;
+            /** Format: int32 */
+            curingHoursRemaining: number;
         };
         FgLotView: {
             /** Format: uuid */
@@ -5775,6 +6002,8 @@ export interface components {
             releasableAt: string;
             /** Format: int32 */
             racks: number;
+            /** Format: int32 */
+            curingHoursRemaining: number;
         };
         FiscalAuthorizationConsumptionView: {
             /** Format: uuid */
@@ -5869,6 +6098,8 @@ export interface components {
             netConsumed: string;
             /** Format: int64 */
             version: number;
+            /** Format: int32 */
+            daysToExpiry: null | number;
         };
         FiscalPackageExemption: {
             regime: string;
@@ -6089,6 +6320,17 @@ export interface components {
             /** Format: decimal */
             netIncome: string;
         };
+        IntegrityStatus: {
+            lastVerification: null | components["schemas"]["IntegrityVerification"];
+            chains: components["schemas"]["ChainState"][];
+        };
+        IntegrityVerification: {
+            /** Format: date-time */
+            verifiedAt: string;
+            verifiedBy: null | string;
+            valid: boolean;
+            chains: components["schemas"]["VerifiedChain"][];
+        };
         InvoiceDetail: {
             header: components["schemas"]["InvoiceSummary"];
             voidReason: null | string;
@@ -6277,7 +6519,45 @@ export interface components {
             version: number;
             conversions: components["schemas"]["UomConversionView"][];
         };
+        JournalSearchHit: {
+            /** Format: uuid */
+            journalId: string;
+            /** Format: uuid */
+            sourceEventId: string;
+            eventType: string;
+            aggregateType: string;
+            documentNumber: null | string;
+            ruleCode: string;
+            journalType: string;
+            /** Format: int32 */
+            generation: number;
+            /** Format: date */
+            postingDate: string;
+            /** Format: decimal */
+            totalDebit: string;
+            /** Format: uuid */
+            reversesJournalId: null | string;
+        };
+        JournalSearchResult: {
+            text: string;
+            items: components["schemas"]["JournalSearchHit"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
         JsonElement: unknown;
+        LatestReconciliationRun: {
+            reconCode: string;
+            name: string;
+            severity: string;
+            sideALabel: null | string;
+            sideBLabel: null | string;
+            latestRun: null | components["schemas"]["ReconciliationRunSummary"];
+        };
+        LatestReconciliationRunList: {
+            items: components["schemas"]["LatestReconciliationRun"][];
+        };
         LedgerDigestList: {
             items: components["schemas"]["LedgerDigestView"][];
             /** Format: int32 */
@@ -6671,6 +6951,7 @@ export interface components {
             plan: components["schemas"]["PaymentApplicationView"][];
             statementLines: components["schemas"]["PaymentLineView"][];
             history: components["schemas"]["StateChange"][];
+            bankAccountAlias: null | string;
         };
         PaymentLineView: {
             /** Format: uuid */
@@ -6691,6 +6972,10 @@ export interface components {
             limit: number;
             /** Format: int32 */
             offset: number;
+            /** Format: int32 */
+            count: number;
+            /** Format: decimal */
+            total: string;
         };
         PaymentProposal: {
             /** Format: date */
@@ -6715,6 +7000,7 @@ export interface components {
             status: string;
             /** Format: int64 */
             version: number;
+            bankAccountAlias: null | string;
         };
         PeriodList: {
             /** Format: int32 */
@@ -7002,6 +7288,14 @@ export interface components {
             /** Format: decimal */
             goodUnits: string;
             materials: components["schemas"]["ProductionDayMaterial"][];
+            /** Format: decimal */
+            mixScrapUnits: string;
+            /** Format: decimal */
+            freshScrapUnits: string;
+            /** Format: decimal */
+            scrapUnits: string;
+            /** Format: decimal */
+            usageTolerancePct: null | string;
         };
         ProductionDayMaterial: {
             /** Format: uuid */
@@ -7014,6 +7308,9 @@ export interface components {
             theoreticalQty: string;
             /** Format: decimal */
             difference: string;
+            /** Format: decimal */
+            differencePct: null | string;
+            outOfTolerance: null | boolean;
         };
         ProductionDayRun: {
             /** Format: uuid */
@@ -7038,6 +7335,12 @@ export interface components {
             summary: null | components["schemas"]["ShiftSummaryView"];
             consumption: components["schemas"]["ConsumptionView"][];
             lot: null | components["schemas"]["FgLotView"];
+            /** Format: uuid */
+            recipeVersionId: string;
+            /** Format: int32 */
+            recipeVersion: number;
+            /** Format: decimal */
+            usageTolerancePct: null | string;
         };
         ProductionRunList: {
             items: components["schemas"]["ProductionRunSummary"][];
@@ -7142,6 +7445,8 @@ export interface components {
             lines: components["schemas"]["PurchaseOrderLineView"][];
             goodsReceipts: components["schemas"]["PurchaseOrderReceiptView"][];
             history: components["schemas"]["StateChange"][];
+            /** Format: decimal */
+            total: string;
         };
         PurchaseOrderLineInput: {
             /** Format: uuid */
@@ -7199,6 +7504,8 @@ export interface components {
             version: number;
             /** Format: decimal */
             openQuantity: string;
+            /** Format: decimal */
+            netAmount: string;
         };
         PurchaseOrderList: {
             items: components["schemas"]["PurchaseOrderSummary"][];
@@ -7206,6 +7513,41 @@ export interface components {
             limit: number;
             /** Format: int32 */
             offset: number;
+        };
+        PurchaseOrderPreview: {
+            lines: components["schemas"]["PurchaseOrderPreviewLine"][];
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            itbisTotal: null | string;
+            /** Format: decimal */
+            total: null | string;
+            itbisUnavailableCode: null | string;
+            itbisUnavailableReason: null | string;
+        };
+        PurchaseOrderPreviewLine: {
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: uuid */
+            itemId: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            unitPrice: string;
+            /** Format: decimal */
+            netAmount: string;
+            /** Format: decimal */
+            itbis: null | string;
+        };
+        PurchaseOrderPreviewRequest: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            partyId: string;
+            /** Format: date */
+            orderDate: string;
+            lines: components["schemas"]["PurchaseOrderLineInput"][];
         };
         PurchaseOrderReceiptView: {
             /** Format: uuid */
@@ -7231,6 +7573,8 @@ export interface components {
             status: string;
             /** Format: int64 */
             version: number;
+            /** Format: decimal */
+            total: string;
         };
         PurchaseOrderToReceive: {
             /** Format: uuid */
@@ -7250,6 +7594,9 @@ export interface components {
             /** Format: int64 */
             version: number;
             lines: components["schemas"]["PurchaseOrderLineToReceive"][];
+            /** Format: uuid */
+            defaultLocationId: null | string;
+            defaultLocationCode: null | string;
         };
         PurchaseOrderToReceiveList: {
             items: components["schemas"]["PurchaseOrderToReceive"][];
@@ -7319,6 +7666,11 @@ export interface components {
             limit: number;
             /** Format: int32 */
             offset: number;
+        };
+        QuotePreviewRequest: {
+            /** Format: uuid */
+            plantId: string;
+            lines: components["schemas"]["QuoteLineInput"][];
         };
         QuotePrint: {
             quoteNo: string;
@@ -7395,6 +7747,19 @@ export interface components {
             invoiceId: string;
             /** Format: decimal */
             amount: string;
+        };
+        ReceiptApplicationSuggestion: {
+            /** Format: uuid */
+            partyId: string;
+            /** Format: decimal */
+            amount: string;
+            invoices: components["schemas"]["SuggestedApplication"][];
+            /** Format: decimal */
+            totalOpen: string;
+            /** Format: decimal */
+            applied: string;
+            /** Format: decimal */
+            unapplied: string;
         };
         ReceiptApplicationView: {
             /** Format: uuid */
@@ -7511,6 +7876,9 @@ export interface components {
             depositNo: null | string;
             /** Format: int64 */
             version: number;
+            bankAccountAlias: null | string;
+            bankCode: null | string;
+            bankAccountNumber: null | string;
         };
         RecipeDetail: {
             recipe: components["schemas"]["RecipeSummary"];
@@ -7581,6 +7949,8 @@ export interface components {
             guidance: string;
             severity: string;
             blockingComponents: string[];
+            sideALabel: null | string;
+            sideBLabel: null | string;
         };
         ReconciliationExceptionView: {
             /** Format: uuid */
@@ -7628,6 +7998,10 @@ export interface components {
             status: string;
             /** Format: int32 */
             exceptionCount: number;
+            /** Format: date */
+            cutoffDate: null | string;
+            sideALabel: null | string;
+            sideBLabel: null | string;
         };
         RecordCustomerWithholding: {
             /** Format: uuid */
@@ -7793,6 +8167,8 @@ export interface components {
             /** Format: date */
             dueDate: string;
             lines: components["schemas"]["SupplierInvoiceLineInput"][];
+            /** Format: decimal */
+            printedTotal?: null | string;
         };
         RegisterVehicle: {
             plate: string;
@@ -8200,6 +8576,7 @@ export interface components {
             bankAccountId: string;
             bankCode: string;
             accountNumber: string;
+            alias: null | string;
         };
         SalesLocationView: {
             /** Format: uuid */
@@ -8256,6 +8633,11 @@ export interface components {
             /** Format: int32 */
             offset: number;
         };
+        SalesOrderPreviewRequest: {
+            /** Format: uuid */
+            plantId: string;
+            lines: components["schemas"]["SalesOrderLineInput"][];
+        };
         SalesOrderProforma: {
             orderNo: string;
             /** Format: date */
@@ -8307,6 +8689,37 @@ export interface components {
             valuationAreaId: string;
             locations: components["schemas"]["SalesLocationView"][];
             name?: null | string;
+        };
+        SalesPreview: {
+            /** Format: uuid */
+            priceListVersionId: string;
+            lines: components["schemas"]["SalesPreviewLine"][];
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            itbisTotal: null | string;
+            /** Format: decimal */
+            total: null | string;
+            itbisUnavailableCode: null | string;
+            itbisUnavailableReason: null | string;
+        };
+        SalesPreviewLine: {
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: uuid */
+            itemId: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            listPrice: string;
+            /** Format: decimal */
+            unitPrice: string;
+            specialPrice: boolean;
+            /** Format: decimal */
+            netAmount: string;
+            /** Format: decimal */
+            itbis: null | string;
         };
         ScrapLot: {
             /** Format: uuid */
@@ -8363,6 +8776,13 @@ export interface components {
             plantId: string;
             code: string;
             name: null | string;
+        };
+        SetBankAccountAlias: {
+            /** Format: uuid */
+            bankAccountId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            alias: null | string;
         };
         SetMachineStatus: {
             /** Format: uuid */
@@ -8568,6 +8988,20 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        SuggestedApplication: {
+            /** Format: uuid */
+            invoiceId: string;
+            invoiceNo: string;
+            encf: null | string;
+            /** Format: date */
+            invoiceDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: decimal */
+            openAmount: string;
+            /** Format: decimal */
+            suggested: string;
+        };
         SupplierInvoiceDetail: {
             /** Format: uuid */
             supplierInvoiceId: string;
@@ -8603,6 +9037,10 @@ export interface components {
             openAmount: null | string;
             paymentStatus: string;
             payments: components["schemas"]["SupplierInvoicePaymentView"][];
+            /** Format: decimal */
+            printedTotal: null | string;
+            /** Format: decimal */
+            printedTotalDifference: null | string;
         };
         SupplierInvoiceLineInput: {
             /** Format: uuid */
@@ -8677,6 +9115,10 @@ export interface components {
             /** Format: decimal */
             openAmount: null | string;
             paymentStatus: string;
+            /** Format: decimal */
+            printedTotal: null | string;
+            /** Format: decimal */
+            printedTotalDifference: null | string;
         };
         SupplierList: {
             items: components["schemas"]["SupplierView"][];
@@ -8731,6 +9173,10 @@ export interface components {
             /** Format: decimal */
             totalClosing: string;
             balanced: boolean;
+            /** Format: decimal */
+            totalDebitBalance: string;
+            /** Format: decimal */
+            totalCreditBalance: string;
         };
         TrialBalanceRow: {
             /** Format: uuid */
@@ -8746,6 +9192,10 @@ export interface components {
             credit: string;
             /** Format: decimal */
             closing: string;
+            /** Format: decimal */
+            debitBalance: string;
+            /** Format: decimal */
+            creditBalance: string;
         };
         UnapplyReceipt: {
             /** Format: uuid */
@@ -8966,6 +9416,12 @@ export interface components {
             status: string;
             /** Format: int64 */
             version: number;
+        };
+        VerifiedChain: {
+            ledger: string;
+            valid: boolean;
+            /** Format: int64 */
+            seals: number;
         };
         VerifyAuthorization: {
             /** Format: uuid */
@@ -10317,6 +10773,82 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CloseBankAccount"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SetBankAccountAlias: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetBankAccountAlias"];
             };
         };
         responses: {
@@ -22389,6 +22921,62 @@ export interface operations {
             };
         };
     };
+    PreviewPurchaseOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListGoodsReceipts: {
         parameters: {
             query?: {
@@ -22795,6 +23383,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationRunList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListLatestReconciliationRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LatestReconciliationRunList"];
                 };
             };
             /** @description Bad Request */
@@ -24395,6 +25032,231 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PreviewSalesOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOrderPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PreviewQuote: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCreditPreview: {
+        parameters: {
+            query: {
+                amount: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+                partyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SuggestReceiptApplication: {
+        parameters: {
+            query: {
+                amount: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+                partyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptApplicationSuggestion"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -27385,6 +28247,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LedgerDigestList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SearchJournals: {
+        parameters: {
+            query: {
+                text: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalSearchResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetIntegrityStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrityStatus"];
                 };
             };
             /** @description Bad Request */

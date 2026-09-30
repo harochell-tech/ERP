@@ -20,7 +20,8 @@ public sealed record ListSupplierInvoices(
 /// E-UX3-6: <see cref="TotalAmount"/> stays the net; <see cref="ItbisTotal"/> is the ITBIS of the invoice's tax determination
 /// (recoverable and non-recoverable input, null until determined) and <see cref="GrossTotal"/> net + ITBIS; <see cref="OpenAmount"/>
 /// is the AP document's open amount (null until posted); <see cref="PaymentStatus"/> is VOIDED, REVERSED, NOT_POSTED (no AP
-/// document), PAID (open 0), PARTIAL (open below original) or OPEN.
+/// document), PAID (open 0), PARTIAL (open below original) or OPEN. E-UX4-7: <see cref="PrintedTotal"/> is the total the supplier
+/// printed (typed at registration, optional) and <see cref="PrintedTotalDifference"/> printed − gross, once the gross is determined.
 /// </summary>
 public sealed record SupplierInvoiceSummary(
     Guid SupplierInvoiceId,
@@ -36,7 +37,9 @@ public sealed record SupplierInvoiceSummary(
     decimal? ItbisTotal,
     decimal? GrossTotal,
     decimal? OpenAmount,
-    string PaymentStatus);
+    string PaymentStatus,
+    decimal? PrintedTotal,
+    decimal? PrintedTotalDifference);
 
 public sealed record SupplierInvoiceList(IReadOnlyList<SupplierInvoiceSummary> Items, int Limit, int Offset);
 
@@ -69,7 +72,7 @@ public sealed class ListSupplierInvoicesHandler : IQueryHandler<ListSupplierInvo
             """,
             r => new SupplierInvoiceSummary(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.Date(4), r.Date(5), r.GetString(6), r.GetString(7), r.GetDecimal(8), r.GetInt64(9),
-                r.NullableDecimal(10), r.NullableDecimal(11), r.NullableDecimal(12), r.GetString(13)),
+                r.NullableDecimal(10), r.NullableDecimal(11), r.NullableDecimal(12), r.GetString(13), r.NullableDecimal(14), r.NullableDecimal(15)),
             cancellationToken,
             ("c", context.CompanyId),
             ("doc", query.DocumentStatus),
@@ -127,7 +130,9 @@ internal static class ApAmounts
                         WHEN ap.ap_doc_id IS NULL THEN 'NOT_POSTED'
                         WHEN ap.open_amount = 0 THEN 'PAID'
                         WHEN ap.open_amount < ap.original_amount THEN 'PARTIAL'
-                        ELSE 'OPEN' END
+                        ELSE 'OPEN' END,
+                   si.printed_total,
+                   CASE WHEN si.tax_determination_id IS NOT NULL AND si.printed_total IS NOT NULL THEN (si.printed_total - (si.total_amount + coalesce(t.itbis, 0)))::numeric(19,2) END
 
         """;
 
@@ -162,7 +167,9 @@ public sealed record SupplierInvoiceDetail(
     decimal? GrossTotal,
     decimal? OpenAmount,
     string PaymentStatus,
-    IReadOnlyList<SupplierInvoicePaymentView> Payments);
+    IReadOnlyList<SupplierInvoicePaymentView> Payments,
+    decimal? PrintedTotal,
+    decimal? PrintedTotalDifference);
 
 [RequiresPermission("supplier_invoice:read")]
 public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice>
@@ -190,7 +197,7 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
             r => new SupplierInvoiceDetail(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.Date(4), r.Date(5), r.GetString(6), r.GetString(7), r.GetDecimal(8),
                 r.NullableString(9), r.NullableString(10), r.NullableGuid(11), r.NullableGuid(12), r.GetInt64(13), [], [], null, [],
-                r.NullableDecimal(14), r.NullableDecimal(15), r.NullableDecimal(16), r.GetString(17), []),
+                r.NullableDecimal(14), r.NullableDecimal(15), r.NullableDecimal(16), r.GetString(17), [], r.NullableDecimal(18), r.NullableDecimal(19)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.SupplierInvoiceId)).ConfigureAwait(false)

@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -108,6 +109,11 @@ public sealed class RegisterSupplierInvoiceHandler : ICommandHandler<RegisterSup
             throw new DomainException(ProcurementErrors.FiscalNumberInvalid, "The supplier fiscal number must be an NCF (B + 10 digits) or an e-NCF (E + 12 digits).");
         }
 
+        if (command.PrintedTotal is { } printed && (printed <= 0m || decimal.Round(printed, 2) != printed))
+        {
+            throw new DomainException(ProcurementErrors.PrintedTotalInvalid, "The printed total must be greater than zero with at most 2 decimals.");
+        }
+
         var today = BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow);
         if (command.DocDate > today || command.DueDate < command.DocDate)
         {
@@ -175,26 +181,37 @@ public sealed class RegisterSupplierInvoiceHandler : ICommandHandler<RegisterSup
                     docDate = command.DocDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     dueDate = command.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     totalAmount = total.ToString(CultureInfo.InvariantCulture),
+                    printedTotal = command.PrintedTotal?.ToString(CultureInfo.InvariantCulture),
                 }),
                 Publish: false),
             cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(SupplierInvoiceStore.Aggregate, siId, "DOCUMENT", null, SupplierInvoiceStatus.Draft, CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        await Sql.ExecuteAsync(
-            context.Connection,
-            context.Transaction,
-            """
-            INSERT INTO pur.supplier_invoice (si_id, company_id, party_id, supplier_fiscal_number, doc_date, due_date, document_status, accounting_status, total_amount, created_by, version)
-            VALUES (@id, @c, @party, @ncf, @doc, @due, 'DRAFT', 'NOT_POSTED', @total, @by, 1)
-            """,
-            cancellationToken,
-            ("id", siId),
-            ("c", context.CompanyId),
-            ("party", command.PartyId),
-            ("ncf", fiscalNumber),
-            ("doc", command.DocDate),
-            ("due", command.DueDate),
-            ("total", total),
-            ("by", creator)).ConfigureAwait(false);
+        try
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                INSERT INTO pur.supplier_invoice (si_id, company_id, party_id, supplier_fiscal_number, doc_date, due_date, document_status, accounting_status, total_amount, created_by, version,
+                  printed_total)
+                VALUES (@id, @c, @party, @ncf, @doc, @due, 'DRAFT', 'NOT_POSTED', @total, @by, 1, @printed)
+                """,
+                cancellationToken,
+                ("id", siId),
+                ("c", context.CompanyId),
+                ("party", command.PartyId),
+                ("ncf", fiscalNumber),
+                ("doc", command.DocDate),
+                ("due", command.DueDate),
+                ("total", total),
+                ("by", creator),
+                ("printed", command.PrintedTotal)).ConfigureAwait(false);
+        }
+        catch (DbException ex) when (ex.SqlState == SqlStates.UniqueViolation)
+        {
+            // E-UX4-7: a registration racing the check above meets the partial unique index si_fiscal_uq.
+            throw new DomainException(ProcurementErrors.FiscalNumberUsed, $"Fiscal number {fiscalNumber} is already registered for this supplier.");
+        }
 
         for (var i = 0; i < command.Lines.Count; i++)
         {

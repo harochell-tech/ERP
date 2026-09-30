@@ -10,3 +10,9 @@ public sealed record RegisterBankAccount(Guid CompanyId, Guid SessionId, string 
 
 /// <summary>ACTIVE → CLOSED with a reason; refused while payments or statement lines of the account are open (E-VS2-02-3).</summary>
 public sealed record CloseBankAccount(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid BankAccountId, long ExpectedVersion, string Reason) : ICommand;
+
+/// <summary>
+/// E-UX4-6: gives a bank account a short name (1–60 characters, trimmed) shown as "alias · banco ••••6789"; null or blank removes it.
+/// Changes nothing else; any status.
+/// </summary>
+public sealed record SetBankAccountAlias(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid BankAccountId, long ExpectedVersion, string? Alias) : ICommand;

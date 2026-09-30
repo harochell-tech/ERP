@@ -30,7 +30,10 @@ public sealed record AgingDocument(Guid ApDocId, Guid SupplierInvoiceId, string 
 public sealed record AgingSupplier(
     Guid SupplierId, string SupplierName, decimal Current, decimal Bucket1, decimal Bucket2, decimal Bucket3, decimal Over, decimal Total, IReadOnlyList<AgingDocument> Documents);
 
-public sealed record ApAging(DateOnly AsOf, AgingBuckets Buckets, IReadOnlyList<AgingSupplier> Suppliers, decimal Total);
+/// <summary>E-UX4-2: the open amount of every supplier per bucket; <c>Total</c> is their sum (the grand total).</summary>
+public sealed record AgingBucketTotals(decimal Current, decimal Bucket1, decimal Bucket2, decimal Bucket3, decimal Over, decimal Total);
+
+public sealed record ApAging(DateOnly AsOf, AgingBuckets Buckets, IReadOnlyList<AgingSupplier> Suppliers, decimal Total, AgingBucketTotals BucketTotals);
 
 [RequiresPermission("payment:read")]
 public sealed class GetApAgingHandler : IQueryHandler<GetApAging>
@@ -77,7 +80,12 @@ public sealed class GetApAgingHandler : IQueryHandler<GetApAging>
             return new AgingSupplier(
                 g.Key.SupplierId, g.Key.SupplierName, Sum(Current), Sum(Bucket1), Sum(Bucket2), Sum(Bucket3), Sum(Over), documents.Sum(d => d.OpenAmount), documents);
         }).ToList();
-        return ApiJson.Serialize(new ApAging(asOf, buckets, suppliers, suppliers.Sum(s => s.Total)));
+        var zero = new decimal(0, 0, 0, false, 2);
+        var total = zero + suppliers.Sum(s => s.Total);
+        var totals = new AgingBucketTotals(
+            zero + suppliers.Sum(s => s.Current), zero + suppliers.Sum(s => s.Bucket1), zero + suppliers.Sum(s => s.Bucket2), zero + suppliers.Sum(s => s.Bucket3),
+            zero + suppliers.Sum(s => s.Over), total);
+        return ApiJson.Serialize(new ApAging(asOf, buckets, suppliers, total, totals));
     }
 
     public static string BucketOf(int daysOverdue, AgingBuckets buckets)
@@ -204,10 +212,13 @@ public sealed class GetPaymentProposalHandler : IQueryHandler<GetPaymentProposal
 
 public sealed record ListPayments(Guid CompanyId, Guid SessionId, string? Status = null, Guid? SupplierId = null, int Limit = 50, int Offset = 0) : IQuery;
 
+/// <summary>E-UX4-6: <see cref="BankAccountAlias"/> is the bank account's alias, if it has one.</summary>
 public sealed record PaymentSummary(
-    Guid PaymentId, string PaymentNo, Guid SupplierId, string SupplierName, Guid BankAccountId, string BankCode, string AccountNumber, decimal Amount, DateOnly ValueDate, string Status, long Version);
+    Guid PaymentId, string PaymentNo, Guid SupplierId, string SupplierName, Guid BankAccountId, string BankCode, string AccountNumber, decimal Amount, DateOnly ValueDate, string Status, long Version,
+    string? BankAccountAlias);
 
-public sealed record PaymentList(IReadOnlyList<PaymentSummary> Items, int Limit, int Offset);
+/// <summary>E-UX4-2: <see cref="Count"/> and <see cref="Total"/> cover every payment the filter selects (all pages), not only this page.</summary>
+public sealed record PaymentList(IReadOnlyList<PaymentSummary> Items, int Limit, int Offset, int Count, decimal Total);
 
 [RequiresPermission("payment:read")]
 public sealed class ListPaymentsHandler : IQueryHandler<ListPayments>
@@ -224,7 +235,7 @@ public sealed class ListPaymentsHandler : IQueryHandler<ListPayments>
             context.Connection,
             context.Transaction,
             """
-            SELECT p.payment_id, p.payment_no, p.party_id, s.legal_name, p.bank_account_id, b.bank_code, b.account_number, p.amount, p.value_date, p.status::text, p.version
+            SELECT p.payment_id, p.payment_no, p.party_id, s.legal_name, p.bank_account_id, b.bank_code, b.account_number, p.amount, p.value_date, p.status::text, p.version, b.alias
             FROM fin.payment p
             JOIN md.party s ON s.party_id = p.party_id
             JOIN fin.bank_account b ON b.bank_account_id = p.bank_account_id
@@ -234,14 +245,29 @@ public sealed class ListPaymentsHandler : IQueryHandler<ListPayments>
             LIMIT @limit OFFSET @offset
             """,
             r => new PaymentSummary(
-                r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), AccountNumbers.Show(r.GetString(6), full), r.GetDecimal(7), r.Date(8), r.GetString(9), r.GetInt64(10)),
+                r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), AccountNumbers.Show(r.GetString(6), full), r.GetDecimal(7), r.Date(8), r.GetString(9), r.GetInt64(10),
+                r.NullableString(11)),
             cancellationToken,
             ("c", context.CompanyId),
             ("status", query.Status),
             ("supplier", query.SupplierId),
             ("limit", query.Limit),
             ("offset", query.Offset)).ConfigureAwait(false);
-        return ApiJson.Serialize(new PaymentList(items, query.Limit, query.Offset));
+        var totals = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT count(*)::int, coalesce(sum(p.amount), 0)::numeric(19,2)
+            FROM fin.payment p
+            WHERE p.company_id = @c AND (CAST(@status AS text) IS NULL OR p.status::text = CAST(@status AS text))
+              AND (CAST(@supplier AS uuid) IS NULL OR p.party_id = CAST(@supplier AS uuid))
+            """,
+            r => (Count: r.GetInt32(0), Total: r.GetDecimal(1)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("status", query.Status),
+            ("supplier", query.SupplierId)).ConfigureAwait(false)).Single();
+        return ApiJson.Serialize(new PaymentList(items, query.Limit, query.Offset, totals.Count, totals.Total));
     }
 }
 
@@ -275,7 +301,8 @@ public sealed record PaymentDetail(
     IReadOnlyList<PaymentApplicationView> Applications,
     IReadOnlyList<PaymentApplicationView> Plan,
     IReadOnlyList<PaymentLineView> StatementLines,
-    IReadOnlyList<StateChange> History);
+    IReadOnlyList<StateChange> History,
+    string? BankAccountAlias);
 
 [RequiresPermission("payment:read")]
 public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
@@ -284,7 +311,8 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
 
     private sealed record Header(
         string PaymentNo, Guid SupplierId, string SupplierName, Guid BankAccountId, string BankCode, string AccountNumber, Guid PartyAccountId, string PartyBankCode,
-        string PartyNumber, string PartyStatus, decimal Amount, DateOnly ValueDate, string? Reference, string Status, string? PreparedBy, string? ReleasedBy, Guid? PostingEventId, long Version);
+        string PartyNumber, string PartyStatus, decimal Amount, DateOnly ValueDate, string? Reference, string Status, string? PreparedBy, string? ReleasedBy, Guid? PostingEventId, long Version,
+        string? Alias);
 
     public async Task<string> HandleAsync(GetPayment query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -295,7 +323,8 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
             context.Transaction,
             """
             SELECT p.payment_no, p.party_id, s.legal_name, p.bank_account_id, b.bank_code, b.account_number, v.party_bank_account_id, v.bank_code, v.account_number, v.status,
-                   p.amount, p.value_date, p.bank_reference, p.status::text, coalesce(pu.display_name, pu.email), coalesce(ru.display_name, ru.email), p.posting_event_id, p.version
+                   p.amount, p.value_date, p.bank_reference, p.status::text, coalesce(pu.display_name, pu.email), coalesce(ru.display_name, ru.email), p.posting_event_id, p.version,
+                   b.alias
             FROM fin.payment p
             JOIN md.party s ON s.party_id = p.party_id
             JOIN fin.bank_account b ON b.bank_account_id = p.bank_account_id
@@ -306,7 +335,7 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
             """,
             r => new Header(
                 r.GetString(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.GetGuid(6), r.GetString(7), r.GetString(8), r.GetString(9),
-                r.GetDecimal(10), r.Date(11), r.NullableString(12), r.GetString(13), r.NullableString(14), r.NullableString(15), r.NullableGuid(16), r.GetInt64(17)),
+                r.GetDecimal(10), r.Date(11), r.NullableString(12), r.GetString(13), r.NullableString(14), r.NullableString(15), r.NullableGuid(16), r.GetInt64(17), r.NullableString(18)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.PaymentId)).ConfigureAwait(false)
@@ -360,7 +389,7 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
         return ApiJson.Serialize(new PaymentDetail(
             query.PaymentId, h.PaymentNo, h.SupplierId, h.SupplierName, h.BankAccountId, h.BankCode, AccountNumbers.Show(h.AccountNumber, full), h.PartyAccountId, h.PartyBankCode,
             AccountNumbers.Show(h.PartyNumber, full), h.PartyStatus, h.Amount, h.ValueDate, h.Reference, h.Status, h.PreparedBy, h.ReleasedBy, h.PostingEventId, h.Version,
-            applications, plan, lines, history));
+            applications, plan, lines, history, h.Alias));
     }
 }
 
@@ -370,7 +399,8 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
 
 public sealed record ListBankAccounts(Guid CompanyId, Guid SessionId) : IQuery;
 
-public sealed record BankAccountView(Guid BankAccountId, string BankCode, string AccountNumber, string Currency, string GlAccountCode, string GlAccountName, string Status, long Version);
+/// <summary>E-UX4-6: <see cref="Alias"/> is the account's short name (SetBankAccountAlias), null when none was given.</summary>
+public sealed record BankAccountView(Guid BankAccountId, string BankCode, string AccountNumber, string Currency, string GlAccountCode, string GlAccountName, string Status, long Version, string? Alias);
 
 public sealed record BankAccountList(IReadOnlyList<BankAccountView> Items);
 
@@ -387,11 +417,11 @@ public sealed class ListBankAccountsHandler : IQueryHandler<ListBankAccounts>
             context.Connection,
             context.Transaction,
             """
-            SELECT b.bank_account_id, b.bank_code, b.account_number, b.currency, a.code, a.name, b.status, b.version
+            SELECT b.bank_account_id, b.bank_code, b.account_number, b.currency, a.code, a.name, b.status, b.version, b.alias
             FROM fin.bank_account b JOIN fin.account a ON a.account_id = b.gl_account_id
             WHERE b.company_id = @c ORDER BY b.status, b.bank_code, b.account_number
             """,
-            r => new BankAccountView(r.GetGuid(0), r.GetString(1), AccountNumbers.Show(r.GetString(2), full), r.GetString(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetInt64(7)),
+            r => new BankAccountView(r.GetGuid(0), r.GetString(1), AccountNumbers.Show(r.GetString(2), full), r.GetString(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetInt64(7), r.NullableString(8)),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false);
         return ApiJson.Serialize(new BankAccountList(items));
@@ -446,7 +476,7 @@ public sealed record ListBankStatements(Guid CompanyId, Guid SessionId, Guid? Ba
 
 public sealed record BankStatementView(
     Guid StatementId, Guid BankAccountId, string BankCode, string AccountNumber, DateOnly PeriodFrom, DateOnly PeriodTo, decimal OpeningBalance, decimal ClosingBalance,
-    string FileName, string? ImportedBy, DateTime ImportedAt, int Lines, int Unmatched);
+    string FileName, string? ImportedBy, DateTime ImportedAt, int Lines, int Unmatched, string? BankAccountAlias);
 
 public sealed record BankStatementList(IReadOnlyList<BankStatementView> Items, int Limit, int Offset);
 
@@ -467,7 +497,7 @@ public sealed class ListBankStatementsHandler : IQueryHandler<ListBankStatements
             """
             SELECT s.statement_id, s.bank_account_id, b.bank_code, b.account_number, s.period_from, s.period_to, s.opening_balance, s.closing_balance, f.file_name, coalesce(u.display_name, u.email), s.imported_at,
                    (SELECT count(*) FROM fin.bank_statement_line l WHERE l.statement_id = s.statement_id)::int,
-                   (SELECT count(*) FROM fin.bank_statement_line l WHERE l.statement_id = s.statement_id AND l.status = 'UNMATCHED')::int
+                   (SELECT count(*) FROM fin.bank_statement_line l WHERE l.statement_id = s.statement_id AND l.status = 'UNMATCHED')::int, b.alias
             FROM fin.bank_statement s
             JOIN fin.bank_account b ON b.bank_account_id = s.bank_account_id
             JOIN fin.bank_statement_file f ON f.statement_id = s.statement_id
@@ -478,7 +508,7 @@ public sealed class ListBankStatementsHandler : IQueryHandler<ListBankStatements
             """,
             r => new BankStatementView(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), AccountNumbers.Show(r.GetString(3), full), r.Date(4), r.Date(5), r.GetDecimal(6), r.GetDecimal(7), r.GetString(8),
-                r.NullableString(9), r.Utc(10), r.GetInt32(11), r.GetInt32(12)),
+                r.NullableString(9), r.Utc(10), r.GetInt32(11), r.GetInt32(12), r.NullableString(13)),
             cancellationToken,
             ("c", context.CompanyId),
             ("b", query.BankAccountId),

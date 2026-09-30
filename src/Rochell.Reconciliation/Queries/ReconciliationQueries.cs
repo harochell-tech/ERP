@@ -102,7 +102,11 @@ public sealed class ListPeriodsHandler : IQueryHandler<ListPeriods>
 /// <summary>Reconciliation runs, newest first, optionally of one reconciliation.</summary>
 public sealed record ListReconciliationRuns(Guid CompanyId, Guid SessionId, string? ReconCode = null, int Limit = 50, int Offset = 0) : IQuery;
 
-/// <summary>E-UX3-2: <see cref="Name"/> and <see cref="Guidance"/> are the reconciliation's Spanish name and what to do about its findings.</summary>
+/// <summary>
+/// E-UX3-2: <see cref="Name"/> and <see cref="Guidance"/> are the reconciliation's Spanish name and what to do about its findings.
+/// E-UX4-2: <see cref="CutoffDate"/> is the date the run reconciled at (null: as of the run), <see cref="SideALabel"/> and
+/// <see cref="SideBLabel"/> say in Spanish what <see cref="TotalA"/> and <see cref="TotalB"/> are (null for a reconciliation without totals).
+/// </summary>
 public sealed record ReconciliationRunSummary(
     Guid RunId,
     string ReconCode,
@@ -114,7 +118,10 @@ public sealed record ReconciliationRunSummary(
     decimal? TotalB,
     decimal? Difference,
     string Status,
-    int ExceptionCount);
+    int ExceptionCount,
+    DateOnly? CutoffDate,
+    string? SideALabel,
+    string? SideBLabel);
 
 public sealed record ReconciliationRunList(IReadOnlyList<ReconciliationRunSummary> Items, int Limit, int Offset);
 
@@ -147,14 +154,15 @@ public sealed class ListReconciliationRunsHandler : IQueryHandler<ListReconcilia
 
     internal const string RunSelect = """
         SELECT r.run_id, r.recon_code, d.description, d.name, d.guidance, r.as_of, r.total_a, r.total_b, r.difference, r.status,
-               (SELECT count(*)::int FROM rec.recon_exception x WHERE x.run_id = r.run_id)
+               (SELECT count(*)::int FROM rec.recon_exception x WHERE x.run_id = r.run_id), r.cutoff_date, d.side_a_label, d.side_b_label
         FROM rec.recon_run r
         JOIN rec.recon_definition d ON d.recon_code = r.recon_code
 
         """;
 
     internal static ReconciliationRunSummary MapRun(System.Data.Common.DbDataReader r)
-        => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.Utc(5), r.NullableDecimal(6), r.NullableDecimal(7), r.NullableDecimal(8), r.GetString(9), r.GetInt32(10));
+        => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.Utc(5), r.NullableDecimal(6), r.NullableDecimal(7), r.NullableDecimal(8), r.GetString(9), r.GetInt32(10),
+            r.IsDBNull(11) ? null : r.Date(11), r.NullableString(12), r.NullableString(13));
 }
 
 /// <summary>
@@ -223,7 +231,8 @@ public sealed class GetReconciliationRunHandler : IQueryHandler<GetReconciliatio
 /// <summary>E-UX3-2: the reconciliations with their Spanish name, what to do about their findings, severity and the components they block.</summary>
 public sealed record ListReconciliationDefinitions(Guid CompanyId, Guid SessionId) : IQuery;
 
-public sealed record ReconciliationDefinitionView(string ReconCode, string Name, string Guidance, string Severity, IReadOnlyList<string> BlockingComponents);
+public sealed record ReconciliationDefinitionView(
+    string ReconCode, string Name, string Guidance, string Severity, IReadOnlyList<string> BlockingComponents, string? SideALabel, string? SideBLabel);
 
 public sealed record ReconciliationDefinitionList(IReadOnlyList<ReconciliationDefinitionView> Items);
 
@@ -241,12 +250,52 @@ public sealed class ListReconciliationDefinitionsHandler : IQueryHandler<ListRec
             context.Transaction,
             """
             SELECT d.recon_code, d.name, d.guidance, d.severity,
-                   coalesce((SELECT array_agg(b.component ORDER BY b.component) FROM rec.recon_blocking b WHERE b.recon_code = d.recon_code), '{}')
+                   coalesce((SELECT array_agg(b.component ORDER BY b.component) FROM rec.recon_blocking b WHERE b.recon_code = d.recon_code), '{}'),
+                   d.side_a_label, d.side_b_label
             FROM rec.recon_definition d
             ORDER BY d.recon_code
             """,
-            r => new ReconciliationDefinitionView(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetFieldValue<string[]>(4)),
+            r => new ReconciliationDefinitionView(r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetFieldValue<string[]>(4), r.NullableString(5), r.NullableString(6)),
             cancellationToken).ConfigureAwait(false);
         return ApiJson.Serialize(new ReconciliationDefinitionList(items));
+    }
+}
+
+/// <summary>
+/// E-UX4-2 (A-23): every reconciliation with its latest run (by run time) — status, cutoff date, totals with their labels and
+/// exception count — or none when it never ran. The reconciliations screen shows this first, instead of every run.
+/// </summary>
+public sealed record ListLatestReconciliationRuns(Guid CompanyId, Guid SessionId) : IQuery;
+
+public sealed record LatestReconciliationRun(string ReconCode, string Name, string Severity, string? SideALabel, string? SideBLabel, ReconciliationRunSummary? LatestRun);
+
+public sealed record LatestReconciliationRunList(IReadOnlyList<LatestReconciliationRun> Items);
+
+[RequiresPermission("reconciliation:read")]
+public sealed class ListLatestReconciliationRunsHandler : IQueryHandler<ListLatestReconciliationRuns>
+{
+    public string QueryType => "Reconciliation.ListLatestReconciliationRuns";
+
+    public async Task<string> HandleAsync(ListLatestReconciliationRuns query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var definitions = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT recon_code, name, severity, side_a_label, side_b_label FROM rec.recon_definition ORDER BY recon_code",
+            r => new LatestReconciliationRun(r.GetString(0), r.GetString(1), r.GetString(2), r.NullableString(3), r.NullableString(4), null),
+            cancellationToken).ConfigureAwait(false);
+        var latest = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            ListReconciliationRunsHandler.RunSelect + """
+            WHERE r.company_id = @c
+              AND r.run_id = (SELECT l.run_id FROM rec.recon_run l WHERE l.company_id = r.company_id AND l.recon_code = r.recon_code ORDER BY l.as_of DESC, l.run_id DESC LIMIT 1)
+            """,
+            ListReconciliationRunsHandler.MapRun,
+            cancellationToken,
+            ("c", context.CompanyId)).ConfigureAwait(false)).ToDictionary(r => r.ReconCode, StringComparer.Ordinal);
+        return ApiJson.Serialize(new LatestReconciliationRunList([.. definitions.Select(d => d with { LatestRun = latest.GetValueOrDefault(d.ReconCode) })]));
     }
 }

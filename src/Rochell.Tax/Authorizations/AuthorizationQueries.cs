@@ -10,9 +10,10 @@ namespace Rochell.Tax.Authorizations;
 
 public sealed record ListFiscalAuthorizations(Guid CompanyId, Guid SessionId, Guid? PartyId = null, string? Status = null) : IQuery;
 
+/// <summary>E-UX4-2: <see cref="DaysToExpiry"/> = valid until − today's business date (0 on its last day, negative once past); null without a date.</summary>
 public sealed record FiscalAuthorizationSummary(
     Guid AuthorizationId, Guid PartyId, string CustomerRnc, string CustomerName, string Regime, string CertificateNo, DateOnly IssuedOn, DateOnly? ValidUntil, string ProjectName,
-    string Status, decimal NetAuthorized, decimal NetConsumed, long Version);
+    string Status, decimal NetAuthorized, decimal NetConsumed, long Version, int? DaysToExpiry);
 
 public sealed record FiscalAuthorizationList(IReadOnlyList<FiscalAuthorizationSummary> Items);
 
@@ -22,13 +23,13 @@ internal static class AuthorizationSql
         SELECT a.authorization_id, a.party_id, p.rnc, p.legal_name, a.regime, a.certificate_no, a.issued_on, a.valid_until, a.project_name, a.status,
                coalesce((SELECT sum(l.net_authorized) FROM tax.fiscal_authorization_line l WHERE l.authorization_id = a.authorization_id), 0),
                coalesce((SELECT sum(l.net_consumed) FROM tax.fiscal_authorization_line l WHERE l.authorization_id = a.authorization_id), 0),
-               a.version
+               a.version, a.valid_until - CAST(@today AS date)
         FROM tax.fiscal_authorization a JOIN md.party p ON p.party_id = a.party_id
         """;
 
     public static FiscalAuthorizationSummary Map(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.Date(6), r.IsDBNull(7) ? null : r.Date(7), r.GetString(8),
-            r.GetString(9), r.GetDecimal(10), r.GetDecimal(11), r.GetInt64(12));
+            r.GetString(9), r.GetDecimal(10), r.GetDecimal(11), r.GetInt64(12), r.IsDBNull(13) ? null : r.GetInt32(13));
 }
 
 [RequiresPermission("sales:read")]
@@ -52,7 +53,8 @@ public sealed class ListFiscalAuthorizationsHandler : IQueryHandler<ListFiscalAu
             cancellationToken,
             ("c", context.CompanyId),
             ("p", query.PartyId),
-            ("s", query.Status)).ConfigureAwait(false);
+            ("s", query.Status),
+            ("today", BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow))).ConfigureAwait(false);
         return ApiJson.Serialize(new FiscalAuthorizationList(items));
     }
 }
@@ -88,7 +90,7 @@ public sealed class GetFiscalAuthorizationHandler : IQueryHandler<GetFiscalAutho
         ArgumentNullException.ThrowIfNull(context);
         var header = await Reading.SingleOrDefaultAsync(
             context.Connection, context.Transaction, AuthorizationSql.Summary + "\nWHERE a.company_id = @c AND a.authorization_id = @id", AuthorizationSql.Map, cancellationToken,
-            ("c", context.CompanyId), ("id", query.AuthorizationId)).ConfigureAwait(false)
+            ("c", context.CompanyId), ("id", query.AuthorizationId), ("today", BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow))).ConfigureAwait(false)
             ?? throw new DomainException(QueryErrors.NotFound, "The fiscal authorization does not exist.");
         var extra = (await Reading.SingleOrDefaultAsync(
             context.Connection,

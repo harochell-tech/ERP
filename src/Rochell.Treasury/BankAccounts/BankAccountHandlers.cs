@@ -150,3 +150,60 @@ public sealed class CloseBankAccountHandler : ICommandHandler<CloseBankAccount>
         return JsonSerializer.Serialize(new { bankAccountId = command.BankAccountId, status = "CLOSED", version });
     }
 }
+
+/// <summary>E-UX4-6: an alias only labels the account on screen, so no step-up; the change is an event with the previous alias.</summary>
+[RequiresPermission("bank_account:manage")]
+public sealed class SetBankAccountAliasHandler : ICommandHandler<SetBankAccountAlias>
+{
+    public const int MaxAliasLength = 60;
+
+    public string CommandType => "Treasury.SetBankAccountAlias";
+
+    private sealed record AliasRow(string? Alias, long Version);
+
+    public async Task<string> HandleAsync(SetBankAccountAlias command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var alias = string.IsNullOrWhiteSpace(command.Alias) ? null : command.Alias.Trim();
+        if (alias is { Length: > MaxAliasLength })
+        {
+            throw new DomainException(TreasuryErrors.BankAccountAliasInvalid, $"A bank account alias has at most {MaxAliasLength} characters.");
+        }
+
+        var row = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT alias, version FROM fin.bank_account WHERE bank_account_id = @id AND company_id = @c FOR UPDATE",
+            r => new AliasRow(r.NullableString(0), r.GetInt64(1)),
+            cancellationToken,
+            ("id", command.BankAccountId),
+            ("c", context.CompanyId)).ConfigureAwait(false)
+            ?? throw new DomainException(TreasuryErrors.BankAccountNotFound, "The bank account does not exist.");
+        if (row.Version != command.ExpectedVersion)
+        {
+            throw new DomainException(TreasuryErrors.VersionConflict, $"The bank account is at version {row.Version}, not {command.ExpectedVersion}.");
+        }
+
+        var version = row.Version + 1;
+        await context.AppendEventAsync(
+            new EventDraft(
+                "BankAccountAliasSet",
+                1,
+                BankAccountRules.Aggregate,
+                command.BankAccountId,
+                version,
+                JsonSerializer.Serialize(new { bankAccountId = command.BankAccountId, alias, previousAlias = row.Alias }),
+                Publish: false),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE fin.bank_account SET alias = @alias, version = @version WHERE bank_account_id = @id",
+            cancellationToken,
+            ("alias", alias),
+            ("version", version),
+            ("id", command.BankAccountId)).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { bankAccountId = command.BankAccountId, alias, version });
+    }
+}

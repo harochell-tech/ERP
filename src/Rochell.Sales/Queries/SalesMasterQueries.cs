@@ -340,7 +340,8 @@ public sealed class ListSalesPlantsHandler : IQueryHandler<ListSalesPlants>
 
 public sealed record ListSalesBankAccounts(Guid CompanyId, Guid SessionId) : IQuery;
 
-public sealed record SalesBankAccountView(Guid BankAccountId, string BankCode, string AccountNumber);
+/// <summary>E-UX4-6: <see cref="Alias"/> is the account's short name, if any.</summary>
+public sealed record SalesBankAccountView(Guid BankAccountId, string BankCode, string AccountNumber, string? Alias);
 
 public sealed record SalesBankAccountList(IReadOnlyList<SalesBankAccountView> Items);
 
@@ -360,8 +361,8 @@ public sealed class ListSalesBankAccountsHandler : IQueryHandler<ListSalesBankAc
         var items = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT bank_account_id, bank_code, account_number FROM fin.bank_account WHERE company_id = @c AND status = 'ACTIVE' ORDER BY bank_code, account_number",
-            r => new SalesBankAccountView(r.GetGuid(0), r.GetString(1), AccountNumbers.Show(r.GetString(2), full: false)),
+            "SELECT bank_account_id, bank_code, account_number, alias FROM fin.bank_account WHERE company_id = @c AND status = 'ACTIVE' ORDER BY bank_code, account_number",
+            r => new SalesBankAccountView(r.GetGuid(0), r.GetString(1), AccountNumbers.Show(r.GetString(2), full: false), r.NullableString(3)),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false);
         return ApiJson.Serialize(new SalesBankAccountList(items));
