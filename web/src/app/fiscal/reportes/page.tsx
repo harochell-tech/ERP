@@ -11,6 +11,7 @@ import {
   ID_TYPES,
   isValidPeriod,
   PAYMENT_METHODS,
+  periodToMonthInput,
   previousPeriod,
   warningLabel,
   WITHHOLDING_TAXES,
@@ -21,6 +22,7 @@ import { csvUrl } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 import { isrWithholdingTypeLabel } from "@/lib/fiscalRuleForm";
+import { ecfTypeLabel, monthValueToPeriod, periodLabel } from "@/lib/ux4a-auditoria";
 
 // FIS2-03 (E-FIS2-03-1…4): the 606 of a month (to paste into the DGII tool) and the informative IT-1 / IR-17 summaries. Every
 // amount, count and total is the server's (fiscal_report:read); the browser only formats them.
@@ -126,7 +128,7 @@ function Report606Rows({ records }: { records: readonly Record606[] }) {
               <td className="num">
                 <Money value={r.itbisPerceived} />
               </td>
-              <td title={r.isrWithholdingType ? isrWithholdingTypeLabel(r.isrWithholdingType) : undefined}>{r.isrWithholdingType ?? "—"}</td>
+              <td className="wrap">{r.isrWithholdingType ? isrWithholdingTypeLabel(r.isrWithholdingType) : "—"}</td>
               <td className="num">
                 <Money value={r.isrWithheld} />
               </td>
@@ -233,7 +235,7 @@ function It1View({ companyId, period }: { companyId: string; period: string }) {
         <Loading error={error} />
       ) : (
         <>
-          <h2>Ventas del período {data.period}</h2>
+          <h2>Ventas de {periodLabel(data.period)}</h2>
           {data.sales.length === 0 ? (
             <p className="muted">No hay facturas emitidas en el período.</p>
           ) : (
@@ -250,7 +252,7 @@ function It1View({ companyId, period }: { companyId: string; period: string }) {
               <tbody>
                 {data.sales.map((s) => (
                   <tr key={s.ecfType}>
-                    <td>{s.ecfType}</td>
+                    <td>{ecfTypeLabel(s.ecfType)}</td>
                     <td className="num">{s.invoices}</td>
                     <td className="num">
                       <Money value={s.taxedNet} />
@@ -355,7 +357,7 @@ function Ir17View({ companyId, period }: { companyId: string; period: string }) 
         <Loading error={error} />
       ) : (
         <>
-          <h2>Retenciones a proveedores pagadas en {data.period}</h2>
+          <h2>Retenciones a proveedores pagadas en {periodLabel(data.period)}</h2>
           {data.lines.length === 0 ? (
             <p className="muted">No hay retenciones a proveedores en el período.</p>
           ) : (
@@ -411,8 +413,9 @@ function Ir17View({ companyId, period }: { companyId: string; period: string }) 
 export default function Page() {
   const { companyId, can } = useSession();
   const [tab, setTab] = useState<FiscalReportTab>("606");
-  const [typed, setTyped] = useState(() => previousPeriod());
-  const period = typed.trim();
+  // UX4-02 (G-24): the period is picked as a month (yyyy-MM); the server still takes AAAAMM.
+  const [month, setMonth] = useState(() => periodToMonthInput(previousPeriod()));
+  const period = monthValueToPeriod(month) ?? "";
   const valid = isValidPeriod(period);
 
   if (!can("fiscal_report:read")) {
@@ -422,8 +425,8 @@ export default function Page() {
     <>
       <h1>Reportes fiscales</h1>
       <div className="inline-form">
-        <Field label="Período (AAAAMM)" required error={valid ? null : "Escriba el período como AAAAMM, por ejemplo 202609."}>
-          <input value={typed} onChange={(e) => setTyped(e.target.value)} inputMode="numeric" maxLength={6} placeholder="202609" />
+        <Field label="Período" required error={valid ? null : "Elija el mes del reporte."} hint={valid ? `Mes de ${periodLabel(period)} (${period}).` : undefined}>
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </Field>
       </div>
       <div className="tabs" role="tablist">

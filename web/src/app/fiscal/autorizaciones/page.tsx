@@ -10,10 +10,12 @@ import { formatDate, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { expiryText, expiryTone } from "@/lib/ux4a-auditoria";
 
 // FIS1-05 (E-FIS1-05-2): CONFOTUR fiscal authorizations by status and customer (sales:read). Crédito and Facturación register them
 // (fiscal_authorization:register); the Especialista fiscal expires those past their validity (fiscal_authorization:suspend, the same
 // command the daily process runs). The net amounts are the server's.
+// UX4-02 (G-26): "Vence en N días" from the server's daysToExpiry; the expiry button says what it does in plain words.
 
 function ExpireButton({ onDone }: { onDone: () => void }) {
   const expire = useCommand("expire-fiscal-authorizations", "/api/v1/companies/{companyId}/tax/expire-fiscal-authorizations", (r) => {
@@ -24,9 +26,9 @@ function ExpireButton({ onDone }: { onDone: () => void }) {
   return (
     <span className="inline-form">
       <ConfirmAction
-        label="Vencer autorizaciones vencidas"
-        title="¿Vencer las autorizaciones pasadas de fecha?"
-        consequence="Las autorizaciones cuya vigencia terminó pasan a Vencido y ya no permiten facturar con e-CF 44. No se deshace (es lo mismo que hace el proceso diario)."
+        label="Marcar como vencidas las que pasaron su fecha"
+        title="¿Marcar como vencidas las autorizaciones cuya vigencia terminó?"
+        consequence="Las autorizaciones cuya fecha «Vigente hasta» ya pasó quedan en estado Vencido y dejan de permitir facturas exentas (e-CF 44). Las vigentes no cambian. No se deshace; el proceso diario hace lo mismo cada madrugada, este botón solo lo adelanta."
         busy={expire.busy}
         onConfirm={async () => {
           setMessage(null);
@@ -46,6 +48,11 @@ function ExpireButton({ onDone }: { onDone: () => void }) {
       <ErrorBox error={expire.error} />
     </span>
   );
+}
+
+/** The expiry count matters while the authorization may still be used or activated. */
+function showsExpiry(status: string): boolean {
+  return status === "ACTIVE" || status === "SUSPENDED" || status === "PENDING_VERIFICATION" || status === "DRAFT";
 }
 
 function Authorizations() {
@@ -137,7 +144,17 @@ function Authorizations() {
                   {a.customerName} <span className="muted">({a.customerRnc})</span>
                 </td>
                 <td className="wrap">{a.projectName}</td>
-                <td>{formatDate(a.validUntil)}</td>
+                <td>
+                  {formatDate(a.validUntil)}
+                  {showsExpiry(a.status) && expiryText(a.daysToExpiry) ? (
+                    <>
+                      <br />
+                      <span className={`badge tone-${expiryTone(a.daysToExpiry)}`} data-testid="expiry">
+                        {expiryText(a.daysToExpiry)}
+                      </span>
+                    </>
+                  ) : null}
+                </td>
                 <td>
                   <StatusBadge status={a.status} />
                 </td>

@@ -52,6 +52,8 @@ function fromDetail(j: Schemas["ManualJournalDetail"]): Values {
 
 // FIN1-04 (E-FIN1-04-4…6): prepare an adjustment, or change a DRAFT (?id=). The form never adds amounts: the adjustment's page
 // shows the server's totals and "Enviar" waits for a difference of 0.00.
+// UX4-02 (A-13, E-UX3-8 (a)): the support's SHA-256 is hidden ("Huella del archivo verificada"), the reference is proposed from the
+// file name, an edited draft shows its current support, and the fiscal checkbox reads without the component code.
 function AdjustmentForm() {
   const { companyId, can, plantName } = useSession();
   const router = useRouter();
@@ -101,7 +103,8 @@ function AdjustmentForm() {
 
   const chooseFile = async (file: File | undefined) => {
     if (file) {
-      set({ supportSha256: await sha256Hex(file), supportFile: file.name, supportRef: values.supportRef || file.name });
+      const keepRef = values.supportRef.trim() !== "" && values.supportRef !== values.supportFile && !(data.journal && values.supportRef === data.journal.supportRef);
+      set({ supportSha256: await sha256Hex(file), supportFile: file.name, supportRef: keepRef ? values.supportRef : file.name });
     }
   };
 
@@ -110,7 +113,7 @@ function AdjustmentForm() {
     const found: Record<string, string | false> = {
       postingDate: !values.postingDate && "Indique la fecha contable.",
       description: !values.description.trim() && "Describa el ajuste.",
-      supportFile: values.supportSha256.length !== 64 && "Elija el archivo del soporte.",
+      supportFile: values.supportSha256.length !== 64 && "Elija el archivo del soporte: el sistema calcula su huella al elegirlo.",
       supportRef: !values.supportRef.trim() && "Indique la referencia del soporte.",
     };
     lines.forEach((l, index) => {
@@ -156,20 +159,27 @@ function AdjustmentForm() {
           <input aria-label="Descripción" maxLength={500} style={{ width: "min(32rem, 100%)" }} value={values.description} onChange={(e) => set({ description: e.target.value })} />
         </Field>
       </div>
+      {values.supportSha256 && !values.supportFile && data.journal ? (
+        <p className="evidence-verified" data-testid="support-current" title={`SHA-256 ${values.supportSha256}`}>
+          <span className="badge tone-done">✓</span> Soporte actual: {values.supportRef} (huella verificada). Elija otro archivo solo si cambia el soporte.
+        </p>
+      ) : null}
       <div>
-        <Field label="Archivo del soporte" required error={fe.errors.supportFile}>
+        <Field label="Archivo del soporte" required error={fe.errors.supportFile} hint="El archivo no se guarda en el sistema; conserve el original.">
           <input type="file" aria-label="Archivo del soporte" onChange={(e) => void chooseFile(e.target.files?.[0])} />
         </Field>
-        <Field label="Referencia del soporte" required error={fe.errors.supportRef}>
+        <Field label="Referencia del soporte" required error={fe.errors.supportRef} hint="Se propone el nombre del archivo; puede cambiarla.">
           <input aria-label="Referencia del soporte" maxLength={200} value={values.supportRef} onChange={(e) => set({ supportRef: e.target.value })} />
         </Field>
       </div>
-      <p className="muted mono" data-testid="support-hash">
-        {values.supportSha256 ? `SHA-256 ${values.supportSha256}${values.supportFile ? ` (${values.supportFile})` : ""}` : "El archivo no se sube: se guarda su huella SHA-256."}
-      </p>
+      {values.supportSha256 && values.supportFile ? (
+        <p className="evidence-verified" data-testid="support-hash" title={`SHA-256 ${values.supportSha256}`}>
+          <span className="badge tone-done">✓</span> Huella del archivo verificada: {values.supportFile}
+        </p>
+      ) : null}
       <div className="actions">
         <label>
-          <input type="checkbox" checked={values.tax} onChange={(e) => set({ tax: e.target.checked })} /> Tiene efecto fiscal (componente ACR-TAX)
+          <input type="checkbox" checked={values.tax} onChange={(e) => set({ tax: e.target.checked })} /> Tiene efecto fiscal (ITBIS, retenciones u otro impuesto)
         </label>
         <label>
           <input type="checkbox" checked={values.autoReverse} onChange={(e) => set({ autoReverse: e.target.checked })} /> Reversar el día 1 del mes siguiente
@@ -247,7 +257,10 @@ function AdjustmentForm() {
           ))}
         </tbody>
       </LineTable>
-      <p className="muted">Solo cuentas activas que no son de control. Los totales y la diferencia los calcula el sistema al guardar.</p>
+      <p className="muted">Solo cuentas activas que no son de control (las de control se mueven solo con sus documentos).</p>
+      <p className="notice" data-testid="totals-on-save">
+        Los totales de débito y crédito y la diferencia (debe ser 0.00 para enviarlo) los calcula el sistema: aparecen al guardar el borrador.
+      </p>
       <div className="actions form-actions">
         <button type="button" onClick={() => set({ lines: [...values.lines, { ...EMPTY_LINE }] })}>
           Agregar línea

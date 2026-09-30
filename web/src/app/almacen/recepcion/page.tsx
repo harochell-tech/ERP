@@ -60,8 +60,12 @@ function CorrectionForm({ receipt, onDone }: { receipt: Receipt; onDone: () => v
   };
 
   return (
-    <>
-      <h2>Corregir cantidad</h2>
+    <section className="card" aria-label="Corregir cantidad">
+      <h2 style={{ marginTop: 0 }}>Corregir cantidad</h2>
+      <p className="muted">
+        Use la corrección cuando lo recibido no coincide con lo pesado o contado. El Controller la aprueba y entonces se ajustan el inventario y
+        su asiento.
+      </p>
       <Field label="Línea" required error={fe.errors.lineId}>
         <select aria-label="Línea a corregir" value={values.lineId} onChange={(e) => setValues({ ...values, lineId: e.target.value })}>
           {receipt.lines.map((l) => (
@@ -71,8 +75,13 @@ function CorrectionForm({ receipt, onDone }: { receipt: Receipt; onDone: () => v
           ))}
         </select>
       </Field>
-      <Field label="Diferencia (+/−)" required error={fe.errors.delta}>
-        <input aria-label="Diferencia" inputMode="decimal" value={values.delta} onChange={(e) => setValues({ ...values, delta: e.target.value })} />
+      <Field
+        label="Diferencia (+/−)"
+        required
+        error={fe.errors.delta}
+        hint="Lo que hay que sumar o restar a lo recibido, en la unidad de la línea: -2.5 (faltaron 2.5 t) o 1 (llegó 1 t más)."
+      >
+        <input aria-label="Diferencia" inputMode="decimal" placeholder="-2.5" value={values.delta} onChange={(e) => setValues({ ...values, delta: e.target.value })} />
       </Field>
       <Field label="Motivo" required error={fe.errors.reason}>
         <input aria-label="Motivo de la corrección" value={values.reason} onChange={(e) => setValues({ ...values, reason: e.target.value })} />
@@ -86,6 +95,36 @@ function CorrectionForm({ receipt, onDone }: { receipt: Receipt; onDone: () => v
         </button>
       </div>
       <ErrorBox error={create.error} />
+    </section>
+  );
+}
+
+/** C-17: the correction form is folded behind a button; most receipts never need one. */
+function Correction({ receipt, onDone }: { receipt: Receipt; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <div className="actions">
+        <button type="button" onClick={() => setOpen(true)}>
+          Corregir cantidad
+        </button>
+      </div>
+    );
+  }
+  return (
+    <>
+      <CorrectionForm
+        receipt={receipt}
+        onDone={() => {
+          setOpen(false);
+          onDone();
+        }}
+      />
+      <div className="actions">
+        <button type="button" onClick={() => setOpen(false)}>
+          Cerrar sin corregir
+        </button>
+      </div>
     </>
   );
 }
@@ -201,7 +240,7 @@ function ReceiptDetail() {
           </tbody>
         </table></div>
       )}
-      {receipt.documentStatus !== "REVERSED" && can("receipt_correction:create") ? <CorrectionForm receipt={receipt} onDone={reload} /> : null}
+      {receipt.documentStatus !== "REVERSED" && can("receipt_correction:create") ? <Correction receipt={receipt} onDone={reload} /> : null}
       <History history={receipt.history} />
     </>
   );

@@ -10,6 +10,7 @@ import { statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { correctionsEmptyText, correctionsFilterLabel } from "@/lib/ux4a-compras";
 
 type Correction = Schemas["ReceiptCorrectionView"];
 
@@ -75,13 +76,28 @@ function Corrections() {
   return (
     <>
       <h1>Correcciones de recepción</h1>
-      <p>
-        <Link href="/almacen/correcciones/">Todas</Link> · <Link href="/almacen/correcciones/?estado=PENDING_APPROVAL">Pendientes de aprobación</Link>
+      {/* C-18: the active filter is marked (aria-current) and named. */}
+      <nav className="actions" aria-label="Filtro de correcciones">
+        {["", "PENDING_APPROVAL"].map((s) => (
+          <Link
+            key={s || "all"}
+            className={`button${status === s ? " primary" : ""}`}
+            aria-current={status === s ? "page" : undefined}
+            href={s ? `/almacen/correcciones/?estado=${s}` : "/almacen/correcciones/"}
+          >
+            {correctionsFilterLabel(s)}
+          </Link>
+        ))}
+      </nav>
+      <p className="muted" data-testid="corrections-filter">
+        Mostrando: {correctionsFilterLabel(status)}.
       </p>
       {data === null ? (
         <Loading error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay correcciones.</p>
+        <p className="muted" data-testid="corrections-empty">
+          {correctionsEmptyText(status)}
+        </p>
       ) : (
         <div className="table-wrap"><table>
           <thead>

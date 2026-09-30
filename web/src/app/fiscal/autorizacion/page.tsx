@@ -4,15 +4,15 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { History } from "@/components/History";
 import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { AUTHORIZATION_DOCUMENT_KINDS, authorizationActions, documentKindLabel } from "@/lib/authorizations";
 import { formatQuantity } from "@/lib/decimal";
-import { formatDate, formatDateTime } from "@/lib/labels";
+import { formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { expiryText, expiryTone } from "@/lib/ux4a-auditoria";
 
 type Authorization = Schemas["FiscalAuthorizationDetail"];
 
@@ -201,7 +201,17 @@ function AuthorizationDetail() {
         <dt>Emitido el</dt>
         <dd>{formatDate(h.issuedOn)}</dd>
         <dt>Vigente hasta</dt>
-        <dd>{formatDate(h.validUntil)}</dd>
+        <dd>
+          {formatDate(h.validUntil)}
+          {h.status !== "EXPIRED" && h.status !== "REJECTED" && expiryText(h.daysToExpiry) ? (
+            <>
+              {" "}
+              <span className={`badge tone-${expiryTone(h.daysToExpiry)}`} data-testid="expiry">
+                {expiryText(h.daysToExpiry)}
+              </span>
+            </>
+          ) : null}
+        </dd>
         <dt>Fin del plazo del proyecto</dt>
         <dd>{formatDate(data.projectTermEndsOn)}</dd>
         {data.salesOrderId ? (
@@ -321,7 +331,27 @@ function AuthorizationDetail() {
           </tbody>
         </table></div>
       )}
-      <History history={data.history.map((x) => ({ statusKind: "DOCUMENT", command: "", by: null, ...x }))} />
+      <h2>Historial</h2>
+      <div className="table-wrap"><table data-testid="authorization-history">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>De</th>
+            <th>A</th>
+            <th>Motivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.history.map((x, i) => (
+            <tr key={i}>
+              <td>{formatDateTime(x.at)}</td>
+              <td>{statusLabel(x.from)}</td>
+              <td>{statusLabel(x.to)}</td>
+              <td className="wrap">{x.reason ?? (x.to === "EXPIRED" ? "Vigencia terminada" : "")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
     </>
   );
 }

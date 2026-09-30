@@ -136,6 +136,7 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   const csv = `Fecha,Referencia,Descripcion,Debito,Credito\n${dd}/${month}/${year},TRF-77,Transferencia Constructora Uno,,5900.00\n`;
   const treasurer = await signIn(browser, "Tesorero");
   await nav(treasurer, "Extractos bancarios");
+  await treasurer.getByRole("button", { name: "Importar extracto" }).click();
   await treasurer.getByLabel("Cuenta bancaria").selectOption({ label: "TEST_BANK ••••4321" });
   await treasurer.getByLabel("Archivo del banco").setInputFiles({ name: "extracto-cobros.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
   await treasurer.getByLabel("Desde").fill(day);

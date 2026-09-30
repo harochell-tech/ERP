@@ -21,11 +21,15 @@ export default function Receipts() {
   return (
     <>
       <h1>Recepciones</h1>
-      <p className="muted">Para recibir, abra una orden aprobada desde Órdenes de compra.</p>
+      <p className="muted">
+        Para recibir material, vaya a <Link href="/almacen/por-recibir/">Por recibir</Link>: allí están las órdenes aprobadas con lo pendiente.
+      </p>
       {data === null ? (
         <Loading error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay recepciones.</p>
+        <p className="muted" data-testid="receipts-empty">
+          Aún no hay recepciones. Cuando llegue material, búsquelo en <Link href="/almacen/por-recibir/">Por recibir</Link> y pulse «Recibir».
+        </p>
       ) : (
         <div className="table-wrap"><table>
           <thead>

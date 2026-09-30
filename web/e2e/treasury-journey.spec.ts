@@ -16,19 +16,37 @@ function dominican(isoDate: string): string {
   return `${day}/${month}/${year}`;
 }
 
+/** UX4-02 (C-27, E-UX4-6): the treasury journey's account, once the Controller names it. */
+const ACCOUNT = "Operativa · TEST_BANK ••••6789";
+
 test("payment from the proposal to a reconciled bank statement", async ({ browser }) => {
+  // UX4-02 (C-27): the Controller names the seeded account; every treasury screen then reads "alias · banco ••••6789". Idempotent
+  // (the button reads "Cambiar alias" when a previous run already named it).
+  const controller = await signIn(browser, "Controller");
+  await nav(controller, "Cuentas bancarias de la empresa");
+  const accountRow = controller.getByRole("row").filter({ hasText: "••••6789" });
+  await accountRow.getByRole("button", { name: /^(Poner|Cambiar) alias$/ }).click();
+  await accountRow.getByLabel("Alias de TEST_BANK ••••6789").fill("Operativa");
+  await accountRow.getByRole("button", { name: "Guardar alias" }).click();
+  await expect(accountRow.getByTestId("bank-account-label")).toHaveText(ACCOUNT);
+
   const treasurer = await signIn(browser, "Tesorero");
   await nav(treasurer, "Propuesta de pago");
-  await treasurer.getByLabel("Vence hasta").fill(today(60));
+  // UX4-02 (C-26, E-UX4-12): the proposal opens with "Esta semana" (today + 7); the seeded invoice falls due in 30 days, so "Todo".
+  await expect(treasurer.getByLabel("Vence hasta", { exact: true })).toHaveValue(today(7));
+  await expect(treasurer.getByRole("button", { name: "Esta semana" })).toHaveAttribute("aria-pressed", "true");
+  await treasurer.getByRole("button", { name: "Todo", exact: true }).click();
+  await expect(treasurer.getByRole("button", { name: "Todo", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(treasurer.getByTestId("supplier-payability")).toHaveText("Verificada · pagable");
   await treasurer.getByRole("checkbox", { name: "Pagar B0100000001" }).check();
+  await treasurer.getByLabel("Cuenta de la empresa").selectOption({ label: ACCOUNT });
   await submit(treasurer, "Preparar pago");
   await expect(treasurer.getByTestId("payment-status")).toHaveText("Preparado");
   await expect(treasurer.getByTestId("payment-amount")).toHaveText("10,620.00");
+  await expect(treasurer.getByTestId("payment-bank-account")).toHaveText(ACCOUNT);
   const paymentUrl = treasurer.url();
   await expect(treasurer.getByRole("button", { name: "Liberar pago" })).toHaveCount(0);
 
-  const controller = await signIn(browser, "Controller");
   await controller.goto(paymentUrl);
   await confirmAction(controller, "Liberar pago");
   await expect(controller.getByTestId("payment-status")).toHaveText("Liberado");
@@ -37,6 +55,9 @@ test("payment from the proposal to a reconciled bank statement", async ({ browse
   const day = today();
   const csv = `Fecha,Referencia,Descripcion,Debito,Credito\n${dominican(day)},TRF-1,Transferencia PAG-000001,10620.00,\n${dominican(day)},,Comision transferencia,150.00,\n`;
   await nav(treasurer, "Extractos bancarios");
+  // UX4-02 (C-30): the import opens from the button beside the title, as "Preparar un pago" on Pagos.
+  await treasurer.getByRole("button", { name: "Importar extracto" }).click();
+  await treasurer.getByLabel("Cuenta bancaria").selectOption({ label: ACCOUNT });
   await treasurer.getByLabel("Archivo del banco").setInputFiles({ name: "extracto.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
   await treasurer.getByLabel("Desde").fill(day);
   await treasurer.getByLabel("Hasta").fill(day);
@@ -53,9 +74,21 @@ test("payment from the proposal to a reconciled bank statement", async ({ browse
   await confirmAction(controller, "Registrar como cargo");
   await expect(controller.getByRole("tab", { name: "Cargos registrados (1)" })).toBeVisible();
   await expect(controller.getByTestId("bank-gl-difference")).toHaveText("0.00");
+  // UX4-02 (C-29): the reconciling statement, statement → books with the server's totals, nothing left unexplained.
+  await expect(controller.getByLabel("Cuenta bancaria")).toContainText(ACCOUNT);
+  await expect(controller.getByTestId("reconciling-statement")).toContainText("Diferencia sin explicar");
+  await expect(controller.getByTestId("recon-difference")).toHaveText("0.00");
 
   await controller.goto(paymentUrl);
   await expect(controller.getByTestId("payment-status")).toHaveText("Compensado");
+
+  // UX4-02 (C-31): the payments list counts and totals what the filter selects (the server's), and names the account by its alias.
+  await nav(controller, "Pagos");
+  await expect(controller.getByTestId("payments-count")).toHaveText(/^\d+ pagos?$/);
+  await expect(controller.getByTestId("payments-total")).toHaveText(/^[\d,]+\.\d{2}$/);
+  await expect(controller.getByRole("row").filter({ hasText: "PAG-000001" })).toContainText(ACCOUNT);
+  await nav(treasurer, "Extractos bancarios");
+  await expect(treasurer.getByRole("row").filter({ hasText: "extracto.csv" }).first()).toContainText("2 líneas, ninguna pendiente");
 
   // UX3-02 (E-UX3-6): the invoice reads paid in the payables list — ITBIS, total with ITBIS and balance are the server's — and its
   // detail lists the payment.

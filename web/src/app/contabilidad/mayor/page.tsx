@@ -9,6 +9,7 @@ import { formatDate, todayInDominicanRepublic } from "@/lib/labels";
 import { accountClassLabel, csvUrl, monthStart } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { filterAccounts } from "@/lib/ux4a-contabilidad";
 
 const PATH = "/api/v1/companies/{companyId}/finance/accounts/{accountId}/ledger";
 const PAGE = 100;
@@ -25,6 +26,7 @@ const DOCUMENTS: Readonly<Record<string, string>> = {
 
 // FIN1-04 (E-FIN1-04-8, E-FIN1-03-7): the movements of one account with their documents and running balance; each one opens
 // "Explicar asiento" for those who may read it (audit:read).
+// UX4-02 (A-12): the account selector is narrowed by a search on code or name (the chosen account always stays listed).
 function Ledger() {
   const { companyId, can } = useSession();
   const search = useSearchParams();
@@ -35,6 +37,8 @@ function Ledger() {
   const [offset, setOffset] = useState(0);
   const allowed = can("ledger:read");
   const { data: accounts } = useLoad(can("configuration:read") ? () => query("/api/v1/companies/{companyId}/finance/accounts", { path: { companyId } }) : null, [companyId]);
+  const [accountSearch, setAccountSearch] = useState("");
+  const matching = filterAccounts(accounts?.items ?? [], accountSearch, accountId);
   const params = { path: { companyId, accountId }, query: { from, to, limit: PAGE, offset } };
   const { data, error } = useLoad(allowed && accountId && from && to ? () => query(PATH, params) : null, [companyId, accountId, from, to, offset, allowed]);
   if (!allowed) {
@@ -44,10 +48,13 @@ function Ledger() {
     <>
       <h1>Mayor por cuenta</h1>
       <div>
-        <Field label="Cuenta">
+        <Field label="Buscar cuenta" hint="Escriba parte del código o del nombre (p. ej. 1100 o banco).">
+          <input type="search" aria-label="Buscar cuenta" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)} />
+        </Field>
+        <Field label="Cuenta" hint={accountSearch.trim() ? `${matching.length} cuenta${matching.length === 1 ? "" : "s"} con «${accountSearch.trim()}»` : undefined}>
           <select aria-label="Cuenta" value={accountId} onChange={(e) => { setAccountId(e.target.value); setOffset(0); }}>
-            <option value="">—</option>
-            {(accounts?.items ?? []).map((a) => (
+            <option value="">{matching.length === 0 ? "Ninguna cuenta coincide" : "— Elija la cuenta —"}</option>
+            {matching.map((a) => (
               <option key={a.accountId} value={a.accountId}>
                 {a.code} — {a.name}
               </option>

@@ -183,7 +183,7 @@ e-NCF prefix, the expiry count), unit-tested.
 
 | Page | What it does |
 | --- | --- |
-| `/fiscal/autorizaciones/` | Filters by status and customer (`?estado=&cliente=`); certificate, customer, project, valid until, status, net authorized and consumed (the server's); "Registrar autorización" (`fiscal_authorization:register`); "Vencer autorizaciones vencidas" runs `expire-fiscal-authorizations` and says how many expired (`fiscal_authorization:suspend`) |
+| `/fiscal/autorizaciones/` | Filters by status and customer (`?estado=&cliente=`); certificate, customer, project, valid until, status, net authorized and consumed (the server's); "Registrar autorización" (`fiscal_authorization:register`); "Marcar como vencidas las que pasaron su fecha" (UX4-02; formerly "Vencer autorizaciones vencidas") runs `expire-fiscal-authorizations` and says how many expired (`fiscal_authorization:suspend`) |
 | `/fiscal/autorizaciones/nueva/[?id=]` | Register, or edit a DRAFT: customer (active, with RNC), certificate, issued on, valid until, project, CONFOTUR resolution, project term end, optional origin order of the customer; scope lines product × unit (the price list in force, `sales:read`) with quantity and net as text, validated by the server |
 | `/fiscal/autorizacion/?id=` | Header, scope (authorized, consumed, available), documents (any of the 4 kinds; the SHA-256 is computed in the browser, the file is not uploaded), "Facturas que la consumen" (consumptions and releases), history; edit / submit (DRAFT), verify (step-up, hidden for the registrar), return to draft / reject with a reason (PENDING_VERIFICATION), suspend (ACTIVE) and reactivate (SUSPENDED) with a reason |
 | `/ventas/proforma/?id=` | From the order's "Proforma" button: issuer, customer, lines with the ITBIS of the rules in force today, totals and a blank signature and stamp area; "Imprimir" calls `window.print()` and the print CSS hides the menu, header and buttons (no PDF) |
@@ -437,3 +437,64 @@ Wave 3 of the UI audit, on top of UX3-01 (`docs/engineering/flows.md`). No API c
   field, and drafts a credit note the invoice's issuer is not offered to issue; the quote journey prints the draft with "BORRADOR"
   and the sent quote without watermark or X-Q1; the production journey has Calidad see the Inicio counter, open "Listos para
   liberar" and release the lot through its "Acciones" dialog. All but the ledger journey run on desktop and on the phone.
+
+## UX4-02 — screens of Compras, Almacén, CxP, Tesorería, Contabilidad, Cierre, Auditoría and Fiscal (E-UX4-1…17)
+
+Wave 4 of the UI audit, on top of UX4-01 (`docs/engineering/ux4.md`); UX4-03 covers the other areas. Every total and difference is
+the server's (E-UX4-2). The pure helpers live in new files, unit-tested (`tests/unit/ux4a*.test.ts`): `lib/ux4a.ts`
+(`previewQuery`, the POST transport of the previews — anti-CSRF header, no Idempotency-Key; `bankAccountLabel`),
+`lib/ux4a-compras.ts`, `lib/ux4a-tesoreria.ts`, `lib/ux4a-contabilidad.ts`, `lib/ux4a-auditoria.ts`.
+
+- **Compras.** The PO form previews through `POST …/purchase-orders/preview` 400 ms after the last change, once plant, supplier,
+  date and every line are complete: "Neto (RD$)" per line, net, "ITBIS estimado" (or "No disponible: <reason>" when the fiscal gate
+  is closed) and total; a preview error is one line and never blocks saving. "Guardar y enviar a aprobación" creates and submits
+  (two commands); a DRAFT's detail says "Aún no enviada a aprobación". The list has Total (RD$, without ITBIS), a supplier filter
+  (`?proveedor=`) and, for approvers, "Pendientes de mi aprobación (n)" (every PENDING_APPROVAL order in scope: the list has no
+  creator, and the server refuses self-approval). The detail adds Neto and Pendiente per line, the total and the receipts as a
+  table (location, item, quantity). Units read "tonelada (t)", "litro (L)"…; an item whose description repeats its code shows the
+  code once. The OC-YYYY-NNNNNN number is assigned on save (E-UX4-5).
+- **Almacén.** Recibir preselects the server's `defaultLocationId`; CURADO and TRANSITO are listed disabled "(no recibe materia
+  prima)" (the server answers LOCATION_NOT_RECEIVABLE anyway, E-UX4-8). "Corregir cantidad" opens the correction form with examples
+  ("-2.5 (faltaron 2.5 t)"); the corrections filters show the active one and explain an empty result; an empty receipts list links
+  to Por recibir.
+- **CxP.** "Cotejada con OC y recepción" (a local label; `labels.ts` MATCHED is unchanged); the accounting status appears only when
+  it adds something (hidden for NOT_POSTED on a DRAFT or matched invoice and when it equals the document status). The register
+  form takes "Total según factura (RD$)" (`printedTotal`, E-UX4-7) and the detail shows the server's difference. Tax effect
+  "Crédito fiscal (deducible)" / "No deducible (va al costo)", rate in %, "Recibido sin facturar", "Diferencia de precio aceptada
+  por <name>". The aging totals row is the server's `bucketTotals`; its empty state names the next step.
+- **Tesorería.** Company accounts read "alias · BANCO ••••6789" everywhere in these areas; the Controller sets the alias on
+  Maestros › Cuentas bancarias ("Poner alias" / "Cambiar alias", `set-bank-account-alias`, blank clears, E-UX4-6). The proposal
+  opens with "Vence hasta" today + 7 (E-UX4-12) and the shortcuts Esta semana / 15 días / Todo ("Todo" sends 9999-12-31); when
+  nothing falls due it counts what falls due later (a second query, rows counted) with "Ver todas". The payments list shows the
+  server's count and total of the filter. Statements read "2 líneas, ninguna pendiente" / "1 de 2 pendiente de conciliar";
+  "Importar extracto" sits by the title like "Preparar un pago". The bank reconciliation shows "Diferencia sin explicar" and the
+  reconciling table Saldo del extracto + movimientos en libros no reflejados (`glItemsTotal`) − movimientos del banco no
+  registrados (`lineItemsTotal`) + diferencia = Saldo en libros, every figure the server's.
+- **Contabilidad.** Balanza: "Saldo deudor" / "Saldo acreedor" with the server's totals. Balance general: a summary with the result
+  inside Patrimonio and "Total pasivo + patrimonio"; "Agrupado según el formato de reporte aprobado" instead of "Estructura versión
+  N". Mayor: "Buscar cuenta" filters the account select (code or name, accents ignored). Ajustes: the support file follows
+  E-UX3-8 (a) (hash hidden, "✓ Huella del archivo verificada", "Soporte actual" when editing), "Tiene efecto fiscal" instead of
+  ACR-TAX, totals on save; the detail says "Debe aprobarlo: Controller, una persona distinta de quien lo preparó" and shows "Aprobó"
+  only once approved; the list drops the Componente column and filters by month (in the browser, over the loaded page:
+  `ListManualJournals` takes no date). Catálogo: the server's balance, "Desactivar" only at zero, "De control" explained, "Sin
+  clasificar". Estructuras: "Preparar versión" is disabled while lines and accounts equal the copied version (the date is not
+  compared: the form proposes today), "Agrupada bajo", "Activo (A)", "Regirá desde" for a draft and who approves next. Apertura:
+  "Descargar plantilla CSV" (`planta,ubicacion,producto,cantidad,documento`), each column explained, the button says what is missing.
+- **Cierre.** `/cierre/conciliaciones/` opens with the latest run of each reconciliation (`/reconciliation/runs/latest`, with the
+  cutoff) and folds the full history; run totals are labelled with `sideALabel` / `sideBLabel`; the run page lists its facts (no
+  "p. m.." sentence).
+- **Auditoría.** `/auditoria/asientos/` without `?evento=` is "Buscar asientos" (`/audit/journals?text=`, by document number or id,
+  `?buscar=`); with an event it is titled after its document ("Asientos de la recepción RM-…"), labels come from `lib/explain.ts`
+  and "Reversa del asiento" links. Verificar integridad and Respaldos diarios inalterables show the last verification and per chain
+  the latest daily backup, last sealed record, pending seal and seal errors (`/audit/integrity-status`). The menu items (in
+  `Shell.tsx`, outside UX4-02) keep their former names.
+- **Fiscal.** Fuentes fiscales: the E-UX3-8 (a) evidence pattern, "Prueba" / "Oficial (DGII)" explained (P-7), rows with title,
+  version, type badge and short hash. Reportes: the period is a month picker (sent as AAAAMM); e-CF types "31 — Crédito fiscal"…
+  (`ecfTypeLabel`) and the ISR types by name. Autorizaciones: "Vence en N días" / "Vence hoy" / "Venció hace N días" from
+  `daysToExpiry`; the history has no "Por" column (the authorization history carries no actor).
+- **Tests.** Playwright: the purchase journey (desktop and mobile) checks the preview (40,000.00), "Guardar y enviar a aprobación",
+  "Pendientes de mi aprobación", the list total, Pendiente and the preselected location; the treasury journey sets the alias
+  "Operativa" and finds "Operativa · TEST_BANK ••••6789" on the proposal, payment and reconciliation, the default "Vence hasta", the
+  payments count and total and "Diferencia sin explicar" 0.00; the ledger journey the adjustment's verified fingerprint, equal
+  debit and credit balance totals, the account search and "Total pasivo + patrimonio"; the security journey searches the journals
+  by a supplier invoice's NCF and reads the integrity status; the fiscal journeys the month picker and "Vence en N días".

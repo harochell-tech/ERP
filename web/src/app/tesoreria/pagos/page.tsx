@@ -8,6 +8,8 @@ import { Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel } from "@/lib/ux4a";
+import { paymentsCountText } from "@/lib/ux4a-tesoreria";
 
 // VS2-08: payments of the company, newest first (payment:read; E-VS2-07-1). Numbers of accounts arrive masked (E-VS2-07-3).
 const FILTERS: readonly { value: string; label: string }[] = [
@@ -55,6 +57,12 @@ function Payments() {
       ) : data.items.length === 0 ? (
         <p className="muted">No hay pagos con ese estado.</p>
       ) : (
+        <>
+        {/* C-31 (E-UX4-2): count and total of every payment the filter selects, the server's (all pages). */}
+        <p data-testid="payments-summary">
+          <strong data-testid="payments-count">{paymentsCountText(data.count)}</strong> por un total de <Money value={data.total} testId="payments-total" currency />
+          {data.count > data.items.length ? <span className="muted"> · se muestran los {data.items.length} más recientes</span> : null}
+        </p>
         <div className="table-wrap"><table>
           <thead>
             <tr>
@@ -73,9 +81,7 @@ function Payments() {
                   <Link href={`/tesoreria/pago/?id=${p.paymentId}`}>{p.paymentNo}</Link>
                 </td>
                 <td className="wrap">{p.supplierName}</td>
-                <td className="mono">
-                  {p.bankCode} {p.accountNumber}
-                </td>
+                <td className="mono">{bankAccountLabel({ alias: p.bankAccountAlias, bankCode: p.bankCode, accountNumber: p.accountNumber })}</td>
                 <td>{formatDate(p.valueDate)}</td>
                 <td className="num">
                   <Money value={p.amount} />
@@ -87,6 +93,7 @@ function Payments() {
             ))}
           </tbody>
         </table></div>
+        </>
       )}
     </>
   );

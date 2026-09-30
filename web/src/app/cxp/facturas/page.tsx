@@ -4,7 +4,8 @@ import Link from "next/link";
 import { query } from "@/api/client";
 import { AccountingStatus, Loading, NoPermission } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
-import { formatDate, statusLabel } from "@/lib/labels";
+import { formatDate } from "@/lib/labels";
+import { accountingStatusWorthShowing, invoiceStatusLabel } from "@/lib/ux4a-compras";
 import { paymentStatusLabel, paymentStatusTone } from "@/lib/payables";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
@@ -32,7 +33,7 @@ export default function Invoices() {
       {data === null ? (
         <Loading error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay facturas.</p>
+        <p className="muted">No hay facturas de proveedor. Se registran contra una orden de compra ya recibida, con «Registrar factura».</p>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -70,10 +71,8 @@ export default function Invoices() {
                     {paymentStatusLabel(si.paymentStatus)}
                   </span>
                 </td>
-                <td>{statusLabel(si.documentStatus)}</td>
-                <td>
-                  <AccountingStatus status={si.accountingStatus} />
-                </td>
+                <td>{invoiceStatusLabel(si.documentStatus)}</td>
+                <td>{accountingStatusWorthShowing(si.documentStatus, si.accountingStatus) ? <AccountingStatus status={si.accountingStatus} /> : null}</td>
               </tr>
             ))}
           </tbody>

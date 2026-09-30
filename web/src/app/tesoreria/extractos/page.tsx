@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { query, type CommandResponse } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission, useFieldErrors } from "@/components/ui";
+import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { isDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel } from "@/lib/ux4a";
+import { statementLinesText } from "@/lib/ux4a-tesoreria";
 
 /** E-VS2-05-2: the file travels base64, at most 5 MB. */
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -86,7 +88,7 @@ function ImportForm({ onDone }: { onDone: () => void }) {
         <select value={bank} onChange={(e) => setBankAccountId(e.target.value)}>
           {active.map((b) => (
             <option key={b.bankAccountId} value={b.bankAccountId}>
-              {b.bankCode} {b.accountNumber}
+              {bankAccountLabel(b)}
             </option>
           ))}
         </select>
@@ -132,17 +134,35 @@ export default function Page() {
     can("bank:read") ? () => query("/api/v1/companies/{companyId}/treasury/bank-statements", { path: { companyId }, query: { limit: 200 } }) : null,
     [companyId],
   );
+  const [importing, setImporting] = useState(false);
   if (!can("bank:read")) {
     return <NoPermission />;
   }
   return (
     <>
-      <h1>Extractos bancarios</h1>
-      {can("bank_statement:import") ? <ImportForm onDone={reload} /> : null}
+      {/* C-30: the create action sits beside the title, as on Pagos; the form opens below it. */}
+      <div className="actions" style={{ justifyContent: "space-between" }}>
+        <h1>Extractos bancarios</h1>
+        {can("bank_statement:import") && !importing ? (
+          <button type="button" className="primary" onClick={() => setImporting(true)}>
+            Importar extracto
+          </button>
+        ) : null}
+      </div>
+      {can("bank_statement:import") && importing ? (
+        <>
+          <ImportForm onDone={reload} />
+          <div className="actions">
+            <button type="button" onClick={() => setImporting(false)}>
+              Cerrar formulario
+            </button>
+          </div>
+        </>
+      ) : null}
       {data === null ? (
         <Loading error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">Todavía no hay extractos importados.</p>
+        <p className="muted">Todavía no hay extractos importados. Importe el archivo CSV que descarga del banco con «Importar extracto».</p>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -153,16 +173,14 @@ export default function Page() {
               <th className="num">Saldo final (RD$)</th>
               <th>Archivo</th>
               <th>Importado</th>
-              <th className="num">Sin conciliar</th>
+              <th>Líneas del extracto</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {data.items.map((s) => (
               <tr key={s.statementId}>
-                <td className="mono">
-                  {s.bankCode} {s.accountNumber}
-                </td>
+                <td className="mono">{bankAccountLabel({ alias: s.bankAccountAlias, bankCode: s.bankCode, accountNumber: s.accountNumber })}</td>
                 <td>
                   {formatDate(s.periodFrom)} – {formatDate(s.periodTo)}
                 </td>
@@ -176,8 +194,8 @@ export default function Page() {
                 <td>
                   {formatDateTime(s.importedAt)} <span className="muted">{s.importedBy ?? ""}</span>
                 </td>
-                <td className="num">
-                  {s.unmatched} / {s.lines}
+                <td>
+                  {s.lines > 0 && s.unmatched === 0 ? <StatusBadge status="MATCHED" label={statementLinesText(s.lines, s.unmatched)} /> : statementLinesText(s.lines, s.unmatched)}
                 </td>
                 <td>
                   <Link href={`/tesoreria/conciliacion/?cuenta=${s.bankAccountId}&extracto=${s.statementId}`}>Conciliar</Link>

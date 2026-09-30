@@ -16,6 +16,7 @@ interface Values {
   docDate: string;
   dueDate: string;
   purchaseOrderId: string;
+  printedTotal?: string;
   lines: Record<string, { quantity: string; unitPrice: string }>;
 }
 
@@ -66,6 +67,7 @@ export default function NewInvoice() {
     setValues((v) => ({ ...v, lines: { ...v.lines, [poLineId]: { quantity: "", unitPrice: "", ...v.lines[poLineId], ...change } } }));
 
   const submit = async () => {
+    const printedTotal = normalizeInput(values.printedTotal ?? "");
     const po = order.data;
     const lines = (po?.lines ?? [])
       .map((l) => ({ l, input: values.lines[l.poLineId] }))
@@ -81,6 +83,7 @@ export default function NewInvoice() {
       docDate: !values.docDate && "Indique la fecha de la factura.",
       dueDate: !values.dueDate && "Indique el vencimiento.",
       purchaseOrderId: !values.purchaseOrderId && "Elija la orden de compra.",
+      printedTotal: printedTotal !== "" && !isPositiveDecimal(printedTotal, 2) && "El total impreso debe ser mayor que cero, con hasta 2 decimales.",
       lines: !!values.purchaseOrderId && lines.length === 0 && "Indique la cantidad facturada de al menos una línea.",
     };
     for (const l of lines) {
@@ -92,7 +95,7 @@ export default function NewInvoice() {
     }
     const fiscalNumber = values.fiscalNumber.trim();
     const response = await register.run(
-      { partyId: values.partyId, supplierFiscalNumber: fiscalNumber, docDate: values.docDate, dueDate: values.dueDate, lines },
+      { partyId: values.partyId, supplierFiscalNumber: fiscalNumber, docDate: values.docDate, dueDate: values.dueDate, lines, printedTotal: printedTotal || null },
       values,
       `Factura de proveedor ${fiscalNumber} registrada en borrador.`,
     );
@@ -186,6 +189,13 @@ export default function NewInvoice() {
         </Field>
         <Field label="Vencimiento" required error={fe.errors.dueDate}>
           <input type="date" aria-label="Vencimiento" value={values.dueDate} onChange={(e) => setValues({ ...values, dueDate: e.target.value })} />
+        </Field>
+        <Field
+          label="Total según factura (RD$)"
+          error={fe.errors.printedTotal}
+          hint="El total con ITBIS impreso en la factura del proveedor. Al contabilizar, el sistema muestra la diferencia con su propio cálculo."
+        >
+          <input aria-label="Total según factura" inputMode="decimal" placeholder="0.00" value={values.printedTotal ?? ""} onChange={(e) => setValues({ ...values, printedTotal: e.target.value })} />
         </Field>
         {termsDays !== null && values.docDate ? (
           <span className="muted" data-testid="due-date-proposal">

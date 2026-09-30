@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ConfirmAction, ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { ACCOUNT_CLASSES, accountClassLabel } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { CONTROL_ACCOUNT_HELP, isZeroDecimal } from "@/lib/ux4a-contabilidad";
 
 type Account = Schemas["AccountView"];
 
@@ -53,10 +54,19 @@ function AccountRow({ account, onDone }: { account: Account; onDone: () => void 
         ) : account.accountClass ? (
           accountClassLabel(account.accountClass)
         ) : (
-          <span className="badge tone-attention">Sin clase</span>
+          <span className="badge tone-attention">Sin clasificar</span>
         )}
       </td>
-      <td>{account.isControl ? "Control" : "—"}</td>
+      <td>
+        {account.isControl ? (
+          <span title={CONTROL_ACCOUNT_HELP}>De control</span>
+        ) : (
+          "Normal"
+        )}
+      </td>
+      <td className="num">
+        <Money value={account.balance} />
+      </td>
       <td>
         <StatusBadge status={account.status} label={account.status === "ACTIVE" ? "Activa" : "Inactiva"} />
       </td>
@@ -77,13 +87,17 @@ function AccountRow({ account, onDone }: { account: Account; onDone: () => void 
                 Editar
               </button>
             )}
-            {account.status === "ACTIVE" ? (
+            {account.status === "ACTIVE" && !isZeroDecimal(account.balance) ? (
+              <span className="muted" data-testid={`no-deactivate-${account.code}`}>
+                Tiene saldo: no se puede desactivar hasta llevarlo a cero.
+              </span>
+            ) : account.status === "ACTIVE" ? (
               <ConfirmAction
                 label="Desactivar"
                 title={`¿Desactivar la cuenta ${account.code}?`}
                 danger
                 busy={busy}
-                consequence={`La cuenta ${account.code} ${account.name} deja de aceptar movimientos y ajustes. Se rechaza si tiene saldo; se puede volver a activar.`}
+                consequence={`La cuenta ${account.code} ${account.name} deja de aceptar movimientos y ajustes; se puede volver a activar.`}
                 onConfirm={async () => after(await deactivate.run({ accountId: account.accountId }))}
               />
             ) : (
@@ -119,10 +133,11 @@ function NewAccount({ onDone }: { onDone: () => void }) {
           <ClassSelect label="Clase de la cuenta" value={accountClass} onChange={setAccountClass} />
         </Field>
         <label className="field">
-          <span>Control</span>
+          <span>Cuenta de control</span>
           <span>
             <input type="checkbox" checked={isControl} onChange={(e) => setIsControl(e.target.checked)} /> Se mueve solo por documentos
           </span>
+          <span className="field-hint">{CONTROL_ACCOUNT_HELP} No se puede cambiar después de crearla.</span>
         </label>
       </div>
       <div className="actions form-actions">
@@ -154,6 +169,8 @@ function NewAccount({ onDone }: { onDone: () => void }) {
 }
 
 // UI-01, FIN1-04 (E-FIN1-3/4/7, E-FIN1-04-3): the chart of accounts with class and status; the Controller maintains it.
+// UX4-02 (A-16, E-UX4-2): the server's balance per account; "Desactivar" only at zero; control accounts and "sin clasificar"
+// explained; the control mark cannot change after creation.
 export default function Page() {
   const { companyId, can } = useSession();
   const [onlyUnclassed, setOnlyUnclassed] = useState(false);
@@ -166,11 +183,15 @@ export default function Page() {
     <>
       <h1>Catálogo de cuentas</h1>
       <p className="muted">
-        El código y la marca de control no cambian. Una cuenta con saldo no se desactiva, y ninguna se borra. Las cuentas de control no admiten ajustes manuales.
+        El código y la marca de control no cambian después de crear la cuenta. Una cuenta con saldo no se desactiva, y ninguna se borra.
+      </p>
+      <p className="muted">
+        <strong>Cuentas de control:</strong> {CONTROL_ACCOUNT_HELP} Una cuenta <strong>sin clasificar</strong> no tiene clase (activo, pasivo, patrimonio,
+        ingreso, costo o gasto) y bloquea los estados financieros hasta asignársela.
       </p>
       {can("account:manage") ? <NewAccount onDone={reload} /> : null}
       <label>
-        <input type="checkbox" checked={onlyUnclassed} onChange={(e) => setOnlyUnclassed(e.target.checked)} /> Solo cuentas sin clase
+        <input type="checkbox" checked={onlyUnclassed} onChange={(e) => setOnlyUnclassed(e.target.checked)} /> Solo cuentas sin clasificar
       </label>
       {data === null ? (
         <Loading error={error} />
@@ -182,6 +203,7 @@ export default function Page() {
               <th>Nombre</th>
               <th>Clase</th>
               <th>Tipo</th>
+              <th className="num">Saldo (RD$)</th>
               <th>Estado</th>
               {can("account:manage") ? <th /> : null}
             </tr>

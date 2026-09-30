@@ -9,6 +9,8 @@ import { formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labe
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel } from "@/lib/ux4a";
+import { activeShortcut, ALL_DUE, DUE_SHORTCUTS, dueUntilFor, laterDueText } from "@/lib/ux4a-tesoreria";
 
 type Supplier = Schemas["ProposalSupplier"];
 
@@ -135,7 +137,7 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
             <select value={bank} onChange={(e) => setBankAccountId(e.target.value)}>
               {active.map((b) => (
                 <option key={b.bankAccountId} value={b.bankAccountId}>
-                  {b.bankCode} {b.accountNumber}
+                  {bankAccountLabel(b)}
                 </option>
               ))}
             </select>
@@ -167,22 +169,44 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
 export default function Page() {
   const { companyId, can } = useSession();
   const today = todayInDominicanRepublic();
-  const [dueUntil, setDueUntil] = useState(today);
+  // C-26 / E-UX4-12: the proposal opens with what falls due this week (today + 7).
+  const [dueUntil, setDueUntil] = useState(() => dueUntilFor("week", today));
   const [supplierId, setSupplierId] = useState("");
   const { data, error } = useLoad(
     can("payment:read") ? () => query("/api/v1/companies/{companyId}/treasury/payment-proposal", { path: { companyId }, query: { dueUntil } }) : null,
     [companyId, dueUntil],
   );
+  const empty = data !== null && data.suppliers.length === 0 && dueUntil !== ALL_DUE;
+  // When nothing falls due by the date, the same proposal without a limit tells how much falls due later (rows counted only).
+  const later = useLoad(
+    can("payment:read") && empty ? () => query("/api/v1/companies/{companyId}/treasury/payment-proposal", { path: { companyId }, query: { dueUntil: ALL_DUE } }) : null,
+    [companyId, empty],
+  );
   if (!can("payment:read")) {
     return <NoPermission />;
   }
   const supplier = data?.suppliers.find((s) => s.supplierId === supplierId) ?? data?.suppliers[0];
+  const shortcut = activeShortcut(dueUntil, today);
+  const laterText = empty && later.data ? laterDueText(later.data.suppliers) : null;
   return (
     <>
       <h1>Propuesta de pago</h1>
       <p className="muted">Facturas contabilizadas con saldo que vencen hasta la fecha elegida. Un pago es para un solo proveedor.</p>
       <div className="card">
-        <Field label="Vence hasta">
+        <div className="actions" role="group" aria-label="Vence hasta: atajos">
+          {DUE_SHORTCUTS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              aria-pressed={shortcut === s.id}
+              className={shortcut === s.id ? "primary" : undefined}
+              onClick={() => setDueUntil(dueUntilFor(s.id, today))}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <Field label="Vence hasta" hint={shortcut === "all" ? "Todas las facturas con saldo, venzan cuando venzan." : undefined}>
           <input type="date" value={dueUntil} onChange={(e) => setDueUntil(e.target.value)} />
         </Field>
         {data && data.suppliers.length > 0 ? (
@@ -211,7 +235,23 @@ export default function Page() {
       {data === null ? (
         <Loading error={error} />
       ) : !supplier ? (
-        <p className="muted">No hay facturas con saldo que venzan hasta esa fecha.</p>
+        <div className="notice" data-testid="proposal-empty">
+          <p style={{ margin: 0 }}>
+            {shortcut === "all" ? (
+              "No hay facturas contabilizadas con saldo pendiente de pago."
+            ) : (
+              <>
+                No hay facturas con saldo que venzan hasta el {formatDate(dueUntil)}.{" "}
+                {laterText ? laterText : later.data ? "Tampoco hay facturas que venzan después." : null}
+              </>
+            )}
+          </p>
+          {laterText ? (
+            <button type="button" onClick={() => setDueUntil(ALL_DUE)}>
+              Ver todas
+            </button>
+          ) : null}
+        </div>
       ) : (
         <PrepareForm key={`${supplier.supplierId}:${dueUntil}`} supplier={supplier} today={today} />
       )}

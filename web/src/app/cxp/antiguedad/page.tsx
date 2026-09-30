@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { query } from "@/api/client";
 import { Field, Loading, Money, NoPermission } from "@/components/ui";
-import { todayInDominicanRepublic } from "@/lib/labels";
+import { formatDate, todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 
@@ -30,7 +31,16 @@ export default function Page() {
       {data === null || !b ? (
         <Loading error={error} />
       ) : data.suppliers.length === 0 ? (
-        <p className="muted">No hay facturas con saldo abierto.</p>
+        <p className="muted" data-testid="ap-aging-empty">
+          No hay facturas contabilizadas con saldo pendiente al {formatDate(asOf)}: no se le debe nada a ningún proveedor. Las facturas aparecen
+          aquí cuando se contabilizan en <Link href="/cxp/facturas/">Facturas de proveedor</Link>
+          {can("payment:prepare") ? (
+            <>
+              ; para pagar lo que vence, use la <Link href="/tesoreria/propuesta/">Propuesta de pagos</Link>
+            </>
+          ) : null}
+          .
+        </p>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -74,18 +84,27 @@ export default function Page() {
                 </td>
               </tr>
             ))}
-            <tr>
+          </tbody>
+          <tfoot>
+            {/* C-24 (E-UX4-2): each bucket's total is the server's (bucketTotals). */}
+            <tr data-testid="ap-aging-totals">
               <td>
                 <strong>Total</strong>
               </td>
-              <td colSpan={5}></td>
+              {(["current", "bucket1", "bucket2", "bucket3", "over"] as const).map((k) => (
+                <td key={k} className="num">
+                  <strong>
+                    <Money value={data.bucketTotals[k]} />
+                  </strong>
+                </td>
+              ))}
               <td className="num">
                 <strong>
-                  <Money value={data.total} />
+                  <Money value={data.bucketTotals.total} testId="ap-aging-total" />
                 </strong>
               </td>
             </tr>
-          </tbody>
+          </tfoot>
         </table></div>
       )}
     </>

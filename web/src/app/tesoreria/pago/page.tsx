@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel } from "@/lib/ux4a";
 
 type Payment = Schemas["PaymentDetail"];
 
@@ -42,7 +43,7 @@ function Actions({ payment, onDone }: { payment: Payment; onDone: () => void }) 
           <ConfirmAction
             label="Liberar pago"
             title={`¿Liberar el pago ${payment.paymentNo}?`}
-            consequence={`Se transfieren RD$ ${formatDecimal(payment.amount)} a ${payment.supplierName} y se contabiliza el pago. Después solo se deshace con una reversa.`}
+            consequence={`Se transfieren RD$ ${formatDecimal(payment.amount)} a ${payment.supplierName} desde la cuenta ${bankAccountLabel({ alias: payment.bankAccountAlias, bankCode: payment.bankCode, accountNumber: payment.accountNumber })} y se contabiliza el pago. Después solo se deshace con una reversa.`}
             stepUp
             className="primary"
             busy={busy}
@@ -117,8 +118,8 @@ function PaymentDetail() {
         </div>
         <div>
           <dt>Cuenta de la empresa</dt>
-          <dd className="mono">
-            {payment.bankCode} {payment.accountNumber}
+          <dd className="mono" data-testid="payment-bank-account">
+            {bankAccountLabel({ alias: payment.bankAccountAlias, bankCode: payment.bankCode, accountNumber: payment.accountNumber })}
           </dd>
         </div>
         <div>

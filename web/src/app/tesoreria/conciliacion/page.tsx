@@ -9,6 +9,8 @@ import { formatDate, lineStatusLabel, todayInDominicanRepublic } from "@/lib/lab
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel } from "@/lib/ux4a";
+import { reconcilingRows } from "@/lib/ux4a-tesoreria";
 
 type Line = Schemas["BankStatementLineView"];
 type Suggestion = Schemas["LineSuggestion"];
@@ -262,7 +264,7 @@ function Reconciliation() {
           <select value={bank} onChange={(e) => router.push(`/tesoreria/conciliacion/?cuenta=${e.target.value}`)}>
             {(banks?.items ?? []).map((b) => (
               <option key={b.bankAccountId} value={b.bankAccountId}>
-                {b.bankCode} {b.accountNumber}
+                {bankAccountLabel(b)}
               </option>
             ))}
           </select>
@@ -303,12 +305,36 @@ function Reconciliation() {
               <span className="value">{items.length}</span>
             </div>
             <div className={`stat ${r.findings.some((f) => f.severity === "ERROR") ? "bad" : "good"}`}>
-              <span>Diferencia (BANK-GL)</span>
+              <span>Diferencia sin explicar</span>
               <span className="value">
                 {r.difference === null ? <span data-testid="bank-gl-difference">—</span> : <Money value={r.difference} testId="bank-gl-difference" currency />}
               </span>
             </div>
           </div>
+          {r.statementBalance !== null ? (
+            // C-29 (E-UX4-2): from the statement's balance to the books' with the server's totals; the difference is what no
+            // item explains.
+            <div className="table-wrap">
+              <table data-testid="reconciling-statement">
+                <caption className="muted" style={{ textAlign: "left" }}>
+                  Cómo cuadra el extracto con los libros al {formatDate(r.asOf)}
+                </caption>
+                <tbody>
+                  {reconcilingRows(r).map((row) => (
+                    <tr key={row.testId} className={row.sign === "=" ? "total" : undefined}>
+                      <td style={{ width: "2em" }} aria-hidden={row.sign === "" ? true : undefined}>
+                        {row.sign}
+                      </td>
+                      <td className="wrap">{row.sign === "=" ? <strong>{row.label}</strong> : row.label}</td>
+                      <td className="num">
+                        <Money value={row.value} testId={row.testId} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
           {r.findings.length > 0 ? (
             <ul>
               {r.findings.map((f) => (

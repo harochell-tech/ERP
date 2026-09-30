@@ -5,10 +5,11 @@ import { Suspense } from "react";
 import { query } from "@/api/client";
 import { Loading, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
-import { COMPONENTS, formatDateTime, statusLabel } from "@/lib/labels";
+import { COMPONENTS, formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { classificationText, exceptionKey, severityLabel, severityTone } from "@/lib/reconciliations";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { sideLabels } from "@/lib/ux4a-auditoria";
 
 /** A run and its exceptions. UX3-02 (E-UX3-2/3): the server's Spanish names, guidance and readable keys. */
 function Run() {
@@ -26,15 +27,34 @@ function Run() {
     return <Loading error={error} />;
   }
   const { run, exceptions } = data;
+  // UX4-02 (A-22): the totals under the reconciliation's own labels; (A-21) the date-time ends in "p. m." so no period follows it.
+  const labels = sideLabels(run);
   return (
     <>
       <h1>{run.name}</h1>
       <p>
         <StatusBadge status={run.status} testId="run-status" /> <span className="muted mono">{run.reconCode}</span>
       </p>
-      <p>
-        Ejecutada {formatDateTime(run.asOf)}. Total A {formatDecimal(run.totalA)}, total B {formatDecimal(run.totalB)}, diferencia {formatDecimal(run.difference)}.
-      </p>
+      <dl className="facts" data-testid="run-totals">
+        <dt>Ejecutada</dt>
+        <dd>{formatDateTime(run.asOf)}</dd>
+        {run.cutoffDate ? (
+          <>
+            <dt>Corte al</dt>
+            <dd>{formatDate(run.cutoffDate)}</dd>
+          </>
+        ) : null}
+        {run.totalA === null && run.totalB === null ? null : (
+          <>
+            <dt>{labels.a}</dt>
+            <dd className="mono">{formatDecimal(run.totalA)}</dd>
+            <dt>{labels.b}</dt>
+            <dd className="mono">{formatDecimal(run.totalB)}</dd>
+            <dt>Diferencia</dt>
+            <dd className="mono">{formatDecimal(run.difference)}</dd>
+          </>
+        )}
+      </dl>
       <div className="alert-block guidance" data-testid="run-guidance">
         <strong>Qué hacer</strong>
         {run.guidance}

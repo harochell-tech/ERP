@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/labels";
 import { REPORTS } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { effectiveFromLabel } from "@/lib/ux4a-contabilidad";
 
 // FIN1-04 (E-FIN1-04-10): the versions of the balance sheet and income statement structures.
 export default function Page() {
@@ -19,7 +20,10 @@ export default function Page() {
   return (
     <>
       <h1>Estructuras de reporte</h1>
-      <p className="muted">Las prepara el Controller y las aprueba el Aprobador de políticas; los estados usan siempre la versión activa.</p>
+      <p className="muted">
+        Definen cómo se agrupan las cuentas en el balance general y el estado de resultados. Las prepara el Controller y las aprueba el
+        Aprobador de políticas contables (otra persona); los estados usan siempre la versión activa.
+      </p>
       {can("account:manage") ? (
         <div className="actions">
           {Object.entries(REPORTS).map(([code, label]) => (
@@ -39,7 +43,7 @@ export default function Page() {
             <tr>
               <th>Reporte</th>
               <th>Versión</th>
-              <th>Vigente desde</th>
+              <th>Desde</th>
               <th>Estado</th>
               <th className="num">Líneas</th>
               <th className="num">Cuentas</th>
@@ -54,14 +58,16 @@ export default function Page() {
                   <Link href={`/contabilidad/estructura/?id=${s.structureVersionId}`}>{REPORTS[s.report] ?? s.report}</Link>
                 </td>
                 <td>{s.version}</td>
-                <td>{formatDate(s.effectiveFrom)}</td>
+                <td>
+                  <span className="muted">{effectiveFromLabel(s.status)}</span> {formatDate(s.effectiveFrom)}
+                </td>
                 <td>
                   <StatusBadge status={s.status} />
                 </td>
                 <td className="num">{s.lines}</td>
                 <td className="num">{s.accounts}</td>
                 <td className="wrap">{s.preparedBy ?? "—"}</td>
-                <td className="wrap">{s.approvedBy ?? "—"}</td>
+                <td className="wrap">{s.approvedBy ?? (s.status === "DRAFT" ? "Pendiente" : "—")}</td>
               </tr>
             ))}
           </tbody>

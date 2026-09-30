@@ -9,6 +9,7 @@ import { accountClassLabel, REPORTS } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { lineOptionLabel, sameStructure, STRUCTURE_NEXT_STEP } from "@/lib/ux4a-contabilidad";
 
 interface Line {
   lineCode: string;
@@ -31,6 +32,8 @@ const CLASSES: Readonly<Record<string, string[]>> = {
 
 // FIN1-04 (E-FIN1-04-10): a new DRAFT version, starting from a copy of the given (or active) version. Lines on top; below, every
 // active account of the report's classes with the line that holds it.
+// UX4-02 (A-17): no version without changes (the button waits for one), lines named by their concept instead of their code
+// ("Activo (A)"), "Agrupada bajo" instead of "Dentro de", and what happens next (who approves).
 function StructureEditor() {
   const { companyId, can } = useSession();
   const router = useRouter();
@@ -44,6 +47,8 @@ function StructureEditor() {
   );
   const [values, setValues] = useState<Values | null>(prepare.restored);
   const [invalid, setInvalid] = useState<string | null>(null);
+  // UX4-02 (A-17): the copied version's lines and placement, to refuse a version without changes.
+  const [original, setOriginal] = useState<Pick<Values, "lines" | "placement"> | null>(null);
   const fe = useFieldErrors();
   const allowed = can("account:manage") && can("configuration:read");
 
@@ -57,18 +62,16 @@ function StructureEditor() {
           const from = source ?? list.items.find((s) => s.status === "ACTIVE")?.structureVersionId;
           const copy = from ? await query("/api/v1/companies/{companyId}/finance/report-structures/{structureVersionId}", { path: { companyId, structureVersionId: from } }) : null;
           const reportAccounts = accounts.items.filter((a) => a.status === "ACTIVE" && a.accountClass !== null && (CLASSES[report] ?? []).includes(a.accountClass ?? ""));
-          if (values === null) {
-            const placement: Record<string, string> = {};
-            for (const line of copy?.lines ?? []) {
-              for (const a of line.accounts) {
-                placement[a.accountId] = line.lineCode;
-              }
+          const placement: Record<string, string> = {};
+          for (const line of copy?.lines ?? []) {
+            for (const a of line.accounts) {
+              placement[a.accountId] = line.lineCode;
             }
-            setValues({
-              effectiveFrom: todayInDominicanRepublic(),
-              lines: (copy?.lines ?? []).map((l) => ({ lineCode: l.lineCode, caption: l.caption, parentLineCode: l.parentLineCode ?? "", sign: l.sign })),
-              placement,
-            });
+          }
+          const copiedLines = (copy?.lines ?? []).map((l) => ({ lineCode: l.lineCode, caption: l.caption, parentLineCode: l.parentLineCode ?? "", sign: l.sign }));
+          setOriginal(copy ? { lines: copiedLines, placement } : null);
+          if (values === null) {
+            setValues({ effectiveFrom: todayInDominicanRepublic(), lines: copiedLines, placement });
           }
           return { accounts: reportAccounts, copiedVersion: copy?.header.version ?? null };
         }
@@ -86,6 +89,8 @@ function StructureEditor() {
   const set = (change: Partial<Values>) => setValues({ ...values, ...change });
   const setLine = (index: number, change: Partial<Line>) => set({ lines: values.lines.map((l, i) => (i === index ? { ...l, ...change } : l)) });
   const codes = values.lines.map((l) => l.lineCode.trim()).filter((c) => c.length > 0);
+  const unchanged = original !== null && sameStructure(original, values);
+  const captionOf = (code: string) => values.lines.find((l) => l.lineCode.trim() === code)?.caption ?? "";
 
   const submit = async () => {
     if (values.lines.length === 0) {
@@ -126,8 +131,9 @@ function StructureEditor() {
     <>
       <h1>Nueva versión: {REPORTS[report]}</h1>
       <p className="muted">{data.copiedVersion ? `Copia de la versión ${data.copiedVersion}.` : "Sin versión anterior: agregue las líneas."} El orden de las filas es el orden del reporte.</p>
-      <Field label="Vigente desde" required error={fe.errors.effectiveFrom}>
-        <input type="date" aria-label="Vigente desde" value={values.effectiveFrom} onChange={(e) => set({ effectiveFrom: e.target.value })} />
+      <p className="muted">{STRUCTURE_NEXT_STEP}</p>
+      <Field label="Regirá desde" required error={fe.errors.effectiveFrom} hint="Fecha desde la que los estados usarán esta versión, una vez aprobada.">
+        <input type="date" aria-label="Regirá desde" value={values.effectiveFrom} onChange={(e) => set({ effectiveFrom: e.target.value })} />
       </Field>
       <h2>Líneas</h2>
       <LineTable>
@@ -135,7 +141,7 @@ function StructureEditor() {
           <tr>
             <th>Código</th>
             <th>Concepto</th>
-            <th>Dentro de</th>
+            <th>Agrupada bajo</th>
             <th>Signo</th>
             <th />
           </tr>
@@ -166,13 +172,13 @@ function StructureEditor() {
                 <FieldMessage id={`line-${index}-caption-message`} error={fe.errors[`line-${index}-caption`]} />
               </td>
               <td>
-                <select aria-label={`Dentro de ${index + 1}`} value={l.parentLineCode} onChange={(e) => setLine(index, { parentLineCode: e.target.value })}>
-                  <option value="">— (primer nivel)</option>
+                <select aria-label={`Agrupada bajo ${index + 1}`} value={l.parentLineCode} onChange={(e) => setLine(index, { parentLineCode: e.target.value })}>
+                  <option value="">Ninguna (línea principal)</option>
                   {codes
                     .filter((c) => c !== l.lineCode.trim())
                     .map((c) => (
                       <option key={c} value={c}>
-                        {c}
+                        {lineOptionLabel(c, captionOf(c))}
                       </option>
                     ))}
                 </select>
@@ -203,7 +209,7 @@ function StructureEditor() {
           <tr>
             <th>Cuenta</th>
             <th>Clase</th>
-            <th>Línea</th>
+            <th>Se muestra en</th>
           </tr>
         </thead>
         <tbody>
@@ -218,7 +224,7 @@ function StructureEditor() {
                   <option value="">— sin línea</option>
                   {codes.map((c) => (
                     <option key={c} value={c}>
-                      {c}
+                      {lineOptionLabel(c, captionOf(c))}
                     </option>
                   ))}
                 </select>
@@ -228,9 +234,14 @@ function StructureEditor() {
         </tbody>
       </table></div>
       <div className="actions form-actions">
-        <button type="button" className="primary" disabled={prepare.busy} onClick={submit}>
+        <button type="button" className="primary" disabled={prepare.busy || unchanged} onClick={submit}>
           Preparar versión
         </button>
+        {unchanged ? (
+          <span className="muted" data-testid="structure-unchanged">
+            Sin cambios respecto de la versión {data.copiedVersion}: cambie líneas o cuentas para preparar una versión nueva.
+          </span>
+        ) : null}
         {invalid ? <span className="field-error">{invalid}</span> : null}
       </div>
       <ErrorBox error={prepare.error} />
