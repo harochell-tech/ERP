@@ -15,6 +15,7 @@ real production data), with synthetic data only
 | Logins | `deploy/staging/init-roles.sql` | `rochell_app_login` ∈ rochell_app, `rochell_sealer_login` ∈ rochell_sealer; passwords reset on each deploy |
 | WORM | Backblaze B2 Object Lock (S3 API), COMPLIANCE, 7 days (E-B03-3, E-B03-10) | `Rochell:Audit:S3:*` incl. `ServiceUrl`; see [hash-chain.md](hash-chain.md) |
 | Digest keys | `/opt/rochell-staging/secrets/digest-{signing,public}.pem` (`bootstrap.sh`) | Private key generated on the server, `0400`, uid 1654; `Rochell:Digest:SigningKeyPemFile`, `Rochell:Audit:DigestPublicKeyPemFile` (E-B03-6) |
+| Daily fiscal expiry | `Rochell__FiscalExpiry__Enabled: "true"` in `compose.yaml` (E-FIS1-04-7) | Configuration reaches the container through environment variables only: the API starts with content root `/app`, so the image's `appsettings.*.json` (in `/app/api`) are not read |
 | Deploy | `.github/workflows/deploy-staging.yml` → `deploy/staging/deploy.sh` | Manual, `main` only, refuses a commit without a green `build-test`; migrate → `init-environment TEST` (Patch 1.1) → logins → restart → HTTPS smoke check |
 | Backup | `deploy/staging/backup.sh` (cron 01:30) | `pg_dump -Fc` → `openssl cms` (AES-256, to `secrets/backup-cert.pem`) → B2 bucket with a 7-day lifecycle rule (E-B03-8, E-B03-10) |
 
