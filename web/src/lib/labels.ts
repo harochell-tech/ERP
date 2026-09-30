@@ -151,7 +151,7 @@ export const COMPONENTS: Readonly<Record<string, string>> = {
   "COST-SET": "Liquidación de costos",
 };
 
-/** FIS1-05: the reconciliations of FIS1-04 in Spanish (the others show the server's description). */
+/** FIS1-05: the reconciliations of FIS1-04 (and later ones) in Spanish (the others show the server's description). */
 export const RECONCILIATIONS: Readonly<Record<string, string>> = {
   "AUTH-CONSUMPTION": "Consumo de autorizaciones fiscales",
   "EXEMPT-WITHOUT-AUTH": "Facturas exentas sin autorización",
