@@ -110,10 +110,11 @@ public sealed class QueryRunner(QueryPipeline pipeline, SessionCookie cookie, IL
 
     /// <summary>
     /// E-FIN1-03-10: a report as JSON, or with <c>?format=csv</c> as a UTF-8 CSV file (with BOM, so a spreadsheet reads the accents)
-    /// built from that same JSON.
+    /// built from that same JSON. <paramref name="byteOrderMark"/> false: without BOM (E-FIS2-02-5, rows pasted into the DGII tool).
     /// </summary>
     public async Task<IResult> RunReportAsync<TQuery>(
-        HttpContext http, string? format, Func<Guid, TQuery> query, IQueryHandler<TQuery> handler, Func<string, string> toCsv, string fileName, CancellationToken cancellationToken)
+        HttpContext http, string? format, Func<Guid, TQuery> query, IQueryHandler<TQuery> handler, Func<string, string> toCsv, string fileName, CancellationToken cancellationToken,
+        bool byteOrderMark = true)
         where TQuery : IQuery
     {
         ArgumentNullException.ThrowIfNull(http);
@@ -137,7 +138,8 @@ public sealed class QueryRunner(QueryPipeline pipeline, SessionCookie cookie, IL
         try
         {
             var json = await pipeline.ExecuteAsync(query(sessionId), handler, cancellationToken).ConfigureAwait(false);
-            var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(toCsv(json))).ToArray();
+            var body = System.Text.Encoding.UTF8.GetBytes(toCsv(json));
+            var bytes = byteOrderMark ? [.. System.Text.Encoding.UTF8.GetPreamble(), .. body] : body;
             return Results.File(bytes, "text/csv; charset=utf-8", fileName);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -26052,6 +26052,235 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/tax/reports/606": {
+      "get": {
+        "tags": [
+          "Tax"
+        ],
+        "operationId": "GetReport606",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report606"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/tax/reports/it1-summary": {
+      "get": {
+        "tags": [
+          "Tax"
+        ],
+        "operationId": "GetIt1Summary",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/It1Summary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/tax/reports/ir17-summary": {
+      "get": {
+        "tags": [
+          "Tax"
+        ],
+        "operationId": "GetIr17Summary",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ir17Summary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/tax/fiscal-authorizations": {
       "get": {
         "tags": [
@@ -33401,6 +33630,73 @@
         },
         "additionalProperties": false
       },
+      "Ir17Line": {
+        "required": [
+          "tax",
+          "isrWithholdingType",
+          "records",
+          "base",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "tax": {
+            "type": "string"
+          },
+          "isrWithholdingType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "records": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "base": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "amount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Ir17Summary": {
+        "required": [
+          "period",
+          "lines",
+          "itbisWithheld",
+          "isrWithheld"
+        ],
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Ir17Line"
+            }
+          },
+          "itbisWithheld": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "isrWithheld": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
       "IssueCreditNote": {
         "required": [
           "creditNoteId",
@@ -33439,6 +33735,125 @@
               "null",
               "string"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "It1SalesLine": {
+        "required": [
+          "ecfType",
+          "invoices",
+          "taxedNet",
+          "exemptNet",
+          "itbis"
+        ],
+        "type": "object",
+        "properties": {
+          "ecfType": {
+            "type": "string"
+          },
+          "invoices": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "taxedNet": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "exemptNet": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbis": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "It1Summary": {
+        "required": [
+          "period",
+          "sales",
+          "creditNotes",
+          "creditNotesNet",
+          "creditNotesItbis",
+          "purchaseItbisBilled",
+          "purchaseItbisToCost",
+          "purchaseItbisToAdvance",
+          "customerWithholdings"
+        ],
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string"
+          },
+          "sales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/It1SalesLine"
+            }
+          },
+          "creditNotes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "creditNotesNet": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "creditNotesItbis": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "purchaseItbisBilled": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "purchaseItbisToCost": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "purchaseItbisToAdvance": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "customerWithholdings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/It1Withholding"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "It1Withholding": {
+        "required": [
+          "kind",
+          "count",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -38996,6 +39411,210 @@
               "null",
               "string"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Report606": {
+        "required": [
+          "companyRnc",
+          "period",
+          "recordCount",
+          "totalAmount",
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "companyRnc": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "recordCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalAmount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Report606Record"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Report606Record": {
+        "required": [
+          "supplierInvoiceId",
+          "recordKind",
+          "supplierName",
+          "rnc",
+          "idType",
+          "goodsType",
+          "ncf",
+          "ncfModified",
+          "ncfDate",
+          "paymentDate",
+          "servicesAmount",
+          "goodsAmount",
+          "totalAmount",
+          "itbisBilled",
+          "itbisWithheld",
+          "itbisProportional",
+          "itbisToCost",
+          "itbisToAdvance",
+          "itbisPerceived",
+          "isrWithholdingType",
+          "isrWithheld",
+          "isrPerceived",
+          "selectiveTax",
+          "otherTaxes",
+          "legalTip",
+          "paymentMethod",
+          "warnings"
+        ],
+        "type": "object",
+        "properties": {
+          "supplierInvoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordKind": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "rnc": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "idType": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "goodsType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ncf": {
+            "type": "string"
+          },
+          "ncfModified": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ncfDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "paymentDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "servicesAmount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "goodsAmount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "totalAmount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbisBilled": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbisWithheld": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbisProportional": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbisToCost": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbisToAdvance": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbisPerceived": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "isrWithholdingType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isrWithheld": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "isrPerceived": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "selectiveTax": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "otherTaxes": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "legalTip": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "paymentMethod": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

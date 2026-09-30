@@ -29,7 +29,7 @@ public static class Reconciliations
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
          "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
          "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER",
-         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY"];
+         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -529,6 +529,21 @@ public static class Reconciliations
             FROM tax.fiscal_authorization
             WHERE company_id = @c AND status IN ('ACTIVE', 'EXHAUSTED', 'SUSPENDED')
               AND ((valid_until IS NOT NULL AND valid_until <= @cutoff + @adays) OR (project_term_ends_on IS NOT NULL AND project_term_ends_on < @cutoff))) f
+            """,
+            null),
+        ["TAX-606"] = (
+            Findings + """
+            -- E-FIS2-02-8: the month of the cutoff — the 606's ITBIS to advance (NCF records) against ITBIS_RECOVERABLE posted in that
+            -- month, and each record's warnings (a withholding without its ISR type, a purchase without classification).
+            WITH r AS (SELECT * FROM tax.report_606(@c, @cutoff)),
+                 gl AS (SELECT coalesce(sum(e.debit - e.credit), 0) AS amount FROM fin.gl_entry e
+                        WHERE e.company_id = @c AND e.account_role = 'ITBIS_RECOVERABLE'
+                          AND e.posting_date >= date_trunc('month', @cutoff)::date AND e.posting_date < (date_trunc('month', @cutoff) + interval '1 month')::date)
+            SELECT 'itbis:' || to_char(@cutoff, 'YYYYMM') AS match_key, (SELECT coalesce(sum(itbis_to_advance), 0) FROM r WHERE record_kind = 'NCF') AS value_a,
+                   gl.amount AS value_b, 'TAX606_ITBIS_DIFFERENCE' AS classification, 'WARNING' AS severity, NULL::text AS component
+            FROM gl WHERE (SELECT coalesce(sum(itbis_to_advance), 0) FROM r WHERE record_kind = 'NCF') <> gl.amount
+            UNION ALL
+            SELECT 'ncf:' || r.ncf, r.total_amount, NULL::numeric, w, 'WARNING', NULL::text FROM r CROSS JOIN unnest(r.warnings) AS w) f
             """,
             null),
         ["GRNI-AGING"] = (
