@@ -13,6 +13,9 @@ namespace Rochell.Tax.Reports;
 
 internal static class FiscalPeriods
 {
+    /// <summary>0.00: an empty sum keeps two decimals in JSON, where a bare 0m would print "0".</summary>
+    public static readonly decimal Zero = new(0, 0, 0, false, 2);
+
     public static DateOnly Parse(string? period)
         => period is { Length: 6 } p && DateOnly.TryParseExact(p + "01", "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var first)
             ? first
@@ -58,7 +61,7 @@ public sealed class GetReport606Handler : IQueryHandler<GetReport606>
             cancellationToken,
             ("c", context.CompanyId),
             ("m", month)).ConfigureAwait(false);
-        return ApiJson.Serialize(new Report606(rnc, query.Period, records.Count, records.Sum(r => r.TotalAmount), records));
+        return ApiJson.Serialize(new Report606(rnc, query.Period, records.Count, records.Sum(r => r.TotalAmount) + FiscalPeriods.Zero, records));
     }
 }
 
@@ -202,6 +205,6 @@ public sealed class GetIr17SummaryHandler : IQueryHandler<GetIr17Summary>
             ("c", context.CompanyId),
             ("m", month)).ConfigureAwait(false);
         return ApiJson.Serialize(new Ir17Summary(
-            query.Period, lines, lines.Where(l => l.Tax == "ITBIS").Sum(l => l.Amount), lines.Where(l => l.Tax == "ISR").Sum(l => l.Amount)));
+            query.Period, lines, lines.Where(l => l.Tax == "ITBIS").Sum(l => l.Amount) + FiscalPeriods.Zero, lines.Where(l => l.Tax == "ISR").Sum(l => l.Amount) + FiscalPeriods.Zero));
     }
 }

@@ -192,6 +192,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   QUOTE_SAME_PERSON: "Quien preparó la cotización no puede aprobar sus precios.",
   QUOTE_REASON_REQUIRED: "Indique el motivo (hasta 500 caracteres).",
   QUOTE_EXPIRED: "La cotización está vencida; cópiela con una nueva vigencia.",
+  // FIS2-03 (E-FIS2-03-6): the 606 classification has no regression tests.
+  FISCAL_RULE_TESTS_NOT_APPLICABLE: "La clasificación del 606 no lleva pruebas de regresión: queda lista para activar con su fuente oficial.",
 };
 
 export interface DescribedError {

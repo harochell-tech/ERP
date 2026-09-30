@@ -156,6 +156,7 @@ export const RECONCILIATIONS: Readonly<Record<string, string>> = {
   "AUTH-CONSUMPTION": "Consumo de autorizaciones fiscales",
   "EXEMPT-WITHOUT-AUTH": "Facturas exentas sin autorización",
   "AUTH-EXPIRY": "Vencimiento de autorizaciones fiscales",
+  "TAX-606": "Formato 606 contra el ITBIS contabilizado", // FIS2-03 (E-FIS2-03-6)
 };
 
 /** FIS1-05: exception classifications in Spanish; the others are shown as the server sends them. */
@@ -165,6 +166,10 @@ export const EXCEPTION_CLASSIFICATIONS: Readonly<Record<string, string>> = {
   EXEMPT_WITHOUT_AUTHORIZATION: "Factura sin ITBIS que no es e-CF 44",
   AUTHORIZATION_EXPIRING: "Autorización por vencer",
   PROJECT_TERM_ENDED: "Terminó el plazo del proyecto",
+  // FIS2-03 (E-FIS2-03-6): TAX-606.
+  TAX606_ITBIS_DIFFERENCE: "ITBIS por adelantar del 606 ≠ ITBIS deducible contabilizado del mes",
+  CLASSIFICATION_MISSING: "Compra sin clasificación del 606 (tipo de bienes y servicios en blanco)",
+  ISR_WITHHOLDING_TYPE_MISSING: "Retención de ISR sin tipo de retención del 606",
 };
 
 export function classificationLabel(classification: string): string {

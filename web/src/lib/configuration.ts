@@ -7,13 +7,31 @@ export async function sha256Hex(data: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export const FISCAL_RULE_KINDS = ["PURCHASE_ITBIS", "PURCHASE_WITHHOLDING", "SALES_ITBIS"] as const;
+export const FISCAL_RULE_KINDS = ["PURCHASE_ITBIS", "PURCHASE_WITHHOLDING", "SALES_ITBIS", "REPORT_606_CLASSIFICATION"] as const;
 export type FiscalRuleKind = (typeof FISCAL_RULE_KINDS)[number];
 
 export const FISCAL_KIND_LABELS: Readonly<Record<string, string>> = {
   PURCHASE_ITBIS: "ITBIS de compras",
   PURCHASE_WITHHOLDING: "Retención en compras",
   SALES_ITBIS: "ITBIS de ventas",
+  REPORT_606_CLASSIFICATION: "Clasificación del 606", // FIS2-03 (E-FIS2-03-5)
+};
+
+/** FIS2-01: the 606 classification is READY with its official source alone; the server refuses test runs for it. */
+export function ruleKindRunsTests(kind: string): boolean {
+  return kind !== "REPORT_606_CLASSIFICATION";
+}
+
+/** FIS2-03 (E-FIS2-03-5): the help shown under the definition of each kind; none for the tax kinds. */
+export const DEFINITION_HELP: Readonly<Partial<Record<FiscalRuleKind, readonly string[]>>> = {
+  PURCHASE_WITHHOLDING: [
+    "Con base \"NET\" la retención es de ISR: agregue \"isr_withholding_type\" con el tipo de retención del 606 (\"1\" a \"9\"). Sin él, el 606 deja el tipo en blanco y TAX-606 lo advierte.",
+  ],
+  REPORT_606_CLASSIFICATION: [
+    "Asigne a cada categoría de materia prima (CEMENTO, AGREGADO, ADITIVO, OTRA_MATERIA_PRIMA) el tipo de bienes y servicios del instructivo del 606:",
+    "01 Gastos de personal · 02 Gastos por trabajos, suministros y servicios · 03 Arrendamientos · 04 Gastos de activos fijos · 05 Gastos de representación · 06 Otras deducciones admitidas · 07 Gastos financieros · 08 Gastos extraordinarios · 09 Compras y gastos que formarán parte del costo de venta · 10 Adquisiciones de activos · 11 Gastos de seguros.",
+    "No lleva pruebas de regresión: queda lista para activar al vincular su fuente oficial (el instructivo del 606).",
+  ],
 };
 
 /**
@@ -24,6 +42,7 @@ export const DEFINITION_TEMPLATES: Readonly<Record<FiscalRuleKind, string>> = {
   PURCHASE_ITBIS: JSON.stringify({ tax_code: "ITBIS", rate: "0.18", effect: "RECOVERABLE_INPUT", exempt_item_categories: [] }, null, 2),
   PURCHASE_WITHHOLDING: JSON.stringify({ tax_code: "RET_ITBIS", rate: "0.30", base: "ITBIS", party_types: ["INDIVIDUAL"] }, null, 2),
   SALES_ITBIS: JSON.stringify({ tax_code: "ITBIS", rate: "0.18", effect: "OUTPUT", exempt_item_categories: [] }, null, 2),
+  REPORT_606_CLASSIFICATION: JSON.stringify({ classes: { CEMENTO: "09", AGREGADO: "09", ADITIVO: "09", OTRA_MATERIA_PRIMA: "09" } }, null, 2),
 };
 
 /** One regression case to start from; the analyst writes the expected taxes the source dictates. */

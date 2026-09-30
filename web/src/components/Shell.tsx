@@ -118,6 +118,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/fiscal/fuentes/", label: "Fuentes fiscales", permission: "configuration:read" },
       { href: "/fiscal/reglas/", label: "Reglas fiscales", permission: "configuration:read" },
       { href: "/fiscal/autorizaciones/", label: "Autorizaciones fiscales", permission: "sales:read" }, // FIS1-05 (E-FIS1-05-1)
+      { href: "/fiscal/reportes/", label: "Reportes fiscales", permission: "fiscal_report:read" }, // FIS2-03 (E-FIS2-03-1)
     ],
   },
   {

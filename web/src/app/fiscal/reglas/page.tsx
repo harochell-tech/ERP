@@ -3,7 +3,16 @@
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { ErrorBox, Field, Loading, NoPermission } from "@/components/ui";
-import { CASES_TEMPLATE, DEFINITION_TEMPLATES, FISCAL_KIND_LABELS, FISCAL_RULE_KINDS, parseJson, type FiscalRuleKind } from "@/lib/configuration";
+import {
+  CASES_TEMPLATE,
+  DEFINITION_HELP,
+  DEFINITION_TEMPLATES,
+  FISCAL_KIND_LABELS,
+  FISCAL_RULE_KINDS,
+  parseJson,
+  ruleKindRunsTests,
+  type FiscalRuleKind,
+} from "@/lib/configuration";
 import { formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -56,6 +65,11 @@ function ConfigureVersion({ onDone }: { onDone: () => void }) {
         <textarea rows={7} cols={70} value={definition} onChange={(e) => setDefinition(e.target.value)} />
       </Field>
       {parsed.error ? <p className="error">{parsed.error}</p> : null}
+      {(DEFINITION_HELP[ruleKind] ?? []).map((line) => (
+        <p key={line} className="muted">
+          {line}
+        </p>
+      ))}
       <Field label="Vigente desde">
         <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} required />
       </Field>
@@ -67,7 +81,7 @@ function ConfigureVersion({ onDone }: { onDone: () => void }) {
   );
 }
 
-function VersionActions({ version, sources, onDone }: { version: RuleVersion; sources: readonly Source[]; onDone: () => void }) {
+function VersionActions({ ruleKind, version, sources, onDone }: { ruleKind: string; version: RuleVersion; sources: readonly Source[]; onDone: () => void }) {
   const { can, state } = useSession();
   const id = version.ruleVersionId;
   // The activator is never the configurer (E-PR03-4 a); the screen does not offer it.
@@ -101,7 +115,9 @@ function VersionActions({ version, sources, onDone }: { version: RuleVersion; so
           </button>
         </div>
       ) : null}
-      {can("fiscal_rule:configure") ? (
+      {!ruleKindRunsTests(ruleKind) ? (
+        <p className="muted">Sin pruebas de regresión: queda lista para activar con su fuente oficial.</p>
+      ) : can("fiscal_rule:configure") ? (
         <details>
           <summary>Correr pruebas de regresión</summary>
           <textarea aria-label="Casos de prueba" rows={10} cols={70} value={cases} onChange={(e) => setCases(e.target.value)} />
@@ -178,13 +194,15 @@ export default function Page() {
                     <td>
                       {v.latestTestRun
                         ? `${v.latestTestRun.passed ? "Pasó" : "Falló"} (${v.latestTestRun.cases} casos, ${formatDateTime(v.latestTestRun.executedAt)})`
-                        : "—"}
+                        : ruleKindRunsTests(rule.ruleKind)
+                          ? "—"
+                          : "No aplica"}
                     </td>
                     <td>
                       {v.configuredBy ?? "—"} / {v.activatedBy ?? "—"}
                     </td>
                     <td>
-                      <VersionActions version={v} sources={sources.data?.items ?? []} onDone={rules.reload} />
+                      <VersionActions ruleKind={rule.ruleKind} version={v} sources={sources.data?.items ?? []} onDone={rules.reload} />
                     </td>
                   </tr>
                 ))}

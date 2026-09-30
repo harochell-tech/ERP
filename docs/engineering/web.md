@@ -226,3 +226,26 @@ submits it; the Aprobador de políticas contables sees the Inicio counter and ap
 sends it, the print view shows net 1,665.00, ITBIS 299.70 and total 1,964.70, converts it and lands on the order ("Desde cotización
 COT-…", 45.00, total 1,665.00), which the credit check confirms; the quote then reads "Convertida en pedido" with the order. It opens
 its own quote by URL and does not depend on the seeded sample quote.
+
+## FIS2-03 — fiscal report screens (E-FIS2-03-1…8)
+
+Menu **Fiscal** adds Reportes fiscales (`fiscal_report:read`: Especialista and Analista fiscal, Contador, Controller, Auditor,
+Director); see `docs/engineering/fiscal-reports.md`. `lib/fiscalReports.ts` holds the pure helpers, unit-tested
+(`tests/unit/fiscalReports.test.ts`): the default period (the previous month in the Dominican Republic, AAAAMM — date handling
+only), period validation, the 606 codes in Spanish (the 11 types of goods and services, payment methods, id types) and the two
+row warnings. Every amount, count and total is the server's.
+
+| Page | What it does |
+| --- | --- |
+| `/fiscal/reportes/` — tab 606 | Period (AAAAMM, default the previous month); the fixed notice that only purchases registered in the system are included; header (company RNC, period, record count, total — the server's); "Descargar CSV para la herramienta DGII" (`?format=csv`, file `606-AAAAMM.csv`) with the three filing steps; the 23 fields grouped (supplier, voucher, amounts, ITBIS, ISR, others) in a table that scrolls sideways, "Pago de retención" on PAYMENT records, each row's warnings in Spanish, the NCF linking to `/cxp/factura/?id=` |
+| `/fiscal/reportes/` — tabs IT-1, IR-17 | "Informativo: no es el formulario oficial de la DGII." IT-1: sales by e-CF type (invoices, taxed and exempt net, ITBIS), credit notes, the 606's purchase ITBIS (billed, to cost, to advance), customer withholdings. IR-17: withholdings to suppliers by tax and ISR type (records, base, amount) and the ITBIS / ISR totals |
+
+`/fiscal/reglas/` offers the kind "Clasificación del 606" (`REPORT_606_CLASSIFICATION`) with a template (the four raw-material
+categories as "09") and a help listing the 11 codes of the instructivo; its versions offer no "Correr pruebas" (READY with the
+source alone; "Última prueba" reads "No aplica"). The withholding kind's help explains `isr_withholding_type` ("1"…"9", base NET).
+`labels.ts` names TAX-606 and its three classifications; `errors.ts` `FISCAL_RULE_TESTS_NOT_APPLICABLE`.
+
+`web/e2e/fiscal-reports-journey.spec.ts`: the Especialista fiscal opens Fiscal › Reportes fiscales, picks the current month (the
+dev seed posts a supplier invoice today), sees the header, the records (as many as the count, one classified "09"), downloads
+`606-AAAAMM.csv` (as many lines as records, 23 fields each), opens the invoice from its NCF, the IT-1 (purchase ITBIS) and IR-17
+tabs, and finds the seeded classification on Reglas fiscales. It asserts shapes, not totals, which other journeys change.

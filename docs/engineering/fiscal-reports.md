@@ -40,3 +40,10 @@ proportionality, perceived taxes, selective, other taxes and tip are 0 (all purc
 TAX-606 (WARNING, blocks nothing): `TAX606_ITBIS_DIFFERENCE` (the NCF records' ITBIS to advance vs ITBIS_RECOVERABLE posted in the
 cutoff's month), `CLASSIFICATION_MISSING`, `ISR_WITHHOLDING_TYPE_MISSING`. Tests: `Report606Tests` (F2-01, F2-02, F2-03, F2-05,
 F2-06), `It1SummaryTests` (F2-04).
+
+## FIS2-03 — screens and end to end (E-FIS2-03-1…8)
+
+Fiscal › Reportes fiscales (606 with the CSV for the DGII tool and the filing steps, IT-1 and IR-17 tabs) and the classification on
+Fiscal › Reglas fiscales: `web.md`. Empty sums read "0.00" (the report's total and the IR-17 totals). E2E-F2: `AcceptanceTests`
+over the API and `web/e2e/fiscal-reports-journey.spec.ts`; acceptance matrix `docs/acceptance/fis2.md`
+(`AcceptanceFis2TraceabilityTests`).
