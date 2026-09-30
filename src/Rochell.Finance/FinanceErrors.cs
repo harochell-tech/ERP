@@ -15,4 +15,6 @@ public static class FinanceErrors
     public const string PolicyParametersInvalid = "POLICY_PARAMETERS_INVALID";
     public const string PolicyUnknown = "POLICY_UNKNOWN";
     public const string PeriodClosed = "PERIOD_CLOSED";
+    public const string AccountRoleInvalid = "ACCOUNT_ROLE_INVALID";
+    public const string MapAccountInvalid = "MAP_ACCOUNT_INVALID";
 }

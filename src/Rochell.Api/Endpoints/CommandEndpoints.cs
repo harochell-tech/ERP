@@ -7,6 +7,7 @@ using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
 using Rochell.Identity.RoleChanges;
 using Rochell.MasterData.BankAccounts;
+using Rochell.MasterData.Company;
 using Rochell.MasterData.Items;
 using Rochell.Manufacturing.Costing;
 using Rochell.Manufacturing.Lots;
@@ -59,6 +60,8 @@ public static class CommandEndpoints
     {
         ArgumentNullException.ThrowIfNull(company);
         var masterData = company.MapGroup("/master-data").WithTags("MasterData");
+        masterData.MapCommand<UpdateCompanyLegalName, UpdateCompanyLegalNameHandler>();
+        masterData.MapCommand<UpdatePlantName, UpdatePlantNameHandler>();
         masterData.MapCommand<CreateSupplier, CreateSupplierHandler>();
         masterData.MapCommand<UpdateSupplier, UpdateSupplierHandler>();
         masterData.MapCommand<ActivateSupplier, ActivateSupplierHandler>();
@@ -109,6 +112,7 @@ public static class CommandEndpoints
         procurement.MapCommand<ApproveValuationResidualAdjustment, ApproveValuationResidualAdjustmentHandler>();
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
+        finance.MapCommand<PrepareAccountRoleMap, PrepareAccountRoleMapHandler>();
         finance.MapCommand<ApproveAccountRoleMap, ApproveAccountRoleMapHandler>();
         finance.MapCommand<ApprovePostingRuleVersion, ApprovePostingRuleVersionHandler>();
         finance.MapCommand<PrepareAccountingPolicyVersion, PrepareAccountingPolicyVersionHandler>();
@@ -252,6 +256,7 @@ public static class CommandEndpoints
     /// <summary>Every handler class the host resolves (the verifier is built by <see cref="HashVerification"/>).</summary>
     public static IReadOnlyList<Type> Handlers { get; } =
     [
+        typeof(UpdateCompanyLegalNameHandler), typeof(UpdatePlantNameHandler),
         typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
@@ -264,7 +269,7 @@ public static class CommandEndpoints
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
         typeof(RegisterSupplierInvoiceHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
-        typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),
+        typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),
         typeof(ApproveAccountingPolicyVersionHandler),
         typeof(CreateAccountHandler), typeof(UpdateAccountHandler), typeof(DeactivateAccountHandler), typeof(ActivateAccountHandler),
         typeof(PrepareManualJournalHandler), typeof(UpdateManualJournalHandler), typeof(SubmitManualJournalHandler), typeof(WithdrawManualJournalHandler),

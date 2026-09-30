@@ -112,3 +112,35 @@ public sealed class ListRoleRequestsHandler : IQueryHandler<ListRoleRequests>
         return ApiJson.Serialize(new RoleRequestList(items, query.Limit, query.Offset));
     }
 }
+
+public sealed record ListRoles(Guid CompanyId, Guid SessionId) : IQuery;
+
+/// <summary>E-UX2-12: a role people can hold, with what it is for.</summary>
+public sealed record RoleView(string Code, string Name, string? Description, IReadOnlyList<string> Permissions);
+
+public sealed record RoleList(IReadOnlyList<RoleView> Items);
+
+[RequiresPermission("iam:read")]
+public sealed class ListRolesHandler : IQueryHandler<ListRoles>
+{
+    public string QueryType => "Identity.ListRoles";
+
+    public async Task<string> HandleAsync(ListRoles query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT r.code, r.name, r.description, coalesce(array_agg(rp.permission_code ORDER BY rp.permission_code) FILTER (WHERE rp.permission_code IS NOT NULL), '{}')
+            FROM iam.role r
+            LEFT JOIN iam.role_permission rp ON rp.role_id = r.role_id
+            WHERE r.code NOT IN ('PROCESO_DIARIO', 'PROBADOR')
+            GROUP BY r.code, r.name, r.description
+            ORDER BY r.name
+            """,
+            r => new RoleView(r.GetString(0), r.GetString(1), r.NullableString(2), r.GetFieldValue<string[]>(3)),
+            cancellationToken).ConfigureAwait(false);
+        return ApiJson.Serialize(new RoleList(items));
+    }
+}

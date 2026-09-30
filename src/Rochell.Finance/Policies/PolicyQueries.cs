@@ -10,7 +10,10 @@ namespace Rochell.Finance.Policies;
 
 public sealed record ListAccountingPolicies(Guid CompanyId, Guid SessionId) : IQuery;
 
-public sealed record PolicyParameterDefinitionView(string ParamCode, string ValueType, decimal? MinValue, decimal? MaxValue, IReadOnlyList<string>? AllowedValues, string Description);
+/// <summary>E-UX2-2: <see cref="Label"/>, <see cref="Unit"/> (PERCENT, AMOUNT, DAYS, HOURS, OPTION), <see cref="Example"/> and <see cref="Affects"/> for the screens.</summary>
+public sealed record PolicyParameterDefinitionView(
+    string ParamCode, string ValueType, decimal? MinValue, decimal? MaxValue, IReadOnlyList<string>? AllowedValues, string Description,
+    string? Label = null, string? Unit = null, string? Example = null, string? Affects = null);
 
 public sealed record PolicyVersionView(
     Guid PolicyVersionId,
@@ -23,12 +26,16 @@ public sealed record PolicyVersionView(
     string Justification,
     IReadOnlyDictionary<string, string> Parameters);
 
+/// <summary>E-UX2-2: <see cref="PreparerRoles"/> and <see cref="ApproverRoles"/> name the roles that prepare and approve versions.</summary>
 public sealed record AccountingPolicyView(
     string PolicyCode,
     string OwnerRole,
     string Description,
     IReadOnlyList<PolicyParameterDefinitionView> Definitions,
-    IReadOnlyList<PolicyVersionView> Versions);
+    IReadOnlyList<PolicyVersionView> Versions,
+    string? Name = null,
+    IReadOnlyList<string>? PreparerRoles = null,
+    IReadOnlyList<string>? ApproverRoles = null);
 
 public sealed record AccountingPolicyList(IReadOnlyList<AccountingPolicyView> Items);
 
@@ -43,15 +50,19 @@ public sealed class ListAccountingPoliciesHandler : IQueryHandler<ListAccounting
         var policies = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT policy_code, owner_role, description FROM acc.accounting_policy ORDER BY policy_code",
-            r => (Code: r.GetString(0), Owner: r.GetString(1), Description: r.GetString(2)),
+            "SELECT policy_code, owner_role, description, name FROM acc.accounting_policy ORDER BY policy_code",
+            r => (Code: r.GetString(0), Owner: r.GetString(1), Description: r.GetString(2), Name: r.NullableString(3)),
             cancellationToken).ConfigureAwait(false);
         var definitions = (await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT policy_code, param_code, value_type, min_value, max_value, allowed_values, description FROM acc.policy_parameter_definition ORDER BY policy_code, param_code",
+            """
+            SELECT policy_code, param_code, value_type, min_value, max_value, allowed_values, description, label, unit, example, affects
+            FROM acc.policy_parameter_definition ORDER BY policy_code, param_code
+            """,
             r => (Policy: r.GetString(0), View: new PolicyParameterDefinitionView(
-                r.GetString(1), r.GetString(2), r.NullableDecimal(3), r.NullableDecimal(4), r.IsDBNull(5) ? null : r.GetFieldValue<string[]>(5), r.GetString(6))),
+                r.GetString(1), r.GetString(2), r.NullableDecimal(3), r.NullableDecimal(4), r.IsDBNull(5) ? null : r.GetFieldValue<string[]>(5), r.GetString(6),
+                r.NullableString(7), r.NullableString(8), r.NullableString(9), r.NullableString(10))),
             cancellationToken).ConfigureAwait(false)).ToLookup(d => d.Policy, d => d.View);
         var values = (await Reading.ListAsync(
             context.Connection,
@@ -80,8 +91,21 @@ public sealed class ListAccountingPoliciesHandler : IQueryHandler<ListAccounting
                 values[v.Id].ToDictionary(p => p.Code, p => p.Value, StringComparer.Ordinal))))
             .ToLookup(v => v.Policy, v => v.View);
 
+        var roles = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT DISTINCT rp.permission_code, r.name FROM iam.role_permission rp JOIN iam.role r ON r.role_id = rp.role_id
+            WHERE rp.permission_code IN ('accounting_policy:prepare', 'accounting_policy:approve') AND r.code <> 'SUPERADMIN'
+            ORDER BY r.name
+            """,
+            r => (Permission: r.GetString(0), Role: r.GetString(1)),
+            cancellationToken).ConfigureAwait(false)).ToLookup(r => r.Permission, r => r.Role);
+
         return ApiJson.Serialize(new AccountingPolicyList(policies
-            .Select(p => new AccountingPolicyView(p.Code, p.Owner, p.Description, definitions[p.Code].ToList(), versions[p.Code].ToList()))
+            .Select(p => new AccountingPolicyView(
+                p.Code, p.Owner, p.Description, definitions[p.Code].ToList(), versions[p.Code].ToList(), p.Name,
+                roles["accounting_policy:prepare"].ToList(), roles["accounting_policy:approve"].ToList()))
             .ToList()));
     }
 }
