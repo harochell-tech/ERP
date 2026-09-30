@@ -10,6 +10,7 @@ import {
   effectsFor,
   initialCases,
   ISR_WITHHOLDING_TYPES,
+  isrWithholdingTypeLabel,
   ITEM_CATEGORIES,
   itemCategoryLabel,
   parseFiscalDefinition,
@@ -132,13 +133,13 @@ function GuidedFields({ kind, form, onChange, errors }: { kind: FiscalRuleKind; 
           <Field
             label="Tipo de retención de ISR (606)"
             error={errors.isrWithholdingType}
-            hint={form.base === "NET" ? "Con base en el monto neto la retención es de ISR: indique su tipo del instructivo del 606. Sin él, el 606 lo deja en blanco y TAX-606 lo advierte." : "Solo para retenciones de ISR (base en el monto neto)."}
+            hint={form.base === "NET" ? "Con base en el monto neto la retención es de ISR: indique su tipo (campo 17 del 606). Sin él, el 606 lo deja en blanco y TAX-606 lo advierte." : "Solo para retenciones de ISR (base en el monto neto)."}
           >
             <select aria-label="Tipo de retención de ISR (606)" value={form.isrWithholdingType} onChange={(e) => set({ isrWithholdingType: e.target.value })}>
               <option value="">Ninguno</option>
               {ISR_WITHHOLDING_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  Tipo {t}
+                  {isrWithholdingTypeLabel(t)}
                 </option>
               ))}
             </select>
