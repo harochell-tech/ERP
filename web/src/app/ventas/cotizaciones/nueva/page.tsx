@@ -3,7 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, useFieldErrors } from "@/components/ui";
+import { PreviewTotals, useSalesPreview } from "@/components/SalesUx4";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { compareDecimals, DEFAULT_QUOTE_VALIDITY_DAYS, isSpecialPrice } from "@/lib/quotes";
 import { addDays, DELIVERY_TERMS, todayInDominicanRepublic } from "@/lib/labels";
@@ -14,7 +16,8 @@ import { useLoad } from "@/lib/useQuery";
 // QUO1-04 (E-QUO1-04-3): create a quote, or edit it while DRAFT (quote:manage). Customers DRAFT or ACTIVE (only an ACTIVE one is
 // converted later); products of the price list in force, each line with its list price and an optional quoted price (empty = the
 // list's). A price below the list is flagged "Precio especial: requiere aprobación" (an exact comparison of decimal strings); the
-// nets and the total are the server's, shown on the quote after saving.
+// nets and the total are the server's.
+// UX4-03 (V-11, E-UX4-3): while typing, the server prices the draft (POST preview): net per line, net total, estimated ITBIS, total.
 
 interface Line {
   itemId: string;
@@ -73,19 +76,30 @@ function QuoteForm() {
       : null,
     [companyId, allowed, editId],
   );
+  const previewSource =
+    values ??
+    (data?.quote
+      ? { plantId: data.quote.plantId, lines: data.quote.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.quantity, unitPrice: compareDecimals(l.unitPrice, l.listPrice) === 0 ? "" : l.unitPrice })) }
+      : null);
+  const preview = useSalesPreview("quote", previewSource?.plantId ?? "", previewSource?.lines ?? []);
 
   if (!allowed) {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const quote = data.quote;
   if (quote && quote.header.status !== "DRAFT") {
     return <p className="muted">Solo se edita una cotización en borrador.</p>;
   }
   if (data.prices.length === 0) {
-    return <p className="muted">No hay lista de precios vigente: el Controller la prepara y el Aprobador de políticas la aprueba (Maestros › Lista de precios).</p>;
+    return (
+      <p className="muted">
+        Todavía no hay una lista de precios aprobada, así que no se puede cotizar. El Controller la prepara en Maestros › Lista de precios y otra
+        persona autorizada la aprueba.
+      </p>
+    );
   }
   const current: Values =
     values ??
@@ -154,7 +168,7 @@ function QuoteForm() {
       <div>
         <Field label="Cliente" required error={fe.errors.partyId}>
           <select aria-label="Cliente" value={current.partyId} disabled={quote !== null} onChange={(e) => set({ partyId: e.target.value })}>
-            <option value="">—</option>
+            <option value="">Seleccione…</option>
             {data.customers.map((c) => (
               <option key={c.partyId} value={c.partyId}>
                 {c.legalName} {c.rnc ? `(${c.rnc})` : ""}
@@ -207,6 +221,7 @@ function QuoteForm() {
             <th className="num">Cantidad</th>
             <th className="num">Precio de lista (RD$)</th>
             <th className="num">Precio cotizado (RD$, opcional)</th>
+            <th className="num">Neto (RD$)</th>
             <th />
           </tr>
         </thead>
@@ -214,6 +229,7 @@ function QuoteForm() {
           {current.lines.map((line, index) => {
             const price = data.prices.find((p) => p.itemId === line.itemId && p.uom === line.uom);
             const special = isSpecialPrice(normalizeInput(line.unitPrice), price?.unitPrice);
+            const priced = preview.preview?.lines[index];
             return (
               <tr key={index}>
                 <td>
@@ -226,7 +242,7 @@ function QuoteForm() {
                       setLine(index, { itemId, uom });
                     }}
                   >
-                    <option value="">—</option>
+                    <option value="">Seleccione…</option>
                     {data.prices.map((p) => (
                       <option key={`${p.itemId}|${p.uom}`} value={`${p.itemId}|${p.uom}`}>
                         {p.itemCode} — {p.itemDescription} ({p.uom})
@@ -265,6 +281,9 @@ function QuoteForm() {
                     </div>
                   ) : null}
                 </td>
+                <td className="num">
+                  {priced && priced.itemId === line.itemId ? <Money value={priced.netAmount} testId={`preview-line-net:${index + 1}`} /> : <span className="muted">—</span>}
+                </td>
                 <td>
                   {current.lines.length > 1 ? (
                     <button type="button" onClick={() => set({ lines: current.lines.filter((_, i) => i !== index) })}>
@@ -277,9 +296,10 @@ function QuoteForm() {
           })}
         </tbody>
       </LineTable>
+      <PreviewTotals {...preview} />
       <p className="muted">
-        Sin precio cotizado, la línea toma el de la lista vigente. Los netos y el total los calcula el sistema al guardar. Un precio por debajo de la lista
-        necesita la aprobación del Aprobador de políticas antes de enviar la cotización.
+        Sin precio cotizado, la línea toma el de la lista vigente. Un precio por debajo de la lista necesita que otra persona autorizada lo apruebe antes
+        de enviar la cotización al cliente.
       </p>
       <div className="actions form-actions">
         <button type="button" onClick={() => set({ lines: [...current.lines, { ...EMPTY_LINE }] })}>

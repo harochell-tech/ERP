@@ -6,7 +6,8 @@ import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
 import { QuoteStatusBadge } from "@/components/QuoteStatus";
-import { ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction } from "@/components/ui";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { ConfirmAction, ErrorBox, Money, NoPermission, ReasonAction } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
 import { addDays, DELIVERY_TERMS, formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labels";
 import { DEFAULT_QUOTE_VALIDITY_DAYS, quoteActions, quoteStatusLabel } from "@/lib/quotes";
@@ -152,7 +153,7 @@ function Actions({ quote, onDone }: { quote: Quote; onDone: () => void }) {
       </div>
       {h.status === "SENT" && h.expired && can("quote:manage") ? <p className="notice">La cotización está vencida: cópiela con una nueva vigencia para ofrecerla de nuevo.</p> : null}
       {h.status === "DRAFT" && approvalPending && can("quote:manage") ? (
-        <p className="notice">Hay precios por debajo de la lista: la cotización se envía al cliente después de que el Aprobador de políticas los apruebe.</p>
+        <p className="notice">Hay precios por debajo de la lista: la cotización se envía al cliente después de que otra persona autorizada los apruebe.</p>
       ) : null}
       <ErrorBox error={submit.error ?? approve.error ?? giveBack.error ?? send.error ?? lost.error ?? cancel.error ?? convert.error} />
     </>
@@ -170,7 +171,7 @@ function QuoteDetail() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const h = data.header;
   return (

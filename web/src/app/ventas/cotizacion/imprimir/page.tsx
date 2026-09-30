@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { Loading, Money, NoPermission } from "@/components/ui";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { Money, NoPermission } from "@/components/ui";
 import { Watermark } from "@/components/Watermark";
 import { formatQuantity } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDate } from "@/lib/labels";
@@ -29,7 +30,7 @@ function QuotePrint() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   return (
     <div className="proforma">

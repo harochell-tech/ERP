@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { query } from "@/api/client";
-import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { codeAndName } from "@/lib/ux4b";
 import { isDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -28,7 +30,7 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
     [companyId],
   );
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   return (
     <form
@@ -40,7 +42,7 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
         if (
           !fe.check({
             itemId: !form.itemId && "Elija el producto.",
-            valuationAreaId: !form.valuationAreaId && "Elija el área (planta).",
+            valuationAreaId: !form.valuationAreaId && "Elija la planta.",
             unitCost: !isPositiveDecimal(unitCost, 4) && "Indique un costo mayor que cero (hasta 4 decimales).",
           })
         ) {
@@ -53,20 +55,21 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
         }
       }}
     >
-      <h2>Preparar costo</h2>
+      <h2>Opción 1 · Escribir el costo unitario</h2>
+      <p className="muted">Para un producto sin receta activa, o cuando el costo viene de otro cálculo: escriba cuánto cuesta una unidad.</p>
       <Field label="Producto" required error={fe.errors.itemId}>
         <select aria-label="Producto" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
-          <option value="">—</option>
+          <option value="">Seleccione…</option>
           {data.goods.map((g) => (
             <option key={g.itemId} value={g.itemId}>
-              {g.code} — {g.description}
+              {codeAndName(g.code, g.description)}
             </option>
           ))}
         </select>
       </Field>
-      <Field label="Área (planta)" required error={fe.errors.valuationAreaId}>
-        <select aria-label="Área (planta)" value={form.valuationAreaId} onChange={(e) => setForm({ ...form, valuationAreaId: e.target.value })}>
-          <option value="">—</option>
+      <Field label="Planta" required error={fe.errors.valuationAreaId} hint="El costo vale para el inventario del producto en esa planta.">
+        <select aria-label="Planta" value={form.valuationAreaId} onChange={(e) => setForm({ ...form, valuationAreaId: e.target.value })}>
+          <option value="">Seleccione…</option>
           {data.plants.map((p) => (
             <option key={p.plantId} value={p.valuationAreaId}>
               {plantName(p.plantId, p.code)}
@@ -74,7 +77,7 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
           ))}
         </select>
       </Field>
-      <Field label="Costo unitario" required error={fe.errors.unitCost}>
+      <Field label="Costo unitario (RD$)" required error={fe.errors.unitCost}>
         <input inputMode="decimal" value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: e.target.value })} />
       </Field>
       <div className="actions form-actions">
@@ -114,7 +117,7 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
   const fe = useFieldErrors();
   const [result, setResult] = useState<FromRecipeResult | null>(null);
   if (recipes.data === null) {
-    return <Loading error={recipes.error} />;
+    return <LoadingIndicator error={recipes.error} />;
   }
   const lines = recipe.data && recipe.data.recipe.recipeVersionId === recipeVersionId ? recipe.data.lines : [];
   return (
@@ -145,7 +148,11 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
         }
       }}
     >
-      <h2>Preparar desde receta</h2>
+      <h2>Opción 2 · Calcular desde la receta</h2>
+      <p className="muted">
+        Para un producto con receta activa: escriba el precio estándar de cada material y el costo de conversión (mano de obra, energía, equipos) por unidad;
+        el sistema calcula el costo unitario con las cantidades de la receta.
+      </p>
       <Field label="Receta activa" required error={fe.errors.recipe}>
         <select
           aria-label="Receta activa"
@@ -156,7 +163,7 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
             setResult(null);
           }}
         >
-          <option value="">—</option>
+          <option value="">Seleccione…</option>
           {recipes.data.items.map((r) => (
             <option key={r.recipeVersionId} value={r.recipeVersionId}>
               {r.itemCode} en {r.machineCode} (v{r.version})
@@ -164,13 +171,13 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
           ))}
         </select>
       </Field>
-      {recipeVersionId && recipe.data === null ? <Loading error={recipe.error} /> : null}
+      {recipeVersionId && recipe.data === null ? <LoadingIndicator error={recipe.error} /> : null}
       {lines.map((l) => (
         <Field key={l.materialItemId} label={`Precio estándar ${l.materialCode} (por ${l.baseUom})`} required error={fe.errors[`price-${l.materialItemId}`]}>
           <input inputMode="decimal" value={prices[l.materialItemId] ?? ""} onChange={(e) => setPrices({ ...prices, [l.materialItemId]: e.target.value })} />
         </Field>
       ))}
-      <Field label="Costo de conversión por unidad" required error={fe.errors.conversion}>
+      <Field label="Costo de conversión por unidad" required error={fe.errors.conversion} hint="En RD$ por unidad producida; puede ser 0.">
         <input inputMode="decimal" value={conversionCost} onChange={(e) => setConversionCost(e.target.value)} />
       </Field>
       <div className="actions form-actions">
@@ -219,18 +226,24 @@ export default function Page() {
   return (
     <>
       <h1>Costos estándar</h1>
+      <p className="muted">
+        El costo estándar es lo que vale una unidad de cada producto terminado en cada planta: con él se valora el inventario y el costo de lo vendido. Se
+        prepara de una de las dos formas de abajo y queda en borrador hasta que el Aprobador de políticas lo apruebe.
+      </p>
       {can("standard_cost:prepare") ? <PrepareCost onDone={reload} /> : null}
       {can("standard_cost:prepare") && can("production:read") ? <PrepareFromRecipe onDone={reload} /> : null}
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay costos estándar.</p>
+        <EmptyState title="Aún no hay costos estándar.">
+          <p>{can("standard_cost:prepare") ? "Prepare el primero con una de las dos opciones de arriba." : "Los prepara el Controller y los aprueba el Aprobador de políticas."}</p>
+        </EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Producto</th>
-              <th>Área</th>
+              <th>Área de valuación</th>
               <th className="num">Versión</th>
               <th>Vigente desde</th>
               <th className="num">Costo unitario (RD$)</th>
@@ -243,9 +256,7 @@ export default function Page() {
           <tbody>
             {data.items.map((c) => (
               <tr key={`${c.costVersionId}:${c.status}`}>
-                <td>
-                  {c.itemCode} — {c.itemDescription}
-                </td>
+                <td>{codeAndName(c.itemCode, c.itemDescription)}</td>
                 <td>{c.valuationAreaCode}</td>
                 <td className="num">{c.version}</td>
                 <td>{formatDate(c.effectiveFrom)}</td>

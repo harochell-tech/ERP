@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
 import { QuoteStatusBadge } from "@/components/QuoteStatus";
-import { Field, Loading, Money, NoPermission } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { Field, Money, NoPermission } from "@/components/ui";
 import { formatDate } from "@/lib/labels";
 import { QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quotes";
 import { useSession } from "@/lib/session";
@@ -63,7 +64,10 @@ function Quotes() {
           </Link>
         ) : null}
       </div>
-      <p className="muted">Una cotización no contabiliza, no mueve inventario ni emite e-CF. Una enviada y vigente se convierte en pedido con sus precios.</p>
+      <p className="muted">
+        Una cotización es solo una oferta al cliente: no reserva productos, no afecta la contabilidad ni genera factura. Cuando el cliente la acepta (y
+        sigue vigente), se convierte en pedido con los mismos precios.
+      </p>
       <div>
         <Field label="Estado">
           <select aria-label="Estado" value={status} onChange={(e) => go({ estado: e.target.value })}>
@@ -91,9 +95,12 @@ function Quotes() {
         </label>
       </div>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay cotizaciones con ese filtro.</p>
+        <EmptyState
+          title={status || partyId || expiredOnly ? "No hay cotizaciones con ese filtro." : "Todavía no hay cotizaciones."}
+          steps={[(status || partyId || expiredOnly) && { href: "/ventas/cotizaciones/", label: "Quitar los filtros" }, can("quote:manage") && { href: "/ventas/cotizaciones/nueva/", label: "Crear una cotización" }]}
+        />
       ) : (
         <div className="table-wrap"><table>
           <thead>

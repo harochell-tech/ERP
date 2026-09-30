@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { PlantSelect, useChosenPlant, usePlants } from "@/components/Production";
-import { ConfirmAction, ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { ConfirmAction, ErrorBox, Field, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatTime, toApiTime } from "@/lib/production";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 
 // MFG1-07 (E-MFG1-07-5): the machines and shifts of a plant, managed by the Gerente de planta (production_master:manage).
+// UX4-03 (P-38): the headers say what each column is; the plant is the one chosen above, not repeated per row.
 
 function CreateMachine({ plantId, onDone }: { plantId: string; onDone: () => void }) {
   const create = useCommand("create-machine", "/api/v1/companies/{companyId}/manufacturing/create-machine");
@@ -48,7 +50,7 @@ function CreateMachine({ plantId, onDone }: { plantId: string; onDone: () => voi
 }
 
 function MachineRow({ machine, onDone }: { machine: Schemas["MachineView"]; onDone: () => void }) {
-  const { can, plantName } = useSession();
+  const { can } = useSession();
   const id = machine.machineId;
   const rename = useCommand(`rename-machine:${id}`, "/api/v1/companies/{companyId}/manufacturing/rename-machine", `Máquina ${machine.code} renombrada.`);
   const status = useCommand(
@@ -63,7 +65,6 @@ function MachineRow({ machine, onDone }: { machine: Schemas["MachineView"]; onDo
     <tr>
       <td className="mono">{machine.code}</td>
       <td>{name === null ? machine.name : <input aria-label={`Nombre ${machine.code}`} value={name} onChange={(e) => setName(e.target.value)} />}</td>
-      <td>{plantName(machine.plantId, machine.plantCode)}</td>
       <td>
         <StatusBadge status={machine.status} />
       </td>
@@ -160,7 +161,7 @@ function DefineShift({ plantId, onDone }: { plantId: string; onDone: () => void 
 }
 
 function ShiftRow({ shift, onDone }: { shift: Schemas["ShiftView"]; onDone: () => void }) {
-  const { can, plantName } = useSession();
+  const { can } = useSession();
   const id = shift.shiftId;
   const times = useCommand(`update-shift-times:${id}`, "/api/v1/companies/{companyId}/manufacturing/update-shift-times", `Horario del turno ${shift.code} actualizado.`);
   const status = useCommand(
@@ -190,8 +191,7 @@ function ShiftRow({ shift, onDone }: { shift: Schemas["ShiftView"]; onDone: () =
           <input type="time" aria-label={`Termina ${shift.code}`} value={edit.endsAt} onChange={(e) => setEdit({ ...edit, endsAt: e.target.value })} />
         )}
       </td>
-      <td>{shift.crossesMidnight ? "Cruza la medianoche" : "—"}</td>
-      <td>{plantName(shift.plantId, shift.plantCode)}</td>
+      <td>{shift.crossesMidnight ? "Sí (termina al día siguiente)" : "No"}</td>
       <td>
         <StatusBadge status={shift.status} />
       </td>
@@ -264,13 +264,13 @@ export default function Page() {
     return <NoPermission />;
   }
   if (plants.data === null) {
-    return <Loading error={plants.error} />;
+    return <LoadingIndicator error={plants.error} />;
   }
   if (plants.data.length === 0) {
     return (
       <>
         <h1>Máquinas y turnos</h1>
-        <p className="muted">No hay plantas disponibles.</p>
+        <EmptyState title="No hay plantas disponibles." />
       </>
     );
   }
@@ -279,22 +279,23 @@ export default function Page() {
       <h1>Máquinas y turnos</h1>
       <PlantSelect plants={plants.data} value={plantId} onChange={setPlant} />
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : (
         <>
           <h2>Máquinas</h2>
           {can("production_master:manage") ? <CreateMachine plantId={plantId} onDone={reload} /> : null}
           {data.machines.length === 0 ? (
-            <p className="muted">No hay máquinas en la planta.</p>
+            <EmptyState title="No hay máquinas en la planta.">
+              <p>{can("production_master:manage") ? "Cree la primera con el formulario de arriba." : "El Gerente de planta crea las máquinas."}</p>
+            </EmptyState>
           ) : (
             <div className="table-wrap"><table>
               <thead>
                 <tr>
-                  <th>Código</th>
+                  <th>Código de la máquina</th>
                   <th>Nombre</th>
-                  <th>Planta</th>
                   <th>Estado</th>
-                  <th />
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -307,18 +308,19 @@ export default function Page() {
           <h2>Turnos</h2>
           {can("production_master:manage") ? <DefineShift plantId={plantId} onDone={reload} /> : null}
           {data.shifts.length === 0 ? (
-            <p className="muted">No hay turnos en la planta.</p>
+            <EmptyState title="No hay turnos en la planta.">
+              <p>{can("production_master:manage") ? "Defina el primero con el formulario de arriba." : "El Gerente de planta define los turnos."}</p>
+            </EmptyState>
           ) : (
             <div className="table-wrap"><table>
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Inicia</th>
-                  <th>Termina</th>
-                  <th>Medianoche</th>
-                  <th>Planta</th>
+                  <th>Código del turno</th>
+                  <th>Hora de inicio</th>
+                  <th>Hora de fin</th>
+                  <th>Cruza la medianoche</th>
                   <th>Estado</th>
-                  <th />
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>

@@ -163,7 +163,7 @@ export default function Page() {
   };
   return (
     <>
-      <h1>Mapas de cuentas</h1>
+      <h1>Cuentas por rol</h1>
       <p className="muted">Cada rol contable de las reglas se contabiliza en la cuenta que le asigna su mapa. Un mapa nuevo se prepara en borrador y lo aprueba otra persona.</p>
       {unmapped.length > 0 ? (
         <div className="alert-block" role="status" data-testid="unmapped-roles">

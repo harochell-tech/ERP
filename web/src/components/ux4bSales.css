@@ -1,0 +1,18 @@
+/* UX4-03: sales, dispatch, billing and collection screens. */
+.money-text { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.preview-box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+.preview-box h3 { margin: 0 0 6px; font-size: 15px; }
+.preview-box dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+.preview-box dt { color: var(--muted); }
+.preview-box dd { margin: 0; }
+.credit-preview { border-radius: 10px; padding: 12px 16px; margin: 12px 0; border: 1px solid var(--line); }
+.credit-preview.fits { background: var(--tone-done-bg); border-color: #b9dcc8; color: var(--tone-done-fg); }
+.credit-preview.exceeds { background: var(--tone-attention-bg); border-color: #efcfa9; color: var(--tone-attention-fg); }
+.credit-preview ul { margin: 6px 0 0; padding-left: 1.2rem; }
+.doc-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 20px; margin: 8px 0 12px; }
+.doc-facts div { display: flex; flex-direction: column; gap: 2px; }
+.doc-facts span:first-child { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.statement-print .print-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
+@media print {
+  .statement-print table { font-size: 11px; }
+}

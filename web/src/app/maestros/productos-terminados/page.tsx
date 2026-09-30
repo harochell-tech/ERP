@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { ErrorBox, Field, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { matchesSearch } from "@/lib/ux4b";
 import { useUomCatalogue } from "@/components/Units";
 import { FINISHED_GOOD_CATEGORIES } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -91,18 +93,43 @@ export default function Page() {
     can("master_data:read") ? () => query("/api/v1/companies/{companyId}/master-data/items", { path: { companyId }, query: { limit: 200 } }) : null,
     [companyId],
   );
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
   if (!can("master_data:read")) {
     return <NoPermission />;
   }
   const goods = data?.items.filter((i) => i.itemType === "FINISHED_GOOD") ?? [];
+  // UX4-03 (V-40): search by code or description and filter by category.
+  const shown = goods.filter((i) => (category === "" || i.itemCategory === category) && matchesSearch(search, i.code, i.description));
   return (
     <>
       <h1>Productos terminados</h1>
       {can("item:create") ? <CreateFinishedGood onDone={reload} /> : null}
+      <div className="inline-form" role="search">
+        <Field label="Buscar producto">
+          <input type="search" placeholder="Código o descripción" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </Field>
+        <Field label="Mostrar categoría">
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">Todas</option>
+            {Object.entries(FINISHED_GOOD_CATEGORIES).map(([code, label]) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : goods.length === 0 ? (
-        <p className="muted">No hay productos terminados.</p>
+        <EmptyState title="Aún no hay productos terminados.">
+          <p>{can("item:create") ? "Cree el primero con el formulario de arriba; queda en borrador hasta que el Controller lo active." : "Quien tenga el permiso de crear artículos los registra aquí."}</p>
+        </EmptyState>
+      ) : shown.length === 0 ? (
+        <EmptyState title="Ningún producto coincide con la búsqueda.">
+          <p>Pruebe con otra palabra o elija «Todas» las categorías.</p>
+        </EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -116,7 +143,7 @@ export default function Page() {
             </tr>
           </thead>
           <tbody>
-            {goods.map((i) => (
+            {shown.map((i) => (
               <tr key={`${i.itemId}:${i.version}`}>
                 <td className="mono">{i.code}</td>
                 <td className="wrap">{i.description}</td>

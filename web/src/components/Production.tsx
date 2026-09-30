@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { Field } from "./ui";
+import { Field, StatusBadge } from "./ui";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { itemDisplay, productionStatus, quantityWithUnit, type ProductionStatusKind } from "@/lib/ux4bProduction";
+import "./ux4bProduction.css";
 
 // MFG1-07: what the production screens share — the plants (with their locations, from master data) and the items.
 
@@ -72,6 +74,29 @@ export function PlantSelect({ plants, value, onChange }: { plants: readonly Plan
   );
 }
 
+/** P-37: "CODE — Description (unit)", the code once when the description repeats it; "L" for litre (P-06). */
 export function itemLabel(item: Pick<Schemas["ItemView"], "code" | "description" | "baseUom">): string {
-  return `${item.code} — ${item.description} (${item.baseUom})`;
+  return itemDisplay(item.code, item.description, item.baseUom);
+}
+
+/** P-12 / E-UX4-14: a production status in words with its own tone (a released lot is done, a recipe "Activa"). */
+export function ProductionBadge({ kind, status, testId }: { kind: ProductionStatusKind; status: string | null | undefined; testId?: string }) {
+  const known = productionStatus(kind, status);
+  if (!known) {
+    return <StatusBadge status={status} testId={testId} />;
+  }
+  return (
+    <span className={`badge tone-${known.tone}`} data-testid={testId}>
+      {known.label}
+    </span>
+  );
+}
+
+/** P-05: a quantity with its unit, in the figures' typeface. */
+export function Quantity({ value, uom, testId }: { value: string | null | undefined; uom?: string | null; testId?: string }) {
+  return (
+    <span className="mono" data-testid={testId}>
+      {quantityWithUnit(value, uom)}
+    </span>
+  );
 }

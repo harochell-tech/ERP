@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { query } from "@/api/client";
-import { Loading, NoPermission, StatusBadge } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { NoPermission, StatusBadge } from "@/components/ui";
+import { formatQuantity } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDate, formatDateTime } from "@/lib/labels";
 import { BOARD_COLUMNS } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { isZeroDecimal } from "@/lib/ux4bSales";
 
 // VS3-10a (E-VS3-10-5): the day's dispatch work — orders waiting for a delivery, then deliveries by status, each opening its page
 // with the step it needs.
+// UX4-03 (V-26): each order shows the date the customer asked for and, per product, what was ordered and what was delivered (the
+// server's figures, never subtracted); the delivery statuses without deliveries are named once, not one "Ninguno." each.
 
 export default function Page() {
   const { companyId, can, plantName } = useSession();
@@ -21,7 +26,9 @@ export default function Page() {
             query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "PARTIALLY_DELIVERED", limit: 200 } }),
             ...BOARD_COLUMNS.map((c) => query("/api/v1/companies/{companyId}/sales/deliveries", { path: { companyId }, query: { status: c.status, limit: 200 } })),
           ]);
-          return { orders: [...confirmed.items, ...partial.items], columns: columns.map((c) => c.items) };
+          const orders = [...confirmed.items, ...partial.items];
+          const details = await Promise.all(orders.map((o) => query("/api/v1/companies/{companyId}/sales/orders/{salesOrderId}", { path: { companyId, salesOrderId: o.salesOrderId } })));
+          return { orders: orders.map((o, i) => ({ ...o, detail: details[i] })), columns: columns.map((c) => c.items) };
         }
       : null,
     [companyId],
@@ -30,61 +37,75 @@ export default function Page() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
+  const empty = BOARD_COLUMNS.filter((_, index) => (data.columns[index] ?? []).length === 0).map((c) => c.title);
   return (
     <>
       <h1>Tablero de despacho</h1>
-      <h2>Pedidos por despachar</h2>
+      <h2>Pedidos por despachar ({data.orders.length})</h2>
       {data.orders.length === 0 ? (
-        <p className="muted">No hay pedidos confirmados pendientes.</p>
+        <EmptyState title="No hay pedidos confirmados pendientes de despacho.">
+          <p>Un pedido aparece aquí cuando Crédito lo confirma.</p>
+        </EmptyState>
       ) : (
-        <div className="table-wrap"><table>
-          <thead>
-            <tr>
-              <th>Pedido</th>
-              <th>Fecha</th>
-              <th>Cliente</th>
-              <th>Entrega</th>
-              <th>Estado</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {data.orders.map((o) => (
-              <tr key={o.salesOrderId}>
-                <td className="mono">
-                  <Link href={`/ventas/pedido/?id=${o.salesOrderId}`}>{o.orderNo}</Link>
-                </td>
-                <td>{formatDate(o.orderDate)}</td>
-                <td className="wrap">{o.customerName}</td>
-                <td>{DELIVERY_TERMS[o.deliveryTermCode] ?? o.deliveryTermCode}</td>
-                <td>
-                  <StatusBadge status={o.status} />
-                </td>
-                <td className="actions">
-                  {can("delivery:manage") ? (
-                    <Link className="button" href={`/despacho/planificar/?pedido=${o.salesOrderId}`}>
-                      Planificar conduce
-                    </Link>
-                  ) : null}
-                </td>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Pedido</th>
+                <th>Fecha del pedido</th>
+                <th>Solicitado para</th>
+                <th>Cliente</th>
+                <th>Entrega</th>
+                <th>Pedido / entregado</th>
+                <th>Estado</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table></div>
+            </thead>
+            <tbody>
+              {data.orders.map((o) => (
+                <tr key={o.salesOrderId}>
+                  <td className="mono">
+                    <Link href={`/ventas/pedido/?id=${o.salesOrderId}`}>{o.orderNo}</Link>
+                  </td>
+                  <td>{formatDate(o.orderDate)}</td>
+                  <td data-testid={`requested:${o.orderNo}`}>{o.detail?.requestedDate ? formatDate(o.detail.requestedDate) : <span className="muted">Sin fecha</span>}</td>
+                  <td className="wrap">{o.customerName}</td>
+                  <td>{DELIVERY_TERMS[o.deliveryTermCode] ?? o.deliveryTermCode}</td>
+                  <td className="wrap">
+                    {(o.detail?.lines ?? []).map((l) => (
+                      <div key={l.salesOrderLineId}>
+                        {l.itemCode}: {formatQuantity(l.qtyOrdered)} {l.uom}
+                        {isZeroDecimal(l.qtyDelivered) ? " · nada entregado" : ` · ${formatQuantity(l.qtyDelivered)} entregado`}
+                      </div>
+                    ))}
+                  </td>
+                  <td>
+                    <StatusBadge status={o.status} />
+                  </td>
+                  <td className="actions">
+                    {can("delivery:manage") ? (
+                      <Link className="button" href={`/despacho/planificar/?pedido=${o.salesOrderId}`}>
+                        Planificar conduce
+                      </Link>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {BOARD_COLUMNS.map((column, index) => {
         const items = data.columns[index] ?? [];
-        return (
+        return items.length === 0 ? null : (
           <section key={column.status}>
             <h2>
               {column.title} ({items.length})
             </h2>
-            {items.length === 0 ? (
-              <p className="muted">Ninguno.</p>
-            ) : (
-              <div className="table-wrap"><table>
+            <div className="table-wrap">
+              <table>
                 <thead>
                   <tr>
                     <th>Conduce</th>
@@ -109,11 +130,16 @@ export default function Page() {
                     </tr>
                   ))}
                 </tbody>
-              </table></div>
-            )}
+              </table>
+            </div>
           </section>
         );
       })}
+      {empty.length > 0 ? (
+        <p className="muted" data-testid="board-empty-columns">
+          Sin conduces {empty.length === BOARD_COLUMNS.length ? "en curso" : `en: ${empty.join(", ").toLowerCase()}`}.
+        </p>
+      ) : null}
     </>
   );
 }

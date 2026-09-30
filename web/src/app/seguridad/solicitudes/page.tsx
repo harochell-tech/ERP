@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { Person } from "@/components/Person";
-import { ConfirmAction, ErrorBox, Loading, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { ConfirmAction, ErrorBox, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
 import { personLabel } from "@/lib/identities";
 import { formatDateTime, ROLES } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -81,9 +82,19 @@ export default function Page() {
         </select>
       </label>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay solicitudes.</p>
+        // UX4-03 (A-20): the empty list explains what the screen is for and where requests come from.
+        <EmptyState
+          title={status === "REQUESTED" ? "No hay solicitudes." : "No hay solicitudes con ese estado."}
+          steps={[can("role:assign") && { href: "/seguridad/usuarios/", label: "Solicitar un rol en Usuarios y roles" }]}
+          testId="requests-empty"
+        >
+          <p>
+            Aquí llegan los cambios de rol que pide el administrador de seguridad en Usuarios y roles. Otra persona, el segundo aprobador, los aprueba o los
+            rechaza; quien pidió el cambio y la persona afectada no pueden decidirlo. Al aprobarse, los permisos cambian de inmediato.
+          </p>
+        </EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { PlantSelect, useChosenPlant, usePlants, type PlantOption } from "@/components/Production";
-import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { PlantSelect, ProductionBadge, useChosenPlant, usePlants, type PlantOption } from "@/components/Production";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { ErrorBox, Field, NoPermission, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import {
@@ -19,6 +22,7 @@ import {
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { curingRemainingText, dayHref } from "@/lib/ux4bProduction";
 
 type Lot = Schemas["FgLotSummary"];
 
@@ -26,6 +30,8 @@ type Lot = Schemas["FgLotSummary"];
 // with a reason; the Gerente de planta scraps units (step-up, handled by useCommand). The API decides whether curing is done.
 // UX3-02 (E-UX3-12): one "Acciones" button per lot opens a dialog with the actions the user may take on it (a sheet on a phone);
 // Calidad opens the screen on "Listos para liberar".
+// UX4-03: "Liberar" only once the curing is done, the remaining hours otherwise (P-29/P-26); no location preselected (P-31); the run
+// links to its production day (P-32); "?lote=" opens the screen on one lot (P-17); a released lot reads done (P-12).
 
 const ACTION_LABELS: Readonly<Record<LotAction, string>> = {
   release: "Liberar",
@@ -42,7 +48,7 @@ function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | und
   const targets = stockLocations(plant?.locations ?? []);
   const sources = scrapLocations(plant?.locations ?? []);
   const [form, setForm] = useState(() => ({
-    toLocationId: targets[0]?.locationId ?? "",
+    toLocationId: "",
     reason: "",
     scrapLocationId: sources.find((l) => l.code === lot.locationCode)?.locationId ?? "",
     quantity: "",
@@ -53,7 +59,8 @@ function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | und
   const unblock = useCommand(`unblock-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/unblock-lot", `Lote ${lot.lotCode} desbloqueado; vuelve a curado.`);
   const scrap = useCommand(`scrap-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/scrap-lot");
   const busy = release.busy || block.busy || unblock.busy || scrap.busy;
-  const available = lotActions(lot.status, can);
+  const available = lotActions(lot.status, can, lot.curingDone);
+  const remaining = curingRemainingText(lot.status, lot.curingHoursRemaining);
   const target = { plantId: lot.plantId, lotId: lot.lotId, expectedVersion: lot.version };
   const toLocation = targets.find((l) => l.locationId === form.toLocationId);
 
@@ -159,9 +166,14 @@ function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | und
               Lote <span className="mono">{lot.lotCode}</span>
             </h2>
             <p className="muted">
-              {lot.itemCode} · {formatQuantity(lot.quantity)} unidades · <StatusBadge status={lot.status} />
-              {lot.status === "CURING" ? (lot.curingDone ? " · curado cumplido" : " · en curado mínimo") : ""}
+              {lot.itemCode} · {formatQuantity(lot.quantity)} unidades · <ProductionBadge kind="lot" status={lot.status} />
+              {remaining ? ` · ${remaining}` : ""}
             </p>
+            {lot.status === "CURING" && !lot.curingDone ? (
+              <p className="notice" data-testid="release-not-yet">
+                Todavía no se puede liberar: se podrá desde {formatDateTime(lot.releasableAt)}.
+              </p>
+            ) : null}
             {action === null ? (
               <div className="actions">
                 {available.map((a) => (
@@ -178,7 +190,7 @@ function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | und
                     <p>Las {formatQuantity(lot.quantity)} unidades del lote pasan de curado a la ubicación elegida y quedan disponibles para despacho. No se puede deshacer.</p>
                     <Field label="Liberar a" required error={fe.errors.toLocationId}>
                       <select aria-label={`Liberar ${lot.lotCode} a`} value={form.toLocationId} onChange={(e) => setForm({ ...form, toLocationId: e.target.value })}>
-                        <option value="">—</option>
+                        <option value="">Seleccione…</option>
                         {targets.map((l) => (
                           <option key={l.locationId} value={l.locationId}>
                             {l.code}
@@ -197,9 +209,9 @@ function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | und
                       Esta acción requiere autenticación reciente: si su última autenticación no es reciente, al confirmar el sistema le pedirá entrar de nuevo con su
                       cuenta y luego deberá pulsar otra vez.
                     </p>
-                    <Field label="Ubicación" required error={fe.errors.scrapLocationId}>
-                      <select aria-label={`Ubicación del scrap ${lot.lotCode}`} value={form.scrapLocationId} onChange={(e) => setForm({ ...form, scrapLocationId: e.target.value })}>
-                        <option value="">—</option>
+                    <Field label="Desechar desde" required error={fe.errors.scrapLocationId} hint="La ubicación donde están las unidades.">
+                      <select aria-label={`Desechar desde ${lot.lotCode}`} value={form.scrapLocationId} onChange={(e) => setForm({ ...form, scrapLocationId: e.target.value })}>
+                        <option value="">Seleccione…</option>
                         {sources.map((l) => (
                           <option key={l.locationId} value={l.locationId}>
                             {l.code}
@@ -238,6 +250,7 @@ function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | und
 }
 
 function LotRow({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | undefined; onDone: () => void }) {
+  const remaining = curingRemainingText(lot.status, lot.curingHoursRemaining);
   return (
     <tr>
       <td>
@@ -248,29 +261,39 @@ function LotRow({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | undefin
         </div>
       </td>
       <td>{lot.itemCode}</td>
-      <td className="mono">{lot.runNo}</td>
+      <td className="mono">
+        <Link href={dayHref(lot.businessDate)} title="Ver la producción de ese día">
+          {lot.runNo}
+        </Link>
+      </td>
       <td>{formatDate(lot.businessDate)}</td>
       <td className="wrap">
-        <StatusBadge status={lot.status} testId={`lot-status-${lot.lotCode}`} />
+        <ProductionBadge kind="lot" status={lot.status} testId={`lot-status-${lot.lotCode}`} />
         {lot.blockReason ? <div className="muted">{lot.blockReason}</div> : null}
       </td>
       <td>
         {formatDateTime(lot.releasableAt)}
-        {lot.status === "CURING" ? <div className="muted">{lot.curingDone ? "Curado cumplido" : "En curado mínimo"}</div> : null}
+        {remaining ? (
+          <div className="muted" data-testid={`lot-remaining-${lot.lotCode}`}>
+            {remaining}
+          </div>
+        ) : null}
       </td>
       <td>{lot.locationCode ?? "—"}</td>
-      <td className="num">{formatQuantity(lot.quantity)}</td>
+      <td className="num">{formatQuantity(lot.quantity)} un</td>
       <td className="num">{lot.racks}</td>
     </tr>
   );
 }
 
-export default function Page() {
+function Lots() {
   const { companyId, can } = useSession();
   const plants = usePlants();
   const { plant, setPlant } = useChosenPlant(plants.data);
   const plantId = plant?.plantId ?? "";
-  const [filter, setFilter] = useState(() => defaultLotFilter(can("fg_lot:release")));
+  const params = useSearchParams();
+  const [lotCode, setLotCode] = useState(() => params.get("lote")?.trim() ?? "");
+  const [filter, setFilter] = useState(() => (lotCode ? "" : defaultLotFilter(can("fg_lot:release"))));
   const status = lotQueryStatus(filter);
   const { data, error, reload } = useLoad(
     can("production:read") && plantId
@@ -282,13 +305,14 @@ export default function Page() {
     return <NoPermission />;
   }
   if (plants.data === null) {
-    return <Loading error={plants.error} />;
+    return <LoadingIndicator error={plants.error} />;
   }
-  const lots = data === null ? null : filter === READY_TO_RELEASE ? data.items.filter(isReadyToRelease) : data.items;
+  const byFilter = data === null ? null : filter === READY_TO_RELEASE ? data.items.filter(isReadyToRelease) : data.items;
+  const lots = byFilter === null ? null : lotCode ? byFilter.filter((l) => l.lotCode === lotCode) : byFilter;
   return (
     <>
       <h1>Curado y liberación</h1>
-      {plants.data.length === 0 ? <p className="muted">No hay plantas con producción.</p> : <PlantSelect plants={plants.data} value={plantId} onChange={setPlant} />}
+      {plants.data.length === 0 ? <EmptyState title="No hay plantas con producción." /> : <PlantSelect plants={plants.data} value={plantId} onChange={setPlant} />}
       <Field label="Estado">
         <select aria-label="Estado" value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="">Todos</option>
@@ -300,10 +324,24 @@ export default function Page() {
           <option value="VOIDED">Anulado</option>
         </select>
       </Field>
+      {lotCode ? (
+        <p className="notice" data-testid="lot-focus">
+          Mostrando el lote <span className="mono">{lotCode}</span>.{" "}
+          <button type="button" onClick={() => setLotCode("")}>
+            Ver todos los lotes
+          </button>
+        </p>
+      ) : null}
       {lots === null ? (
-        plantId ? <Loading error={error} /> : null
+        plantId ? <LoadingIndicator error={error} /> : null
       ) : lots.length === 0 ? (
-        <p className="muted">{filter === READY_TO_RELEASE ? "No hay lotes con el curado cumplido por liberar." : "No hay lotes."}</p>
+        <EmptyState title={filter === READY_TO_RELEASE ? "No hay lotes con el curado cumplido por liberar." : "No hay lotes con ese filtro."}>
+          <p>
+            {filter === READY_TO_RELEASE
+              ? "Los lotes entran a curado al cerrar el resumen del turno; elija «En curado» para ver cuánto les falta."
+              : "Los lotes se crean al cerrar el resumen del turno de una corrida."}
+          </p>
+        </EmptyState>
       ) : (
         <div className="table-wrap">
           <table>
@@ -314,8 +352,8 @@ export default function Page() {
                 <th>Corrida</th>
                 <th>Fecha</th>
                 <th>Estado</th>
-                <th>Liberable desde</th>
-                <th>Ubicación</th>
+                <th>Se puede liberar desde</th>
+                <th>Ubicación actual</th>
                 <th className="num">Unidades</th>
                 <th className="num">Racks</th>
               </tr>
@@ -329,5 +367,13 @@ export default function Page() {
         </div>
       )}
     </>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <Lots />
+    </Suspense>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { query } from "@/api/client";
-import { Loading, NoPermission } from "@/components/ui";
+import { NoPermission } from "@/components/ui";
+import { LoadingIndicator } from "@/components/StateNotices";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 
@@ -19,9 +20,9 @@ export default function Page() {
   return (
     <>
       <h1>Plantas y ubicaciones</h1>
-      <p className="muted">Solo lectura: las plantas y ubicaciones se crean con la herramienta de despliegue.</p>
+      <p className="muted">Consulta de las plantas de la empresa y de sus ubicaciones (patio, curado, tránsito…). Para abrir una planta o una ubicación nueva, pídalo al equipo de sistemas; el nombre de cada planta se cambia en Configuración › Empresa.</p>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : (
         <div className="table-wrap"><table>
           <thead>

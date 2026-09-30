@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { Money, NoPermission, StatusBadge } from "@/components/ui";
 import { DELIVERY_TERMS, formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
@@ -54,9 +55,9 @@ function Orders() {
         </select>
       </label>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay pedidos con ese estado.</p>
+        <EmptyState title={status ? "No hay pedidos con ese estado." : "Todavía no hay pedidos."} steps={[status && { href: "/ventas/pedidos/", label: "Ver todos los pedidos" }, can("sales_order:create") && { href: "/ventas/pedidos/nuevo/", label: "Crear un pedido" }]} />
       ) : (
         <div className="table-wrap"><table>
           <thead>

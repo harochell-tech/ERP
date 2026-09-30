@@ -59,11 +59,17 @@ export function lotQueryStatus(filter: string): string {
 
 export type LotAction = "release" | "block" | "unblock" | "scrap";
 
-/** UX3-02 (E-UX3-12): what the lot's "Acciones" dialog offers, by its status and the user's permissions. */
-export function lotActions(status: string, can: (permission: string) => boolean): LotAction[] {
+/**
+ * UX3-02 (E-UX3-12): what the lot's "Acciones" dialog offers, by its status and the user's permissions. UX4-03 (P-29): "Liberar"
+ * only once the API reports the curing done (`curingDone`; callers that do not know it pass nothing and keep the former offer).
+ */
+export function lotActions(status: string, can: (permission: string) => boolean, curingDone = true): LotAction[] {
   const actions: LotAction[] = [];
   if (status === "CURING" && can("fg_lot:release")) {
-    actions.push("release", "block");
+    if (curingDone) {
+      actions.push("release");
+    }
+    actions.push("block");
   }
   if (status === "BLOCKED" && can("fg_lot:release")) {
     actions.push("unblock");

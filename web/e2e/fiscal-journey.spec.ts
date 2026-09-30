@@ -127,7 +127,7 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await expect(billing.getByText(/e-CF 44/).first()).toBeVisible();
   await expect(billing.getByTestId("invoice-exemption")).toContainText("Exenta — CONFOTUR");
   await confirmAction(billing, "Emitir factura");
-  await expect(billing.getByTestId("invoice-status")).toHaveText("Confirmado");
+  await expect(billing.getByTestId("invoice-status")).toHaveText("Emitida");
   await expect(billing.getByTestId("invoice-total")).toHaveText("2,000.00");
   await expect(billing.getByTestId("invoice-exemption")).toContainText(certificate);
   await expect(billing.locator("tr", { hasText: "Indicador de facturación" }).locator("td").first()).toHaveText("4");

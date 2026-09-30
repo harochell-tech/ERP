@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { Money, NoPermission } from "@/components/ui";
 import { formatDate } from "@/lib/labels";
 import { METHODS } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel, receiptStatusSummary } from "@/lib/ux4bSales";
 
-// VS3-10b (E-VS3-10-7): customer receipts REC-… with their three statuses (E-VS3-07-4), newest first (sales:read).
+// VS3-10b (E-VS3-10-7): customer receipts REC-…, newest first (sales:read).
+// UX4-03 (V-36): the three statuses (E-VS3-07-4) read as one ("Aplicado en parte · sin depositar"); V-35: the account as "alias · banco ••••6789".
 const FILTERS: readonly { value: string; label: string; query: Record<string, string> }[] = [
   { value: "", label: "Todos", query: {} },
   { value: "sin-aplicar", label: "Con saldo sin aplicar", query: { status: "RECORDED", applicationStatus: "UNAPPLIED" } },
@@ -53,9 +56,9 @@ function Receipts() {
         </select>
       </label>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay recibos.</p>
+        <EmptyState title={filter.value ? "No hay recibos con ese filtro." : "Todavía no hay cobros registrados."} steps={[filter.value && { href: "/cobros/recibos/", label: "Ver todos los recibos" }, can("receipt:record") && { href: "/cobros/recibos/nuevo/", label: "Registrar un cobro" }]} />
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -67,8 +70,7 @@ function Receipts() {
               <th className="num">Monto (RD$)</th>
               <th className="num">Sin aplicar (RD$)</th>
               <th>Estado</th>
-              <th>Aplicación</th>
-              <th>Banco</th>
+              <th>Cuenta de depósito</th>
             </tr>
           </thead>
           <tbody>
@@ -87,14 +89,11 @@ function Receipts() {
                   <Money value={r.unapplied} />
                 </td>
                 <td>
-                  <StatusBadge status={r.status} />
+                  <span className={`badge tone-${receiptStatusSummary(r).tone}`} data-testid={`receipt-row-status:${r.receiptNo}`}>
+                    {receiptStatusSummary(r).label}
+                  </span>
                 </td>
-                <td>
-                  <StatusBadge status={r.applicationStatus} />
-                </td>
-                <td>
-                  <StatusBadge status={r.bankStatus} />
-                </td>
+                <td className="wrap">{r.bankCode || r.bankAccountAlias ? bankAccountLabel({ alias: r.bankAccountAlias, bankCode: r.bankCode, accountNumber: r.bankAccountNumber }) : "—"}</td>
               </tr>
             ))}
           </tbody>

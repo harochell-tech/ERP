@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { History } from "@/components/History";
-import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { SalesHistory } from "@/components/SalesUx4";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { ConfirmAction, ErrorBox, Field, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { isDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -73,11 +74,12 @@ function EditCustomer({ customer, onDone }: { customer: Customer; onDone: () => 
   );
 }
 
-function PrepareTerms({ partyId, onDone }: { partyId: string; onDone: () => void }) {
+function PrepareTerms({ partyId, current, onDone }: { partyId: string; current: Schemas["CustomerTermsView"] | undefined; onDone: () => void }) {
   const prepare = useCommand(`prepare-terms:${partyId}`, "/api/v1/companies/{companyId}/sales/prepare-customer-terms", "Términos de crédito preparados; falta la aprobación del Controller.");
-  const [days, setDays] = useState("30");
-  const [limit, setLimit] = useState("");
-  const [hold, setHold] = useState(false);
+  // V-16: start from the terms in force (days, limit, hold), so a change only touches what changes.
+  const [days, setDays] = useState(current ? String(current.paymentTermsDays) : "30");
+  const [limit, setLimit] = useState(current?.creditLimit ?? "");
+  const [hold, setHold] = useState(current?.creditHold ?? false);
   const fe = useFieldErrors<"days" | "limit">();
   return (
     <form
@@ -101,16 +103,21 @@ function PrepareTerms({ partyId, onDone }: { partyId: string; onDone: () => void
       <Field label="Días de crédito" required error={fe.errors.days}>
         <input inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} />
       </Field>
-      <Field label="Límite de crédito" required error={fe.errors.limit} hint="En RD$.">
+      <Field label="Límite de crédito" required error={fe.errors.limit} hint={current ? "En RD$. Se propone el límite vigente." : "En RD$."}>
         <input inputMode="decimal" value={limit} onChange={(e) => setLimit(e.target.value)} />
       </Field>
       <label className="field">
         <span>Retener crédito</span>
         <input type="checkbox" checked={hold} onChange={(e) => setHold(e.target.checked)} />
+        <span className="field-hint" style={{ fontWeight: 400 }}>Con el crédito retenido, ningún pedido del cliente se confirma solo: todos pasan a Crédito para aprobación.</span>
       </label>
       <button type="submit" className="primary" disabled={prepare.busy}>
         Preparar términos
       </button>
+      <p className="muted" style={{ flexBasis: "100%" }}>
+        «Preparar términos» guarda una propuesta en borrador; no cambia nada hasta que el Controller la apruebe. Desde ese día rige para los pedidos
+        nuevos.
+      </p>
       <ErrorBox error={prepare.error} />
     </form>
   );
@@ -158,13 +165,13 @@ function Exposure({ partyId }: { partyId: string }) {
   const { companyId } = useSession();
   const { data, error } = useLoad(() => query("/api/v1/companies/{companyId}/sales/customers/{partyId}/exposure", { path: { companyId, partyId } }), [companyId, partyId]);
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   return (
     <div className="table-wrap"><table>
       <tbody>
         <tr>
-          <th>CxC abierta</th>
+          <th>Facturas pendientes de cobro</th>
           <td className="num">
             <Money value={data.openAr} currency />
           </td>
@@ -182,7 +189,7 @@ function Exposure({ partyId }: { partyId: string }) {
           </td>
         </tr>
         <tr>
-          <th>Exposición</th>
+          <th>Crédito usado (total)</th>
           <td className="num">
             <Money value={data.exposure} testId="exposure" currency />
           </td>
@@ -200,7 +207,7 @@ function Exposure({ partyId }: { partyId: string }) {
           </td>
         </tr>
         <tr>
-          <th>Días de atraso</th>
+          <th>Días de atraso (factura más vencida)</th>
           <td className="num">{data.overdueDays}</td>
         </tr>
       </tbody>
@@ -220,7 +227,7 @@ function CustomerDetail() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   return (
     <>
@@ -245,12 +252,17 @@ function CustomerDetail() {
         </div>
       ) : null}
       {can("customer:update") ? <EditCustomer key={data.version} customer={data} onDone={reload} /> : null}
-      <h2>Exposición de crédito</h2>
+      <h2>Crédito usado</h2>
+      <p className="muted">Lo que el cliente ya debe o tiene comprometido; la evaluación de crédito de un pedido lo suma al monto del pedido.</p>
       <Exposure partyId={data.partyId} />
       <h2>Términos de crédito</h2>
-      {can("customer_terms:prepare") ? <PrepareTerms partyId={data.partyId} onDone={reload} /> : null}
+      {can("customer_terms:prepare") ? (
+        <PrepareTerms key={data.terms.find((t) => t.status === "ACTIVE")?.termsVersionId ?? "none"} partyId={data.partyId} current={data.terms.find((t) => t.status === "ACTIVE")} onDone={reload} />
+      ) : null}
       {data.terms.length === 0 ? (
-        <p className="muted">Sin términos todavía.</p>
+        <EmptyState title="Sin términos de crédito todavía.">
+          <p>Sin términos aprobados, los pedidos de este cliente no se pueden confirmar: Crédito los prepara y el Controller los aprueba.</p>
+        </EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -273,7 +285,7 @@ function CustomerDetail() {
           </tbody>
         </table></div>
       )}
-      <History history={data.history} />
+      <SalesHistory history={data.history} />
     </>
   );
 }

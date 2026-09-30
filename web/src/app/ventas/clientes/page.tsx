@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { query } from "@/api/client";
 import { RncHint, useRncLookup } from "@/components/RncLookup";
-import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { ErrorBox, Field, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -54,6 +55,7 @@ export default function Page() {
   const { companyId, can } = useSession();
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
   const { data, error, reload } = useLoad(
     can("sales:read") ? () => query("/api/v1/companies/{companyId}/sales/customers", { path: { companyId }, query: { status, search, limit: 200 } }) : null,
     [companyId, status, search],
@@ -63,8 +65,33 @@ export default function Page() {
   }
   return (
     <>
-      <h1>Clientes</h1>
-      {can("customer:create") ? <CreateCustomer onDone={reload} /> : null}
+      <div className="actions" style={{ justifyContent: "space-between" }}>
+        <h1>Clientes</h1>
+        {can("customer:create") && !creating ? (
+          <button type="button" className="primary" onClick={() => setCreating(true)}>
+            Nuevo cliente
+          </button>
+        ) : null}
+      </div>
+      {creating ? (
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Nuevo cliente</h2>
+          <p className="muted">
+            Se crea en borrador con su RNC o cédula y razón social. Después, en su ficha, Crédito prepara sus términos de crédito y lo activa para
+            tomarle pedidos.
+          </p>
+          <CreateCustomer
+            onDone={() => {
+              setCreating(false);
+              reload();
+            }}
+          />
+          <button type="button" onClick={() => setCreating(false)}>
+            Cancelar
+          </button>
+        </div>
+      ) : null}
+      <h2>Buscar clientes</h2>
       <div className="inline-form">
         <Field label="Estado">
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -79,9 +106,11 @@ export default function Page() {
         </Field>
       </div>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay clientes.</p>
+        <EmptyState title={search || status ? "Ningún cliente coincide con la búsqueda." : "Todavía no hay clientes."}>
+          {can("customer:create") ? <p>Use «Nuevo cliente» para registrarlo con su RNC o cédula.</p> : null}
+        </EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>

@@ -9,8 +9,8 @@ test("a role requested by the security admin is approved by a second person", as
   const admin = await signIn(browser, "Administrador de seguridad");
   await nav(admin, "Usuarios y roles");
   const newcomer = (await admin.locator("tr", { hasText: "Sin roles" }).locator("td").first().innerText()).trim();
-  await admin.getByLabel("Usuario").selectOption({ label: newcomer });
-  await admin.getByLabel("Rol").selectOption({ label: "Comprador" });
+  await admin.locator("form").getByLabel("Usuario").selectOption({ label: newcomer });
+  await admin.locator("form").getByLabel("Rol").selectOption({ label: "Comprador" });
   await admin.getByRole("button", { name: "Solicitar", exact: true }).click();
   await expect(admin.getByText("Solicitud enviada")).toBeVisible();
 
@@ -50,15 +50,15 @@ test("the read-only audit and master screens open for their readers", async ({ b
   await expect(controller.getByTestId("journal").first()).toBeVisible();
 
   const auditor = await signIn(browser, "Auditor");
-  // UX4-02 (A-09): the menu item keeps its name (Shell), the screen reads "Verificar integridad" with the last verification.
-  await nav(auditor, "Verificar cadena");
+  // UX4-02/03 (A-09): the menu and the screen read "Verificar integridad", with the last verification.
+  await nav(auditor, "Verificar integridad");
   await expect(auditor.getByRole("heading", { name: "Verificar integridad" })).toBeVisible();
   await expect(auditor.getByTestId("last-verification")).toBeVisible();
   await expect(auditor.getByTestId("integrity-chains")).toContainText("Libro mayor");
   await auditor.getByRole("button", { name: "Verificar ahora" }).click();
   // The dev stack has no WORM storage: the screen says so instead of failing (E-UI01-2).
   await expect(auditor.getByText("no está disponible en este ambiente").or(auditor.getByTestId("chain-result"))).toBeVisible();
-  await nav(auditor, "Resúmenes en WORM");
+  await nav(auditor, "Respaldos diarios inalterables");
   await expect(auditor.getByRole("heading", { name: "Respaldos diarios inalterables" })).toBeVisible();
   await expect(auditor.getByRole("link", { name: "Usuarios y roles" })).toBeVisible();
 });
