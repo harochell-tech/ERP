@@ -46,4 +46,24 @@ test("an adjustment from the Contador to the trial balance and the statements", 
   await expect(contador.getByTestId("balance-difference")).toHaveText("0.00");
   await contador.getByRole("tab", { name: "Estado de resultados" }).click();
   await expect(contador.getByTestId("net-income")).toBeVisible();
+
+  // UX3-02 (E-UX3-1): the guided close. The current month has not ended; last month's "Ajustes contables" shows its checklist and
+  // "Verificar ahora" runs its blocking reconciliations at the month's end (nothing is closed here: other journeys post today).
+  await nav(controller, "Períodos y cierre");
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santo_Domingo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const [year, month] = today.split("-").map(Number);
+  const current = controller.getByTestId(`month-${today.slice(0, 7)}`);
+  await expect(current.getByTestId("component-ACR-NTX")).toContainText("Aún no termina");
+  const previous = month === 1 ? `${(year ?? 0) - 1}-12` : `${year}-${String((month ?? 1) - 1).padStart(2, "0")}`;
+  if (month === 1) {
+    await controller.getByRole("button", { name: `← ${(year ?? 0) - 1}` }).click();
+  }
+  const component = controller.getByTestId(`month-${previous}`).getByTestId("component-ACR-NTX");
+  await component.locator("summary").click();
+  await expect(component.getByTestId("check-ended")).toContainText("El mes terminó: Sí");
+  await expect(component.getByTestId("check-TB-BALANCED")).toBeVisible();
+  await component.getByRole("button", { name: "Verificar ahora" }).click();
+  await expect(component.getByTestId("check-TB-BALANCED")).toContainText("verificada");
+  await component.getByTestId("check-TB-BALANCED").getByRole("link", { name: "Ver resultado" }).click();
+  await expect(controller.getByTestId("run-guidance")).toBeVisible();
 });

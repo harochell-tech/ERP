@@ -115,23 +115,6 @@ export default function NewInvoice() {
             ))}
           </select>
         </Field>
-        <Field label="NCF" required error={fe.errors.fiscalNumber}>
-          <input aria-label="NCF" placeholder="B0100000001" value={values.fiscalNumber} onChange={(e) => setValues({ ...values, fiscalNumber: e.target.value })} />
-        </Field>
-        <Field label="Fecha" required error={fe.errors.docDate}>
-          <input type="date" aria-label="Fecha de la factura" value={values.docDate} onChange={(e) => setValues({ ...values, docDate: e.target.value })} />
-        </Field>
-        <Field label="Vencimiento" required error={fe.errors.dueDate}>
-          <input type="date" aria-label="Vencimiento" value={values.dueDate} onChange={(e) => setValues({ ...values, dueDate: e.target.value })} />
-        </Field>
-        {termsDays !== null && values.docDate ? (
-          <span className="muted" data-testid="due-date-proposal">
-            Plazo del proveedor: {termsDays} días →{" "}
-            <button type="button" className="link" onClick={() => setValues({ ...values, dueDate: addDays(values.docDate, termsDays) })}>
-              usar {formatDate(addDays(values.docDate, termsDays))}
-            </button>
-          </span>
-        ) : null}
         <Field label="Orden de compra" required error={fe.errors.purchaseOrderId}>
           <select aria-label="Orden de compra" value={values.purchaseOrderId} onChange={(e) => setValues({ ...values, purchaseOrderId: e.target.value, lines: {} })}>
             <option value="">—</option>
@@ -193,6 +176,26 @@ export default function NewInvoice() {
         </LineTable>
       ) : null}
       {fe.errors.lines ? <div className="error">{fe.errors.lines}</div> : null}
+      {/* UX3-02 (E-UX3-6): supplier → order → lines, then the fiscal data of the invoice. */}
+      <div>
+        <Field label="NCF" required error={fe.errors.fiscalNumber}>
+          <input aria-label="NCF" placeholder="B0100000001" value={values.fiscalNumber} onChange={(e) => setValues({ ...values, fiscalNumber: e.target.value })} />
+        </Field>
+        <Field label="Fecha" required error={fe.errors.docDate}>
+          <input type="date" aria-label="Fecha de la factura" value={values.docDate} onChange={(e) => setValues({ ...values, docDate: e.target.value })} />
+        </Field>
+        <Field label="Vencimiento" required error={fe.errors.dueDate}>
+          <input type="date" aria-label="Vencimiento" value={values.dueDate} onChange={(e) => setValues({ ...values, dueDate: e.target.value })} />
+        </Field>
+        {termsDays !== null && values.docDate ? (
+          <span className="muted" data-testid="due-date-proposal">
+            Plazo del proveedor: {termsDays} días →{" "}
+            <button type="button" className="link" onClick={() => setValues({ ...values, dueDate: addDays(values.docDate, termsDays) })}>
+              usar {formatDate(addDays(values.docDate, termsDays))}
+            </button>
+          </span>
+        ) : null}
+      </div>
       <div className="actions form-actions">
         <button type="button" className="primary" disabled={register.busy} onClick={submit}>
           Registrar factura

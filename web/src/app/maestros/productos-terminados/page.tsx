@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { query } from "@/api/client";
 import { ErrorBox, Field, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { useUomCatalogue } from "@/components/Units";
 import { FINISHED_GOOD_CATEGORIES } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -14,6 +15,7 @@ function CreateFinishedGood({ onDone }: { onDone: () => void }) {
   const create = useCommand("create-finished-good", "/api/v1/companies/{companyId}/master-data/create-finished-good");
   const [form, setForm] = useState({ code: "", description: "", baseUom: "un", itemCategory: "BLOQUE" });
   const fe = useFieldErrors<"code" | "description" | "baseUom">();
+  const uoms = useUomCatalogue(); // UX3-02 (E-UX3-11)
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
   return (
     <form
@@ -43,7 +45,14 @@ function CreateFinishedGood({ onDone }: { onDone: () => void }) {
         <input value={form.description} onChange={set("description")} />
       </Field>
       <Field label="Unidad base" required error={fe.errors.baseUom}>
-        <input value={form.baseUom} onChange={set("baseUom")} size={6} />
+        <select aria-label="Unidad base" value={form.baseUom} onChange={set("baseUom")}>
+          {uoms.length === 0 ? <option value={form.baseUom}>{form.baseUom}</option> : null}
+          {uoms.map((u) => (
+            <option key={u.value} value={u.value}>
+              {u.label}
+            </option>
+          ))}
+        </select>
       </Field>
       <Field label="Categoría" required>
         <select value={form.itemCategory} onChange={set("itemCategory")}>

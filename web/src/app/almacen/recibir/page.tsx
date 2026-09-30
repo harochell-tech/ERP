@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { query } from "@/api/client";
 import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
+import { prefillQuantity } from "@/lib/receiving";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -44,7 +45,17 @@ function Receive() {
             query: { plantId: plantFor("purchase_order:read") },
           });
           const plants = await query("/api/v1/companies/{companyId}/master-data/plants", { path: { companyId }, query: { plantId: plantFor("master_data:read") ?? order.plantId } });
-          return { order, locations: plants.items.find((p) => p.plantId === order.plantId)?.locations ?? [] };
+          // E-UX3-5: the maximum each line may still take (the server's PostGoodsReceipt rule), from the orders to receive.
+          const toReceive = await query("/api/v1/companies/{companyId}/procurement/purchase-orders/to-receive", {
+            path: { companyId },
+            query: { plantId: plantFor("purchase_order:read") ?? order.plantId, supplierId: order.supplierId, limit: 200 },
+          });
+          const receivable = toReceive.items.find((o) => o.purchaseOrderId === order.purchaseOrderId);
+          return {
+            order,
+            locations: plants.items.find((p) => p.plantId === order.plantId)?.locations ?? [],
+            maximum: new Map((receivable?.lines ?? []).map((l) => [l.poLineId, l.maxReceivable])),
+          };
         }
       : null,
     [companyId, poId, allowed],
@@ -56,16 +67,18 @@ function Receive() {
   if (data === null) {
     return <Loading error={error} />;
   }
-  const { order, locations } = data;
+  const { order, locations, maximum } = data;
+  // E-UX3-5: each line starts with its open quantity (the server's); the user may change or clear it.
+  const quantityOf = (line: (typeof order.lines)[number]) => values.lines[line.poLineId]?.quantity ?? prefillQuantity(line.openQuantity);
 
   const submit = async () => {
     const lines = order.lines
-      .map((l) => ({ line: l, input: values.lines[l.poLineId] }))
-      .filter((x) => x.input && normalizeInput(x.input.quantity) !== "")
+      .map((l) => ({ line: l, quantity: normalizeInput(quantityOf(l)), lot: values.lines[l.poLineId]?.supplierLotNumber ?? "" }))
+      .filter((x) => x.quantity !== "")
       .map((x) => ({
         purchaseOrderLineId: x.line.poLineId,
-        quantity: normalizeInput(x.input!.quantity),
-        supplierLotNumber: x.input!.supplierLotNumber.trim() || null,
+        quantity: x.quantity,
+        supplierLotNumber: x.lot.trim() || null,
       }));
     const found: Record<string, string | false> = {
       locationId: !values.locationId && "Elija la ubicación.",
@@ -95,13 +108,21 @@ function Receive() {
   };
 
   const setLine = (poLineId: string, change: Partial<{ quantity: string; supplierLotNumber: string }>) =>
-    setValues((v) => ({ ...v, lines: { ...v.lines, [poLineId]: { quantity: "", supplierLotNumber: "", ...v.lines[poLineId], ...change } } }));
+    setValues((v) => {
+      const line = order.lines.find((l) => l.poLineId === poLineId);
+      const current = v.lines[poLineId] ?? { quantity: prefillQuantity(line?.openQuantity), supplierLotNumber: "" };
+      return { ...v, lines: { ...v.lines, [poLineId]: { ...current, ...change } } };
+    });
 
   return (
     <>
       <h1>Recibir material — orden {order.poNo}</h1>
       <p>
         Proveedor: {order.supplierName}. Planta: {plantName(order.plantId, order.plantCode)}.
+      </p>
+      <p className="muted">
+        Cada línea trae lo pendiente de la orden; cámbielo si llegó otra cantidad, sin pasar del máximo permitido (incluye la tolerancia de
+        recepción). Deje vacía una línea que no llegó.
       </p>
       <div>
         <Field label="Ubicación" required error={fe.errors.locationId}>
@@ -128,6 +149,8 @@ function Receive() {
             <th>Unidad</th>
             <th className="num">Pedido</th>
             <th className="num">Ya recibido</th>
+            <th className="num">Pendiente</th>
+            <th className="num">Máximo permitido</th>
             <th className="num">Cantidad a recibir</th>
             <th>Lote del proveedor</th>
           </tr>
@@ -139,12 +162,18 @@ function Receive() {
               <td>{l.uom}</td>
               <td className="num">{formatQuantity(l.qtyOrdered)}</td>
               <td className="num">{formatQuantity(l.qtyReceived)}</td>
+              <td className="num" data-testid={`open-${l.itemCode}`}>
+                {formatQuantity(l.openQuantity)}
+              </td>
+              <td className="num" data-testid={`max-${l.itemCode}`}>
+                {maximum.has(l.poLineId) ? formatQuantity(maximum.get(l.poLineId)) : "—"}
+              </td>
               <td className="num">
                 <input
                   aria-label={`Cantidad a recibir ${l.itemCode}`}
                   {...fieldAria(fe.errors[`line-${l.poLineId}`], `gr-line-${l.poLineId}`)}
                   inputMode="decimal"
-                  value={values.lines[l.poLineId]?.quantity ?? ""}
+                  value={quantityOf(l)}
                   onChange={(e) => setLine(l.poLineId, { quantity: e.target.value })}
                 />
                 <FieldMessage id={`gr-line-${l.poLineId}`} error={fe.errors[`line-${l.poLineId}`]} />

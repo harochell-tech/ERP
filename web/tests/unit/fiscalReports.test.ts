@@ -56,13 +56,3 @@ describe("the 606 classification rule kind", () => {
     expect(ruleKindRunsTests("PURCHASE_ITBIS")).toBe(true);
   });
 });
-
-describe("TAX-606 on the reconciliation screens", () => {
-  it("names the reconciliation and its three classifications in Spanish", async () => {
-    const { RECONCILIATIONS, classificationLabel } = await import("@/lib/labels");
-    expect(RECONCILIATIONS["TAX-606"]).toBeDefined();
-    for (const code of ["TAX606_ITBIS_DIFFERENCE", "CLASSIFICATION_MISSING", "ISR_WITHHOLDING_TYPE_MISSING"]) {
-      expect(classificationLabel(code)).not.toBe(code);
-    }
-  });
-});

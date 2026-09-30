@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError, query, type Schemas } from "@/api/client";
 import { plantLabel } from "./plants";
-import { can as canIn, hasPlantScope, queryPlant, scopeOf, type PermissionScope, type SessionCompany } from "./scope";
+import { can as canIn, hasPlantScope, isOwnUserId, queryPlant, scopeOf, type PermissionScope, type SessionCompany } from "./scope";
 
 type SessionDescription = Schemas["SessionDescription"];
 
@@ -32,6 +32,8 @@ interface SessionContextValue {
    * Always false for a superadministrator, whose four-eyes controls are waived (E-ADM-2-4).
    */
   isMine: (actor: string | null | undefined) => boolean;
+  /** UX3-02 (E-UX3-9): the same question for a user id the server returns (e.g. who issued an invoice). */
+  isMyUserId: (userId: string | null | undefined) => boolean;
   reload: () => void;
 }
 
@@ -115,6 +117,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         !!actor &&
         !(company?.assignments ?? []).some((a) => a.roleCode === "SUPERADMIN") &&
         [state.session.email, state.session.displayName?.trim()].includes(actor),
+      isMyUserId: (userId) =>
+        state.status === "ready" &&
+        isOwnUserId(userId, state.session.userId, (company?.assignments ?? []).some((a) => a.roleCode === "SUPERADMIN")),
       reload: () => setGeneration((g) => g + 1),
     }),
     [state, company, selectCompany, plantId, selectPlant],

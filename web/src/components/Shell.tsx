@@ -67,6 +67,7 @@ export const NAV: readonly NavGroup[] = [
   {
     title: "Almacén",
     items: [
+      { href: "/almacen/por-recibir/", label: "Por recibir", permission: "goods_receipt:post" }, // UX3-02 (E-UX3-5)
       { href: "/almacen/recepciones/", label: "Recepciones", permission: "goods_receipt:read" },
       { href: "/almacen/correcciones/", label: "Correcciones", permission: "goods_receipt:read" },
     ],
@@ -158,7 +159,7 @@ export const NAV: readonly NavGroup[] = [
 const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/compras/orden/": "/compras/ordenes/",
   "/almacen/recepcion/": "/almacen/recepciones/",
-  "/almacen/recibir/": "/compras/ordenes/",
+  "/almacen/recibir/": "/almacen/por-recibir/",
   "/cxp/factura/": "/cxp/facturas/",
   "/cierre/conciliacion/": "/cierre/conciliaciones/",
   "/tesoreria/pago/": "/tesoreria/pagos/",

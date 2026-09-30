@@ -3,12 +3,14 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { Loading, NoPermission } from "@/components/ui";
+import { Loading, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
-import { classificationLabel, COMPONENTS, formatDateTime, RECONCILIATIONS, statusLabel } from "@/lib/labels";
+import { COMPONENTS, formatDateTime, statusLabel } from "@/lib/labels";
+import { classificationText, exceptionKey, severityLabel, severityTone } from "@/lib/reconciliations";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 
+/** A run and its exceptions. UX3-02 (E-UX3-2/3): the server's Spanish names, guidance and readable keys. */
 function Run() {
   const { companyId, can } = useSession();
   const id = useSearchParams().get("id") ?? "";
@@ -26,42 +28,56 @@ function Run() {
   const { run, exceptions } = data;
   return (
     <>
-      <h1>
-        {run.reconCode} — {statusLabel(run.status)}
-      </h1>
+      <h1>{run.name}</h1>
       <p>
-        {RECONCILIATIONS[run.reconCode] ?? run.description}. Ejecutada {formatDateTime(run.asOf)}. Total A {formatDecimal(run.totalA)}, total B {formatDecimal(run.totalB)}, diferencia{" "}
-        {formatDecimal(run.difference)}.
+        <StatusBadge status={run.status} testId="run-status" /> <span className="muted mono">{run.reconCode}</span>
       </p>
+      <p>
+        Ejecutada {formatDateTime(run.asOf)}. Total A {formatDecimal(run.totalA)}, total B {formatDecimal(run.totalB)}, diferencia {formatDecimal(run.difference)}.
+      </p>
+      <div className="alert-block guidance" data-testid="run-guidance">
+        <strong>Qué hacer</strong>
+        {run.guidance}
+      </div>
       {exceptions.length === 0 ? (
         <p>Sin excepciones.</p>
       ) : (
-        <div className="table-wrap"><table>
-          <thead>
-            <tr>
-              <th>Clave</th>
-              <th className="num">Valor A</th>
-              <th className="num">Valor B</th>
-              <th>Clasificación</th>
-              <th>Severidad</th>
-              <th>Bloquea</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {exceptions.map((x) => (
-              <tr key={x.exceptionId}>
-                <td className="wrap">{x.matchKey}</td>
-                <td className="num">{formatDecimal(x.valueA)}</td>
-                <td className="num">{formatDecimal(x.valueB)}</td>
-                <td>{classificationLabel(x.classification)}</td>
-                <td>{x.severity}</td>
-                <td>{x.component ? (COMPONENTS[x.component] ?? x.component) : x.severity === "ERROR" ? "Ambos componentes" : "—"}</td>
-                <td>{statusLabel(x.status)}</td>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Documento o clave</th>
+                <th className="num">Valor A</th>
+                <th className="num">Valor B</th>
+                <th>Qué se encontró</th>
+                <th>Severidad</th>
+                <th>Bloquea</th>
+                <th>Estado</th>
+                <th>Qué hacer</th>
               </tr>
-            ))}
-          </tbody>
-        </table></div>
+            </thead>
+            <tbody>
+              {exceptions.map((x) => (
+                <tr key={x.exceptionId} data-testid="exception">
+                  <td className="wrap" title={x.matchKey}>
+                    {exceptionKey(x)}
+                  </td>
+                  <td className="num">{formatDecimal(x.valueA)}</td>
+                  <td className="num">{formatDecimal(x.valueB)}</td>
+                  <td className="wrap" title={x.classification}>
+                    {classificationText(x)}
+                  </td>
+                  <td>
+                    <span className={`badge tone-${severityTone(x.severity)}`}>{severityLabel(x.severity)}</span>
+                  </td>
+                  <td>{x.component ? (COMPONENTS[x.component] ?? x.component) : x.severity === "ERROR" ? "Todos sus componentes" : "—"}</td>
+                  <td>{statusLabel(x.status)}</td>
+                  <td className="wrap">{x.guidance ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   );

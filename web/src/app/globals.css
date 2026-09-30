@@ -264,3 +264,29 @@ tr.changed td:first-child { box-shadow: inset 3px 0 0 var(--tone-attention-fg); 
 .light-red { background: #c7303c; }
 .areas { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 12px 0; }
 .plain-list { margin: 0; padding-left: 18px; }
+
+/* UX3-02 (E-UX3-1…13): critical flows per area. */
+details.close-component { border-top: 1px solid var(--line-soft); padding: 8px 0; }
+details.close-component > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 36px; }
+.close-component-name { font-weight: 600; }
+.close-component-body { padding: 4px 0 8px 18px; }
+ul.checklist { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.alert-block.guidance { background: var(--tone-progress-bg); color: var(--tone-progress-fg); }
+details.technical pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.evidence-verified { font-size: 14px; margin: 0 0 12px; }
+dialog.lot-actions section { border-top: 1px solid var(--line-soft); padding: 10px 0; }
+dialog.lot-actions section h3 { margin: 0 0 8px; font-size: 15px; }
+/* E-UX3-7 / E-UX3-10: the diagonal watermark, on screen and on paper. */
+.proforma { position: relative; }
+.watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; z-index: 1; }
+.watermark span { transform: rotate(-30deg); font-size: clamp(28px, 9vw, 96px); font-weight: 700; letter-spacing: 0.06em; color: rgba(143, 21, 32, 0.16); white-space: nowrap; text-align: center; }
+.conduce .print-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.conduce .print-head h1 { margin: 0 0 4px; }
+.conduce .print-number { text-align: right; }
+@page conduce { size: letter; margin: 12mm; }
+@media print {
+  .conduce { page: conduce; }
+  .watermark { position: fixed; }
+  .watermark span { font-size: 88px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .proforma .table-wrap { overflow: visible; }
+}

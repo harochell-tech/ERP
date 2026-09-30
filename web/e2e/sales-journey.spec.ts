@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { confirmAction, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, signIn, submit } from "./support";
 
 // VS#3 E2E-S1 through the UI (VS3-10b, E-VS3-10-10): the Vendedor creates the order (credit auto-approved), Despacho loads it on our
 // truck, weighs it out and records the POD, Facturación invoices it and records the e-CF, Cobros records the transfer and applies
@@ -25,6 +25,13 @@ function dominicanNow(offsetMinutes = 0): { date: string; dateTime: string } {
 async function attach(page: Page, label: string, name: string) {
   await page.getByLabel(label, { exact: true }).setInputFiles({ name, mimeType: "application/octet-stream", buffer: Buffer.from(`evidencia ${name}`) });
   await expect(page.getByLabel("SHA-256")).toHaveValue(/^[0-9a-f]{64}$/);
+}
+
+/** UX3-02 (E-UX3-8 (a)): weigh tickets and PODs show no SHA-256 field; choosing the file verifies its fingerprint. */
+async function attachEvidence(page: Page, label: string, name: string) {
+  await page.getByLabel(label, { exact: true }).setInputFiles({ name, mimeType: "application/octet-stream", buffer: Buffer.from(`evidencia ${name}`) });
+  await expect(page.getByTestId("evidence-verified")).toHaveText(`✓ Huella del archivo verificada: ${name}`);
+  await expect(page.getByLabel("SHA-256")).toHaveCount(0);
 }
 
 test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
@@ -56,16 +63,28 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await expect(status).toHaveText("Cargando");
   await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
   await expect(status).toHaveText("Cargado");
+  // UX3-02 (E-UX3-7): the printable conduce carries "BORRADOR – NO DESPACHADO" until the truck goes out of the gate.
+  const deliveryUrl = dispatch.url();
+  await dispatch.getByRole("link", { name: "Imprimir conduce" }).click();
+  await expect(dispatch.getByTestId("watermark")).toHaveText("BORRADOR – NO DESPACHADO");
+  await expect(dispatch.getByTestId("conduce-customer")).toContainText("Constructora Uno");
+  await expectFits(dispatch);
+  await dispatch.goto(deliveryUrl);
   await dispatch.getByLabel("Peso bruto (kg)").fill("9000");
   await dispatch.getByLabel("Tara (kg)").fill("8000");
-  await attach(dispatch, "Ticket de báscula", "ticket-bascula.jpg");
+  await attachEvidence(dispatch, "Ticket de báscula", "ticket-bascula.jpg");
   await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
   await expect(status).toHaveText("En tránsito");
+  await dispatch.getByRole("link", { name: "Imprimir conduce" }).click();
+  await expect(dispatch.getByTestId("conduce-net")).toHaveText("1,000");
+  await expect(dispatch.getByTestId("watermark")).toHaveCount(0);
+  await dispatch.goto(deliveryUrl);
   await dispatch.getByLabel("Recibió (nombre)").fill("Ing. María Gómez");
   await dispatch.getByLabel("Fecha y hora de recepción").fill(dominicanNow(-1).dateTime);
-  await attach(dispatch, "Evidencia del POD (foto o firma)", "pod-firma.jpg");
+  await attachEvidence(dispatch, "Evidencia del POD (foto o firma)", "pod-firma.jpg");
   await dispatch.getByRole("button", { name: "Registrar entrega (POD)" }).click();
   await expect(status).toHaveText("Entregado");
+  await expect(dispatch.getByTestId("pod-evidence")).toHaveText("Evidencia: pod-firma.jpg (huella verificada)");
 
   // Billing: invoice what was delivered (5,000.00 + 18 % ITBIS), then the e-CF from the provider's portal.
   const billing = await signIn(browser, "Facturación");
@@ -85,6 +104,17 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await billing.getByLabel("Total (según el portal)").fill("5900.00");
   await billing.getByRole("button", { name: "Registrar e-CF" }).click();
   await expect(billing.getByTestId("invoice-fiscal-status")).toHaveText("e-CF aceptado");
+  // UX3-02 (E-UX3-9): a credit note drafted on the invoice cannot be issued by who issued the invoice — the button is not offered.
+  // It stays a draft (no accounting effect), so the receipt below still pays the full invoice.
+  const invoiceUrl = billing.url();
+  await billing.getByLabel("Acreditar línea 1").fill("100.00");
+  await billing.getByLabel("Explicación").fill("Descuento por volumen (E2E)");
+  await submit(billing, "Crear nota de crédito");
+  await billing.getByRole("link", { name: /^NC-/ }).first().click();
+  await expect(billing.getByTestId("credit-note-own-invoice")).toBeVisible();
+  await expect(billing.getByRole("button", { name: "Emitir nota de crédito" })).toHaveCount(0);
+  await expect(billing.getByText("Motivo: Descuento")).toBeVisible();
+  await billing.goto(invoiceUrl);
 
   // Cobros: the customer's transfer to the receipts' account, applied to the invoice.
   const cobros = await signIn(browser, "Cobros");

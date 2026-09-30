@@ -33,6 +33,10 @@ test("a quote with a special price approved, sent, printed and converted into an
   const quoteNo = ((await seller.getByRole("heading", { level: 1 }).innerText()).match(/COT-\d+/) ?? [""])[0];
   expect(quoteNo).not.toBe("");
   const quoteUrl = seller.url();
+  // UX3-02 (E-UX3-10): a draft prints with the diagonal "BORRADOR".
+  await seller.getByRole("link", { name: "Imprimir cotización" }).click();
+  await expect(seller.getByTestId("watermark")).toHaveText("BORRADOR");
+  await seller.goto(quoteUrl);
   await seller.getByRole("button", { name: "Enviar a aprobación de precios" }).click();
   await expect(status).toHaveText("Pendiente de aprobación");
   await expect(seller.getByRole("button", { name: "Aprobar precios" })).toHaveCount(0);
@@ -60,7 +64,9 @@ test("a quote with a special price approved, sent, printed and converted into an
   await expect(seller.getByTestId("print-net")).toHaveText("1,665.00");
   await expect(seller.getByTestId("print-itbis")).toHaveText("299.70");
   await expect(seller.getByTestId("print-total")).toHaveText("1,964.70");
-  await expect(seller.getByTestId("print-conditions")).toContainText("X-Q1");
+  await expect(seller.getByTestId("print-conditions")).toContainText("Documento no fiscal");
+  await expect(seller.getByTestId("print-conditions")).not.toContainText("X-Q1");
+  await expect(seller.getByTestId("watermark")).toHaveCount(0); // sent and valid: no watermark
   await expect(seller.getByRole("button", { name: "Imprimir" })).toBeVisible();
 
   // Converted into an order at the quoted price; the credit check confirms it.

@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { ErrorBox, Field, FieldMessage, fieldAria, Loading, NoPermission, useFieldErrors } from "@/components/ui";
+import { useUomCatalogue } from "@/components/Units";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -12,8 +13,7 @@ import { useLoad } from "@/lib/useQuery";
 type Item = Schemas["ItemView"];
 
 // E-B03-15-4: raw materials — list, create (item:create), activate and unit conversions (item:activate).
-
-const UOMS = ["kg", "t", "m3", "l", "un"] as const;
+// UX3-02 (E-UX3-11): the units come from the md.uom catalogue (GET /master-data/uoms), not from a list in the code.
 const CATEGORIES: Readonly<Record<string, string>> = {
   CEMENTO: "Cemento",
   AGREGADO: "Agregado",
@@ -27,6 +27,7 @@ function CreateItem({ onDone }: { onDone: () => void }) {
   const [description, setDescription] = useState("");
   const [baseUom, setBaseUom] = useState<string>("kg");
   const [itemCategory, setItemCategory] = useState("CEMENTO");
+  const uoms = useUomCatalogue();
   const fe = useFieldErrors<"code" | "description">();
   return (
     <form
@@ -51,9 +52,12 @@ function CreateItem({ onDone }: { onDone: () => void }) {
         <input value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
       <Field label="Unidad base" required>
-        <select value={baseUom} onChange={(e) => setBaseUom(e.target.value)}>
-          {UOMS.map((u) => (
-            <option key={u}>{u}</option>
+        <select aria-label="Unidad base" value={baseUom} onChange={(e) => setBaseUom(e.target.value)}>
+          {uoms.length === 0 ? <option value={baseUom}>{baseUom}</option> : null}
+          {uoms.map((u) => (
+            <option key={u.value} value={u.value}>
+              {u.label}
+            </option>
           ))}
         </select>
       </Field>
@@ -81,7 +85,9 @@ function ItemRow({ item, onDone }: { item: Item; onDone: () => void }) {
   const id = item.itemId;
   const activate = useCommand(`activate-item:${id}`, "/api/v1/companies/{companyId}/master-data/activate-item", `Materia prima ${item.code} activada.`);
   const convert = useCommand(`uom-conversion:${id}`, "/api/v1/companies/{companyId}/master-data/define-uom-conversion");
-  const [fromUom, setFromUom] = useState<string>(UOMS.find((u) => u !== item.baseUom) ?? "un");
+  const uoms = useUomCatalogue().filter((u) => u.value !== item.baseUom);
+  const [chosenUom, setFromUom] = useState<string>("");
+  const fromUom = chosenUom || (uoms[0]?.value ?? "");
   const [factor, setFactor] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const fe = useFieldErrors<"factor" | "effectiveFrom">();
@@ -129,8 +135,10 @@ function ItemRow({ item, onDone }: { item: Item; onDone: () => void }) {
           >
             1{" "}
             <select aria-label="Unidad de compra" value={fromUom} onChange={(e) => setFromUom(e.target.value)}>
-              {UOMS.filter((u) => u !== item.baseUom).map((u) => (
-                <option key={u}>{u}</option>
+              {uoms.map((u) => (
+                <option key={u.value} value={u.value}>
+                  {u.label}
+                </option>
               ))}
             </select>{" "}
             ={" "}

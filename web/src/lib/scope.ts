@@ -38,3 +38,11 @@ export function queryPlant(company: SessionCompany | undefined, permission: stri
 export function hasPlantScope(company: SessionCompany | undefined): boolean {
   return (company?.assignments ?? []).some((a) => a.plantId !== null);
 }
+
+/**
+ * UX3-02 (E-UX3-9): whether a user id the server returns (e.g. who issued an invoice) is the signed-in user, to hide a decision the
+ * server would refuse. As `isMine`, never true for a superadministrator, whose four-eyes controls are waived (E-ADM-2-4).
+ */
+export function isOwnUserId(userId: string | null | undefined, sessionUserId: string | null | undefined, superadmin: boolean): boolean {
+  return !superadmin && !!userId && !!sessionUserId && userId === sessionUserId;
+}

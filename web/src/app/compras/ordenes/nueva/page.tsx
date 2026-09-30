@@ -7,6 +7,7 @@ import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermiss
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
+import { uomOptions } from "@/lib/units";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 
@@ -137,7 +138,7 @@ export default function NewPurchaseOrder() {
         <tbody>
           {values.lines.map((line, index) => {
             const item = data.items.find((i) => i.itemId === line.itemId);
-            const uoms = item ? [item.baseUom, ...item.conversions.filter((c) => c.toUom === item.baseUom).map((c) => c.fromUom)] : [];
+            const uoms = item ? uomOptions(item.baseUom, item.conversions) : [];
             const id = (field: string) => `po-line-${index}-${field}`;
             return (
               <tr key={index}>
@@ -159,7 +160,7 @@ export default function NewPurchaseOrder() {
                 </td>
                 <td>
                   <select aria-label={`Unidad ${index + 1}`} {...fieldAria(lineError(index, "uom"), id("uom"), true)} value={line.uom} onChange={(e) => setLine(index, { uom: e.target.value })}>
-                    {[...new Set(uoms)].map((u) => (
+                    {uoms.map((u) => (
                       <option key={u} value={u}>
                         {u}
                       </option>

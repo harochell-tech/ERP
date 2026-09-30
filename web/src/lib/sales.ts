@@ -68,3 +68,14 @@ export function applicationGroups<T extends { eventId: string; live: boolean; re
   }
   return [...groups.entries()].map(([eventId, items]) => ({ eventId, items }));
 }
+
+/** UX3-02 (E-UX3-9): the three reasons of a commercial credit note (E-VS3-06), in Spanish. */
+export const CREDIT_NOTE_REASONS: Readonly<Record<string, string>> = {
+  DESCUENTO: "Descuento",
+  ERROR_DE_PRECIO: "Error de precio",
+  OTRO: "Otro",
+};
+
+export function creditNoteReasonLabel(category: string): string {
+  return CREDIT_NOTE_REASONS[category] ?? category;
+}

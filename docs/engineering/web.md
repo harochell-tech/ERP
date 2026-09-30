@@ -36,7 +36,7 @@ with `audit:read`.
 | Area | Screens | Commands |
 | --- | --- | --- |
 | Compras | `/compras/ordenes/`, `/compras/ordenes/nueva/`, `/compras/orden/?id=` | create, submit, approve, reject, cancel (reject/cancel: E-PR18b-7) |
-| Almacén | `/almacen/recepciones/`, `/almacen/recibir/?oc=`, `/almacen/recepcion/?id=`, `/almacen/correcciones/` | post receipt, reverse (Controller), create correction, approve/reject correction (Controller) |
+| Almacén | `/almacen/por-recibir/` (UX3-02), `/almacen/recepciones/`, `/almacen/recibir/?oc=`, `/almacen/recepcion/?id=`, `/almacen/correcciones/` | post receipt, reverse (Controller), create correction, approve/reject correction (Controller) |
 | Cuentas por pagar | `/cxp/facturas/`, `/cxp/facturas/nueva/`, `/cxp/factura/?id=` | register, match, approve exception (Controller), post, reverse (Controller) |
 | Cierre | `/cierre/conciliaciones/`, `/cierre/conciliacion/?id=`, `/cierre/periodos/` | run reconciliations, close component, request reopen, approve/reject reopen (second approver) |
 | Auditoría | `/auditoria/asientos/?evento=`, `/auditoria/explicar/?entrada=` | — (EX-01) |
@@ -361,3 +361,79 @@ Wave 2 of the UI audit, on top of UX2-01 (`docs/engineering/configuration.md`). 
   of "Cargos y comisiones bancarias" and the Controller approves it; the Analista fiscal configures a withholding with the guided
   form and the advanced JSON reads exactly the server's; the Controller renames a plant, opens the Centro de configuración (19
   steps) and sees "Puesta en marcha" on Inicio while setup is incomplete. Everything it creates starts next year.
+
+## UX3-02 — critical flows per area, screens (E-UX3-1…14)
+
+Wave 3 of the UI audit, on top of UX3-01 (`docs/engineering/flows.md`). No API change; the helpers are pure and unit-tested
+(`tests/unit/ux3.test.ts`). Every rule stays the server's: readiness, open and maximum quantities, ITBIS, balances, net weight.
+
+- **Guided close (E-UX3-1)** `/cierre/periodos/`: one card per month (`lib/close.ts`: `groupPeriodsByMonth`, "Agosto 2026"), each
+  component folded with a summary badge ("Listo para cerrar", "Aún no termina", "Pendiente de verificar", its status once closed,
+  "Reapertura solicitada"). Unfolded, an OPEN / REOPENED component lists `GET …/periods/{id}/close-readiness` as a checklist
+  (`readinessChecklist`): the month ended, records sealed, and each blocking reconciliation by its Spanish name with its last run
+  for the period ("Sin errores que bloqueen (verificada …)", "2 errores bloquean el cierre", "Sin verificar para este mes") and
+  "Ver resultado" to the run. "Verificar ahora" (`reconciliation:run`, ended months) runs `RunReconciliation` with the component's
+  blocking codes and `cutoffDate` = the period's end, then reloads the readiness. "Cerrar" appears only when the month ended and
+  the server says `ready` (`closeAvailability`); a month that has not ended reads "Aún no termina" (future months are not asked
+  for readiness). Reopen, approve and reject reopen are unchanged.
+- **Reconciliations (E-UX3-2/3)**: the runs list and the run use the server's `name` and `guidance` ("Qué hacer"); the list filters
+  by reconciliation (`ListReconciliationDefinitions`), runs one or all, and folds "Qué revisa cada conciliación" (severity, the
+  components it blocks, guidance). Exceptions show `matchLabel` (the raw key as tooltip and as fallback), `classificationName`
+  (fallback the code), severity "Error" / "Aviso" (`lib/reconciliations.ts`) and each classification's guidance. The hard-coded
+  `RECONCILIATIONS` and `EXCEPTION_CLASSIFICATIONS` of `labels.ts` were removed: nothing uses them any more.
+- **Explain (E-UX3-4)** `/auditoria/explicar/`: journal type, event type, command, posting rule ("R-01 · Recepción de mercancía"),
+  integrity status and document kind in Spanish (`lib/explain.ts`, unknown codes as they come); the account role and the mapping by
+  the role's name (`/finance/account-roles`, with `configuration:read`, as the journals page); plant, item and party names; the
+  source document linked by kind (receipt and supplier invoice to their detail, reversal and correction to their lists); the
+  mapping as a card "Por qué esta cuenta"; the ids, the mapping, the frozen inputs and the event payload folded under "Detalle
+  técnico (avanzado)".
+- **Por recibir (E-UX3-5)** `/almacen/por-recibir/` (menu Almacén, `goods_receipt:post`; the query is `purchase_order:read` and
+  plant-scoped): one card per APPROVED / PARTIALLY_RECEIVED order, oldest first — supplier, order and approval dates, lines with
+  ordered, received, "Pendiente" and "Máximo permitido" — and "Recibir" while a line can take more. `/almacen/recibir/` prefills
+  each line with the server's `openQuantity` (`prefillQuantity`; the user may change or clear it) and shows "Pendiente" and
+  "Máximo permitido" (from the orders to receive). Inicio's "Recibir material" counts the same query (APPROVED and
+  PARTIALLY_RECEIVED) and links to Por recibir.
+- **CxP (E-UX3-6)**: the supplier invoice list shows Neto, ITBIS, Total con ITBIS, Saldo and "Estado de pago" (`lib/payables.ts`:
+  Sin contabilizar, Pendiente de pago, Pagada en parte, Pagada, Anulada, Reversada, with tones); the detail the same plus
+  "Pagos" (number linked to `/tesoreria/pago/` with `payment:read`, value date, status, amount applied). The register form reads
+  Proveedor → Orden de compra → lines → NCF, fecha, vencimiento.
+- **Conduce (E-UX3-7)** `/despacho/conduce/imprimir/?id=` from `GET /sales/deliveries/{id}/print`, linked "Imprimir conduce" on the
+  delivery: issuer and customer with RNC, site, plant, delivery and order numbers and dates, gate-out, vehicle and driver (own or the
+  customer's), gross / tare / net kg (the server's net), lines with planned / issued / delivered and their lots, "Despachado por" and
+  "Recibido por (nombre, cédula, firma)" boxes. Letter size through a named page (`@page conduce { size: letter }`), the proforma's
+  print CSS otherwise. Until the gate-out it carries the diagonal watermark "BORRADOR – NO DESPACHADO" (`deliveryWatermark`,
+  `components/Watermark.tsx`: absolute on screen, fixed on paper so every printed page carries it).
+- **Evidence (E-UX3-8 (a))**: the weigh ticket and POD forms no longer show an editable SHA-256. Choosing the file computes it and
+  shows "✓ Huella del archivo verificada: <file>"; the reference is proposed from the file name; the hint says "El archivo no se
+  guarda en el sistema; conserve el original". The delivery reads "Evidencia: <reference> (huella verificada)" (hash as tooltip).
+  The other evidence forms (e-CF, authorizations, adjustments) are unchanged.
+- **Credit note (E-UX3-9)**: "Emitir nota de crédito" is hidden, with a notice why, when `invoiceIssuedById` is the signed-in user
+  (`useSession().isMyUserId`, pure `isOwnUserId` in `lib/scope.ts`: never true for a SUPERADMIN, as `isMine`). The reason category
+  ("Descuento", "Error de precio", "Otro") and the rate (in %) read in Spanish.
+- **Quote print (E-UX3-10)**: the "(X-Q1)" wording is gone ("Documento no fiscal" stays); the diagonal watermark by status
+  (`quoteWatermark`): BORRADOR (DRAFT, PENDING_APPROVAL), VENCIDA (the server's `expired`), PERDIDA, CANCELADA; none when sent and
+  valid or converted.
+- **Units (E-UX3-11)**: the consumption unit of a production run is a select of the material's base unit plus the units converted
+  into it (`uomOptions`, also used by the purchase order form; a recorded unit stays listed); "Unidad base" of raw materials and
+  finished goods and the conversion's "Unidad de compra" come from `GET /master-data/uoms` (`useUomCatalogue`, "kg (masa)").
+- **Lots (E-UX3-12)** `/produccion/lotes/`: one "Acciones" button per lot (in its first cell, so it stays in view on a phone) opens a
+  dialog with the actions `lotActions` allows — Liberar (location), Bloquear / Desbloquear (reason), Desechar unidades (location,
+  units, reason; step-up notice) — each confirmed with "Confirmar: <acción>". The filter "Listos para liberar" (CURING with the
+  API's `curingDone`) is the default for `fg_lot:release`.
+- **Inicio (E-UX3-13)**, from existing queries: "Corridas de hoy sin resumen" (`shift_summary:record`: today's IN_PROGRESS runs without
+  summary), "Resúmenes de turno en borrador" (`shift_summary:record`) and "Resúmenes de turno por contabilizar"
+  (`shift_summary:post`): IN_PROGRESS runs with a DRAFT summary, linked to the card "Resúmenes en borrador" of Producción del día
+  (any day, `#resumenes-borrador`); "Recetas por aprobar" (`recipe:approve`, DRAFT recipes); "Lotes listos para liberar"
+  (`fg_lot:release`).
+- **Notices**: "Conciliaciones de <component> verificadas al <end>.", "Conciliación «<name>» ejecutada: revise el resultado.", the
+  lot actions' notices.
+- **Tests.** Vitest `tests/unit/ux3.test.ts`: month grouping, checklist and close availability, severities, match-label and
+  classification fallbacks, Explain labels and document links, receiving prefill, payment status labels and tones, watermarks,
+  own-user check and reason labels, unit options and catalogue, lot filter and actions. Playwright: the ledger journey (desktop)
+  checks the current month "Aún no termina", last month's ACR-NTX checklist, "Verificar ahora" and the run it links to; the
+  purchase journey goes Inicio "Recibir material" → Almacén › Por recibir → receive with 40 prefilled; the treasury journey finds the
+  seeded invoice "Pagada" with balance 0.00 and PAG-000001 among its payments; the sales journey opens the conduce print view with
+  the watermark before the gate-out and without it after (net 1,000 kg), verifies the evidence fingerprints without a SHA-256
+  field, and drafts a credit note the invoice's issuer is not offered to issue; the quote journey prints the draft with "BORRADOR"
+  and the sent quote without watermark or X-Q1; the production journey has Calidad see the Inicio counter, open "Listos para
+  liberar" and release the lot through its "Acciones" dialog. All but the ledger journey run on desktop and on the phone.

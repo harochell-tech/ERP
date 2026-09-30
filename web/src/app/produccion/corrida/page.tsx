@@ -9,6 +9,7 @@ import { ConfirmAction, ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loa
 import { formatQuantity, isDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
 import { parseWholeNumber, stockLocations } from "@/lib/production";
+import { uomOptions } from "@/lib/units";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -57,6 +58,13 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
     ),
   );
   const fe = useFieldErrors();
+  // UX3-02 (E-UX3-11): each material's unit is its base unit or one with a conversion into it (as the purchase order form offers).
+  const { companyId, plantFor } = useSession();
+  const items = useLoad(
+    () => query("/api/v1/companies/{companyId}/master-data/items", { path: { companyId }, query: { plantId: plantFor("master_data:read"), status: "ACTIVE", limit: 200 } }),
+    [companyId],
+  );
+  const conversionsOf = (materialItemId: string) => items.data?.items.find((i) => i.itemId === materialItemId)?.conversions ?? [];
   const setLine = (materialItemId: string, patch: Partial<ConsumptionDraft>) =>
     setConsumption({ ...consumption, [materialItemId]: { ...(consumption[materialItemId] ?? { locationId: "", quantity: "", uom: "" }), ...patch } });
   const scrapInvalid = (value: string) => value !== "" && (!isDecimal(value, 6) || value.startsWith("-"));
@@ -159,13 +167,18 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
                   <FieldMessage id={`quantity-${l.materialItemId}-message`} error={quantityError} />
                 </td>
                 <td>
-                  <input
+                  <select
                     aria-label={`Unidad ${l.materialCode}`}
                     value={c.uom}
                     onChange={(e) => setLine(l.materialItemId, { uom: e.target.value })}
-                    style={{ maxWidth: "8rem" }}
                     {...fieldAria(uomError, `uom-${l.materialItemId}-message`, true)}
-                  />
+                  >
+                    {uomOptions(l.baseUom, conversionsOf(l.materialItemId), c.uom).map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
                   <FieldMessage id={`uom-${l.materialItemId}-message`} error={uomError} />
                 </td>
               </tr>
