@@ -225,7 +225,7 @@ internal static class ReceiptCorrectionReader
             context.Transaction,
             """
             SELECT rc.rc_id, rc.gr_id, gr.gr_no, rc.gr_line_id, rc.delta_qty, rc.reason, rc.evidence_object_key, rc.document_status,
-                   rc.accounting_status::text, cu.email, au.email, rc.posting_event_id, rc.version
+                   rc.accounting_status::text, coalesce(cu.display_name, cu.email), coalesce(au.display_name, au.email), rc.posting_event_id, rc.version
             FROM pur.receipt_correction rc
             JOIN pur.goods_receipt gr ON gr.gr_id = rc.gr_id
             JOIN pur.purchase_order po ON po.po_id = gr.po_id

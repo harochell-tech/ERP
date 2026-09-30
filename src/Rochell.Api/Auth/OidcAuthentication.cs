@@ -225,7 +225,8 @@ public static class OidcAuthentication
             principal.FindFirstValue("sub") ?? string.Empty,
             principal.FindFirstValue("email"),
             string.Equals(principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase),
-            principal.FindFirstValue("hd"));
+            principal.FindFirstValue("hd"),
+            principal.FindFirstValue("name"));
         var sessions = http.RequestServices.GetRequiredService<SessionService>();
         var cookie = http.RequestServices.GetRequiredService<SessionCookie>();
         var returnUrl = SafeReturnUrl(context.Properties?.RedirectUri);

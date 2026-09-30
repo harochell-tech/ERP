@@ -754,6 +754,18 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS2-03-6 | FIS2-03 | Spanish labels for TAX-606 and its findings. |
 | E-FIS2-03-7 | FIS2-03 | E2E-F2 over the API (`AcceptanceTests`) and Playwright (`fiscal-reports-journey`); matrix `docs/acceptance/fis2.md` with `AcceptanceFis2TraceabilityTests`. |
 | E-FIS2-03-8 | FIS2-03 | The dev seed already activates the classification; the journey uses the purchases that exist or creates its own. |
+| E-UX1-01-1 | UX1-01 | UX audit wave 1 (2026-09-30, 175 findings; order waves 1→4 approved). Below 900 px a fixed top bar with "☰ Menú", the screen title and the company; the menu opens as a side panel, closes on choosing and remembers its open groups; desktop menu groups fold too. |
+| E-UX1-01-2 | UX1-01 | Each table scrolls sideways inside its own box, never the page; line editors become stacked cards below 700 px with the primary button fixed at the bottom; row actions under one "Acciones" button. |
+| E-UX1-01-3 | UX1-01 | The Google "name" claim is kept in `iam.user.display_name` at each sign-in and step-up (migration 0060); queries return the name where they returned the actor's e-mail (e-mail when no name yet); identity lists keep the e-mail and add the name; the top bar shows "Name · main role". |
+| E-UX1-01-4 | UX1-01 | Plants read "Name (CODE)": `md.plant.name` (0060; the plant row is no longer append-only — only the name changes), `rochell-migrate create-plant … [name]` and `set-plant-name`; the session description lists each company's plants. |
+| E-UX1-01-5 | UX1-01 | One date format (`29/09/2026`, `29/09/2026 11:15 p. m.`), `lang="es-DO"`; "RD$" in money column headers and single-value cards, not in every cell; quantities without trailing zeros. |
+| E-UX1-01-6 | UX1-01 | A shared form pattern: required fields marked, the message under the failing field, focus on the first error, the primary button emphasized; applied to every create and edit form. |
+| E-UX1-01-7 | UX1-01 | Every server error code has a Spanish message in `lib/errors.ts`, checked by a test against the server's catalogue; an unknown code reads "No se pudo completar (CÓDIGO)" with the technical detail folded. |
+| E-UX1-01-8 | UX1-01 | A shared confirmation dialog stating the consequence for posting, settling, closing / reopening, approving (rules, policies, maps, recipes, prices), deactivating, issuing, voiding, releasing and scrapping; it warns when re-authentication will follow. |
+| E-UX1-01-9 | UX1-01 | A green notice for a few seconds after each command, naming the document and the result. |
+| E-UX1-01-10 | UX1-01 | A visible "STAGING" / "PRUEBA" badge in the top bar outside production. |
+| E-UX1-01-11 | UX1-01 | Playwright adds a mobile (390 px) project over the main journeys that fails on page overflow or an unreachable primary button; vitest covers the shared components. |
+| E-UX1-01-12 | UX1-01 | Scope: UI, plus migration 0060 and the query changes that return names; no business rule changes; waves 2–4 stay out. Split in UX1-01a (names, plants, API) and UX1-01b (screens). |
 
 Implementation rules derived from the above (no architectural change):
 

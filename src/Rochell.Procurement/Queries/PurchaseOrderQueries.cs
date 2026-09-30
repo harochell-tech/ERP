@@ -119,7 +119,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             context.Transaction,
             """
             SELECT po.po_id, po.po_no, po.revision, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.status::text,
-                   cu.email, au.email, po.approved_at, po.policy_version_id, po.version
+                   coalesce(cu.display_name, cu.email), coalesce(au.display_name, au.email), po.approved_at, po.policy_version_id, po.version
             FROM pur.purchase_order po
             JOIN md.party p ON p.party_id = po.party_id
             JOIN md.plant pl ON pl.plant_id = po.plant_id

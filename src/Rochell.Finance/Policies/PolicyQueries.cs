@@ -64,7 +64,7 @@ public sealed class ListAccountingPoliciesHandler : IQueryHandler<ListAccounting
             context.Connection,
             context.Transaction,
             """
-            SELECT v.policy_code, v.policy_version_id, v.version, v.status, v.effective_from, v.effective_to, p.email, a.email, v.justification
+            SELECT v.policy_code, v.policy_version_id, v.version, v.status, v.effective_from, v.effective_to, coalesce(p.display_name, p.email), coalesce(a.display_name, a.email), v.justification
             FROM acc.accounting_policy_version v
             JOIN iam.user p ON p.user_id = v.prepared_by
             LEFT JOIN iam.user a ON a.user_id = v.approved_by

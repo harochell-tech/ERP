@@ -6441,6 +6441,7 @@ export interface components {
             valuationAreaId: string;
             valuationAreaCode: string;
             locations: components["schemas"]["LocationView"][];
+            name?: null | string;
         };
         PodLine: {
             /** Format: uuid */
@@ -7779,6 +7780,7 @@ export interface components {
             /** Format: date-time */
             rejectedAt: null | string;
             rejectionReason: null | string;
+            userDisplayName?: null | string;
         };
         RunFiscalRuleTests: {
             /** Format: uuid */
@@ -7904,6 +7906,7 @@ export interface components {
             /** Format: uuid */
             valuationAreaId: string;
             locations: components["schemas"]["SalesLocationView"][];
+            name?: null | string;
         };
         ScrapLot: {
             /** Format: uuid */
@@ -7935,6 +7938,7 @@ export interface components {
             legalName: string;
             assignments: components["schemas"]["SessionAssignment"][];
             permissions: string[];
+            plants?: null | components["schemas"]["SessionPlant"][];
         };
         SessionDescription: {
             /** Format: uuid */
@@ -7952,6 +7956,13 @@ export interface components {
             expiresAt: string;
             companies: components["schemas"]["SessionCompany"][];
             authenticatedEmail?: null | string;
+            displayName?: null | string;
+        };
+        SessionPlant: {
+            /** Format: uuid */
+            plantId: string;
+            code: string;
+            name: null | string;
         };
         SetMachineStatus: {
             /** Format: uuid */
@@ -8489,6 +8500,7 @@ export interface components {
             kind: string;
             status: string;
             roles: components["schemas"]["UserRoleView"][];
+            displayName?: null | string;
         };
         VehicleList: {
             items: components["schemas"]["VehicleView"][];

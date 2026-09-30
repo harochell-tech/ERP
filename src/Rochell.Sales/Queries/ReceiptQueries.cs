@@ -93,7 +93,7 @@ public sealed class GetReceiptHandler : IQueryHandler<GetReceipt>
         var extra = (await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT u.email, r.closing_reason FROM fin.receipt r LEFT JOIN iam.user u ON u.user_id = r.recorded_by WHERE r.receipt_id = @r",
+            "SELECT coalesce(u.display_name, u.email), r.closing_reason FROM fin.receipt r LEFT JOIN iam.user u ON u.user_id = r.recorded_by WHERE r.receipt_id = @r",
             r => new Extra(r.NullableString(0), r.NullableString(1)),
             cancellationToken,
             ("r", query.ReceiptId)).ConfigureAwait(false))!;

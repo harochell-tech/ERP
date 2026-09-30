@@ -58,3 +58,11 @@ or rejecter and reason). `identity/reject-role-change` (`role:second_approve`, E
 a mandatory reason; like the approval, never by the requester nor the affected user (command and CHECK). Screens: Seguridad ›
 Usuarios y roles (request assignment / revocation, company-wide) and Solicitudes de rol (approve / reject). A READ permission
 added after 0031 is granted to DIRECTOR explicitly by its migration (0032 does so for `iam:read`).
+
+## Display names (UX1-01a, E-UX1-01-3)
+
+`iam.user.display_name` (migration 0060) holds the "name" claim of the Google ID token (the API asks for the `profile` scope). It
+is written at every sign-in and step-up when the token carries one (trimmed, at most 200 characters; a token without it leaves it
+unchanged) and never used for identity: the e-mail and the OIDC subject stay the identity. Queries that show who prepared,
+approved or changed something return `coalesce(display_name, email)`; the users and role-request lists keep the e-mail and add
+`displayName` / `userDisplayName`; the session description adds `displayName` and each company's `plants` (code and name).

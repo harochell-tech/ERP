@@ -116,7 +116,7 @@ public sealed class ListFiscalRulesHandler : IQueryHandler<ListFiscalRules>
             context.Connection,
             context.Transaction,
             """
-            SELECT v.rule_id, v.rule_version_id, v.version, v.status, v.definition::text, v.effective_from, v.effective_to, c.email, a.email, v.row_version
+            SELECT v.rule_id, v.rule_version_id, v.version, v.status, v.definition::text, v.effective_from, v.effective_to, coalesce(c.display_name, c.email), coalesce(a.display_name, a.email), v.row_version
             FROM tax.fiscal_rule_version v
             JOIN iam.user c ON c.user_id = v.configured_by
             LEFT JOIN iam.user a ON a.user_id = v.activated_by

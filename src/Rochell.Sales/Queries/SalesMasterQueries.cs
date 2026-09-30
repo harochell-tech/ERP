@@ -66,7 +66,7 @@ internal static class TermsReading
 {
     public const string Select = """
         SELECT t.terms_version_id, t.party_id, p.legal_name, t.version, t.effective_from, t.payment_terms_days, t.credit_limit::numeric(19,2), t.credit_hold, t.status,
-               pu.email, au.email
+               coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email)
         FROM sal.customer_terms_version t
         JOIN md.party p ON p.party_id = t.party_id
         JOIN iam.user pu ON pu.user_id = t.prepared_by
@@ -155,7 +155,7 @@ public sealed class ListStandardCostsHandler : IQueryHandler<ListStandardCosts>
             context.Connection,
             context.Transaction,
             """
-            SELECT s.cost_version_id, s.item_id, i.code, i.description, i.base_uom, s.valuation_area_id, a.code, s.version, s.effective_from, s.unit_cost, s.status, pu.email, au.email
+            SELECT s.cost_version_id, s.item_id, i.code, i.description, i.base_uom, s.valuation_area_id, a.code, s.version, s.effective_from, s.unit_cost, s.status, coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email)
             FROM md.standard_cost_version s
             JOIN md.item i ON i.item_id = s.item_id
             JOIN md.valuation_area a ON a.valuation_area_id = s.valuation_area_id
@@ -196,7 +196,7 @@ public sealed class ListPriceListsHandler : IQueryHandler<ListPriceLists>
             context.Transaction,
             """
             SELECT v.price_list_version_id, v.version, v.effective_from, v.status,
-                   (SELECT count(*) FROM sal.price_list_line l WHERE l.price_list_version_id = v.price_list_version_id)::int, pu.email, au.email
+                   (SELECT count(*) FROM sal.price_list_line l WHERE l.price_list_version_id = v.price_list_version_id)::int, coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email)
             FROM sal.price_list_version v
             JOIN iam.user pu ON pu.user_id = v.prepared_by
             LEFT JOIN iam.user au ON au.user_id = v.approved_by
@@ -302,7 +302,7 @@ public sealed record ListSalesPlants(Guid CompanyId, Guid SessionId) : IQuery;
 
 public sealed record SalesLocationView(Guid LocationId, string Code);
 
-public sealed record SalesPlantView(Guid PlantId, string Code, Guid ValuationAreaId, IReadOnlyList<SalesLocationView> Locations);
+public sealed record SalesPlantView(Guid PlantId, string Code, Guid ValuationAreaId, IReadOnlyList<SalesLocationView> Locations, string? Name = null);
 
 public sealed record SalesPlantList(IReadOnlyList<SalesPlantView> Items);
 
@@ -322,8 +322,8 @@ public sealed class ListSalesPlantsHandler : IQueryHandler<ListSalesPlants>
         var plants = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT plant_id, code, valuation_area_id FROM md.plant WHERE company_id = @c ORDER BY code",
-            r => new SalesPlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), []),
+            "SELECT plant_id, code, valuation_area_id, name FROM md.plant WHERE company_id = @c ORDER BY code",
+            r => new SalesPlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), [], r.NullableString(3)),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false);
         var locations = (await Reading.ListAsync(

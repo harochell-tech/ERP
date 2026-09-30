@@ -126,7 +126,8 @@ public sealed record ListPlants(Guid CompanyId, Guid SessionId, Guid? PlantId = 
 
 public sealed record LocationView(Guid LocationId, string Code);
 
-public sealed record PlantView(Guid PlantId, string Code, Guid ValuationAreaId, string ValuationAreaCode, IReadOnlyList<LocationView> Locations);
+/// <param name="Name">E-UX1-01-4: the readable name, null until one is set.</param>
+public sealed record PlantView(Guid PlantId, string Code, Guid ValuationAreaId, string ValuationAreaCode, IReadOnlyList<LocationView> Locations, string? Name = null);
 
 public sealed record PlantList(IReadOnlyList<PlantView> Items);
 
@@ -143,13 +144,13 @@ public sealed class ListPlantsHandler : IQueryHandler<ListPlants>
             context.Connection,
             context.Transaction,
             """
-            SELECT p.plant_id, p.code, p.valuation_area_id, va.code
+            SELECT p.plant_id, p.code, p.valuation_area_id, va.code, p.name
             FROM md.plant p
             JOIN md.valuation_area va ON va.valuation_area_id = p.valuation_area_id
             WHERE p.company_id = @c AND (CAST(@plant AS uuid) IS NULL OR p.plant_id = CAST(@plant AS uuid))
             ORDER BY p.code
             """,
-            r => new PlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), []),
+            r => new PlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), [], r.NullableString(4)),
             cancellationToken,
             ("c", context.CompanyId),
             ("plant", query.PlantId)).ConfigureAwait(false);
