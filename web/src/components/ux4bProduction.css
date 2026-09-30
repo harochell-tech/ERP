@@ -1,0 +1,8 @@
+/* UX4-03 (production): full-width folded forms, the day's totals, variance marks and the recipe comparison. */
+.ux4b-fold { display: block; width: 100%; box-sizing: border-box; }
+.ux4b-variance { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: flex-end; }
+.ux4b-next { white-space: nowrap; }
+.ux4b-compare tr.changed td { background: var(--tone-attention-bg); }
+.ux4b-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin: 8px 0; }
+.ux4b-facts dt { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ux4b-facts dd { margin: 0; }

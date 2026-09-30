@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query, type Schemas } from "@/api/client";
-import { History } from "@/components/History";
-import { ConfirmAction, ErrorBox, Loading, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
+import { CreditPreviewCard, MoneyText, SalesHistory } from "@/components/SalesUx4";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { ConfirmAction, ErrorBox, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { orderCancellable, orderDispatchable } from "@/lib/sales";
@@ -32,6 +33,15 @@ function Actions({ order, onDone }: { order: Order; onDone: () => void }) {
   const after = (response: unknown) => response && onDone();
   return (
     <>
+      {h.status === "DRAFT" && can("sales_order:create") ? (
+        <>
+          <p className="muted" data-testid="submit-explanation">
+            Al enviarlo a crédito, el sistema revisa el crédito del cliente: si el pedido cabe en su crédito disponible y no tiene facturas muy vencidas,
+            queda confirmado y Despacho puede planificarlo; si no, pasa a Crédito para que lo apruebe o lo rechace.
+          </p>
+          <CreditPreviewCard partyId={h.partyId} amount={h.totalNet} />
+        </>
+      ) : null}
       <div className="actions">
         {h.status === "DRAFT" && can("sales_order:create") ? (
           <>
@@ -112,7 +122,7 @@ function OrderDetail() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const { order, deliveries, exposure } = data;
   const h = order.header;
@@ -182,19 +192,19 @@ function OrderDetail() {
 
       <h2>Crédito</h2>
       <p>
-        Exposición actual <Money value={exposure.exposure} currency /> de un límite <Money value={exposure.creditLimit} currency /> · disponible{" "}
-        <Money value={exposure.available} currency />
-        {exposure.overdueDays > 0 ? ` · ${exposure.overdueDays} días de atraso` : ""}
+        Crédito usado hoy (facturas abiertas, pedidos confirmados y entregas sin facturar) <MoneyText value={exposure.exposure} /> de un límite de{" "}
+        <MoneyText value={exposure.creditLimit} /> · disponible <MoneyText value={exposure.available} />
+        {exposure.overdueDays > 0 ? ` · su factura más atrasada lleva ${exposure.overdueDays} días vencida` : ""}
       </p>
       {order.creditChecks.length === 0 ? (
-        <p className="muted">Todavía no se ha evaluado el crédito.</p>
+        <p className="muted">Todavía no se ha evaluado el crédito: se evalúa al enviar el pedido a crédito.</p>
       ) : (
         <div className="table-wrap"><table>
           <thead>
             <tr>
               <th>Fecha</th>
               <th className="num">Pedido (RD$)</th>
-              <th className="num">CxC (RD$)</th>
+              <th className="num">Facturas abiertas (RD$)</th>
               <th className="num">Pedidos (RD$)</th>
               <th className="num">Sin facturar (RD$)</th>
               <th className="num">Límite (RD$)</th>
@@ -235,7 +245,7 @@ function OrderDetail() {
 
       <h2>Conduces</h2>
       {deliveries.length === 0 ? (
-        <p className="muted">Sin conduces.</p>
+        <EmptyState title="Sin conduces todavía." steps={[orderDispatchable(h.status) && can("delivery:manage") && { href: `/despacho/planificar/?pedido=${h.salesOrderId}`, label: "Planificar el primer conduce" }]}>{orderDispatchable(h.status) ? null : <p>Despacho planifica los conduces cuando el pedido está confirmado.</p>}</EmptyState>
       ) : (
         <ul>
           {deliveries.map((d) => (
@@ -245,7 +255,7 @@ function OrderDetail() {
           ))}
         </ul>
       )}
-      <History history={order.history} />
+      <SalesHistory history={order.history} />
     </>
   );
 }

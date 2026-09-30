@@ -9,7 +9,7 @@ export async function signIn(browser: Browser, account: string): Promise<Page> {
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto("/");
-  await page.getByRole("link", { name: "Iniciar sesión" }).click();
+  await page.getByRole("link", { name: "Entrar con Google" }).click();
   await page.getByRole("link", { name: account, exact: true }).click();
   // On a phone the user block lives in the (closed) menu panel: attached, not visible.
   await expect(page.getByTestId("user-email")).toBeAttached();

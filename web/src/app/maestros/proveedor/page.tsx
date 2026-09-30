@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ConfirmAction, ErrorBox, Field, Loading, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
+import { LoadingIndicator } from "@/components/StateNotices";
 import { formatDateTime } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -124,7 +125,7 @@ function BankAccounts({ partyId }: { partyId: string }) {
     [companyId, partyId],
   );
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   // UX1-01a: requestedBy is the display name (the e-mail until the first sign-in brings one); either identifies the requester.
   const current = data.items.find((v) => v.status === "VERIFIED");
@@ -191,7 +192,7 @@ function Supplier() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const supplier = data.items.find((s) => s.supplierId === id);
   if (!supplier) {
@@ -212,9 +213,15 @@ function Supplier() {
           <dd className="mono">{supplier.rnc ?? "—"}</dd>
         </div>
         <div>
-          <dt>CxP abierta</dt>
+          <dt>Saldo por pagar</dt>
           <dd>
             <Money value={supplier.openApAmount} currency />
+          </dd>
+        </div>
+        <div>
+          <dt>Plazo de pago</dt>
+          <dd data-testid="supplier-terms">
+            {supplier.paymentTermsDays === null ? <span className="muted">Sin plazo registrado</span> : supplier.paymentTermsDays === 0 ? "Al contado" : `${supplier.paymentTermsDays} días`}
           </dd>
         </div>
         <div>
@@ -224,8 +231,21 @@ function Supplier() {
           </dd>
         </div>
       </dl>
+      {/* UX4-03 (C-34): where this supplier's documents are. The contact data is not kept in the system yet. */}
+      <div className="actions" data-testid="supplier-links">
+        {can("purchase_order:read") ? <Link href={`/compras/ordenes/?proveedor=${supplier.supplierId}`}>Órdenes de compra</Link> : null}
+        {can("supplier_invoice:read") ? <Link href={`/cxp/facturas/?proveedor=${supplier.supplierId}`}>Facturas del proveedor</Link> : null}
+        {can("payment:read") ? <Link href="/cxp/antiguedad/">Cuentas por pagar por antigüedad</Link> : null}
+      </div>
       <h2>Cuentas bancarias</h2>
-      {can("bank:read") ? <BankAccounts partyId={supplier.supplierId} /> : <p className="muted">Su rol no ve las cuentas bancarias.</p>}
+      {can("bank:read") ? (
+        <BankAccounts partyId={supplier.supplierId} />
+      ) : (
+        <p className="muted" data-testid="bank-hidden">
+          Por seguridad, los números de cuenta del proveedor solo los ven Tesorería, Contabilidad y Auditoría. Arriba puede ver si tiene una cuenta verificada para
+          pagarle.
+        </p>
+      )}
     </>
   );
 }

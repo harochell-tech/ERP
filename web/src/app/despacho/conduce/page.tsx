@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { History } from "@/components/History";
-import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
+import { SalesHistory } from "@/components/SalesUx4";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDateTime, statusLabel } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
@@ -13,6 +14,7 @@ import { cancellable, nextDeliveryStep } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { canSeeAccounting, deliveryLotLabel } from "@/lib/ux4bSales";
 
 type Delivery = Schemas["DeliveryDetail"];
 
@@ -86,7 +88,7 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
     [companyId, own],
   );
   if (own && data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   return (
     <form
@@ -112,7 +114,7 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
         <>
           <Field label="Camión" required error={fe.errors.vehicleId}>
             <select value={form.vehicleId} onChange={(e) => setForm({ ...form, vehicleId: e.target.value })}>
-              <option value="">—</option>
+              <option value="">Seleccione…</option>
               {data.vehicles.map((v) => (
                 <option key={v.vehicleId} value={v.vehicleId}>
                   {v.plate} ({formatQuantity(v.capacityKg)} kg)
@@ -122,7 +124,7 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
           </Field>
           <Field label="Chofer" required error={fe.errors.driverId}>
             <select value={form.driverId} onChange={(e) => setForm({ ...form, driverId: e.target.value })}>
-              <option value="">—</option>
+              <option value="">Seleccione…</option>
               {data.drivers.map((d) => (
                 <option key={d.driverId} value={d.driverId}>
                   {d.fullName}
@@ -159,7 +161,7 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
   const fe = useFieldErrors();
   const { data, error } = useLoad(() => query("/api/v1/companies/{companyId}/sales/plants", { path: { companyId } }), [companyId]);
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const locations = data.items.find((p) => p.code === delivery.header.plantCode)?.locations ?? [];
   return (
@@ -182,7 +184,7 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
           <tr>
             <th>Producto</th>
             <th className="num">Cantidad</th>
-            <th>Sale de</th>
+            <th>Ubicación de salida</th>
           </tr>
         </thead>
         <tbody>
@@ -196,7 +198,7 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
               </td>
               <td>
                 <select
-                  aria-label={`Ubicación ${l.itemCode}`}
+                  aria-label={`Ubicación de salida ${l.itemCode}`}
                   value={sources[l.deliveryLineId] ?? locations[0]?.locationId ?? ""}
                   onChange={(e) => setSources({ ...sources, [l.deliveryLineId]: e.target.value })}
                   {...fieldAria(fe.errors[l.deliveryLineId], `source-${l.deliveryLineId}`, true)}
@@ -271,7 +273,7 @@ function GateOut({ delivery, onDone }: { delivery: Delivery; onDone: () => void 
 
 function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const id = delivery.header.deliveryId;
-  const pod = useCommand(`pod:${id}`, "/api/v1/companies/{companyId}/sales/record-pod", `Conduce ${delivery.header.deliveryNo}: entrega (POD) registrada.`);
+  const pod = useCommand(`pod:${id}`, "/api/v1/companies/{companyId}/sales/record-pod", `Conduce ${delivery.header.deliveryNo}: entrega al cliente registrada.`);
   const [receiver, setReceiver] = useState("");
   const [receivedAt, setReceivedAt] = useState("");
   const [evidence, setEvidence] = useState<EvidenceValue>(NO_EVIDENCE);
@@ -331,7 +333,7 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
       <Field label="Fecha y hora de recepción" required error={fe.errors.receivedAt}>
         <input type="datetime-local" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} />
       </Field>
-      <Evidence label="Evidencia del POD (foto o firma)" value={evidence} onChange={setEvidence} errors={{ ref: fe.errors.ref, sha256: fe.errors.sha256 }} />
+      <Evidence label="Constancia de entrega firmada (foto o firma)" value={evidence} onChange={setEvidence} errors={{ ref: fe.errors.ref, sha256: fe.errors.sha256 }} />
       <LineTable>
         <thead>
           <tr>
@@ -381,7 +383,7 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
       </Field>
       <div className="actions form-actions">
         <button type="submit" className="primary" disabled={pod.busy}>
-          Registrar entrega (POD)
+          Registrar entrega al cliente
         </button>
       </div>
       <ErrorBox error={pod.error} />
@@ -403,7 +405,7 @@ function DeliveryDetail() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const h = data.header;
   const step = can("delivery:manage") ? nextDeliveryStep(h.status) : null;
@@ -455,7 +457,7 @@ function DeliveryDetail() {
             <th>Producto</th>
             <th>Unidad</th>
             <th className="num">Planificado</th>
-            <th>Sale de</th>
+            <th>Ubicación de salida</th>
             <th className="num">Despachado</th>
             <th className="num">Entregado</th>
             <th className="num">Devuelto</th>
@@ -468,7 +470,7 @@ function DeliveryDetail() {
             <tr key={l.deliveryLineId}>
               <td>
                 {l.itemCode} — {l.itemDescription}
-                {l.lots.length > 0 ? <div className="muted">{l.lots.map((lot) => `${lot.lotCode}: ${formatQuantity(lot.baseQuantity)}`).join(" · ")}</div> : null}
+                {l.lots.length > 0 ? <div className="muted">{l.lots.map((lot) => deliveryLotLabel(lot, formatQuantity)).join(" · ")}</div> : null}
               </td>
               <td>{l.uom}</td>
               <td className="num">{formatQuantity(l.qtyPlanned)}</td>
@@ -484,7 +486,7 @@ function DeliveryDetail() {
       </table></div>
       {data.pod ? (
         <>
-          <h2>Entrega (POD)</h2>
+          <h2>Entrega al cliente</h2>
           <p>
             Recibió {data.pod.receivedByName} el {formatDateTime(data.pod.receivedAt)} ·{" "}
             <span data-testid="pod-evidence" title={`SHA-256 ${data.pod.evidenceSha256}`}>
@@ -493,19 +495,20 @@ function DeliveryDetail() {
           </p>
         </>
       ) : null}
-      {data.assessments.length > 0 ? (
+      {/* E-UX4-11 (V-23): when the goods became the customer's, for the revenue, is the books' matter: Controller, Contador, Auditor. */}
+      {data.assessments.length > 0 && canSeeAccounting(can) ? (
         <>
-          <h2>Transferencia de control</h2>
-          <ul>
+          <h2>Cuándo la mercancía pasó a ser del cliente (contabilidad)</h2>
+          <ul data-testid="control-transfer">
             {data.assessments.map((a, i) => (
               <li key={i}>
-                {a.triggerPoint === "GATE_OUT" ? "Portón" : "POD"}: {statusLabel(a.result)} · {formatDateTime(a.assessedAt)}
+                {a.triggerPoint === "GATE_OUT" ? "Al salir por el portón" : "Al entregarla al cliente"}: {statusLabel(a.result)} · {formatDateTime(a.assessedAt)}
               </li>
             ))}
           </ul>
         </>
       ) : null}
-      <History history={data.history} />
+      <SalesHistory history={data.history} />
     </>
   );
 }

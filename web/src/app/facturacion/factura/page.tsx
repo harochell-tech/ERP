@@ -5,8 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
-import { History } from "@/components/History";
-import { AccountingStatus, ConfirmAction, ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
+import { MoneyText, SalesHistory } from "@/components/SalesUx4";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { AccountingStatus, ConfirmAction, ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { invoiceEncfPrefix } from "@/lib/authorizations";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, formatDateTime, statusLabel, todayInDominicanRepublic } from "@/lib/labels";
@@ -14,6 +15,8 @@ import { sha256Hex } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { canSeeAccounting, creditNoteOffered, creditNoteStatusLabel, invoiceStatusLabel } from "@/lib/ux4bSales";
+import { ecfTypeLabel } from "@/lib/ux4b";
 
 type Invoice = Schemas["InvoiceDetail"];
 
@@ -36,8 +39,8 @@ function Issue({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) {
         <Field label="Tipo de e-CF">
           <select value={ecfType} onChange={(e) => setEcfType(e.target.value)}>
             <option value="">Automático (31 con RNC, 32 con cédula)</option>
-            <option value="31">31 · Crédito fiscal</option>
-            <option value="32">32 · Consumo</option>
+            <option value="31">{ecfTypeLabel("31")}</option>
+            <option value="32">{ecfTypeLabel("32")}</option>
           </select>
         </Field>
       )}
@@ -74,7 +77,7 @@ function FiscalPackage({ invoiceId }: { invoiceId: string }) {
   const { companyId } = useSession();
   const { data, error } = useLoad(() => query("/api/v1/companies/{companyId}/sales/invoices/{invoiceId}/fiscal-package", { path: { companyId, invoiceId } }), [companyId, invoiceId]);
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   return (
     <>
@@ -104,7 +107,7 @@ function FiscalPackage({ invoiceId }: { invoiceId: string }) {
   );
 }
 
-function CreditNoteForm({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) {
+function CreditNoteForm({ invoice, onDone, onCancel }: { invoice: Invoice; onDone: () => void; onCancel: () => void }) {
   const create = useCommand(`create-credit-note:${invoice.header.invoiceId}`, "/api/v1/companies/{companyId}/sales/create-credit-note", (_r, doc) =>
     doc ? `Nota de crédito ${doc} creada en borrador sobre ${invoice.header.invoiceNo}.` : `Nota de crédito creada en borrador sobre ${invoice.header.invoiceNo}.`,
   );
@@ -170,6 +173,9 @@ function CreditNoteForm({ invoice, onDone }: { invoice: Invoice; onDone: () => v
       </Field>
       <p className="muted">El ITBIS de la nota lo calcula el sistema con la tasa de la factura. La nota la emite otra persona de Facturación.</p>
       <div className="actions form-actions">
+        <button type="button" onClick={onCancel}>
+          Cancelar
+        </button>
         <button
           type="button"
           className="primary"
@@ -325,29 +331,68 @@ function InvoiceDetail() {
   );
   const record = useCommand(`record-ecf:${id}`, "/api/v1/companies/{companyId}/sales/record-external-fiscal-document", () => `e-CF registrado en la factura ${data?.header.invoiceNo ?? ""}.`);
   const voidInvoice = useCommand(`void-invoice:${id}`, "/api/v1/companies/{companyId}/sales/void-unfiscalized-invoice", () => `Factura ${data?.header.invoiceNo ?? ""} anulada.`);
+  const [creditNoteOpen, setCreditNoteOpen] = useState(false);
   if (!can("sales:read")) {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const h = data.header;
   const issued = h.commercialStatus !== "DRAFT";
   const open = h.commercialStatus === "CONFIRMED" || h.commercialStatus === "PARTIALLY_PAID";
   const pendingEcf = issued && h.commercialStatus !== "VOIDED" && h.fiscalStatus === "PENDING_EXTERNAL";
-  const creditable = h.fiscalStatus === "ACCEPTED_EXTERNAL" && (open || h.commercialStatus === "PAID");
+  // V-31: a credit note only while something is still owed on an invoice whose e-CF was accepted.
+  const creditable = creditNoteOffered(h.commercialStatus, h.fiscalStatus);
   return (
     <>
       <p>
         <Link href="/facturacion/facturas/">← Facturas</Link>
       </p>
       <h1>
-        Factura {h.invoiceNo} <StatusBadge status={h.commercialStatus} testId="invoice-status" /> <StatusBadge status={h.fiscalStatus} testId="invoice-fiscal-status" />
+        Factura {h.invoiceNo} <StatusBadge status={h.commercialStatus} label={invoiceStatusLabel(h.commercialStatus)} testId="invoice-status" />{" "}
+        <StatusBadge status={h.fiscalStatus} testId="invoice-fiscal-status" />
       </h1>
-      <p>
-        {h.customerName} · e-CF {h.ecfType} {h.encf ? `· e-NCF ${h.encf}` : ""} · fecha {formatDate(h.invoiceDate)} · vence {formatDate(h.dueDate)} · contabilidad{" "}
-        <AccountingStatus status={h.accountingStatus} eventId={data.postingEventId} />
-      </p>
+      {/* V-30: the header as a few labelled facts instead of one dense line. */}
+      <div className="doc-facts">
+        <div>
+          <span>Cliente</span>
+          <span>{h.customerName}</span>
+        </div>
+        <div>
+          <span>Comprobante</span>
+          <span>
+            e-CF {ecfTypeLabel(h.ecfType)}
+            {h.encf ? <span className="mono"> · {h.encf}</span> : null}
+          </span>
+        </div>
+        <div>
+          <span>Fecha · vence</span>
+          <span>
+            {formatDate(h.invoiceDate)} · {formatDate(h.dueDate)}
+          </span>
+        </div>
+        <div>
+          <span>Total de la factura</span>
+          <span>
+            <MoneyText value={h.total ?? h.netTotal} />
+          </span>
+        </div>
+        <div>
+          <span>Pendiente de cobro</span>
+          <span>
+            <MoneyText value={h.openAmount} />
+          </span>
+        </div>
+        {canSeeAccounting(can) ? (
+          <div>
+            <span>Contabilidad</span>
+            <span>
+              <AccountingStatus status={h.accountingStatus} eventId={data.postingEventId} />
+            </span>
+          </div>
+        ) : null}
+      </div>
       {data.voidReason ? <p className="muted">Anulada: {data.voidReason}</p> : null}
       {issued && h.ecfType === EXEMPT_ECF_TYPE ? <Exemption invoiceId={h.invoiceId} /> : null}
       {h.commercialStatus === "DRAFT" && can("invoice:issue") ? <Issue invoice={data} onDone={reload} /> : null}
@@ -396,9 +441,15 @@ function InvoiceDetail() {
             </td>
           </tr>
           <tr>
-            <th colSpan={6}>Total · abierto</th>
+            <th colSpan={6}>Total con ITBIS (RD$)</th>
             <td className="num">
-              <Money value={h.total} testId="invoice-total" /> · <Money value={h.openAmount} testId="invoice-open" />
+              <Money value={h.total} testId="invoice-total" />
+            </td>
+          </tr>
+          <tr>
+            <th colSpan={6}>Pendiente de cobro (RD$)</th>
+            <td className="num">
+              <Money value={h.openAmount} testId="invoice-open" />
             </td>
           </tr>
         </tbody>
@@ -436,12 +487,23 @@ function InvoiceDetail() {
         <ul>
           {data.creditNotes.map((n) => (
             <li key={n.creditNoteId}>
-              <Link href={`/facturacion/nota/?id=${n.creditNoteId}`}>{n.creditNoteNo}</Link> — <Money value={n.total} /> — {statusLabel(n.commercialStatus)} · {statusLabel(n.fiscalStatus)}
+              <Link href={`/facturacion/nota/?id=${n.creditNoteId}`}>{n.creditNoteNo}</Link> — <MoneyText value={n.total} /> — {creditNoteStatusLabel(n.commercialStatus)} ·{" "}
+              {statusLabel(n.fiscalStatus)}
             </li>
           ))}
         </ul>
       )}
-      {creditable && can("credit_note:create") ? <CreditNoteForm invoice={data} onDone={reload} /> : null}
+      {creditable && can("credit_note:create") ? (
+        creditNoteOpen ? (
+          <CreditNoteForm invoice={data} onDone={() => { setCreditNoteOpen(false); reload(); }} onCancel={() => setCreditNoteOpen(false)} />
+        ) : (
+          <div className="actions">
+            <button type="button" onClick={() => setCreditNoteOpen(true)}>
+              Nueva nota de crédito
+            </button>
+          </div>
+        )
+      ) : null}
 
       <h2>Retenciones del cliente</h2>
       {data.withholdings.length === 0 ? (
@@ -466,7 +528,7 @@ function InvoiceDetail() {
         </table></div>
       )}
       {open && can("customer_withholding:record") ? <RecordWithholding invoice={data} onDone={reload} /> : null}
-      <History history={data.history} />
+      <SalesHistory history={data.history} label={invoiceStatusLabel} />
     </>
   );
 }

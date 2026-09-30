@@ -46,7 +46,7 @@ test("a policy version typed in % is approved by a second person who sees the ch
 
 test("an account role map is prepared by the Contador and approved by the Controller", async ({ browser }) => {
   const contador = await signIn(browser, "Contador");
-  await nav(contador, "Mapas de cuentas");
+  await nav(contador, "Cuentas por rol");
   // Roles read by their names everywhere.
   await expect(contador.getByRole("cell", { name: "Cargos y comisiones bancarias" }).first()).toBeVisible();
   await contador.getByLabel("Rol contable").selectOption({ label: "Cargos y comisiones bancarias" });
@@ -59,7 +59,7 @@ test("an account role map is prepared by the Contador and approved by the Contro
   await expect(draft(contador).getByRole("button", { name: "Aprobar" })).toHaveCount(0);
 
   const controller = await signIn(browser, "Controller");
-  await nav(controller, "Mapas de cuentas");
+  await nav(controller, "Cuentas por rol");
   await draft(controller).getByRole("button", { name: "Aprobar" }).click();
   const dialog = controller.getByRole("dialog");
   await expect(dialog).toContainText("Cargos y comisiones bancarias");

@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { ErrorBox, Field, Money, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDate } from "@/lib/labels";
 import { METHODS } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel } from "@/lib/ux4bSales";
 
 // VS3-10b (E-VS3-10-7, E-VS3-07-3): deposit slips DEP-…; Cobros picks the cheques and cash in transit and the bank account
 // (masked list, E-VS3-10-14). The slip's total is the server's.
@@ -30,16 +32,17 @@ function NewDeposit({ onDone }: { onDone: (depositId: string) => void }) {
     [companyId],
   );
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   if (data.receipts.length === 0) {
-    return <p className="muted">No hay cheques ni efectivo por depositar.</p>;
+    return <p className="muted">No hay cheques ni efectivo por depositar: todo lo cobrado por esos medios ya está depositado.</p>;
   }
   const bank = bankAccountId || data.banks[0]?.bankAccountId || "";
   const chosen = data.receipts.filter((r) => picked[r.receiptId]).map((r) => r.receiptId);
   return (
     <>
       <h2>Nuevo depósito</h2>
+      <p className="muted">Marque los cheques y el efectivo que lleva al banco en un mismo volante de depósito y elija la cuenta donde los deposita.</p>
       <div className="table-wrap"><table>
         <thead>
           <tr>
@@ -74,7 +77,7 @@ function NewDeposit({ onDone }: { onDone: (depositId: string) => void }) {
           <select aria-label="Cuenta del depósito" value={bank} onChange={(e) => setBankAccountId(e.target.value)}>
             {data.banks.map((b) => (
               <option key={b.bankAccountId} value={b.bankAccountId}>
-                {b.bankCode} {b.accountNumber}
+                {bankAccountLabel(b)}
               </option>
             ))}
           </select>
@@ -109,11 +112,11 @@ export default function Page() {
     <>
       <h1>Depósitos</h1>
       {can("receipt:deposit") ? <NewDeposit onDone={(id) => router.push(`/cobros/deposito/?id=${id}`)} /> : null}
-      <h2>Volantes</h2>
+      <h2>Depósitos registrados</h2>
       {data === null ? (
-        <Loading error={error} />
+        <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
-        <p className="muted">No hay depósitos.</p>
+        <EmptyState title="Todavía no hay depósitos."><p>Un depósito agrupa los cheques y el efectivo cobrados que se llevan juntos al banco.</p></EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -133,8 +136,8 @@ export default function Page() {
                   <Link href={`/cobros/deposito/?id=${d.depositId}`}>{d.depositNo}</Link>
                 </td>
                 <td>{formatDate(d.depositDate)}</td>
-                <td className="mono">
-                  {d.bankCode} {d.accountNumber}
+                <td className="wrap">
+                  {bankAccountLabel({ alias: d.bankAccountAlias, bankCode: d.bankCode, accountNumber: d.accountNumber })}
                 </td>
                 <td className="num">{d.receipts}</td>
                 <td className="num">

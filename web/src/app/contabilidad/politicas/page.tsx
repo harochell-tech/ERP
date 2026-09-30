@@ -21,6 +21,8 @@ import {
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { groupParametersByTheme, groupPoliciesByTheme } from "@/lib/ux4b";
+import "@/components/states.css";
 
 type Policy = Schemas["AccountingPolicyView"];
 type Version = Schemas["PolicyVersionView"];
@@ -272,15 +274,25 @@ function PolicySection({ policy, onDone }: { policy: Policy; onDone: () => void 
               <th>Qué afecta</th>
             </tr>
           </thead>
-          <tbody>
-            {policy.definitions.map((d) => (
-              <tr key={d.paramCode}>
-                <td className="wrap">{parameterLabelWithUnit(d)}</td>
-                <td className="mono">{formatParameterValue(d, inForce?.parameters[d.paramCode])}</td>
-                <td className="wrap muted">{d.affects ?? d.description}</td>
-              </tr>
-            ))}
-          </tbody>
+          {/* UX4-03 (G-22): the parameters by theme (a fiscal alert under "Fiscal"); a policy without themes keeps one body. */}
+          {groupParametersByTheme(policy.definitions).map((group) => (
+            <tbody key={group.theme ?? "all"} data-testid={group.theme ? `parameter-group:${group.theme}` : undefined}>
+              {group.theme ? (
+                <tr className="group-row">
+                  <th colSpan={3} scope="colgroup">
+                    {group.theme}
+                  </th>
+                </tr>
+              ) : null}
+              {group.definitions.map((d) => (
+                <tr key={d.paramCode}>
+                  <td className="wrap">{parameterLabelWithUnit(d)}</td>
+                  <td className="mono">{formatParameterValue(d, inForce?.parameters[d.paramCode])}</td>
+                  <td className="wrap muted">{d.affects ?? d.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          ))}
         </table>
       </div>
       {drafts.map((v) => (
@@ -355,8 +367,13 @@ export default function Page() {
     <>
       <h1>Políticas contables</h1>
       <p className="muted">Los porcentajes se escriben y se muestran en % (5 = 5 %); los montos en RD$.</p>
-      {data.items.map((policy) => (
-        <PolicySection key={policy.policyCode} policy={policy} onDone={reload} />
+      {groupPoliciesByTheme(data.items).map((group) => (
+        <div key={group.theme} className="policy-theme" data-testid={`policy-theme:${group.theme}`}>
+          <h2 className="theme-title">{group.theme}</h2>
+          {group.policies.map((policy) => (
+            <PolicySection key={policy.policyCode} policy={policy} onDone={reload} />
+          ))}
+        </div>
       ))}
     </>
   );

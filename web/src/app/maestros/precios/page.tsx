@@ -2,7 +2,8 @@
 
 import { useId, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ConfirmAction, ErrorBox, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { ConfirmAction, ErrorBox, FieldMessage, fieldAria, LineTable, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -62,7 +63,7 @@ function PrepareList({ current, onDone }: { current: Schemas["PriceListLineView"
                       onChange={(e) => setLine(index, { itemId: e.target.value, uom: goods.find((g) => g.itemId === e.target.value)?.baseUom ?? "" })}
                       {...fieldAria(fe.errors[`line-${index}-item`], `${messageId}-${index}-item`, true)}
                     >
-                      <option value="">—</option>
+                      <option value="">Seleccione…</option>
                       {goods.map((g) => (
                         <option key={g.itemId} value={g.itemId}>
                           {g.code} — {g.description}
@@ -169,7 +170,7 @@ function Version({ version, onDone }: { version: Schemas["PriceListSummary"]; on
         <tr>
           <td colSpan={7}>
             {data === null ? (
-              <Loading error={error} />
+              <LoadingIndicator error={error} />
             ) : (
               <div className="table-wrap"><table>
                 <tbody>
@@ -214,8 +215,9 @@ export default function Page() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
+  const active = data.lists.find((l) => l.status === "ACTIVE");
   return (
     <>
       <div className="actions" style={{ justifyContent: "space-between" }}>
@@ -226,6 +228,43 @@ export default function Page() {
           </button>
         ) : null}
       </div>
+      {/* UX4-03 (V-21): what a salesperson needs first — the prices in force today (the ACTIVE version). */}
+      <h2>Precios vigentes</h2>
+      {active ? (
+        <>
+          <p className="muted">
+            Versión {active.version}, vigente desde el {formatDate(active.effectiveFrom)}. Precios en RD$ sin ITBIS.
+          </p>
+          <div className="table-wrap">
+            <table data-testid="current-prices">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Unidad</th>
+                  <th className="num">Precio sin ITBIS (RD$)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.activeLines.map((l) => (
+                  <tr key={`${l.itemId}:${l.uom}`}>
+                    <td className="wrap">
+                      {l.itemCode} — {l.itemDescription}
+                    </td>
+                    <td>{l.uom}</td>
+                    <td className="num">
+                      <Money value={l.unitPrice} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <EmptyState title="Todavía no hay una lista de precios vigente.">
+          <p>Sin ella no se pueden tomar pedidos ni cotizar. El Controller la prepara aquí y otra persona autorizada la aprueba.</p>
+        </EmptyState>
+      )}
       {preparing ? (
         <PrepareList
           current={data.activeLines}
@@ -235,7 +274,7 @@ export default function Page() {
           }}
         />
       ) : null}
-      <h2>Versiones</h2>
+      <h2>Todas las versiones</h2>
       {data.lists.length === 0 ? (
         <p className="muted">No hay listas de precios.</p>
       ) : (

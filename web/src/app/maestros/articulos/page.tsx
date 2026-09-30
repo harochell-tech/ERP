@@ -2,7 +2,9 @@
 
 import { useId, useState } from "react";
 import { query, type Schemas } from "@/api/client";
-import { ErrorBox, Field, FieldMessage, fieldAria, Loading, NoPermission, useFieldErrors } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, NoPermission, useFieldErrors } from "@/components/ui";
+import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
+import { matchesSearch } from "@/lib/ux4b";
 import { useUomCatalogue } from "@/components/Units";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, statusLabel } from "@/lib/labels";
@@ -105,9 +107,14 @@ function ItemRow({ item, onDone }: { item: Item; onDone: () => void }) {
         ) : (
           <ul>
             {item.conversions.map((c) => (
-              <li key={`${c.fromUom}:${c.effectiveFrom}`}>
-                1 {c.fromUom} = {formatQuantity(c.factor)} {c.toUom} desde {formatDate(c.effectiveFrom)}
-                {c.effectiveTo ? ` hasta ${formatDate(c.effectiveTo)}` : ""}
+              <li key={`${c.fromUom}:${c.effectiveFrom}`} data-testid={`conversion:${item.code}:${c.fromUom}`}>
+                {/* UX4-03 (C-32): the factor without trailing zeros, as a sentence. */}
+                1 {c.fromUom} equivale a <strong>{formatQuantity(c.factor)} {c.toUom}</strong>
+                <span className="muted">
+                  {" "}
+                  · desde {formatDate(c.effectiveFrom)}
+                  {c.effectiveTo ? ` hasta ${formatDate(c.effectiveTo)}` : ""}
+                </span>
               </li>
             ))}
           </ul>
@@ -186,18 +193,61 @@ export default function Page() {
     can("master_data:read") ? () => query("/api/v1/companies/{companyId}/master-data/items", { path: { companyId }, query: { limit: 200 } }) : null,
     [companyId],
   );
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const [creating, setCreating] = useState(false);
 
   if (!can("master_data:read")) {
     return <NoPermission />;
   }
+  // UX4-03 (C-32): this screen is the raw materials; finished goods have their own (Maestros › Productos terminados).
+  const materials = data?.items.filter((i) => i.itemType === "RAW_MATERIAL") ?? [];
+  const shown = materials.filter((i) => (category === "" || i.itemCategory === category) && matchesSearch(search, i.code, i.description));
   return (
     <>
       <h1>Materias primas</h1>
-      {can("item:create") ? <CreateItem onDone={reload} /> : null}
+      <p className="muted">Cemento, agregados, aditivos y demás materiales que se compran y se consumen en producción. Los bloques y demás productos están en Productos terminados.</p>
+      {can("item:create") ? (
+        creating ? (
+          <CreateItem
+            onDone={() => {
+              setCreating(false);
+              reload();
+            }}
+          />
+        ) : (
+          <div className="actions">
+            <button type="button" className="primary" onClick={() => setCreating(true)}>
+              Nueva materia prima
+            </button>
+          </div>
+        )
+      ) : null}
+      <div className="inline-form" role="search">
+        <Field label="Buscar">
+          <input type="search" placeholder="Código o descripción" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </Field>
+        <Field label="Mostrar categoría">
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">Todas</option>
+            {Object.entries(CATEGORIES).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       {data === null ? (
-        <Loading error={error} />
-      ) : data.items.length === 0 ? (
-        <p className="muted">No hay materias primas.</p>
+        <LoadingIndicator error={error} />
+      ) : materials.length === 0 ? (
+        <EmptyState title="Aún no hay materias primas.">
+          <p>{can("item:create") ? "Cree la primera con «Nueva materia prima»; quedará en borrador hasta que se active." : "Quien tenga el permiso de crear artículos las registra aquí."}</p>
+        </EmptyState>
+      ) : shown.length === 0 ? (
+        <EmptyState title="Ninguna materia prima coincide con la búsqueda.">
+          <p>Pruebe con otra palabra o elija «Todas» las categorías.</p>
+        </EmptyState>
       ) : (
         <div className="table-wrap"><table>
           <thead>
@@ -212,7 +262,7 @@ export default function Page() {
             </tr>
           </thead>
           <tbody>
-            {data.items.map((i) => (
+            {shown.map((i) => (
               <ItemRow key={`${i.itemId}:${i.version}:${i.conversions.length}`} item={i} onDone={reload} />
             ))}
           </tbody>

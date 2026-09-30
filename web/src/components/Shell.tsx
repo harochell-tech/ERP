@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { actAs, loginUrl, logout, query, stopActingAs } from "@/api/client";
 import { ErrorBox } from "./ui";
+import { LoadingIndicator } from "./StateNotices";
 import { useSession } from "@/lib/session";
 import { identityLabel, showIdentitySelector, type TestIdentityOption } from "@/lib/identities";
 import { environmentBadge, type EnvironmentBadge } from "@/lib/environment";
@@ -43,7 +44,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/ventas/cotizaciones/", label: "Cotizaciones", permission: "sales:read" }, // QUO1-04 (E-QUO1-04-1)
       { href: "/ventas/pedidos/", label: "Pedidos", permission: "sales:read" },
       { href: "/ventas/clientes/", label: "Clientes", permission: "sales:read" },
-      { href: "/ventas/antiguedad/", label: "Antigüedad de CxC", permission: "sales:read" },
+      { href: "/ventas/antiguedad/", label: "Cuentas por cobrar por antigüedad", permission: "sales:read" },
       { href: "/ventas/estado-de-cuenta/", label: "Estado de cuenta", permission: "sales:read" },
     ],
   },
@@ -126,8 +127,8 @@ export const NAV: readonly NavGroup[] = [
   {
     title: "Auditoría",
     items: [
-      { href: "/auditoria/verificar/", label: "Verificar cadena", permission: "hash:verify" },
-      { href: "/auditoria/digests/", label: "Resúmenes en WORM", permission: "audit:read" },
+      { href: "/auditoria/verificar/", label: "Verificar integridad", permission: "hash:verify" },
+      { href: "/auditoria/digests/", label: "Respaldos diarios inalterables", permission: "audit:read" },
     ],
   },
   {
@@ -146,8 +147,8 @@ export const NAV: readonly NavGroup[] = [
       { href: "/maestros/plantas/", label: "Plantas y ubicaciones", permission: "master_data:read" },
       { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
       { href: "/contabilidad/estructuras/", label: "Estructuras de reporte", permission: "configuration:read" },
-      { href: "/contabilidad/mapas/", label: "Mapas de cuentas", permission: "configuration:read" },
-      { href: "/contabilidad/reglas/", label: "Reglas contables", permission: "configuration:read" },
+      { href: "/contabilidad/mapas/", label: "Cuentas por rol", permission: "configuration:read" }, // UX4-03 (G-13)
+      { href: "/contabilidad/reglas/", label: "Reglas de contabilización", permission: "configuration:read" },
       { href: "/contabilidad/politicas/", label: "Políticas", permission: "configuration:read" },
       { href: "/fiscal/fuentes/", label: "Fuentes fiscales", permission: "configuration:read" },
       { href: "/fiscal/reglas/", label: "Reglas fiscales", permission: "configuration:read" },
@@ -515,6 +516,44 @@ function EnvironmentTag() {
   ) : null;
 }
 
+/** UX4-03 (G-18): a signed-in person without roles learns what to do next and can copy the e-mail to send. */
+function NoRoles() {
+  const { state } = useSession();
+  const [copied, setCopied] = useState(false);
+  const email = state.status === "ready" ? state.session.email : null;
+  return (
+    <section className="card" data-testid="no-roles">
+      <h1 style={{ marginTop: 0 }}>Aún no tiene acceso</h1>
+      <p>Su cuenta entró bien, pero todavía no tiene roles en ninguna empresa.</p>
+      <p>
+        Pida al responsable de seguridad de la empresa que le asigne un rol en <strong>Seguridad › Usuarios y roles</strong>, y envíele el correo con el que
+        entró:
+      </p>
+      {email ? (
+        <p className="ux4-copy">
+          <strong className="mono" data-testid="no-roles-email">
+            {email}
+          </strong>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(email);
+                setCopied(true);
+              } catch {
+                setCopied(false);
+              }
+            }}
+          >
+            {copied ? "Copiado" : "Copiar correo"}
+          </button>
+        </p>
+      ) : null}
+      <p className="muted">Cuando se lo asignen, vuelva a cargar esta página.</p>
+    </section>
+  );
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const { state, company, can } = useSession();
   const pathname = usePathname();
@@ -528,7 +567,11 @@ export function Shell({ children }: { children: ReactNode }) {
   const menuVisible = mobile && menuOpen;
 
   if (state.status === "loading") {
-    return <main className="page">Cargando…</main>;
+    return (
+      <main className="page">
+        <LoadingIndicator />
+      </main>
+    );
   }
   if (state.status === "error") {
     return (
@@ -538,13 +581,21 @@ export function Shell({ children }: { children: ReactNode }) {
     );
   }
   if (state.status === "anonymous") {
+    // UX4-03 (G-19): the sign-in screen carries the brand and one primary button that says where it goes.
     return (
-      <main className="page">
-        <h1>Rochell Core</h1>
-        <p>Inicie sesión con su cuenta de la organización.</p>
-        <a className="button primary" href={loginUrl(pathname)}>
-          Iniciar sesión
-        </a>
+      <main className="login-screen">
+        <section className="login-card" aria-labelledby="login-title">
+          <span className="brand-mark login-mark" aria-hidden="true">
+            R
+          </span>
+          <h1 id="login-title">Rochell Core</h1>
+          <p className="muted">Industrias Rochell · Sistema de gestión</p>
+          <p>Entre con la cuenta de Google que la empresa le asignó.</p>
+          <a className="button primary login-button" href={loginUrl(pathname)}>
+            Entrar con Google
+          </a>
+          <EnvironmentTag />
+        </section>
       </main>
     );
   }
@@ -587,7 +638,7 @@ export function Shell({ children }: { children: ReactNode }) {
             {account}
           </header>
         )}
-        <main className="page">{company ? children : <p>No tiene roles asignados en ninguna empresa.</p>}</main>
+        <main className="page">{company ? children : <NoRoles />}</main>
       </div>
     </div>
   );

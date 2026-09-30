@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { query } from "@/api/client";
+import { EmptyState } from "@/components/StateNotices";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { isReadyToRelease } from "@/lib/production";
 import { nextSteps, setupProgress, stepInfo } from "@/lib/setup";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { authorizationAlertDays, countDraftsToApprove, countExpiringAuthorizations, countFiscalRulesToActivate, countPolicyDraftsToApprove } from "@/lib/ux4b";
 
 /** Lists are read with this limit; a full page shows as "200+" (E-UI01-7). */
 const COUNT_LIMIT = 200;
 
-type Counter = (companyId: string, plantId: string | null | undefined) => Promise<number>;
+/** `isMine` leaves out the drafts the reader prepared: four eyes, another person approves them. */
+type Counter = (companyId: string, plantId: string | null | undefined, isMine: (actor: string | null | undefined) => boolean) => Promise<number>;
 
 interface Task {
   href: string;
@@ -149,7 +152,7 @@ const TASKS: readonly Task[] = [
   },
   {
     href: "/produccion/dia/#resumenes-borrador",
-    label: "Resúmenes de turno por contabilizar",
+    label: "Resúmenes de turno por cerrar",
     permission: "shift_summary:post",
     countPermission: "production:read",
     count: draftSummaries,
@@ -170,8 +173,63 @@ const TASKS: readonly Task[] = [
       (await query("/api/v1/companies/{companyId}/manufacturing/lots", { path: { companyId }, query: { plantId, status: "CURING", limit: COUNT_LIMIT } })).items.filter(isReadyToRelease)
         .length,
   },
+  // UX4-03 (G-15): configuration waiting for its approver, counted from the configuration screens' own lists (configuration:read).
+  {
+    href: "/contabilidad/politicas/",
+    label: "Políticas contables por aprobar",
+    permission: "accounting_policy:approve",
+    countPermission: "configuration:read",
+    count: async (companyId, _plantId, isMine) =>
+      countPolicyDraftsToApprove((await query("/api/v1/companies/{companyId}/finance/accounting-policies", { path: { companyId } })).items, isMine),
+  },
+  {
+    href: "/contabilidad/mapas/",
+    label: "Cuentas por rol por aprobar",
+    permission: "account_role_map:approve",
+    countPermission: "configuration:read",
+    count: async (companyId, _plantId, isMine) =>
+      countDraftsToApprove((await query("/api/v1/companies/{companyId}/finance/account-role-maps", { path: { companyId }, query: { status: "DRAFT" } })).items, isMine),
+  },
+  {
+    href: "/contabilidad/estructuras/",
+    label: "Estructuras de reporte por aprobar",
+    permission: "report_structure:approve",
+    countPermission: "configuration:read",
+    count: async (companyId, _plantId, isMine) =>
+      countDraftsToApprove((await query("/api/v1/companies/{companyId}/finance/report-structures", { path: { companyId } })).items, isMine),
+  },
+  {
+    href: "/contabilidad/reglas/",
+    label: "Reglas de contabilización por aprobar",
+    permission: "posting_rule:approve",
+    countPermission: "configuration:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/finance/posting-rules", { path: { companyId } })).items.filter((r) => r.status === "DRAFT").length,
+  },
+  {
+    href: "/fiscal/reglas/",
+    label: "Reglas fiscales por activar",
+    permission: "fiscal_rule:activate",
+    countPermission: "configuration:read",
+    count: async (companyId, _plantId, isMine) =>
+      countFiscalRulesToActivate((await query("/api/v1/companies/{companyId}/tax/fiscal-rules", { path: { companyId } })).items, isMine),
+  },
+  {
+    // The alert window is the REVENUE_ACCOUNTING policy's authorization_expiry_alert_days, the AUTH-EXPIRY reconciliation's.
+    href: "/fiscal/autorizaciones/?estado=ACTIVE",
+    label: "Autorizaciones fiscales por vencer",
+    permission: "fiscal_authorization:suspend",
+    countPermission: "configuration:read",
+    count: async (companyId) => {
+      const [policies, authorizations] = await Promise.all([
+        query("/api/v1/companies/{companyId}/finance/accounting-policies", { path: { companyId } }),
+        query("/api/v1/companies/{companyId}/tax/fiscal-authorizations", { path: { companyId }, query: { status: "ACTIVE" } }),
+      ]);
+      return countExpiringAuthorizations(authorizations.items, authorizationAlertDays(policies.items, todayInDominicanRepublic()));
+    },
+  },
   { href: "/cierre/conciliaciones/", label: "Ejecutar conciliaciones", permission: "reconciliation:run" },
-  { href: "/cierre/periodos/", label: "Cerrar o reabrir períodos", permission: "period:read" },
+  // UX4-03 (G-16): closing is for whoever may close a component, not for every reader of the periods (the Auditor).
+  { href: "/cierre/periodos/", label: "Cerrar o reabrir períodos", permission: "period_component:close" },
   { href: "/seguridad/usuarios/", label: "Solicitar cambios de rol", permission: "role:assign" },
   {
     href: "/seguridad/solicitudes/",
@@ -184,10 +242,10 @@ const TASKS: readonly Task[] = [
 ];
 
 function TaskItem({ task }: { task: Task }) {
-  const { companyId, can, plantFor } = useSession();
+  const { companyId, can, plantFor, isMine } = useSession();
   const counted = task.count !== undefined && task.countPermission !== undefined && can(task.countPermission);
   const plantId = task.countPermission ? plantFor(task.countPermission) : undefined;
-  const { data } = useLoad(counted && task.count ? () => task.count!(companyId, plantId) : null, [companyId, plantId, counted]);
+  const { data } = useLoad(counted && task.count ? () => task.count!(companyId, plantId, isMine) : null, [companyId, plantId, counted]);
   return (
     <li>
       <Link href={task.href}>{task.label}</Link>
@@ -247,17 +305,16 @@ export default function Home() {
       <SetupCard />
       <h2>Tareas</h2>
       {tasks.length === 0 ? (
-        <p className="muted">Sus roles no tienen tareas en esta versión de la interfaz.</p>
+        <EmptyState title="No hay tareas para sus roles en Inicio." testId="no-tasks">
+          <p>Lo que puede consultar está en el menú. Si necesita otra pantalla, pida el rol en Seguridad › Solicitudes de rol.</p>
+        </EmptyState>
       ) : (
-        <ul>
+        <ul data-testid="tasks">
           {tasks.map((t) => (
             <TaskItem key={`${t.href}|${t.label}`} task={t} />
           ))}
         </ul>
       )}
-      <p className="muted">
-        Ningún estado mostrado en pantalla es evidencia contable: lo contabilizado es lo que está en los asientos (E-11).
-      </p>
     </>
   );
 }

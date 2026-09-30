@@ -3,7 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, useFieldErrors } from "@/components/ui";
+import { CreditPreviewCard, PreviewTotals, useSalesPreview } from "@/components/SalesUx4";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { DELIVERY_TERMS } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -11,7 +13,9 @@ import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 
 // VS3-10a (E-VS3-10-4): a DRAFT order — customer, plant, delivery term, site, lines of products of the price list in force. Prices
-// and totals are the server's (shown on the order after saving); the screen never multiplies.
+// and totals are the server's; the screen never multiplies.
+// UX4-03 (V-11, E-UX4-3/4): while typing, the server prices the draft (POST preview): net per line, net total, estimated ITBIS and
+// total, and the customer's credit with that net.
 
 interface Line {
   itemId: string;
@@ -66,12 +70,14 @@ function OrderForm() {
       : null,
     [companyId, allowed, editId],
   );
+  const previewSource = values ?? (data?.order ? { plantId: data.order.plantId, lines: data.order.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.qtyOrdered })) } : null);
+  const preview = useSalesPreview("order", previewSource?.plantId ?? "", previewSource?.lines ?? []);
 
   if (!allowed) {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const order = data.order;
   const current: Values =
@@ -94,7 +100,12 @@ function OrderForm() {
     return <p className="muted">Solo se edita un pedido en borrador.</p>;
   }
   if (data.prices.length === 0) {
-    return <p className="muted">No hay lista de precios vigente: el Controller la prepara y el Aprobador de políticas la aprueba (Maestros › Lista de precios).</p>;
+    return (
+      <p className="muted">
+        Todavía no hay una lista de precios aprobada, así que no se pueden tomar pedidos. El Controller la prepara en Maestros › Lista de precios y
+        otra persona autorizada la aprueba.
+      </p>
+    );
   }
 
   const submit = async () => {
@@ -133,7 +144,7 @@ function OrderForm() {
       <div>
         <Field label="Cliente" required error={fe.errors.partyId}>
           <select aria-label="Cliente" value={current.partyId} disabled={order !== null} onChange={(e) => set({ partyId: e.target.value })}>
-            <option value="">—</option>
+            <option value="">Seleccione…</option>
             {data.customers.map((c) => (
               <option key={c.partyId} value={c.partyId}>
                 {c.legalName} ({c.rnc})
@@ -178,12 +189,14 @@ function OrderForm() {
             <th>Unidad</th>
             <th className="num">Precio de lista (RD$)</th>
             <th className="num">Cantidad</th>
+            <th className="num">Neto (RD$)</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {current.lines.map((line, index) => {
             const price = data.prices.find((p) => p.itemId === line.itemId && p.uom === line.uom);
+            const priced = preview.preview?.lines[index];
             return (
               <tr key={index}>
                 <td>
@@ -196,7 +209,7 @@ function OrderForm() {
                       setLine(index, { itemId, uom });
                     }}
                   >
-                    <option value="">—</option>
+                    <option value="">Seleccione…</option>
                     {data.prices.map((p) => (
                       <option key={`${p.itemId}|${p.uom}`} value={`${p.itemId}|${p.uom}`}>
                         {p.itemCode} — {p.itemDescription} ({p.uom})
@@ -219,6 +232,9 @@ function OrderForm() {
                   />
                   <FieldMessage id={`order-line-${index}-quantity`} error={fe.errors[`line-${index}-quantity`]} />
                 </td>
+                <td className="num">
+                  {priced && priced.itemId === line.itemId ? <Money value={priced.netAmount} testId={`preview-line-net:${index + 1}`} /> : <span className="muted">—</span>}
+                </td>
                 <td>
                   {current.lines.length > 1 ? (
                     <button type="button" onClick={() => set({ lines: current.lines.filter((_, i) => i !== index) })}>
@@ -231,7 +247,10 @@ function OrderForm() {
           })}
         </tbody>
       </LineTable>
-      <p className="muted">El total del pedido lo calcula el sistema al guardar, con los precios de la lista vigente.</p>
+      <PreviewTotals {...preview} />
+      {preview.preview && current.partyId ? (
+        <CreditPreviewCard partyId={current.partyId} amount={preview.preview.netTotal} intro="Crédito del cliente con este pedido (se evalúa de nuevo al enviarlo a crédito):" />
+      ) : null}
       <div className="actions form-actions">
         <button type="button" onClick={() => set({ lines: [...current.lines, { ...EMPTY_LINE }] })}>
           Agregar línea

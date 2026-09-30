@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { Loading, Money, NoPermission, StatusBadge } from "@/components/ui";
+import { MoneyText } from "@/components/SalesUx4";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { Money, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDate } from "@/lib/labels";
 import { METHODS } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { bankAccountLabel } from "@/lib/ux4bSales";
 
 // VS3-10b: a deposit slip DEP-… — its receipts and the statement line it was matched to (E-VS3-07-3, E-VS3-07-10).
 
@@ -23,7 +26,7 @@ function DepositDetail() {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   const h = data.header;
   return (
@@ -34,8 +37,9 @@ function DepositDetail() {
       <h1>
         Depósito {h.depositNo} <StatusBadge status={h.status} />
       </h1>
+      <p className="muted">Volante de depósito con los cheques y el efectivo llevados juntos al banco.</p>
       <p>
-        {h.bankCode} {h.accountNumber} · {formatDate(h.depositDate)} · total <Money value={h.total} currency />
+        Cuenta {bankAccountLabel({ alias: h.bankAccountAlias, bankCode: h.bankCode, accountNumber: h.accountNumber })} · {formatDate(h.depositDate)} · total <MoneyText value={h.total} />
       </p>
       <div className="table-wrap"><table>
         <thead>

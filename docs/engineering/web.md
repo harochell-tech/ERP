@@ -437,3 +437,92 @@ Wave 3 of the UI audit, on top of UX3-01 (`docs/engineering/flows.md`). No API c
   field, and drafts a credit note the invoice's issuer is not offered to issue; the quote journey prints the draft with "BORRADOR"
   and the sent quote without watermark or X-Q1; the production journey has Calidad see the Inicio counter, open "Listos para
   liberar" and release the lot through its "Acciones" dialog. All but the ledger journey run on desktop and on the phone.
+
+## UX4-03 — remaining findings, screens part 2 (E-UX4-1…17)
+
+Wave 4 of the UI audit, on top of UX4-01 (`docs/engineering/ux4.md`): Ventas / Cotizaciones, Despacho, Facturación, Cobros,
+Producción, Maestros (but the company bank accounts), Seguridad, Inicio and the shell. UX4-02 does the other areas. No API change;
+every figure shown is the server's string (the previews and suggestions are queries), comparisons are on text only.
+
+- **Shared (G-31).** `components/StateNotices.tsx`: `LoadingIndicator` (spinner + "Cargando…", `role="status"`), `EmptyState` (what
+  the screen is for and next-step links, filtered by permission) and `StepsHelp`; styles in `components/states.css`. `lib/ux4b.ts`:
+  `previewQuery` (POST query: the anti-CSRF header, no Idempotency-Key, E-UX4-3), `matchesSearch` (case- and accent-insensitive,
+  every word in some field), `codeAndName` ("ADITIVO-P", not "ADITIVO-P — ADITIVO-P"), Inicio's configuration counters and the
+  policy themes. Empty select options read "Seleccione…".
+- **Shell (G-13, G-18, G-19).** The sign-in screen carries the brand and one primary button "Entrar con Google"; a signed-in person
+  without roles reads "Aún no tiene acceso", what to ask and to whom, with the e-mail and "Copiar correo". Menu: "Cuentas por rol"
+  (was "Mapas de cuentas", also the page heading and the setup steps), "Reglas de contabilización" (as the page heading), "Cuentas
+  por cobrar por antigüedad", "Verificar integridad" and "Respaldos diarios inalterables" (A-09, the pages renamed by UX4-02).
+  The invoice reads its e-CF type with its name ("31 — Crédito fiscal", `ecfTypeLabel` in `lib/ux4b.ts`, G-25; the portal package
+  keeps the bare code to copy).
+- **Inicio (G-15, G-16, G-17).** Configuration waiting for its approver, counted from the configuration lists (`configuration:read`)
+  and leaving out what the reader prepared: policy versions (`accounting_policy:approve`), account role maps
+  (`account_role_map:approve`), report structures (`report_structure:approve`), posting rules (`posting_rule:approve`), fiscal rule
+  versions READY to activate (`fiscal_rule:activate`), and ACTIVE authorizations whose `daysToExpiry` is within the REVENUE_ACCOUNTING
+  `authorization_expiry_alert_days` in force (`fiscal_authorization:suspend`; none without that policy value). "Cerrar o reabrir
+  períodos" needs `period_component:close` (the Auditor no longer sees it). The "(E-11)" note is gone; no task reads as an empty
+  state. The production counter reads "Resúmenes de turno por cerrar".
+- **Políticas (G-22).** Policies by theme (Compras e inventario, Ventas y crédito, Producción, Contabilización y tesorería, Otras),
+  and inside a policy its parameters by theme when some have one (`authorization_expiry_alert_days` under "Fiscal").
+- **Maestros (C-32…35, V-38, V-40).** Materias primas lists raw materials only, with search, category filter, "Nueva materia prima"
+  folded and the conversion as "1 saco equivale a 42.5 kg". Proveedores: "Nuevo proveedor" folded, search, "Saldo por pagar", the
+  row buttons aligned; the supplier shows the payment term and links to its orders, invoices and AP aging, and says who may see bank
+  accounts. Plantas / Empresa no longer mention "la herramienta de despliegue". Costos estándar explains the two ways to prepare
+  a cost ("Opción 1 · Escribir el costo unitario", "Opción 2 · Calcular desde la receta") and says "Planta" / "Área de valuación".
+  Productos terminados: search and category filter.
+- **Seguridad (A-19, A-20).** Usuarios y roles: search by name or e-mail, filter by role ("Sin roles" too); "Solicitar revocación" is a
+  quiet link beside each role, confirmed in a dialog that says the second approver decides it. Solicitudes de rol: the empty list
+  explains the four-eyes flow and links to Usuarios y roles.
+- **Previews (V-11, V-14, E-UX4-3/4).** The order and quote forms ask the server to price the draft 400 ms after the last change,
+  once every line has a product and a quantity (`useSalesPreview`, `components/SalesUx4.tsx`): net per line, net total, estimated
+  ITBIS (or `itbisUnavailableReason`) and total; a failure is a quiet note. The order form and a DRAFT order show
+  `CreditPreviewCard` (GET `credit-preview?amount=` with the net): "Cabe en el crédito disponible…" or "Excede el crédito disponible
+  por RD$ X…" (X the server's `availableAfter` without its sign) and the reasons in words; the order explains "Enviar a crédito".
+- **Accounting visibility (E-UX4-11, V-05, V-23).** `canSeeAccounting` (`configuration:read` or `ledger:read`: Controller, Contador,
+  Auditor) gates the invoice and credit-note accounting status and the delivery's control transfer ("Cuándo la mercancía pasó a
+  ser del cliente (contabilidad)"). `SalesHistory` splits the commercial "Historial" from "Historial contable" (accounting readers).
+- **Sales words (V-06, V-07, V-10, V-17, V-23, V-27, V-37).** Invoices read Emitida / Cobrada en parte / Cobrada / Acreditada /
+  Anulada, credit notes Emitida / Anulada; "Facturas pendientes de cobro", "Crédito usado"; "Registrar entrega al cliente" and
+  "Constancia de entrega firmada"; lots "Lote X: 100 (sale de LOC)" under "Ubicación de salida"; "Depósitos registrados"; "otra
+  persona autorizada"; amounts inside sentences use `MoneyText` (RD$, not monospace).
+- **Customers, prices, aging, statement, proforma (V-15…V-21).** "Nuevo cliente" is its own button, the search apart; the terms form
+  starts from the ACTIVE terms and explains "Retener crédito" and "Preparar términos"; Lista de precios shows "Precios vigentes"
+  (the ACTIVE version) first. AR aging: the server's `bucketTotals` in the footer ("(sin filtro)" while a filter hides rows),
+  invoice and statement links, name and "Solo con saldo vencido" filters. The statement has "Vista para imprimir"
+  (`/ventas/estado-de-cuenta/imprimir/`, the proforma's print CSS). The proforma carries BORRADOR (DRAFT / PENDING_CREDIT) or
+  CANCELADO and "Válida al <fecha>".
+- **Dispatch (V-25, V-26).** Planning shows "Pendiente", prefills "A despachar" and offers "Despachar todo" only when the pending
+  quantity needs no arithmetic (nothing delivered and no open delivery, so pending = ordered, `pendingWithoutArithmetic`);
+  otherwise "Lo verifica el sistema" and the open deliveries are named. The board shows the requested date and ordered / delivered
+  per line (from the order details) and names empty statuses once.
+- **Invoice and collections (V-30…V-36).** The invoice header is labelled facts with "Total con ITBIS" and "Pendiente de cobro";
+  "Nueva nota de crédito" is a button offered with the e-CF accepted and the invoice Emitida or Cobrada en parte. A new receipt shows
+  `SuggestReceiptApplication` (oldest first, editable, "Volver a la sugerencia"); "Registrar cobro" records it and then applies the
+  amounts with the receipt's version (if applying fails the receipt opens with the suggestion prefilled). Bank accounts read
+  "alias · banco ••••6789"; "Fecha valor" is explained; the receipts list has one status column ("Aplicado en parte · sin
+  depositar") and the deposit account. Empty states with next steps on invoices, credit notes, Por facturar, orders, quotes,
+  customers, receipts, deposits and the statement.
+- **Production vocabulary and units (P-03, P-05, P-06, P-10, P-12, P-24, P-37, E-UX4-14)** (`lib/ux4bProduction.ts`): "Merma de
+  mezcla" / "Merma en fresco", "Cerrar resumen del turno" (a POSTED summary reads "Cerrado"), "Costo acumulado en proceso", no
+  "colector", no "Registrado" / "Real (unidad base)"; quantities carry their unit, the litre reads "L" (display only);
+  `ProductionBadge` gives a released lot the done tone and a recipe "Activa".
+- **Producción del día (P-13…P-18).** A 3-step help; the form's date is the page's day (`?dia=`); "Iniciar una corrida" folded and full
+  width; "Totales del día" from `GetProductionDay` (runs, good units, `mixScrapUnits`, `freshScrapUnits`, `scrapUnits`); per run a
+  "Siguiente paso" button (`runNextStep`); lot codes linked to `/produccion/lotes/?lote=`; materials with the server's signed
+  difference, `differencePct`, the `outOfTolerance` mark and the tolerance ("±5 %").
+- **Corrida (P-22…P-26).** A header card and the run's own recipe version (`recipeVersionId`, E-UX4-9); consumption shows
+  `qtyPerBatch`, the recorded theoretical for the run's batches, real, signed difference, % and tolerance mark; the consumption
+  location is chosen explicitly; the lot shows `curingHoursRemaining`. While the form is being filled only the per-batch figure
+  shows (no server field gives the theoretical for the batches being typed).
+- **Lots, recipes, machines, costs (P-29…P-41).** "Liberar" only once `curingDone` (else the remaining hours); no preselected release
+  location; the run number links to its day. Recipe form folded, with the notice that it stays in draft for the Gerente de planta,
+  hints for batch, cycle, rack and curing, minimum curing ≥ 1 h checked on the client, the unit beside the quantity per batch; the
+  detail shows "Preparada por / Aprobada por" and a text-only comparison with the previous version. Machines and shifts: explicit
+  headers. Costs: the month opens on the previous one; "Liquidar" only for ended months; RD$ and "—" explained.
+- **Tests.** Vitest `tests/unit/ux4b.test.ts` (search, code and name, Inicio counters, alert window, policy themes, menu titles,
+  `previewQuery`), `ux4b-sales.test.ts`, `ux4b-production.test.ts`. Playwright (desktop and mobile): `home-journey.spec.ts` (sign-in
+  screen, no-roles page, Inicio configuration tasks and the Auditor without "Cerrar o reabrir períodos", policies by theme, menu
+  names, master-data and user search); the sales journey (order and credit previews, planning prefilled, no control transfer for
+  Despacho, "Emitida" without accounting status, the folded credit note, AR aging totals, a receipt recorded and applied from the
+  suggestion); the quote journey (quote preview, credit preview); the production journey (minimum curing, day totals and
+  variances with tolerance, a still-curing lot with remaining hours and no "Liberar").

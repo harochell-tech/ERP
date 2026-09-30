@@ -185,7 +185,7 @@ export default function Page() {
         </section>
       ) : null}
       <h2>Plantas</h2>
-      <p className="muted">Cada planta se muestra en las pantallas como «Nombre (CÓDIGO)». Las plantas y sus ubicaciones se crean con la herramienta de despliegue.</p>
+      <p className="muted">Cada planta se muestra en las pantallas como «Nombre (CÓDIGO)». Para abrir una planta nueva o una ubicación, pídalo al equipo de sistemas.</p>
       <div className="table-wrap">
         <table>
           <thead>

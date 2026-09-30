@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
-import { Loading, Money, NoPermission } from "@/components/ui";
+import { LoadingIndicator } from "@/components/StateNotices";
+import { Money, NoPermission } from "@/components/ui";
+import { Watermark } from "@/components/Watermark";
+import { proformaWatermark } from "@/lib/ux4bSales";
 import { formatQuantity } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -18,17 +21,27 @@ function Proforma() {
   const { companyId, can } = useSession();
   const id = useSearchParams().get("id") ?? "";
   const { data, error } = useLoad(
-    can("sales:read") && id ? () => query("/api/v1/companies/{companyId}/tax/proformas/{salesOrderId}", { path: { companyId, salesOrderId: id } }) : null,
+    can("sales:read") && id
+      ? async () => {
+          const [proforma, order] = await Promise.all([
+            query("/api/v1/companies/{companyId}/tax/proformas/{salesOrderId}", { path: { companyId, salesOrderId: id } }),
+            query("/api/v1/companies/{companyId}/sales/orders/{salesOrderId}", { path: { companyId, salesOrderId: id } }),
+          ]);
+          return { ...proforma, orderStatus: order.header.status };
+        }
+      : null,
     [companyId, id],
   );
   if (!can("sales:read")) {
     return <NoPermission />;
   }
   if (data === null) {
-    return <Loading error={error} />;
+    return <LoadingIndicator error={error} />;
   }
   return (
     <div className="proforma">
+      {/* UX4-03 (V-20): an order not yet confirmed prints "BORRADOR", a cancelled one "CANCELADO". */}
+      <Watermark text={proformaWatermark(data.orderStatus)} />
       <div className="actions no-print">
         <Link href={`/ventas/pedido/?id=${id}`}>← Pedido {data.orderNo}</Link>
         <button type="button" className="primary" onClick={() => window.print()}>
@@ -38,6 +51,9 @@ function Proforma() {
       <h1>Proforma</h1>
       <p>
         Pedido <span className="mono">{data.orderNo}</span> del {formatDate(data.orderDate)} · proforma emitida el {formatDate(data.proformaDate)}
+      </p>
+      <p data-testid="proforma-validity">
+        <strong>Válida al {formatDate(data.proformaDate)}:</strong> precios de la lista vigente e ITBIS según las reglas vigentes ese día.
       </p>
       <dl className="facts">
         <dt>Suplidor</dt>
