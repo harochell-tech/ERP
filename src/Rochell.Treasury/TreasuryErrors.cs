@@ -10,4 +10,5 @@ public static class TreasuryErrors
     public const string BankAccountHasOpenItems = "BANK_ACCOUNT_HAS_OPEN_ITEMS";
     public const string VersionConflict = "VERSION_CONFLICT";
     public const string ReasonRequired = "REASON_REQUIRED";
+    public const string BankAccountAliasInvalid = "BANK_ACCOUNT_ALIAS_INVALID";
 }

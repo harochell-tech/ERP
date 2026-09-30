@@ -78,6 +78,7 @@ public static class CommandEndpoints
         var treasury = company.MapGroup("/treasury").WithTags("Treasury");
         treasury.MapCommand<RegisterBankAccount, RegisterBankAccountHandler>();
         treasury.MapCommand<CloseBankAccount, CloseBankAccountHandler>();
+        treasury.MapCommand<SetBankAccountAlias, SetBankAccountAliasHandler>(); // E-UX4-6
         treasury.MapCommand<PrepareSupplierPayment, PrepareSupplierPaymentHandler>();
         treasury.MapCommand<UpdatePreparedPayment, UpdatePreparedPaymentHandler>();
         treasury.MapCommand<VoidPayment, VoidPaymentHandler>();
@@ -260,7 +261,7 @@ public static class CommandEndpoints
         typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
-        typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler),
+        typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
         typeof(ReversePaymentHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(MatchBankLineToReceiptHandler), typeof(UnmatchBankLineHandler),
         typeof(RecognizeBankChargeHandler),

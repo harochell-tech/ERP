@@ -8,7 +8,11 @@ namespace Rochell.Procurement.SupplierInvoices;
 /// </summary>
 public sealed record SupplierInvoiceLineInput(Guid PurchaseOrderLineId, decimal Quantity, decimal UnitPrice, string LineKind = SupplierInvoiceLineKinds.InventoryPo);
 
-/// <summary>T-06 (§11.4): registers a DRAFT invoice of an ACTIVE supplier with its fiscal number (E-PR13-4) and dates (E-PR13-5).</summary>
+/// <summary>
+/// T-06 (§11.4): registers a DRAFT invoice of an ACTIVE supplier with its fiscal number (E-PR13-4) and dates (E-PR13-5).
+/// E-UX4-7: <paramref name="PrintedTotal"/> is the total printed on the supplier's document (ITBIS included), kept to compare with
+/// the determined gross once the invoice is posted.
+/// </summary>
 public sealed record RegisterSupplierInvoice(
     Guid CompanyId,
     Guid SessionId,
@@ -17,7 +21,8 @@ public sealed record RegisterSupplierInvoice(
     string SupplierFiscalNumber,
     DateOnly DocDate,
     DateOnly DueDate,
-    IReadOnlyList<SupplierInvoiceLineInput> Lines) : ICommand;
+    IReadOnlyList<SupplierInvoiceLineInput> Lines,
+    decimal? PrintedTotal = null) : ICommand;
 
 /// <summary>T-07: three-way match of every line against received-not-invoiced quantity and PO price (E-PR13-1/2). Also re-match.</summary>
 public sealed record MatchSupplierInvoice(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SupplierInvoiceId, long ExpectedVersion) : ICommand;

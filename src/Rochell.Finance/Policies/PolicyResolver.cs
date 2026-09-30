@@ -36,6 +36,8 @@ public sealed record ResolvedPolicy(Guid PolicyVersionId, string PolicyCode, int
 
     public string Text(string param) => Value(param);
 
+    public bool Has(string param) => Values.ContainsKey(param);
+
     private string Value(string param)
         => Values.TryGetValue(param, out var value)
             ? value
@@ -52,12 +54,20 @@ public static class PolicyResolver
     public static async Task<ResolvedPolicy> ResolveAsync(CommandContext context, string policyCode, DateOnly date, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
+        return await TryResolveAsync(context.Connection, context.Transaction, context.CompanyId, policyCode, date, cancellationToken).ConfigureAwait(false)
+            ?? throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"No ACTIVE {policyCode} accounting policy for {date:yyyy-MM-dd}.");
+    }
+
+    /// <summary>E-UX4-2/4: the same resolution on any connection (read-only queries); null when no ACTIVE version covers the date.</summary>
+    public static async Task<ResolvedPolicy?> TryResolveAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid companyId, string policyCode, DateOnly date, CancellationToken cancellationToken)
+    {
         Guid? versionId = null;
         var version = 0;
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         await using var command = Sql.Command(
-            context.Connection,
-            context.Transaction,
+            connection,
+            transaction,
             """
             SELECT v.policy_version_id, v.version, p.param_code, p.value #>> '{}'
             FROM acc.accounting_policy_version v
@@ -65,7 +75,7 @@ public static class PolicyResolver
             WHERE v.company_id = @company AND v.policy_code = @policy AND v.status = 'ACTIVE'
               AND v.effective_from <= @date AND (v.effective_to IS NULL OR v.effective_to > @date)
             """,
-            ("company", context.CompanyId),
+            ("company", companyId),
             ("policy", policyCode),
             ("date", date));
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
@@ -78,8 +88,6 @@ public static class PolicyResolver
             }
         }
 
-        return versionId is null
-            ? throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"No ACTIVE {policyCode} accounting policy for {date:yyyy-MM-dd}.")
-            : new ResolvedPolicy(versionId.Value, policyCode, version, values);
+        return versionId is null ? null : new ResolvedPolicy(versionId.Value, policyCode, version, values);
     }
 }

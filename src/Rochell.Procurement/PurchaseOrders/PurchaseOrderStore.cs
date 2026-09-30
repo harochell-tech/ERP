@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Text.Json;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
@@ -64,13 +65,18 @@ internal static class PurchaseOrderStore
         => string.IsNullOrWhiteSpace(reason) ? throw new DomainException(ProcurementErrors.ReasonRequired, "A reason is required.") : reason.Trim();
 
     /// <summary>Validates supplier and lines for create/update (Patch 1.1 P-1: price &gt; 0; E-PR08-4: UOM convertible to base).</summary>
-    public static async Task ValidateAsync(CommandContext context, Guid partyId, DateOnly orderDate, IReadOnlyList<PurchaseOrderLineInput> lines, CancellationToken cancellationToken)
+    public static Task ValidateAsync(CommandContext context, Guid partyId, DateOnly orderDate, IReadOnlyList<PurchaseOrderLineInput> lines, CancellationToken cancellationToken)
+        => ValidateAsync(context.Connection, context.Transaction, context.CompanyId, partyId, orderDate, lines, cancellationToken);
+
+    /// <summary>The same validation on any connection (E-UX4-3: the read-only preview of an order runs it too).</summary>
+    public static async Task ValidateAsync(
+        DbConnection connection, DbTransaction transaction, Guid companyId, Guid partyId, DateOnly orderDate, IReadOnlyList<PurchaseOrderLineInput> lines, CancellationToken cancellationToken)
     {
         await using (var supplier = Sql.Command(
-            context.Connection,
-            context.Transaction,
+            connection,
+            transaction,
             "SELECT EXISTS (SELECT 1 FROM md.party WHERE company_id = @c AND party_id = @p AND status = 'ACTIVE' AND is_supplier)",
-            ("c", context.CompanyId),
+            ("c", companyId),
             ("p", partyId)))
         {
             if (await supplier.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
@@ -97,8 +103,8 @@ internal static class PurchaseOrderStore
             }
 
             await using var item = Sql.Command(
-                context.Connection,
-                context.Transaction,
+                connection,
+                transaction,
                 """
                 SELECT i.status::text = 'ACTIVE',
                        i.base_uom = @uom OR EXISTS (
@@ -109,7 +115,7 @@ internal static class PurchaseOrderStore
                 """,
                 ("uom", line.Uom),
                 ("date", orderDate),
-                ("c", context.CompanyId),
+                ("c", companyId),
                 ("i", line.ItemId));
             await using var reader = await item.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || !reader.GetBoolean(0))

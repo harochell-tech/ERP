@@ -13,7 +13,11 @@ public sealed record GetBankReconciliation(Guid CompanyId, Guid SessionId, Guid 
 
 public sealed record BankReconciliationFinding(string Classification, string Severity, string MatchKey, decimal? ValueA, decimal? ValueB);
 
-/// <summary><see cref="Skipped"/>: no movement and a zero balance up to the date (E-VS2-06-8).</summary>
+/// <summary>
+/// <see cref="Skipped"/>: no movement and a zero balance up to the date (E-VS2-06-8). E-UX4-2: <see cref="GlItemsTotal"/> and
+/// <see cref="LineItemsTotal"/> are the sums of the in-transit items' amounts (each with its effect on the equation), so
+/// GL = statement + GL items total − line items total + difference.
+/// </summary>
 public sealed record BankReconciliationView(
     Guid BankAccountId,
     DateOnly AsOf,
@@ -23,7 +27,9 @@ public sealed record BankReconciliationView(
     decimal? Difference,
     IReadOnlyList<BankItem> GlItems,
     IReadOnlyList<BankItem> LineItems,
-    IReadOnlyList<BankReconciliationFinding> Findings);
+    IReadOnlyList<BankReconciliationFinding> Findings,
+    decimal GlItemsTotal,
+    decimal LineItemsTotal);
 
 [RequiresPermission("bank:read")]
 public sealed class GetBankReconciliationHandler : IQueryHandler<GetBankReconciliation>
@@ -46,9 +52,12 @@ public sealed class GetBankReconciliationHandler : IQueryHandler<GetBankReconcil
         var asOf = query.AsOf ?? BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow);
         var (findings, accounts) = await BankGl.ReadAsync(context.Connection, context.Transaction, context.CompanyId, asOf, query.BankAccountId, cancellationToken).ConfigureAwait(false);
         var findingViews = findings.Select(f => new BankReconciliationFinding(f.Classification, f.Severity, f.MatchKey, f.ValueA, f.ValueB)).ToList();
+        var zero = new decimal(0, 0, 0, false, 2);
         var view = accounts.SingleOrDefault() is { } a
-            ? new BankReconciliationView(query.BankAccountId, a.Cutoff, false, a.GlBalance, a.StatementBalance, a.Difference, a.GlItems, a.LineItems, findingViews)
-            : new BankReconciliationView(query.BankAccountId, asOf, true, null, null, null, [], [], findingViews);
+            ? new BankReconciliationView(
+                query.BankAccountId, a.Cutoff, false, a.GlBalance, a.StatementBalance, a.Difference, a.GlItems, a.LineItems, findingViews, zero + a.GlItems.Sum(i => i.Amount),
+                zero + a.LineItems.Sum(i => i.Amount))
+            : new BankReconciliationView(query.BankAccountId, asOf, true, null, null, null, [], [], findingViews, zero, zero);
         return ApiJson.Serialize(view);
     }
 }

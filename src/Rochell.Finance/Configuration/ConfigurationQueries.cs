@@ -12,7 +12,11 @@ namespace Rochell.Finance.Configuration;
 public sealed record ListAccounts(Guid CompanyId, Guid SessionId) : IQuery;
 
 /// <summary>E-FIN1-01-1: <see cref="AccountClass"/> is null until the Controller sets it.</summary>
-public sealed record AccountView(Guid AccountId, string Code, string Name, bool IsControl, string? AccountClass, string Status);
+/// <summary>
+/// E-UX4-2: <see cref="Balance"/> is Σ(debit − credit) of every entry of the account to date and <see cref="HasEntries"/> whether it
+/// has any, so the chart of accounts can offer to deactivate only an account at zero.
+/// </summary>
+public sealed record AccountView(Guid AccountId, string Code, string Name, bool IsControl, string? AccountClass, string Status, decimal Balance, bool HasEntries);
 
 public sealed record AccountList(IReadOnlyList<AccountView> Items);
 
@@ -27,8 +31,13 @@ public sealed class ListAccountsHandler : IQueryHandler<ListAccounts>
         var items = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT account_id, code, name, is_control, account_class, status FROM fin.account WHERE company_id = @c ORDER BY code",
-            r => new AccountView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetBoolean(3), r.NullableString(4), r.GetString(5)),
+            """
+            SELECT a.account_id, a.code, a.name, a.is_control, a.account_class, a.status, coalesce(b.balance, 0)::numeric(19,2), b.account_id IS NOT NULL
+            FROM fin.account a
+            LEFT JOIN (SELECT account_id, sum(debit - credit) AS balance FROM fin.gl_entry WHERE company_id = @c GROUP BY account_id) b ON b.account_id = a.account_id
+            WHERE a.company_id = @c ORDER BY a.code
+            """,
+            r => new AccountView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetBoolean(3), r.NullableString(4), r.GetString(5), r.GetDecimal(6), r.GetBoolean(7)),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false);
         return ApiJson.Serialize(new AccountList(items));

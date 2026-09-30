@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Rochell.Api.Http;
 using Rochell.Audit;
@@ -40,6 +41,8 @@ public static class QueryEndpoints
     public static IReadOnlyList<Type> Handlers { get; } =
     [
         typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler), typeof(ListUomsHandler), typeof(GetCompanyHandler), typeof(GetRncHandler), typeof(GetRncRegistryStatusHandler),
+        typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
+        typeof(ListLatestReconciliationRunsHandler), typeof(SearchJournalsHandler), typeof(GetIntegrityStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
         typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
@@ -99,6 +102,12 @@ public static class QueryEndpoints
         procurement.MapGet("/purchase-orders/to-receive", (HttpContext http, Guid companyId, Guid? plantId, Guid? supplierId, int? limit, int? offset, ListPurchaseOrdersToReceiveHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPurchaseOrdersToReceive(companyId, s, plantId, supplierId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<PurchaseOrderToReceiveList>(nameof(ListPurchaseOrdersToReceive));
+        // E-UX4-3: the preview of a draft order (POST: the lines travel in the body; read-only).
+        procurement.MapPost("/purchase-orders/preview", (HttpContext http, Guid companyId, PreviewPurchaseOrderHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<PurchaseOrderPreviewRequest, PreviewPurchaseOrder>(
+                    http, (s, b) => new PreviewPurchaseOrder(companyId, s, b.PlantId, b.PartyId, b.OrderDate, b.Lines), handler, ct))
+            .Describe<PurchaseOrderPreview>(nameof(PreviewPurchaseOrder))
+            .Accepts<PurchaseOrderPreviewRequest>("application/json");
         procurement.MapGet("/goods-receipts", (HttpContext http, Guid companyId, Guid? plantId, Guid? purchaseOrderId, string? documentStatus, int? limit, int? offset, ListGoodsReceiptsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListGoodsReceipts(companyId, s, plantId, purchaseOrderId, documentStatus, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<GoodsReceiptList>(nameof(ListGoodsReceipts));
@@ -125,6 +134,10 @@ public static class QueryEndpoints
         reconciliation.MapGet("/runs", (HttpContext http, Guid companyId, string? reconCode, int? limit, int? offset, ListReconciliationRunsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListReconciliationRuns(companyId, s, reconCode, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<ReconciliationRunList>(nameof(ListReconciliationRuns));
+        // E-UX4-2: each reconciliation's latest run.
+        reconciliation.MapGet("/runs/latest", (HttpContext http, Guid companyId, ListLatestReconciliationRunsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListLatestReconciliationRuns(companyId, s), handler, ct))
+            .Describe<LatestReconciliationRunList>(nameof(ListLatestReconciliationRuns));
         reconciliation.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetReconciliationRunHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetReconciliationRun(companyId, s, runId), handler, ct))
             .Describe<ReconciliationRunDetail>(nameof(GetReconciliationRun), notFound: true);
@@ -219,6 +232,26 @@ public static class QueryEndpoints
         sales.MapGet("/quotes/{quoteId:guid}/print", (HttpContext http, Guid companyId, Guid quoteId, GetQuotePrintHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetQuotePrint(companyId, s, quoteId), handler, ct))
             .Describe<QuotePrint>(nameof(GetQuotePrint), notFound: true);
+        // E-UX4-3/4/10: previews of a draft order or quote (POST: the lines travel in the body; read-only), the credit an order would
+        // use and how a receipt would be applied.
+        sales.MapPost("/orders/preview", (HttpContext http, Guid companyId, PreviewSalesOrderHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewSalesOrder>(http, (s, b) => new PreviewSalesOrder(companyId, s, b.PlantId, b.Lines), handler, ct))
+            .Describe<SalesPreview>(nameof(PreviewSalesOrder))
+            .Accepts<SalesOrderPreviewRequest>("application/json");
+        sales.MapPost("/quotes/preview", (HttpContext http, Guid companyId, PreviewQuoteHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<QuotePreviewRequest, PreviewQuote>(http, (s, b) => new PreviewQuote(companyId, s, b.PlantId, b.Lines), handler, ct))
+            .Describe<SalesPreview>(nameof(PreviewQuote))
+            .Accepts<QuotePreviewRequest>("application/json");
+        sales.MapGet("/customers/{partyId:guid}/credit-preview", (HttpContext http, Guid companyId, Guid partyId, string amount, GetCreditPreviewHandler handler, QueryRunner runner, CancellationToken ct)
+                => TryAmount(amount, out var value)
+                    ? runner.RunAsync(http, s => new GetCreditPreview(companyId, s, partyId, value), handler, ct)
+                    : Task.FromResult(InvalidAmount(http)))
+            .Describe<CreditPreview>(nameof(GetCreditPreview), notFound: true);
+        sales.MapGet("/customers/{partyId:guid}/receipt-application-suggestion", (HttpContext http, Guid companyId, Guid partyId, string amount, SuggestReceiptApplicationHandler handler, QueryRunner runner, CancellationToken ct)
+                => TryAmount(amount, out var value)
+                    ? runner.RunAsync(http, s => new SuggestReceiptApplication(companyId, s, partyId, value), handler, ct)
+                    : Task.FromResult(InvalidAmount(http)))
+            .Describe<ReceiptApplicationSuggestion>(nameof(SuggestReceiptApplication));
         sales.MapGet("/customers/{partyId:guid}/exposure", (HttpContext http, Guid companyId, Guid partyId, GetCustomerExposureHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetCustomerExposure(companyId, s, partyId), handler, ct))
             .Describe<CustomerExposure>(nameof(GetCustomerExposure), notFound: true);
@@ -397,16 +430,31 @@ public static class QueryEndpoints
         identity.MapGet("/role-requests", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListRoleRequestsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListRoleRequests(companyId, s, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<RoleRequestList>(nameof(ListRoleRequests));
-        company.MapGroup("/audit").WithTags("Audit")
-            .MapGet("/digests", (HttpContext http, Guid companyId, int? limit, int? offset, ListLedgerDigestsHandler handler, QueryRunner runner, CancellationToken ct)
+        var audit = company.MapGroup("/audit").WithTags("Audit");
+        audit.MapGet("/digests", (HttpContext http, Guid companyId, int? limit, int? offset, ListLedgerDigestsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListLedgerDigests(companyId, s, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<LedgerDigestList>(nameof(ListLedgerDigests));
+
+        // E-UX4-15: journals by document number or id, and the last verification of the hash chains.
+        audit.MapGet("/journals", (HttpContext http, Guid companyId, string text, int? limit, int? offset, SearchJournalsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new SearchJournals(companyId, s, text, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<JournalSearchResult>(nameof(SearchJournals));
+        audit.MapGet("/integrity-status", (HttpContext http, Guid companyId, GetIntegrityStatusHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetIntegrityStatus(companyId, s), handler, ct))
+            .Describe<IntegrityStatus>(nameof(GetIntegrityStatus));
 
         // E-PR17-6: the HTTP endpoint of "Explain this entry". Its result is the PR-17 document, returned as is.
         finance.MapGet("/entries/{glEntryId:guid}/explanation", (HttpContext http, Guid companyId, Guid glEntryId, ExplainEntryHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ExplainEntry(companyId, s, glEntryId), handler, ct))
             .Describe<JsonElement>(nameof(ExplainEntry), notFound: true);
     }
+
+    /// <summary>A decimal amount in the query string, as the API writes decimals: digits with an optional point (E-UX4-4/10).</summary>
+    private static bool TryAmount(string? value, out decimal amount)
+        => decimal.TryParse(value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount);
+
+    private static IResult InvalidAmount(HttpContext http)
+        => ApiProblems.Problem(http, Platform.Queries.QueryErrors.InvalidParameter, "amount must be a decimal number such as 1500.00.", isQuery: true);
 
     /// <summary>The report is also served as text/csv with <c>?format=csv</c> (the same report, see LedgerCsv).</summary>
     private static RouteHandlerBuilder Csv<TResult>(this RouteHandlerBuilder endpoint) => endpoint.Produces<TResult>(StatusCodes.Status200OK, "application/json", "text/csv");

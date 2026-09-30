@@ -19,7 +19,7 @@ public sealed class CreatePurchaseOrderHandler : ICommandHandler<CreatePurchaseO
         await PurchaseOrderStore.ValidateAsync(context, command.PartyId, command.OrderDate, command.Lines, cancellationToken).ConfigureAwait(false);
         var creator = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         var poId = context.ResultRef;
-        var poNo = string.Create(CultureInfo.InvariantCulture, $"OC-{command.OrderDate.Year:D4}-{poId.ToString("N")[^8..].ToUpperInvariant()}");
+        var poNo = await DocumentNumbers.NextAsync(context, DocumentNumbers.PurchaseOrder, command.OrderDate.Year, cancellationToken).ConfigureAwait(false);
 
         var eventId = await context.AppendEventAsync(
             new EventDraft(

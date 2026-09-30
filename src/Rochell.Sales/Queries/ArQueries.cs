@@ -25,7 +25,11 @@ public sealed record ArAgingCustomer(
     Guid CustomerId, string CustomerName, decimal Current, decimal Bucket1, decimal Bucket2, decimal Bucket3, decimal Over, decimal Total, decimal Unapplied, decimal Net,
     IReadOnlyList<ArAgingDocument> Documents);
 
-public sealed record ArAging(DateOnly AsOf, ArAgingBuckets Buckets, IReadOnlyList<ArAgingCustomer> Customers, decimal Total, decimal Unapplied, decimal Net);
+/// <summary>E-UX4-2: the open amount of every customer per bucket; <c>Total</c> is their sum (the grand total).</summary>
+public sealed record ArAgingBucketTotals(decimal Current, decimal Bucket1, decimal Bucket2, decimal Bucket3, decimal Over, decimal Total);
+
+public sealed record ArAging(
+    DateOnly AsOf, ArAgingBuckets Buckets, IReadOnlyList<ArAgingCustomer> Customers, decimal Total, decimal Unapplied, decimal Net, ArAgingBucketTotals BucketTotals);
 
 [RequiresPermission("sales:read")]
 public sealed class GetArAgingHandler : IQueryHandler<GetArAging>
@@ -92,7 +96,10 @@ public sealed class GetArAgingHandler : IQueryHandler<GetArAging>
             }).ToList();
         var all = zero + customers.Sum(c => c.Total);
         var favour = zero + customers.Sum(c => c.Unapplied);
-        return ApiJson.Serialize(new ArAging(asOf, buckets, customers, all, favour, all - favour));
+        var totals = new ArAgingBucketTotals(
+            zero + customers.Sum(c => c.Current), zero + customers.Sum(c => c.Bucket1), zero + customers.Sum(c => c.Bucket2), zero + customers.Sum(c => c.Bucket3),
+            zero + customers.Sum(c => c.Over), all);
+        return ApiJson.Serialize(new ArAging(asOf, buckets, customers, all, favour, all - favour, totals));
     }
 
     public static string BucketOf(int daysOverdue, ArAgingBuckets buckets)

@@ -110,7 +110,7 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
             cancellationToken).ConfigureAwait(false);
 
         var grId = context.ResultRef;
-        var grNo = string.Create(CultureInfo.InvariantCulture, $"RM-{businessDate.Year:D4}-{grId.ToString("N")[^8..].ToUpperInvariant()}");
+        var grNo = await DocumentNumbers.NextAsync(context, DocumentNumbers.GoodsReceipt, businessDate.Year, cancellationToken).ConfigureAwait(false);
         var eventId = await context.AppendEventAsync(
             new EventDraft(
                 "GoodsReceiptPosted",
@@ -242,12 +242,20 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
         });
     }
 
+    /// <summary>The location is in the order's plant; E-UX4-8: raw material is never received into CURADO nor TRANSITO.</summary>
     private static async Task EnsureLocationInPlantAsync(CommandContext context, Guid locationId, Guid plantId, CancellationToken cancellationToken)
     {
-        await using var command = Sql.Command(context.Connection, context.Transaction, "SELECT EXISTS (SELECT 1 FROM md.location WHERE location_id = @l AND plant_id = @p)", ("l", locationId), ("p", plantId));
-        if (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
+        await using var command = Sql.Command(
+            context.Connection, context.Transaction, "SELECT is_curing OR is_transit FROM md.location WHERE location_id = @l AND plant_id = @p", ("l", locationId), ("p", plantId));
+        var special = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        if (special is not bool excluded)
         {
             throw new DomainException(ProcurementErrors.LocationNotInPlant, "The location is not in the plant of the purchase order.");
+        }
+
+        if (excluded)
+        {
+            throw new DomainException(ProcurementErrors.LocationNotReceivable, "Raw material is not received into the curing (CURADO) or in-transit (TRANSITO) location.");
         }
     }
 

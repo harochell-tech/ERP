@@ -63,7 +63,7 @@ public sealed class GoodsReceiptTests(PostgresFixture postgres)
         Assert.Equal("PARTIALLY_RECEIVED|6.000000,0.000000|1|1|6.000000|1", await Snapshot(h, po));
         var grId = first.ResultRef;
         Assert.True(await h.ScalarAsync<bool>(
-            "SELECT document_status = 'POSTED' AND accounting_status = 'POSTED' AND weigh_ticket_ref = 'BAS-0001' AND gr_no LIKE 'RM-____-________' FROM pur.goods_receipt WHERE gr_id = @g",
+            "SELECT document_status = 'POSTED' AND accounting_status = 'POSTED' AND weigh_ticket_ref = 'BAS-0001' AND gr_no ~ '^RM-[0-9]{4}-000001$' FROM pur.goods_receipt WHERE gr_id = @g",
             ("g", grId)));
         Assert.Equal("R01-DR-INV:1301:9000.0000:0.0000:item,R01-CR-GRNI:2105:0.0000:9000.0000:party", await h.ScalarAsync<string>(
             """

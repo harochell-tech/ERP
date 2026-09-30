@@ -112,3 +112,9 @@ UoM, planned, issued, delivered) with their lots, and who received it (POD name 
 - E-UX3-11: `MasterData.ListUoms` — GET `/master-data/uoms`, `master_data:read`, plant-scoped — the `md.uom` catalogue (code and
   dimension; there is no name column).
 - E-UX3-8 (a), E-UX3-10, 12, 13 are web-only (the SHA-256 field is hidden, the quote watermark, …): no server change.
+
+## Wave 4
+
+The remaining findings (E-UX4-1…17: totals from the server, previews, sequential OC / RM numbers, bank alias, printed total,
+receiving location, recipe curing minimum, receipt suggestion, Contador's reads, journal search and integrity status) are in
+[ux4.md](ux4.md).
