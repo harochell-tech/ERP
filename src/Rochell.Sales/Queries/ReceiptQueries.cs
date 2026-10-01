@@ -17,7 +17,7 @@ public sealed record ListReceipts(
 public sealed record ReceiptSummary(
     Guid ReceiptId, string ReceiptNo, Guid PartyId, string CustomerName, string Method, decimal Amount, DateOnly ReceiptDate, DateOnly ValueDate, Guid? BankAccountId, string? Reference,
     string? ChequeBank, string? ChequeNo, DateOnly? ChequeDate, string Status, string ApplicationStatus, string BankStatus, decimal Unapplied, Guid? DepositId, string? DepositNo, long Version,
-    string? BankAccountAlias, string? BankCode, string? BankAccountNumber);
+    string? BankAccountAlias, string? BankCode, string? BankAccountNumber, decimal Allocated, decimal Available);
 
 public sealed record ReceiptList(IReadOnlyList<ReceiptSummary> Items, int Limit, int Offset);
 
@@ -26,7 +26,7 @@ internal static class ReceiptReading
     public const string Select = """
         SELECT r.receipt_id, r.receipt_no, r.party_id, p.legal_name, r.method, r.amount::numeric(19,2), r.receipt_date, r.value_date, r.bank_account_id, r.reference,
                r.cheque_bank, r.cheque_no, r.cheque_date, r.status, r.application_status, r.bank_status, r.unapplied_amount::numeric(19,2), r.deposit_id, d.deposit_no, r.version,
-               b.alias, b.bank_code, b.account_number
+               b.alias, b.bank_code, b.account_number, r.allocated_amount::numeric(19,2), (r.unapplied_amount - r.allocated_amount)::numeric(19,2)
         FROM fin.receipt r
         JOIN md.party p ON p.party_id = r.party_id
         LEFT JOIN fin.receipt_deposit d ON d.deposit_id = r.deposit_id
@@ -36,7 +36,7 @@ internal static class ReceiptReading
     public static ReceiptSummary Map(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.Date(6), r.Date(7), r.NullableGuid(8), r.NullableString(9),
             r.NullableString(10), r.NullableString(11), r.IsDBNull(12) ? null : r.Date(12), r.GetString(13), r.GetString(14), r.GetString(15), r.GetDecimal(16), r.NullableGuid(17),
-            r.NullableString(18), r.GetInt64(19), r.NullableString(20), r.NullableString(21), r.IsDBNull(22) ? null : AccountNumbers.Show(r.GetString(22), full: false));
+            r.NullableString(18), r.GetInt64(19), r.NullableString(20), r.NullableString(21), r.IsDBNull(22) ? null : AccountNumbers.Show(r.GetString(22), full: false), r.GetDecimal(23), r.GetDecimal(24));
 }
 
 [RequiresPermission("sales:read")]
@@ -78,9 +78,12 @@ public sealed record ReceiptApplicationView(Guid ApplicationId, Guid EventId, Gu
 
 public sealed record MatchedLineView(Guid LineId, DateOnly ValueDate, string Direction, decimal Amount, string? BankReference, string Description);
 
+/// <summary>E-FIS1b-4: an allocation of the receipt to a proforma (or its release); <c>Live</c> while it holds the money for that proforma's invoice.</summary>
+public sealed record ReceiptAllocationView(Guid AllocationId, Guid EventId, Guid ProformaId, string ProformaNo, decimal Amount, DateTime At, Guid? ReversesAllocationId, bool Live);
+
 public sealed record ReceiptDetail(
     ReceiptSummary Header, string? RecordedBy, string? ClosingReason, IReadOnlyList<ReceiptApplicationView> Applications, IReadOnlyList<MatchedLineView> MatchedLines,
-    IReadOnlyList<StateChange> History);
+    IReadOnlyList<StateChange> History, IReadOnlyList<ReceiptAllocationView> Allocations);
 
 [RequiresPermission("sales:read")]
 public sealed class GetReceiptHandler : IQueryHandler<GetReceipt>
@@ -131,7 +134,21 @@ public sealed class GetReceiptHandler : IQueryHandler<GetReceipt>
             cancellationToken,
             ("r", query.ReceiptId)).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "Receipt", query.ReceiptId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new ReceiptDetail(header, extra.RecordedBy, extra.ClosingReason, applications, lines, history));
+        var allocations = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT x.allocation_id, x.event_id, f.proforma_id, f.proforma_no, x.amount::numeric(19,2), e.occurred_at, x.reverses_allocation_id,
+                   x.reverses_allocation_id IS NULL AND NOT EXISTS (SELECT 1 FROM fin.proforma_allocation u WHERE u.reverses_allocation_id = x.allocation_id)
+            FROM fin.proforma_allocation x
+            JOIN sal.proforma f ON f.proforma_id = x.proforma_id
+            JOIN core.domain_event e ON e.company_id = x.company_id AND e.event_id = x.event_id
+            WHERE x.receipt_id = @r ORDER BY e.occurred_at, x.allocation_id
+            """,
+            r => new ReceiptAllocationView(r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetString(3), r.GetDecimal(4), r.GetFieldValue<DateTime>(5), r.NullableGuid(6), r.GetBoolean(7)),
+            cancellationToken,
+            ("r", query.ReceiptId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new ReceiptDetail(header, extra.RecordedBy, extra.ClosingReason, applications, lines, history, allocations));
     }
 }
 

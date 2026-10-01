@@ -603,3 +603,27 @@ and the pickers of suppliers and customers no longer stop at the first 200 (E-IM
 (Comprador imports suppliers, Controller activates them; Vendedor imports customers, Controller approves their terms, Crédito
 activates them), with synthetic `.csv` files.
 
+## FIS1b-07 — proforma screens (E-FIS1b-1…11, E-FIS1b-01-1…14, E-FIS1b-05-1)
+
+| Screen | What it does |
+| --- | --- |
+| Ventas › Nuevo pedido / Pedido | «Exención de ITBIS (CONFOTUR)»: no aplica, or in process with proformas collected with or without ITBIS (`exemptionPending`, `proformaCollectsItbis`; only in DRAFT). The order shows the mark and links to the proformas |
+| Facturación › Proformas | Proformas by customer (open, invoiced, voided): delivery, due text, net, ITBIS, collected, deposit, balance, certification. `invoice:create` ticks whole OPEN proformas of one customer and creates the invoice: «Con ITBIS», or «Exenta e-CF 44» with an ACTIVE authorization that cites every ticked proforma (`authorizationsFor`) |
+| Facturación › Proforma | Detail and print view (letter; signature and stamp of the supplier; watermark ANULADA): lines with ITBIS, what it collects, the receipts assigned, history. «Anular proforma» with a reason (`proforma:void`) |
+| Cobros › Registrar cobro | Notice when the customer has proformas with a balance; «Dejar sin aplicar» records the receipt without applying the suggestion to invoices |
+| Cobros › Recibo | «Asignar a proformas» (one amount per open proforma, `receipt:apply`), the assignments with «Liberar asignación» (reason), and «Devoluciones al cliente»: Cobros prepares (`customer_refund:prepare`), the Controller releases with step-up (`customer_refund:release`, never who prepared it), a PREPARED one is voided with a reason. The header shows unapplied, assigned and available |
+| Fiscal › Registrar autorización | «Proformas que cita el certificado»: the customer's OPEN proformas no other authorization cites; ticking any hides the scope lines — the server computes the scope from them (E-FIS1b-01-8). The detail lists them and links to invoicing |
+| Ventas › Antigüedad | Columns «En proforma» and «Depósito ITBIS» apart from the fiscal receivable, with each proforma under its customer |
+| Ventas › Estado de cuenta | «Devolución al cliente» entries (DEV-…) and, below the balance, the open proformas with their own balance (screen and print view) |
+| Tesorería › Conciliación | An UNMATCHED debit line offers «Conciliar con devolución DEV-…» for the released refunds of that account and amount |
+
+`lib/proformas.ts` (unit-tested: `tests/unit/proformas.test.ts`) holds the Spanish words for states and certification, the due
+text and `authorizationsFor`. `components/ReceiptProformas.tsx` holds the receipt's assignment and refund blocks. The UI does no
+money arithmetic: amounts are the server's; comparisons only decide what to show.
+
+Playwright `proforma-journey.spec.ts` (desktop and mobile, E2E-P1): Vendedor marks the order → Despacho delivers twice → Facturación
+sees two proformas (not billable by conduce; aging column) → Cobros records 2,950.00 unapplied and assigns it → Facturación registers
+the certification citing both → Especialista fiscal verifies → one e-CF 44 of 2,500.00, paid on issue → Cobros prepares the refund of
+450.00 and cannot release it → the Controller releases it → the statement shows «Devolución al cliente». The dev seed approves P-36.
+The refund's match with the bank statement is covered by E2E-P1 over the API (`ProformaAcceptanceTests`).
+

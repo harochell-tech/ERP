@@ -124,7 +124,7 @@ internal static class Orders
     /// <summary>Creates a DRAFT order PV-… (numbered under a lock) with its lines, event and state history; <paramref name="quoteId"/> links a converted quote.</summary>
     public static async Task<string> InsertAsync(
         CommandContext context, Guid orderId, Guid partyId, Header header, Guid priceList, List<PricedLine> lines, decimal total, Guid? quoteId, string commandType,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, (bool Pending, bool? CollectsItbis) exemption = default)
     {
         var creator = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         await SalesSql.LockAsync(context, "sales-order-no", cancellationToken).ConfigureAwait(false);
@@ -148,6 +148,8 @@ internal static class Orders
                     deliveryTermCode = header.Term,
                     priceListVersionId = priceList,
                     quoteId,
+                    exemptionPending = exemption.Pending,
+                    proformaCollectsItbis = exemption.CollectsItbis,
                     totalNet = M(total),
                     lines = lines.Select(l => new { itemId = l.ItemId, uom = l.Uom, quantity = M(l.Quantity), unitPrice = M(l.UnitPrice), net = M(l.Net) }),
                 }),
@@ -158,8 +160,8 @@ internal static class Orders
             context.Transaction,
             """
             INSERT INTO sal.sales_order (sales_order_id, company_id, order_no, party_id, plant_id, order_date, delivery_term_code, site_address, requested_date, customer_po_ref,
-              price_list_version_id, status, total_net, lines_version, created_by, version, quote_id)
-            VALUES (@id, @c, @no, @p, @plant, @date, @term, @site, @req, @po, @list, 'DRAFT', @total, 1, @by, 1, @quote)
+              price_list_version_id, status, total_net, lines_version, created_by, version, quote_id, exemption_pending, proforma_collects_itbis)
+            VALUES (@id, @c, @no, @p, @plant, @date, @term, @site, @req, @po, @list, 'DRAFT', @total, 1, @by, 1, @quote, @pending, @collects)
             """,
             cancellationToken,
             ("id", orderId),
@@ -175,7 +177,9 @@ internal static class Orders
             ("list", priceList),
             ("total", total),
             ("by", creator),
-            ("quote", quoteId)).ConfigureAwait(false);
+            ("quote", quoteId),
+            ("pending", exemption.Pending),
+            ("collects", exemption.CollectsItbis)).ConfigureAwait(false);
         await WriteLinesAsync(context, orderId, 1, lines, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(Aggregate, orderId, "DOCUMENT", null, "DRAFT", commandType, eventId, cancellationToken).ConfigureAwait(false);
         return orderNo;
@@ -299,6 +303,7 @@ public sealed class CreateSalesOrderHandler : ICommandHandler<CreateSalesOrder>
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var header = Orders.ValidateHeader(command.DeliveryTermCode, command.SiteAddress, command.RequestedDate, command.CustomerPoRef, command.PlantId);
+        var exemption = Proformas.Proformas.Validate(command.ExemptionPending, command.ProformaCollectsItbis);
         var customer = await Orders.CustomerStatusAsync(context, command.PartyId, cancellationToken).ConfigureAwait(false)
             ?? throw new DomainException(SalesErrors.NotCustomer, "The party is not a customer.");
         if (customer == "BLOCKED")
@@ -307,7 +312,7 @@ public sealed class CreateSalesOrderHandler : ICommandHandler<CreateSalesOrder>
         }
 
         var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken).ConfigureAwait(false);
-        var orderNo = await Orders.InsertAsync(context, context.ResultRef, command.PartyId, header, list, lines, total, null, CommandType, cancellationToken).ConfigureAwait(false);
+        var orderNo = await Orders.InsertAsync(context, context.ResultRef, command.PartyId, header, list, lines, total, null, CommandType, cancellationToken, exemption).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.M(total), version = 1 });
     }
 }
@@ -322,6 +327,7 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var header = Orders.ValidateHeader(command.DeliveryTermCode, command.SiteAddress, command.RequestedDate, command.CustomerPoRef, command.PlantId);
+        var exemption = Proformas.Proformas.Validate(command.ExemptionPending, command.ProformaCollectsItbis);
         var row = await Orders.LockAsync(context, command.SalesOrderId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         if (row.Status != "DRAFT")
         {
@@ -347,7 +353,7 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
             context.Transaction,
             """
             UPDATE sal.sales_order SET plant_id = @plant, delivery_term_code = @term, site_address = @site, requested_date = @req, customer_po_ref = @po,
-              price_list_version_id = @list, total_net = @total, lines_version = @lv, version = @v
+              price_list_version_id = @list, total_net = @total, lines_version = @lv, exemption_pending = @pending, proforma_collects_itbis = @collects, version = @v
             WHERE sales_order_id = @o
             """,
             cancellationToken,
@@ -359,6 +365,8 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
             ("list", list),
             ("total", total),
             ("lv", linesVersion),
+            ("pending", exemption.Pending),
+            ("collects", exemption.CollectsItbis),
             ("v", version),
             ("o", command.SalesOrderId)).ConfigureAwait(false);
         await Orders.WriteLinesAsync(context, command.SalesOrderId, linesVersion, lines, cancellationToken).ConfigureAwait(false);

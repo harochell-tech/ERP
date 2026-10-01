@@ -194,9 +194,10 @@ public static class BankGl
                         WHEN rr.receipt_id IS NOT NULL THEN 'OUTSTANDING_RECEIPT_REVERSAL'
                         WHEN rb.receipt_id IS NOT NULL THEN 'OUTSTANDING_BOUNCE'
                         WHEN dp.deposit_id IS NOT NULL THEN 'OUTSTANDING_DEPOSIT'
+                        WHEN rf.refund_id IS NOT NULL THEN 'OUTSTANDING_REFUND'
                         ELSE 'UNLINKED_ENTRY' END,
-                   coalesce(pay.payment_no, rev.payment_no, chg.line_id::text, rc.receipt_no, rr.receipt_no, rb.receipt_no, dp.deposit_no, e.gl_entry_id::text),
-                   coalesce(dl.value_date, cl.value_date, chg.value_date, rcl.value_date, rbl.value_date, dpl.value_date),
+                   coalesce(pay.payment_no, rev.payment_no, chg.line_id::text, rc.receipt_no, rr.receipt_no, rb.receipt_no, dp.deposit_no, rf.refund_no, e.gl_entry_id::text),
+                   coalesce(dl.value_date, cl.value_date, chg.value_date, rcl.value_date, rbl.value_date, dpl.value_date, rfl.value_date),
                    coalesce(pay.payment_id, rev.payment_id, rc.receipt_id, rr.receipt_id)
             FROM fin.gl_entry e
             JOIN fin.gl_journal j ON j.journal_id = e.journal_id
@@ -213,6 +214,8 @@ public static class BankGl
             LEFT JOIN fin.bank_statement_line rcl ON rcl.matched_receipt_id = rc.receipt_id AND rcl.direction = 'CREDIT'
             LEFT JOIN fin.bank_statement_line rbl ON rbl.matched_receipt_id = rb.receipt_id AND rbl.direction = 'DEBIT'
             LEFT JOIN fin.bank_statement_line dpl ON dpl.matched_deposit_id = dp.deposit_id
+            LEFT JOIN fin.customer_refund rf ON j.journal_type = 'AUTO' AND rf.company_id = e.company_id AND rf.posting_event_id = j.source_event_id
+            LEFT JOIN fin.bank_statement_line rfl ON rfl.matched_refund_id = rf.refund_id
             WHERE e.company_id = @c AND e.subledger_type = 'BANK' AND e.subledger_ref = @b AND e.posting_date <= @d
             ORDER BY e.posting_date, e.gl_entry_id
             """,
@@ -237,6 +240,10 @@ public static class BankGl
                           (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
                            JOIN fin.receipt_deposit d ON d.posting_event_id = j.source_event_id
                            WHERE d.deposit_id = l.matched_deposit_id AND j.journal_type = 'AUTO' AND e.subledger_type = 'BANK')
+                        WHEN l.matched_refund_id IS NOT NULL THEN
+                          (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
+                           JOIN fin.customer_refund f ON f.posting_event_id = j.source_event_id
+                           WHERE f.refund_id = l.matched_refund_id AND j.journal_type = 'AUTO' AND e.subledger_type = 'BANK')
                         WHEN l.status = 'CHARGE_RECOGNIZED' THEN
                           (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
                            WHERE j.source_event_id = l.charge_event_id AND j.journal_type = 'AUTO' AND e.subledger_type = 'BANK')

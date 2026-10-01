@@ -32,7 +32,9 @@ using Rochell.Sales.Opening;
 using Rochell.Sales.Orders;
 using Rochell.Sales.Quotes;
 using Rochell.Sales.Pricing;
+using Rochell.Sales.Proformas;
 using Rochell.Sales.Receipts;
+using Rochell.Sales.Refunds;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
 using Rochell.Treasury.BankAccounts;
@@ -90,6 +92,7 @@ public static class CommandEndpoints
         treasury.MapCommand<ImportBankStatement, ImportBankStatementHandler>();
         treasury.MapCommand<MatchBankLine, MatchBankLineHandler>();
         treasury.MapCommand<MatchBankLineToReceipt, MatchBankLineToReceiptHandler>();
+        treasury.MapCommand<MatchBankLineToRefund, MatchBankLineToRefundHandler>();
         treasury.MapCommand<UnmatchBankLine, UnmatchBankLineHandler>();
         treasury.MapCommand<RecognizeBankCharge, RecognizeBankChargeHandler>();
 
@@ -218,6 +221,8 @@ public static class CommandEndpoints
         sales.MapCommand<CancelDelivery, CancelDeliveryHandler>();
         sales.MapCommand<CloseShortSalesOrder, CloseShortSalesOrderHandler>();
         sales.MapCommand<CreateInvoiceFromDeliveries, CreateInvoiceFromDeliveriesHandler>();
+        sales.MapCommand<CreateInvoiceFromProformas, CreateInvoiceFromProformasHandler>();
+        sales.MapCommand<VoidProforma, VoidProformaHandler>();
         sales.MapCommand<IssueInvoice, IssueInvoiceHandler>();
         sales.MapCommand<RecordExternalFiscalDocument, RecordExternalFiscalDocumentHandler>();
         sales.MapCommand<VoidUnfiscalizedInvoice, VoidUnfiscalizedInvoiceHandler>();
@@ -227,6 +232,11 @@ public static class CommandEndpoints
         sales.MapCommand<RecordReceipt, RecordReceiptHandler>();
         sales.MapCommand<DepositReceipts, DepositReceiptsHandler>();
         sales.MapCommand<ApplyReceipt, ApplyReceiptHandler>();
+        sales.MapCommand<PrepareCustomerRefund, PrepareCustomerRefundHandler>();
+        sales.MapCommand<ReleaseCustomerRefund, ReleaseCustomerRefundHandler>();
+        sales.MapCommand<VoidCustomerRefund, VoidCustomerRefundHandler>();
+        sales.MapCommand<AllocateReceiptToProformas, AllocateReceiptToProformasHandler>();
+        sales.MapCommand<ReleaseProformaAllocation, ReleaseProformaAllocationHandler>();
         sales.MapCommand<UnapplyReceipt, UnapplyReceiptHandler>();
         sales.MapCommand<MarkReceiptBounced, MarkReceiptBouncedHandler>();
         sales.MapCommand<ReverseReceipt, ReverseReceiptHandler>();
@@ -270,7 +280,7 @@ public static class CommandEndpoints
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
-        typeof(ReversePaymentHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(MatchBankLineToReceiptHandler), typeof(UnmatchBankLineHandler),
+        typeof(ReversePaymentHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(MatchBankLineToReceiptHandler), typeof(MatchBankLineToRefundHandler), typeof(UnmatchBankLineHandler),
         typeof(RecognizeBankChargeHandler),
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
@@ -295,9 +305,10 @@ public static class CommandEndpoints
         typeof(CreateQuoteHandler), typeof(UpdateDraftQuoteHandler), typeof(SubmitQuoteForApprovalHandler), typeof(ApproveQuotePricesHandler), typeof(ReturnQuoteToDraftHandler),
         typeof(SendQuoteHandler), typeof(MarkQuoteLostHandler), typeof(CancelQuoteHandler), typeof(CopyQuoteHandler), typeof(ConvertQuoteHandler),
         typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
-        typeof(CreateInvoiceFromDeliveriesHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
+        typeof(CreateInvoiceFromDeliveriesHandler), typeof(CreateInvoiceFromProformasHandler), typeof(VoidProformaHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),
-        typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
+        typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(PrepareCustomerRefundHandler), typeof(ReleaseCustomerRefundHandler), typeof(VoidCustomerRefundHandler),
+        typeof(AllocateReceiptToProformasHandler), typeof(ReleaseProformaAllocationHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),

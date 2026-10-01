@@ -10,6 +10,7 @@ import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermissio
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate, todayInDominicanRepublic } from "@/lib/labels";
 import { METHODS } from "@/lib/sales";
+import { OpenProformasNotice } from "@/components/ReceiptProformas";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -103,7 +104,11 @@ function Suggestion({
       </LineTable>
       {amounts === null ? (
         <p data-testid="suggestion-totals">
-          Se aplican <MoneyText value={data.applied} testId="suggestion-applied" /> · quedan sin aplicar <MoneyText value={data.unapplied} testId="suggestion-unapplied" />
+          Se aplican <MoneyText value={data.applied} testId="suggestion-applied" /> · quedan sin aplicar <MoneyText value={data.unapplied} testId="suggestion-unapplied" />{" "}
+          {/* FIS1b-07: a payment of proformas is recorded unapplied and assigned on the receipt. */}
+          <button type="button" onClick={() => onChange({})}>
+            Dejar sin aplicar
+          </button>
         </p>
       ) : (
         <p className="muted">
@@ -288,6 +293,7 @@ export default function Page() {
         <Field label="Referencia (opcional)">
           <input value={values.reference} onChange={set("reference")} />
         </Field>
+        {values.partyId ? <OpenProformasNotice partyId={values.partyId} /> : null}
         {values.partyId && amountValid && canApply ? (
           <Suggestion data={suggestionData} error={suggestion.error} amounts={applyAmounts} errors={fe.errors} onChange={setApplyAmounts} />
         ) : null}

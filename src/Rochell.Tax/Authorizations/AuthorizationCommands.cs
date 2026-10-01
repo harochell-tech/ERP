@@ -21,9 +21,14 @@ public sealed record RegisterFiscalAuthorization(
     string ConfoturResolutionNo,
     DateOnly? ProjectTermEndsOn,
     Guid? SalesOrderId,
-    IReadOnlyList<AuthorizationLineInput> Lines) : ICommand;
+    IReadOnlyList<AuthorizationLineInput>? Lines,
+    IReadOnlyList<Guid>? ProformaIds = null) : ICommand;
 
 /// <summary>E-FIS1-02-2: replaces the data and the scope of a DRAFT authorization.</summary>
+/// <remarks>
+/// E-FIS1b-5, E-FIS1b-01-8 (both commands): <c>ProformaIds</c> are the proformas the certification cites — then the scope is
+/// computed from their lines and <c>Lines</c> is not given.
+/// </remarks>
 public sealed record UpdateDraftAuthorization(
     Guid CompanyId,
     Guid SessionId,
@@ -37,7 +42,8 @@ public sealed record UpdateDraftAuthorization(
     string ConfoturResolutionNo,
     DateOnly? ProjectTermEndsOn,
     Guid? SalesOrderId,
-    IReadOnlyList<AuthorizationLineInput> Lines) : ICommand;
+    IReadOnlyList<AuthorizationLineInput>? Lines,
+    IReadOnlyList<Guid>? ProformaIds = null) : ICommand;
 
 /// <summary>E-FIS1-02-3: a document (CERTIFICADO_DGII, RESOLUCION_CONFOTUR, LISTA_MATERIALES, PROFORMA) by reference and SHA-256.</summary>
 public sealed record AttachAuthorizationDocument(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid AuthorizationId, string Kind, string EvidenceRef, string EvidenceSha256)

@@ -21,7 +21,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             + "master_data:read,payment:read,period:read,production:read,purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read",
         ["COMPRADOR"] = "master_data:read,purchase_order:cancel,purchase_order:create,purchase_order:read,purchase_order:submit,rnc:read,supplier:create,supplier:import,supplier:update",
         ["CONTROLLER"] = "account:manage,account_role_map:approve,account_role_map:prepare,accounting_policy:approve,accounting_policy:prepare,audit:read,bank:read,bank_account:manage,"
-            + "bank_account_number:read,bank_charge:recognize,bank_line:unmatch,company:manage,configuration:read,cost_collector:settle,customer_terms:approve,"
+            + "bank_account_number:read,bank_charge:recognize,bank_line:unmatch,company:manage,configuration:read,cost_collector:settle,customer_refund:release,customer_terms:approve,"
             + "customer_withholding:reverse,fiscal_report:read,goods_receipt:read,goods_receipt:reverse,hash:verify,invoice:void,item:activate,journal:repost,"
             + "ledger:read,manual_journal:approve,master_data:read,match_exception:approve,opening_inventory:prepare,party_bank_account:verify,payment:read,"
             + "payment:release,payment:reverse,period:read,period_component:close,period_component:reopen,posting_rule:approve,price_list:prepare,production:read,"
@@ -40,8 +40,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["VENDEDOR"] = "customer:create,customer:import,customer:update,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11
         ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,fiscal_authorization:register,rnc:read,sales:read,sales_order:close",
         ["DESPACHO"] = "delivery:manage,fleet:manage,sales:read",
-        ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,sales:read",
-        ["COBROS"] = "customer_withholding:record,receipt:apply,receipt:deposit,receipt:record,sales:read",
+        ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,proforma:void,sales:read",
+        ["COBROS"] = "customer_refund:prepare,customer_withholding:record,receipt:apply,receipt:deposit,receipt:record,sales:read",
         ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
         ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,production:read,production_master:manage,recipe:approve,shift_summary:post",
         ["CALIDAD"] = "fg_lot:release,master_data:read,production:read",
@@ -53,8 +53,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(118L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + supplier:import, customer:import (E-IMP-10)
-        Assert.Equal(44L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + import ≠ activate for suppliers and customers (E-IMP-01-5)
+        Assert.Equal(121L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
+        Assert.Equal(45L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {
             Assert.Equal(permissions, await h.ScalarAsync<string>(

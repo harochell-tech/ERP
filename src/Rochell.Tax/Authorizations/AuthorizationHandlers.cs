@@ -168,6 +168,73 @@ internal static class AuthorizationStore
         return result;
     }
 
+    /// <summary>
+    /// E-FIS1b-5, E-FIS1b-01-8: the scope of an authorization that cites proformas — open proformas of the customer, each in at
+    /// most one live authorization — summed by product and unit. Without proformas the scope is the lines given (FIS-1).
+    /// </summary>
+    public static async Task<IReadOnlyList<AuthorizationLineInput>?> ScopeAsync(
+        CommandContext context, Guid partyId, Guid? authorizationId, IReadOnlyList<AuthorizationLineInput>? lines, IReadOnlyList<Guid>? proformaIds, CancellationToken cancellationToken)
+    {
+        var ids = (proformaIds ?? []).Distinct().ToArray();
+        if (ids.Length == 0)
+        {
+            return lines;
+        }
+
+        if (lines is { Count: > 0 })
+        {
+            throw new DomainException(TaxErrors.AuthorizationFieldInvalid, "An authorization that cites proformas takes its scope from them; do not give scope lines (E-FIS1b-01-8).");
+        }
+
+        var valid = await ScalarAsync<long?>(
+            context,
+            """
+            SELECT count(*) FROM sal.proforma pf
+            WHERE pf.company_id = @c AND pf.proforma_id = ANY (@ids) AND pf.party_id = @p AND pf.status = 'OPEN'
+              AND NOT EXISTS (SELECT 1 FROM tax.fiscal_authorization_proforma x JOIN tax.fiscal_authorization a ON a.authorization_id = x.authorization_id
+                              WHERE x.proforma_id = pf.proforma_id AND a.status NOT IN ('REJECTED', 'EXPIRED') AND a.authorization_id IS DISTINCT FROM CAST(@a AS uuid))
+            """,
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("ids", ids),
+            ("p", partyId),
+            ("a", authorizationId)).ConfigureAwait(false);
+        if (valid != ids.Length)
+        {
+            throw new DomainException(TaxErrors.AuthorizationProformaInvalid, "Each proforma must be an OPEN proforma of the customer that no other authorization cites (E-FIS1b-5).");
+        }
+
+        return await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT l.item_id, l.uom, sum(l.quantity), sum(l.net_amount)::numeric(19,2)
+            FROM sal.proforma_line l WHERE l.company_id = @c AND l.proforma_id = ANY (@ids)
+            GROUP BY l.item_id, l.uom ORDER BY min(l.line_no), l.item_id
+            """,
+            r => new AuthorizationLineInput(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetDecimal(3)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("ids", ids)).ConfigureAwait(false);
+    }
+
+    /// <summary>Replaces the proformas a DRAFT authorization cites.</summary>
+    public static async Task ReplaceProformasAsync(CommandContext context, Guid id, IReadOnlyList<Guid>? proformaIds, CancellationToken cancellationToken)
+    {
+        await Sql.ExecuteAsync(context.Connection, context.Transaction, "DELETE FROM tax.fiscal_authorization_proforma WHERE authorization_id = @id", cancellationToken, ("id", id)).ConfigureAwait(false);
+        foreach (var proforma in (proformaIds ?? []).Distinct())
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "INSERT INTO tax.fiscal_authorization_proforma (company_id, authorization_id, proforma_id) VALUES (@c, @id, @p)",
+                cancellationToken,
+                ("c", context.CompanyId),
+                ("id", id),
+                ("p", proforma)).ConfigureAwait(false);
+        }
+    }
+
     public static async Task InsertLinesAsync(CommandContext context, Guid id, List<Line> lines, CancellationToken cancellationToken)
     {
         var no = 0;
@@ -216,7 +283,8 @@ public sealed class RegisterFiscalAuthorizationHandler : ICommandHandler<Registe
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var header = AuthorizationStore.ValidateHeader(command.CertificateNo, command.IssuedOn, command.ValidUntil, command.ProjectName, command.ConfoturResolutionNo, command.ProjectTermEndsOn, command.SalesOrderId);
-        var lines = await AuthorizationStore.ValidateAsync(context, command.PartyId, header, command.Lines, cancellationToken).ConfigureAwait(false);
+        var scope = await AuthorizationStore.ScopeAsync(context, command.PartyId, null, command.Lines, command.ProformaIds, cancellationToken).ConfigureAwait(false);
+        var lines = await AuthorizationStore.ValidateAsync(context, command.PartyId, header, scope, cancellationToken).ConfigureAwait(false);
         var registrar = await AuthorizationStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         var id = context.ResultRef;
         var eventId = await context.AppendEventAsync(
@@ -251,6 +319,7 @@ public sealed class RegisterFiscalAuthorizationHandler : ICommandHandler<Registe
         }
 
         await AuthorizationStore.InsertLinesAsync(context, id, lines, cancellationToken).ConfigureAwait(false);
+        await AuthorizationStore.ReplaceProformasAsync(context, id, command.ProformaIds, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(AuthorizationStore.Aggregate, id, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { authorizationId = id, status = "DRAFT", version = 1, lines = lines.Count });
     }
@@ -268,7 +337,8 @@ public sealed class UpdateDraftAuthorizationHandler : ICommandHandler<UpdateDraf
         var header = AuthorizationStore.ValidateHeader(command.CertificateNo, command.IssuedOn, command.ValidUntil, command.ProjectName, command.ConfoturResolutionNo, command.ProjectTermEndsOn, command.SalesOrderId);
         var row = await AuthorizationStore.LockAsync(context, command.AuthorizationId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         AuthorizationStore.RequireStatus(row, "DRAFT");
-        var lines = await AuthorizationStore.ValidateAsync(context, row.PartyId, header, command.Lines, cancellationToken).ConfigureAwait(false);
+        var scope = await AuthorizationStore.ScopeAsync(context, row.PartyId, row.Id, command.Lines, command.ProformaIds, cancellationToken).ConfigureAwait(false);
+        var lines = await AuthorizationStore.ValidateAsync(context, row.PartyId, header, scope, cancellationToken).ConfigureAwait(false);
         var next = row.Version + 1;
         await context.AppendEventAsync(
             new EventDraft("FiscalAuthorizationUpdated", 1, AuthorizationStore.Aggregate, row.Id, await AuthorizationStore.NextEventVersionAsync(context, row.Id, cancellationToken).ConfigureAwait(false), JsonSerializer.Serialize(AuthorizationStore.Payload(row.Id, row.PartyId, header, lines)), Publish: true),
@@ -301,6 +371,7 @@ public sealed class UpdateDraftAuthorizationHandler : ICommandHandler<UpdateDraf
 
         await Sql.ExecuteAsync(context.Connection, context.Transaction, "DELETE FROM tax.fiscal_authorization_line WHERE authorization_id = @id", cancellationToken, ("id", row.Id)).ConfigureAwait(false);
         await AuthorizationStore.InsertLinesAsync(context, row.Id, lines, cancellationToken).ConfigureAwait(false);
+        await AuthorizationStore.ReplaceProformasAsync(context, row.Id, command.ProformaIds, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { authorizationId = row.Id, status = "DRAFT", version = next, lines = lines.Count });
     }
 }

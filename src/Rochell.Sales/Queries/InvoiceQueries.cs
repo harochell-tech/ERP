@@ -254,6 +254,7 @@ public sealed class ListBillableDeliveriesHandler : IQueryHandler<ListBillableDe
             JOIN md.item i ON i.item_id = dl.item_id
             WHERE dl.company_id = @c AND d.status IN ('DELIVERED', 'DELIVERED_WITH_EXCEPTIONS') AND dl.qty_delivered > dl.qty_invoiced
               AND (CAST(@p AS uuid) IS NULL OR o.party_id = CAST(@p AS uuid))
+              AND NOT EXISTS (SELECT 1 FROM sal.proforma pf WHERE pf.delivery_id = d.delivery_id AND pf.status <> 'VOIDED') -- E-FIS1b-01-6: billed from the proforma
             ORDER BY p.legal_name, d.delivery_no, dl.line_no
             LIMIT 500
             """,

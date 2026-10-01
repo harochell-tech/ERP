@@ -265,13 +265,17 @@ public sealed class ApplyReceiptHandler : ICommandHandler<ApplyReceipt>
             throw new DomainException(SalesErrors.InvalidState, $"The receipt is {receipt.Status}.");
         }
 
+        // E-FIS1b-01-4: what is allocated to proformas waits for their invoice and is not applied elsewhere.
         var total = input.Sum(a => a.Amount);
-        if (total > receipt.Unapplied)
+        if (total > receipt.Unapplied - receipt.Allocated)
         {
-            throw new DomainException(ReceiptErrors.ExceedsUnapplied, $"{Receipting.Money(total)} exceeds the {Receipting.Money(receipt.Unapplied)} still unapplied on {receipt.No}.");
+            throw new DomainException(
+                ReceiptErrors.ExceedsUnapplied,
+                $"{Receipting.Money(total)} exceeds the {Receipting.Money(receipt.Unapplied - receipt.Allocated)} still unapplied on {receipt.No}"
+                + (receipt.Allocated > 0m ? $" ({Receipting.Money(receipt.Allocated)} is allocated to proformas)." : "."));
         }
 
-        var lines = new List<PostingLineInput>();
+        var targets = new List<Receipting.Target>();
         foreach (var a in input)
         {
             var invoice = invoices.Single(i => i.InvoiceId == a.InvoiceId);
@@ -290,66 +294,17 @@ public sealed class ApplyReceiptHandler : ICommandHandler<ApplyReceipt>
                 throw new DomainException(ReceiptErrors.ExceedsOpen, $"{Receipting.Money(a.Amount)} exceeds the {Receipting.Money(open[invoice.ArDocId])} open on {invoice.InvoiceNo}.");
             }
 
-            var inputs = new Dictionary<string, string> { ["receipt_no"] = receipt.No, ["invoice_no"] = invoice.InvoiceNo };
-            lines.Add(new PostingLineInput("P25-DR-UNAP", "applied_amount", a.Amount, PartyId: receipt.PartyId, SubledgerRef: command.ReceiptId, Inputs: inputs));
-            lines.Add(new PostingLineInput("P25-CR-AR", "applied_amount", a.Amount, PartyId: receipt.PartyId, SubledgerRef: invoice.ArDocId, Inputs: inputs));
+            targets.Add(new Receipting.Target(invoice.InvoiceId, invoice.InvoiceNo, invoice.ArDocId, a.Amount));
         }
 
-        var today = SalesSql.Today(context);
-        var plan = await _engine.PrepareAsync(context, new PostingRequest(RuleCode, today, context.Clock.UtcNow, lines), cancellationToken).ConfigureAwait(false);
         var version = receipt.Version + 1;
-        var unapplied = receipt.Unapplied - total;
-        var status = Receipting.ApplicationStatus(receipt.Amount, unapplied);
-        var eventId = await context.AppendEventAsync(
-            new EventDraft(
-                "ReceiptApplied",
-                1,
-                Receipting.Aggregate,
-                command.ReceiptId,
-                version,
-                JsonSerializer.Serialize(new
-                {
-                    receiptId = command.ReceiptId,
-                    receiptNo = receipt.No,
-                    invoices = input.Select(a => new { invoiceId = a.InvoiceId, invoiceNo = invoices.Single(i => i.InvoiceId == a.InvoiceId).InvoiceNo, amount = Receipting.Money(a.Amount) }),
-                    amount = Receipting.Money(total),
-                }),
-                Publish: true,
-                BusinessDate: today),
-            cancellationToken).ConfigureAwait(false);
-        foreach (var a in input)
-        {
-            var doc = invoices.Single(i => i.InvoiceId == a.InvoiceId).ArDocId;
-            await Sql.ExecuteAsync(
-                context.Connection,
-                context.Transaction,
-                "INSERT INTO fin.ar_application (application_id, company_id, receipt_id, ar_doc_id, amount, event_id) VALUES (@id, @c, @r, @d, @a, @e)",
-                cancellationToken,
-                ("id", context.Ids.NewId()),
-                ("c", context.CompanyId),
-                ("r", command.ReceiptId),
-                ("d", doc),
-                ("a", a.Amount),
-                ("e", eventId)).ConfigureAwait(false);
-            await Receipting.MoveOpenAsync(context, doc, -a.Amount, cancellationToken).ConfigureAwait(false);
-        }
-
-        await Sql.ExecuteAsync(
-            context.Connection,
-            context.Transaction,
-            "UPDATE fin.receipt SET unapplied_amount = @u, application_status = @s, version = @v WHERE receipt_id = @r",
-            cancellationToken,
-            ("u", unapplied),
-            ("s", status),
-            ("v", version),
-            ("r", command.ReceiptId)).ConfigureAwait(false);
+        var (eventId, journalId, unapplied, status) = await Receipting.ApplyAsync(context, _engine, command.ReceiptId, receipt, version, targets, null, cancellationToken).ConfigureAwait(false);
         var statuses = new Dictionary<string, string>();
         foreach (var invoice in invoices)
         {
             statuses[invoice.InvoiceNo] = await InvoiceStanding.RefreshAsync(context, invoice.InvoiceId, CommandType, eventId, cancellationToken).ConfigureAwait(false);
         }
 
-        var journal = await _engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new
         {
             receiptId = command.ReceiptId,
@@ -357,7 +312,7 @@ public sealed class ApplyReceiptHandler : ICommandHandler<ApplyReceipt>
             applicationStatus = status,
             unapplied = Receipting.Money(unapplied),
             invoices = statuses,
-            journalId = journal.JournalId,
+            journalId,
             version,
         });
     }

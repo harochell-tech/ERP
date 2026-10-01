@@ -853,6 +853,32 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-IMP-02-1 | IMP-02 | The API pages at 200 rows and the screens asked for one page: with the bulk load the supplier and customer lists and pickers would silently stop at 200. They now read every page (`lib/paging.ts`). |
 | E-IMP-02-2 | IMP-02 | E-mails are edited as one box, one per line (the first is the principal one), on the customer page and on the supplier page; the Controller, who cannot edit a customer, does not see its contact data there (as before). |
 | E-IMP-02-3 | IMP-02 | The batch actions send only what is still a draft on screen, at most 500 per command; "approve the terms of the selected ones" approves each customer's DRAFT terms as they are (the importer's days and limit), so limits are completed before approving. |
+| E-FIS1b-1 | FIS-1b | The proforma becomes a document: PF-000001 per company, one per delivered delivery, with its lines, net, computed ITBIS and total. Not a fiscal document and no journal: it documents the unbilled receivable the delivery already posted. |
+| E-FIS1b-2 | FIS-1b | The order is marked "exención en trámite" when created; each of its deliveries issues its proforma. Other orders stay as they are. Never a mark on the customer. |
+| E-FIS1b-3 | FIS-1b | The proforma is due by the customer's terms counted from the delivery and enters the AR aging and the statement in a column of its own. |
+| E-FIS1b-4 | FIS-1b | Receipts are allocated to proformas; up to the net they lower the proforma's balance and the credit used; what exceeds the net (the ITBIS advanced) is the customer's deposit tied to that proforma. |
+| E-FIS1b-5 | FIS-1b | The fiscal authorization lists the proformas it covers (one or several; a proforma belongs to one authorization); the scope comes from their lines. |
+| E-FIS1b-6 | FIS-1b | Invoicing picks proformas of one customer: e-CF 44 with their authorization, 31 / 32 with ITBIS without it; an invoice is all exempt or all taxed. |
+| E-FIS1b-7 | FIS-1b | The invoice inherits what was collected. With an e-CF 31 the ITBIS deposit pays the invoice's ITBIS; with an e-CF 44 it stays as the customer's credit balance. |
+| E-FIS1b-8 | FIS-1b | New "customer refund" on the credit balance: prepared by Cobros, released by Treasury (two people, as a supplier payment), by transfer or cheque. |
+| E-FIS1b-9 | FIS-1b | Proformas per customer (number, delivery, dates, net, ITBIS, collected, deposit, balance, days, state of the certification) and a warning for proformas older than N days without e-CF, N from a policy. |
+| E-FIS1b-10 | FIS-1b | A proforma without collections or invoice is voided with a reason. |
+| E-FIS1b-11 | FIS-1b | Reconciliations of proformas and deposits block the AR close. |
+| E-FIS1b-01-1 | FIS-1b | With the mark, the order says whether the customer is collected with or without ITBIS; the proforma's balance is its total or its net accordingly. |
+| E-FIS1b-01-2 | FIS-1b | Proforma date = the day of the delivery (gate-out for a pickup, the POD for a site delivery); due by the customer's terms in force that day. |
+| E-FIS1b-01-3 | FIS-1b | The proforma's ITBIS is computed with the fiscal rule in force on the delivery day and stored; without a rule in force the delivery of such an order is refused. |
+| E-FIS1b-01-4 | FIS-1b | Accounting option A: allocating a receipt to proformas posts nothing — the receipt stays in UNAPPLIED_RECEIPTS until the invoice exists. "Allocate receipt to proformas" (Cobros), up to each proforma's balance, and its release; a bounced cheque releases its allocations. The balance sheet shows the unbilled receivable and the advances gross until the e-CF. |
+| E-FIS1b-01-5 | FIS-1b | The credit used subtracts what is allocated; an overdue proforma with a balance counts as overdue days like an overdue invoice. |
+| E-FIS1b-01-6 | FIS-1b | "Invoice from proformas": whole proformas of one customer. A delivery with a proforma is not invoiced through the delivery path. |
+| E-FIS1b-01-7 | FIS-1b | On issue, what was allocated is applied to the invoice up to its total (P-25); the remainder stays as the customer's credit balance. |
+| E-FIS1b-01-8 | FIS-1b | The authorization lists its proformas and its scope is computed from their lines; authorizations without proformas keep the manual scope. An e-CF 44 from proformas needs all of them in that authorization. |
+| E-FIS1b-01-9 | FIS-1b | Customer refund DEV-000001 on a receipt's credit balance: prepared by Cobros, released by Treasury (another person, step-up), by transfer or cheque; matched with the bank statement like a payment. |
+| E-FIS1b-01-10 | FIS-1b | The warning for old proformas reuses the existing "delivered, not invoiced for more than N days" (revenue policy); no new parameter. |
+| E-FIS1b-01-11 | FIS-1b | A proforma is voided only without allocations and without an invoice (an order marked by mistake); its delivery returns to normal invoicing. Permission `proforma:void` (Facturación). |
+| E-FIS1b-01-12 | FIS-1b | New reconciliation PROFORMA-ASIG (allocations against receipts and proformas); refunds join the receipt and bank reconciliations. They block the AR close. |
+| E-FIS1b-01-13 | FIS-1b | The proforma prints with issuer, customer, lines, ITBIS, total and room for signature and stamp; the order's printable proforma of FIS-1 stays for quoting before delivery. |
+| E-FIS1b-01-14 | FIS-1b | Seven PRs: schema; proforma on delivery, queries and print; allocation, credit and aging; authorization and invoice from proformas; customer refund; reconciliations; screens and end-to-end journey. |
+| E-FIS1b-05-1 | FIS-1b | Amends E-FIS1b-8 and E-FIS1b-01-9: the refund is released by the **Controller**, as supplier payments are (Cobros prepares, the Controller releases with step-up, the Tesorero matches it with the statement). With the Tesorero releasing, who lets the money out would also reconcile the bank, and would need read access to sales. |
 
 Implementation rules derived from the above (no architectural change):
 
