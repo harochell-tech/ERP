@@ -75,6 +75,10 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   RECEIPT_CORRECTION_NOT_PENDING: "La corrección ya no está pendiente.",
   RNC_INVALID: "El RNC no es válido.",
   RNC_DUPLICATE: "Ya existe un proveedor con ese RNC.",
+  // IMP-01: bulk load of suppliers and customers.
+  IMPORT_FILE_INVALID: "El archivo no se puede leer como la exportación de ADM Cloud (.xlsx o .csv con «Razón Social» e «ID Fiscal»).",
+  IMPORT_FILE_TOO_LARGE: "El archivo supera 5 MB.",
+  BATCH_INVALID: "Seleccione entre 1 y 500 registros.",
   // VS#2: treasury.
   BANK_ACCOUNT_INVALID: "El banco o el número de cuenta no son válidos (número: 5 a 30 dígitos).",
   BANK_ACCOUNT_DUPLICATE: "Esa cuenta bancaria ya está registrada.",

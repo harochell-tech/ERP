@@ -66,6 +66,9 @@ public static class CommandEndpoints
         masterData.MapCommand<UpdateSupplier, UpdateSupplierHandler>();
         masterData.MapCommand<ActivateSupplier, ActivateSupplierHandler>();
         masterData.MapCommand<SetSupplierPaymentTerms, SetSupplierPaymentTermsHandler>();
+        masterData.MapCommand<SetSupplierContact, SetSupplierContactHandler>();
+        masterData.MapCommand<ImportSuppliers, ImportSuppliersHandler>();
+        masterData.MapCommand<ActivateSuppliers, ActivateSuppliersHandler>();
         masterData.MapCommand<CreateRawMaterial, CreateRawMaterialHandler>();
         masterData.MapCommand<CreateFinishedGood, CreateFinishedGoodHandler>();
         masterData.MapCommand<DefineUomConversion, DefineUomConversionHandler>();
@@ -171,6 +174,9 @@ public static class CommandEndpoints
         sales.MapCommand<ActivateCustomer, ActivateCustomerHandler>();
         sales.MapCommand<PrepareCustomerTerms, PrepareCustomerTermsHandler>();
         sales.MapCommand<ApproveCustomerTerms, ApproveCustomerTermsHandler>();
+        sales.MapCommand<ImportCustomers, ImportCustomersHandler>();
+        sales.MapCommand<ApproveCustomerTermsBatch, ApproveCustomerTermsBatchHandler>();
+        sales.MapCommand<ActivateCustomers, ActivateCustomersHandler>();
         sales.MapCommand<PrepareStandardCost, PrepareStandardCostHandler>();
         sales.MapCommand<PrepareStandardCostFromRecipe, PrepareStandardCostFromRecipeHandler>();
         sales.MapCommand<ApproveStandardCost, ApproveStandardCostHandler>();
@@ -258,7 +264,8 @@ public static class CommandEndpoints
     public static IReadOnlyList<Type> Handlers { get; } =
     [
         typeof(UpdateCompanyLegalNameHandler), typeof(UpdatePlantNameHandler),
-        typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler),
+        typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler),
+        typeof(SetSupplierContactHandler), typeof(ImportSuppliersHandler), typeof(ActivateSuppliersHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
@@ -280,7 +287,8 @@ public static class CommandEndpoints
         typeof(ActivateFiscalRuleVersionHandler),
         typeof(RegisterFiscalAuthorizationHandler), typeof(UpdateDraftAuthorizationHandler), typeof(AttachAuthorizationDocumentHandler), typeof(SubmitForVerificationHandler), typeof(VerifyAuthorizationHandler), typeof(ReturnAuthorizationToDraftHandler), typeof(RejectAuthorizationHandler), typeof(SuspendAuthorizationHandler), typeof(ReactivateAuthorizationHandler), typeof(ExpireFiscalAuthorizationsHandler),
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),
-        typeof(CreateCustomerHandler), typeof(UpdateCustomerHandler), typeof(ActivateCustomerHandler), typeof(PrepareCustomerTermsHandler), typeof(ApproveCustomerTermsHandler), typeof(PrepareStandardCostHandler), typeof(PrepareStandardCostFromRecipeHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler),
+        typeof(CreateCustomerHandler), typeof(UpdateCustomerHandler), typeof(ActivateCustomerHandler), typeof(PrepareCustomerTermsHandler), typeof(ApproveCustomerTermsHandler),
+        typeof(ImportCustomersHandler), typeof(ApproveCustomerTermsBatchHandler), typeof(ActivateCustomersHandler), typeof(PrepareStandardCostHandler), typeof(PrepareStandardCostFromRecipeHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler),
         typeof(RegisterVehicleHandler), typeof(UpdateVehicleHandler), typeof(DeactivateVehicleHandler), typeof(ActivateVehicleHandler), typeof(RegisterDriverHandler), typeof(UpdateDriverHandler), typeof(DeactivateDriverHandler), typeof(ActivateDriverHandler),
         typeof(PrepareOpeningInventoryHandler), typeof(PostOpeningInventoryHandler), typeof(ReverseOpeningInventoryHandler),
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),

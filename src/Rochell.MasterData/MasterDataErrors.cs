@@ -14,6 +14,10 @@ public static class MasterDataErrors
     public const string ConversionInvalid = "CONVERSION_INVALID";
     public const string ConversionRetroactive = "CONVERSION_RETROACTIVE";
     public const string FieldRequired = "FIELD_REQUIRED";
+    public const string FieldInvalid = "FIELD_INVALID";
+    public const string ImportFileInvalid = "IMPORT_FILE_INVALID";
+    public const string ImportFileTooLarge = "IMPORT_FILE_TOO_LARGE";
+    public const string BatchInvalid = "BATCH_INVALID";
 }
 
 public static class ItemCategories

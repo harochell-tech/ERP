@@ -9,10 +9,13 @@ using Rochell.Finance.Policies;
 using Rochell.Identity.Queries;
 using Rochell.Manufacturing.Queries;
 using Rochell.MasterData.Company;
+using Rochell.MasterData.Import;
+using Rochell.MasterData.Suppliers;
 using Rochell.MasterData.Queries;
 using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
+using Rochell.Sales.Customers;
 using Rochell.Sales.Queries;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
@@ -41,6 +44,7 @@ public static class QueryEndpoints
     public static IReadOnlyList<Type> Handlers { get; } =
     [
         typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler), typeof(ListUomsHandler), typeof(GetCompanyHandler), typeof(GetRncHandler), typeof(GetRncRegistryStatusHandler),
+        typeof(PreviewSupplierImportHandler), typeof(PreviewCustomerImportHandler),
         typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
         typeof(ListLatestReconciliationRunsHandler), typeof(SearchJournalsHandler), typeof(GetIntegrityStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
@@ -90,6 +94,11 @@ public static class QueryEndpoints
         masterData.MapGet("/rnc-registry", (HttpContext http, Guid companyId, GetRncRegistryStatusHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetRncRegistryStatus(companyId, s), handler, ct))
             .Describe<RncRegistryStatus>(nameof(GetRncRegistryStatus));
+        // E-IMP-1: what the supplier file would load (POST: the file travels in the body; read-only).
+        masterData.MapPost("/suppliers/import-preview", (HttpContext http, Guid companyId, PreviewSupplierImportHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<PartyImportRequest, PreviewSupplierImport>(http, (s, b) => new PreviewSupplierImport(companyId, s, b.FileName, b.ContentBase64), handler, ct))
+            .Describe<PartyImportPreview>(nameof(PreviewSupplierImport))
+            .Accepts<PartyImportRequest>("application/json");
 
         var procurement = company.MapGroup("/procurement").WithTags("Procurement");
         procurement.MapGet("/purchase-orders", (HttpContext http, Guid companyId, Guid? plantId, string? status, Guid? supplierId, int? limit, int? offset, ListPurchaseOrdersHandler handler, QueryRunner runner, CancellationToken ct)
@@ -242,6 +251,11 @@ public static class QueryEndpoints
                 => runner.RunBodyAsync<QuotePreviewRequest, PreviewQuote>(http, (s, b) => new PreviewQuote(companyId, s, b.PlantId, b.Lines), handler, ct))
             .Describe<SalesPreview>(nameof(PreviewQuote))
             .Accepts<QuotePreviewRequest>("application/json");
+        // E-IMP-1: what the customer file would load (read-only).
+        sales.MapPost("/customers/import-preview", (HttpContext http, Guid companyId, PreviewCustomerImportHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<PartyImportRequest, PreviewCustomerImport>(http, (s, b) => new PreviewCustomerImport(companyId, s, b.FileName, b.ContentBase64), handler, ct))
+            .Describe<PartyImportPreview>(nameof(PreviewCustomerImport))
+            .Accepts<PartyImportRequest>("application/json");
         sales.MapGet("/customers/{partyId:guid}/credit-preview", (HttpContext http, Guid companyId, Guid partyId, string amount, GetCreditPreviewHandler handler, QueryRunner runner, CancellationToken ct)
                 => TryAmount(amount, out var value)
                     ? runner.RunAsync(http, s => new GetCreditPreview(companyId, s, partyId, value), handler, ct)

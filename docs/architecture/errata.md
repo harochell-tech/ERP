@@ -827,6 +827,29 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-UX4-15 | UX4 | `Audit.SearchJournals(Text)` (`audit:read`, GET `/audit/journals?text=`): a UUID matches a journal, its source event or the event's document; otherwise the text (case-insensitive) matches the number of a goods receipt, supplier invoice (NCF), payment, manual journal, sales invoice or credit note (number or e-NCF), receipt, deposit, delivery or production run, and returns the journals of that document's events and of events whose payload names it. `Audit.GetIntegrityStatus` (`audit:read`, GET `/audit/integrity-status`): a verification is a command, so the latest committed VerifyHashChain result in `core.command_log` (when, by whom, valid, per chain) is the last verification — a verification that failed technically rolled back and left none; beside it per chain the latest digest date, last sealed sequence and the groups pending seal or in error. |
 | E-UX4-16 | UX4 | Out of scope. |
 | E-UX4-17 | UX4 | Three PRs: UX4-01 (server: migration 0064, queries, command, tests), UX4-02 and UX4-03 (screens). |
+| E-IMP-1 | Bulk load | No bulk load existed. An "Importar" action in Maestros › Proveedores and Ventas › Clientes takes the `.xlsx` (or `.csv`) as ADM Cloud exports it, with its headers. Two steps: a row-by-row preview that writes nothing, then confirm. |
+| E-IMP-2 | Bulk load | Loaded: legal name, fiscal identifier, phone, e-mail and payment term ("Contado" = 0 days, "N días" = N). Every other column is ignored and the preview names them. |
+| E-IMP-3 | Bulk load | When the RNC is in the DGII registry the party gets the registry's legal name (the preview shows both); otherwise the file's. |
+| E-IMP-4 | Bulk load | Rows without a valid identifier (9 or 11 digits) are not loaded and are listed with the reason. Foreign suppliers and the final consumer are decided apart. |
+| E-IMP-5 | Bulk load | An RNC repeated in the file is loaded once; one that already exists is skipped; a supplier that appears in the customer file becomes a customer too (E-VS3-02-3). |
+| E-IMP-6 | Bulk load | As corrected by the owner: every party keeps a list of e-mails, the first being the principal one. The import splits the cell on `;` or `,` and keeps them all; the forms add and remove them. Sending documents comes later: it will propose the saved ones and accept others typed at that moment. |
+| E-IMP-7 | Bulk load | Everything enters as DRAFT with its data and payment term; activation follows the normal flow, with a new "activate the selected ones" action. |
+| E-IMP-8 | Bulk load | Customer terms need a credit limit: an optional column "Límite de Crédito"; without it the DRAFT terms carry 0 for Crédito to complete before approval. |
+| E-IMP-9 | Bulk load | Supplier bank accounts are not loaded in bulk; they enter through Treasury with their two-person verification. |
+| E-IMP-10 | Bulk load | The import is an audited command: the file is identified by its SHA-256 and the result lists every row. New permissions `supplier:import` and `customer:import`, with step-up. |
+| E-IMP-11 | Bulk load | The real files never enter the repository; tests use synthetic files. |
+| E-IMP-01-1 | IMP-01 | The file travels whole from the browser, base64, at most 5 MB (as bank statements, E-VS2-05-2). The server reads the first sheet of the `.xlsx`, or a UTF-8 `.csv`, with the ADM Cloud header row. |
+| E-IMP-01-2 | IMP-01 | The import also keeps phone and e-mails for suppliers (`SetSupplierContact` changes them afterwards). |
+| E-IMP-01-3 | IMP-01 | At most 10 e-mails per party, each of valid format; repeated ones (ignoring case) are kept once. |
+| E-IMP-01-4 | IMP-01 | The roles that create suppliers or customers hold the import permissions, plus SUPERADMIN; with step-up. |
+| E-IMP-01-5 | IMP-01 | `ActivateSuppliers` (up to 500) with the existing `supplier:activate`. Who creates does not activate: `supplier:import` ≠ `supplier:activate` and `customer:import` ≠ `customer:activate` are SoD rules; SUPERADMIN's waiver is marked as usual. |
+| E-IMP-01-6 | IMP-01 | A customer is activated only with approved terms, so there are also `ApproveCustomerTermsBatch` (Controller) and `ActivateCustomers` (Crédito), with the same two-person rules; an item that fails a rule is reported and skipped. |
+| E-IMP-01-7 | IMP-01 | Customers without a payment term in the file get DRAFT terms of 0 days (cash) and limit 0. |
+| E-IMP-01-8 | IMP-01 | Suppliers without a payment term enter without one. |
+| E-IMP-01-9 | IMP-01 | Implementation choices, for the owner's review with the PR: a row whose payment term is neither "Contado" nor "N días" (≤ 365), whose e-mail is malformed or whose credit limit is not a non-negative amount is rejected, never loaded with the value dropped; a file has at most 2,000 rows and 50 columns. |
+| E-IMP-01-10 | IMP-01 | Implementation choice: an RNC that exists only as a customer is not made a supplier by the supplier import (it is reported); load suppliers first, then customers. |
+| E-IMP-01-11 | IMP-01 | Implementation choice: a supplier that becomes a customer keeps its own phone and e-mails; the file's apply only where it has none. `UpdateCustomer` without the list replaces only the principal e-mail (the form before the screens of IMP-02). |
+| E-IMP-01-12 | IMP-01 | Two PRs: IMP-01 (server: migration 0065, commands, queries, tests) and IMP-02 (screens). |
 
 Implementation rules derived from the above (no architectural change):
 
