@@ -10,8 +10,9 @@ set -a; . ./.env; set +a
 docker compose pull api
 docker compose up -d postgres
 docker compose run --rm migrate migrate
-# Patch 1.1: a staging database is TEST (only TEST or PRODUCTION exist); written once, never changed.
-docker compose run --rm migrate init-environment TEST
+# Patch 1.1 / E-PAR-3: staging runs the parallel run with real data, so its database is PRODUCTION (no synthetic users, no
+# "Actuar como", official sources for fiscal rules); written once, never changed — the CLI refuses a database marked otherwise.
+docker compose run --rm migrate init-environment PRODUCTION
 docker compose exec -T postgres psql -U rochell_deploy -d rochell -q \
   -v app_password="$APP_DB_PASSWORD" -v sealer_password="$SEALER_DB_PASSWORD" < init-roles.sql
 docker compose up -d --remove-orphans api caddy

@@ -46,6 +46,7 @@ services:
       Rochell__Digest__Enabled: "true"
       # E-FIS1-04-7: the daily expiry of fiscal authorizations (the image's appsettings.*.json are not read: the content root is /app).
       Rochell__FiscalExpiry__Enabled: "true"
+      Rochell__EnvironmentBadge: PARALELO # E-PAR-3: the top bar tells the parallel run apart from production
       Rochell__Digest__SigningKeyPemFile: /run/secrets/digest-signing.pem
       Rochell__Audit__DigestPublicKeyPemFile: /run/secrets/digest-public.pem
       Rochell__Audit__S3__Bucket: ${WORM_BUCKET:?}

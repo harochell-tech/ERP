@@ -23,6 +23,12 @@ public sealed class ApiOptions
     /// <summary>E-PR18b-2: directory of the web UI's static export (web/out), served from the API's own origin. Unset: no UI.</summary>
     public string? WebRoot { get; set; }
 
+    /// <summary>
+    /// E-PAR-3: the label the web shows in its top bar for this deployment (staging runs the parallel run: "PARALELO"). Unset: the web
+    /// decides from the host name (E-UX1-01-10).
+    /// </summary>
+    public string? EnvironmentBadge { get; set; }
+
     public IdentitySettings Identity { get; set; } = new();
 
     public OidcSettings Oidc { get; set; } = new();

@@ -42,6 +42,27 @@
         ]
       }
     },
+    "/api/v1/environment": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name). No sign-in needed.",
+        "operationId": "GetEnvironment",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "get": {
         "tags": [
@@ -34462,6 +34483,21 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EnvironmentInfo": {
+        "required": [
+          "badge"
+        ],
+        "type": "object",
+        "properties": {
+          "badge": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
