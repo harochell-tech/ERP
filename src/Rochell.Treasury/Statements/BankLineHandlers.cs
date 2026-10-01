@@ -279,6 +279,12 @@ public sealed class UnmatchBankLineHandler : ICommandHandler<UnmatchBankLine>
             return await ReceiptUnmatching.UnmatchAsync(command, context, receiptId, depositId, reason, CommandType, cancellationToken).ConfigureAwait(false);
         }
 
+        // E-FIS1b-01-9: a customer refund's line.
+        if (await RefundLines.MatchedAsync(context, command.LineId, cancellationToken).ConfigureAwait(false) is { } refundId)
+        {
+            return await RefundLines.UnmatchAsync(command, context, refundId, reason, CommandType, cancellationToken).ConfigureAwait(false);
+        }
+
         // Lock order (E-VS2-05-8): payment → statement line → bank account. The line names its payment; it is read again under lock.
         var paymentId = await BankLines.MatchedPaymentAsync(context, command.LineId, cancellationToken).ConfigureAwait(false);
         var payment = paymentId is { } p ? await BankLines.LockPaymentAsync(context, p, cancellationToken).ConfigureAwait(false) : null;

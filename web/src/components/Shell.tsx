@@ -53,6 +53,7 @@ export const NAV: readonly NavGroup[] = [
     title: "Facturación",
     items: [
       { href: "/facturacion/por-facturar/", label: "Por facturar", permission: "sales:read" },
+      { href: "/facturacion/proformas/", label: "Proformas", permission: "sales:read" }, // FIS1b-07 (E-FIS1b-9)
       { href: "/facturacion/facturas/", label: "Facturas", permission: "sales:read" },
       { href: "/facturacion/notas/", label: "Notas de crédito", permission: "sales:read" },
     ],
@@ -173,6 +174,7 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/contabilidad/apertura-lote/": "/contabilidad/apertura/",
   "/facturacion/factura/": "/facturacion/facturas/",
   "/facturacion/nota/": "/facturacion/notas/",
+  "/facturacion/proforma/": "/facturacion/proformas/",
   "/cobros/recibo/": "/cobros/recibos/",
   "/cobros/deposito/": "/cobros/depositos/",
   "/produccion/corrida/": "/produccion/dia/",

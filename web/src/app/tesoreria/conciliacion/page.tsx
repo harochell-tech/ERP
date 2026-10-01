@@ -28,6 +28,7 @@ const ITEM_KINDS: Readonly<Record<string, string>> = {
   OUTSTANDING_RECEIPT_REVERSAL: "Cobro anulado sin línea",
   OUTSTANDING_DEPOSIT: "Depósito sin crédito en el extracto",
   OUTSTANDING_BOUNCE: "Cheque devuelto sin débito en el extracto",
+  OUTSTANDING_REFUND: "Devolución a cliente sin débito en el extracto",
 };
 
 const RECEIPT_KINDS: Readonly<Record<string, string>> = {
@@ -107,6 +108,37 @@ function ReceiptActions({ line, onDone }: { line: Line; onDone: () => void }) {
   );
 }
 
+// FIS1b-07 (E-FIS1b-8): an UNMATCHED DEBIT line against the released customer refunds of the same account and amount
+// (bank:read lists them; bank_line:match confirms). The match leaves the refund CLEARED.
+function RefundActions({ line, refunds, onDone }: { line: Line; refunds: readonly Schemas["RefundToMatch"][]; onDone: () => void }) {
+  const { can } = useSession();
+  const match = useCommand(`match-refund-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/match-bank-line-to-refund", "Línea del extracto conciliada.");
+  const candidates = refunds.filter((r) => Number(r.amount) === Number(line.amount));
+  if (line.direction !== "DEBIT" || candidates.length === 0 || !can("bank_line:match")) {
+    return null;
+  }
+  return (
+    <>
+      {candidates.map((r) => (
+        <button
+          key={r.refundId}
+          type="button"
+          className="primary"
+          disabled={match.busy}
+          onClick={async () => {
+            if (await match.run({ lineId: line.lineId, expectedLineVersion: line.version, refundId: r.refundId, expectedVersion: r.version }, undefined, `Línea del extracto conciliada con la devolución ${r.refundNo}.`)) {
+              onDone();
+            }
+          }}
+        >
+          Conciliar con devolución {r.refundNo} · {r.customerName}
+        </button>
+      ))}
+      <ErrorBox error={match.error} />
+    </>
+  );
+}
+
 // VS2-08: BANK-GL of the account at the date (read-only, E-VS2-07-5) and the statement's lines. A match is always confirmed by a
 // person (E-VS2-05-6): the suggestion, or a payment picked by hand; a CREDIT line only as the return of a reversed payment
 // (E-VS2-05-10). The Controller recognizes charges (R-10) and unmatches with a reason.
@@ -115,12 +147,14 @@ function LineActions({
   suggestion,
   released,
   reversed,
+  refunds,
   onDone,
 }: {
   line: Line;
   suggestion?: Suggestion;
   released: PaymentSummary[];
   reversed: PaymentSummary[];
+  refunds: readonly Schemas["RefundToMatch"][];
   onDone: () => void;
 }) {
   const { can } = useSession();
@@ -180,11 +214,12 @@ function LineActions({
           onConfirm={async () => after(await charge.run({ lineId: line.lineId, expectedVersion: line.version }))}
         />
       ) : null}
+      {line.status === "UNMATCHED" ? <RefundActions line={line} refunds={refunds} onDone={onDone} /> : null}
       {line.status === "UNMATCHED" ? <ReceiptActions line={line} onDone={onDone} /> : null}
       {line.status === "MATCHED" && can("bank_line:unmatch") ? (
         <ReasonAction
           label="Desconciliar"
-          consequence="La línea vuelve a quedar sin conciliar y el pago vuelve a estar liberado (en tránsito)."
+          consequence="La línea vuelve a quedar sin conciliar y el pago, el cobro o la devolución vuelve a estar en tránsito."
           stepUp
           busy={busy}
           onConfirm={async (reason) => after(await unmatch.run({ lineId: line.lineId, expectedVersion: line.version, reason }))}
@@ -240,6 +275,7 @@ function Reconciliation() {
     can("payment:read") ? () => query("/api/v1/companies/{companyId}/treasury/payments", { path: { companyId }, query: { limit: 200 } }) : null,
     [companyId],
   );
+  const refunds = useLoad(allowed ? () => query("/api/v1/companies/{companyId}/treasury/refunds-to-match", { path: { companyId } }) : null, [companyId]);
   if (!allowed) {
     return <NoPermission />;
   }
@@ -248,6 +284,7 @@ function Reconciliation() {
     lines.reload();
     suggestions.reload();
     payments.reload();
+    refunds.reload();
   };
   const released = (payments.data?.items ?? []).filter((p) => p.status === "RELEASED" && p.bankAccountId === bank);
   const reversed = (payments.data?.items ?? []).filter((p) => p.status === "REVERSED" && p.bankAccountId === bank);
@@ -416,6 +453,7 @@ function Reconciliation() {
                     suggestion={suggestions.data?.lines.find((s) => s.lineId === l.lineId)}
                     released={released}
                     reversed={reversed}
+                    refunds={(refunds.data?.items ?? []).filter((x) => x.bankAccountId === bank)}
                     onDone={reloadAll}
                   />
                 </td>

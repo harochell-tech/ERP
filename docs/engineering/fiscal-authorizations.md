@@ -87,3 +87,76 @@ UNAPPLIED_RECEIPTS until the invoice is issued, when its allocations become P-25
 | `CreateInvoiceFromDeliveries`, `ListBillableDeliveries` | A delivery line with a proforma that is not VOIDED is refused (`PROFORMA_REQUIRED`) and not listed: it is invoiced from its proforma (FIS1b-04) |
 | `GET /sales/proformas`, `GET /sales/proformas/{id}` (`sales:read`) | Balance = what the proforma collects (total, or net when it collects without ITBIS) − allocated; deposit = allocated above the net; days overdue; certification NONE / IN_PROCESS / CERTIFIED from the authorizations that list it. The detail adds issuer, site address, lines and history — what the printed proforma shows |
 
+## FIS1b-03 — receipts allocated to proformas (E-FIS1b-3/4, E-FIS1b-01-4/5)
+
+Option A: an allocation posts nothing. The receipt keeps its whole unapplied amount in UNAPPLIED_RECEIPTS; `allocated_amount` (on
+the receipt and on the proforma) only keeps that money for the proforma's invoice.
+
+| Piece | Behaviour |
+| --- | --- |
+| `AllocateReceiptToProformas` (`receipt:apply`, Cobros) | A RECORDED receipt to OPEN proformas of its customer, each up to its balance (total, or net when it collects without ITBIS) and in all up to unapplied − allocated; rows in `fin.proforma_allocation`, event `ReceiptAllocated`. Errors `ALLOCATION_EXCEEDS_AVAILABLE`, `ALLOCATION_EXCEEDS_BALANCE`, `PROFORMA_NOT_OPEN`, `PROFORMA_OF_ANOTHER_CUSTOMER` |
+| `ReleaseProformaAllocation` (`receipt:apply`) | Releases one whole allocation event with a reason (mirror rows, `ReceiptAllocationReleased`) |
+| `ApplyReceipt` | Applies at most unapplied − allocated |
+| `MarkReceiptBounced` | Releases the cheque's live allocations before the bounce; `ReverseReceipt` refuses a receipt with allocations |
+| Lock order | Proformas (by id) → invoices → AR documents → receipt |
+| `CreditExposure` | Delivered-not-invoiced is net of what was allocated to open proformas (up to their net); overdue days also from overdue open proformas with a balance |
+| `GetArAging` | `proformas` / `deposits` per customer and in total, with `proformaDocuments` (balance, deposit, days, bucket), outside `total` and `net`; `unapplied` leaves out what is allocated. CSV: a row per proforma ("Proforma (sin e-CF)"), the deposit and "Total proformas pendientes de e-CF" |
+| `GetCustomerStatement` | `openProformas` and `proformaBalance`, apart from the ledger balance; CSV rows `PROFORMA_SIN_ECF` |
+| `GetReceipt` / `ListReceipts`, `GetProforma` | `allocated`, `available` and the receipt's allocations; the proforma's live collections |
+
+## FIS1b-04 — authorization with proformas, invoice from proformas (E-FIS1b-5…7, 10, E-FIS1b-01-6…8, 11)
+
+| Piece | Behaviour |
+| --- | --- |
+| `RegisterFiscalAuthorization` / `UpdateDraftAuthorization` | `proformaIds`: OPEN proformas of the customer that no other live authorization cites (`AUTHORIZATION_PROFORMA_INVALID`); the scope is the sum of their lines by product and unit, so `lines` is not given with them. `GetFiscalAuthorization` returns `proformas` |
+| `CreateInvoiceFromProformas` (`invoice:create`) | Whole OPEN proformas of one customer → the DRAFT invoice of their delivery lines (`InvoiceDrafts.CreateAsync`, shared with the delivery path). With an authorization that cites proformas, every line must come from them (`PROFORMA_NOT_CERTIFIED`) |
+| `IssueInvoice` | Locks the invoice's proformas first. After P-18, `ProformaInvoicing.InheritAsync` releases every live allocation of those proformas and applies it to the new AR document, receipt by receipt, with the usual P-25 (`Receipting.ApplyAsync`), up to the invoice's total; the rest stays unapplied on its receipt — the customer's credit balance. The proformas become INVOICED; the invoice ends CONFIRMED, PARTIALLY_PAID or PAID and the result says `collectedOnProformas` |
+| `VoidUnfiscalizedInvoice` | The proformas of the voided invoice return to OPEN (the receipts were unapplied before: a paid invoice is not voided) |
+| `VoidProforma` (`proforma:void`, Facturación) | OPEN, nothing allocated, cited by no live authorization; reason required; its delivery is billable through the delivery path again |
+| Lock order | Proformas → invoice → AR document → receipts |
+
+The invoice's due date is still the issue date plus the customer's terms (not the proforma's).
+
+## FIS1b-05 — customer refund (migration 0067, E-FIS1b-8, E-FIS1b-01-9)
+
+The credit balance of a receipt — what is neither applied nor allocated, typically the ITBIS advanced on proformas that ended in an
+e-CF 44 — is paid back to the customer.
+
+| Piece | Behaviour |
+| --- | --- |
+| `fin.customer_refund` | DEV-000001 per company: receipt, company bank account, TRANSFER / CHEQUE, amount, reason; PREPARED → RELEASED → CLEARED (⇄ RELEASED on unmatch) or VOIDED; releaser ≠ preparer (`core.four_eyes`); state history; K-25 (a released refund has the live journal of its event) |
+| `PrepareCustomerRefund` (`customer_refund:prepare`, Cobros) | A RECORDED receipt whose money is in the bank (not IN_TRANSIT); amount ≤ unapplied − allocated − other prepared refunds; an ACTIVE bank account. Nothing posts |
+| `ReleaseCustomerRefund` (`customer_refund:release`, step-up, Controller: E-FIS1b-05-1) | Not the preparer. **P-36** `CustomerRefundReleased`: Dr UNAPPLIED_RECEIPTS (the receipt) / Cr BANK; the receipt's unapplied amount goes down. Close component BANK-REC, also AR-REC |
+| `VoidCustomerRefund` (`customer_refund:prepare`) | A PREPARED refund, with a reason |
+| `MatchBankLineToRefund` (`bank_line:match`, Treasury) | An UNMATCHED DEBIT line of the refund's account and amount, within ten days of the release → line MATCHED, refund CLEARED; `UnmatchBankLine` returns both |
+| `MarkReceiptBounced` | Refused while the receipt has a refund that is not VOIDED |
+| Reconciliations | RECEIPT-APPL (a) counts released refunds with the applications; ACC-EVIDENCE checks `DEV`; BANK-GL links the P-36 entry and its line (`OUTSTANDING_REFUND` until matched) |
+| Queries | `GET /sales/customer-refunds`, `/{id}` (`sales:read`); `GET /treasury/refunds-to-match` (`bank:read`) |
+
+SoD: `customer_refund:prepare` ≠ `customer_refund:release`. 181 commands, 121 permissions, 45 SoD rules.
+
+## FIS1b-06 — reconciliation PROFORMA-ASIG (migration 0068, E-FIS1b-11, E-FIS1b-01-10, 12)
+
+Blocks AR-REC. Three checks (`Reconciliations.cs`):
+
+| Classification | A | B |
+| --- | --- | --- |
+| `PROFORMA_ALLOCATION_DIFFERENCE` | `sal.proforma.allocated_amount` | Σ live `fin.proforma_allocation` of the proforma |
+| `RECEIPT_ALLOCATION_DIFFERENCE` | `fin.receipt.allocated_amount` | Σ live allocations of the receipt |
+| `PROFORMA_UNBILLED_DIFFERENCE` | Net of an OPEN proforma (0 for an INVOICED one) | Delivered and not invoiced of its delivery lines, at the proforma's price |
+
+Refunds joined RECEIPT-APPL, ACC-EVIDENCE and BANK-GL in FIS1b-05. The warning for proformas waiting too long for their e-CF is
+the existing `UNBILLED_AGED` of CONTRACT-ASSET (`unbilled_aging_alert_days`): no new parameter (E-FIS1b-01-10). 31 reconciliations,
+60 classifications.
+
+## FIS1b-07 — screens, E2E-P1 and acceptance (E-FIS1b-01-14)
+
+- Screens: `web.md` (FIS1b-07). Acceptance matrix: `docs/acceptance/fis1b.md`; `AcceptanceFis1bTraceabilityTests` ties PRF-01…13 and
+  E2E-P1 to their tests.
+- `ProformaAcceptanceTests` (E2E-P1 over HTTP): 1,000 blocks at 50.00 in two pickups → PF-000001 (35,400.00) and PF-000002
+  (23,600.00) → receipt of 59,000.00 allocated (no journal) → certification citing both (scope 1,000 / 50,000.00) → e-CF 44 of
+  50,000.00 paid on issue → refund DEV-000001 of 9,000.00 (Cobros prepares, the Controller releases, P-36) → both statement lines
+  matched. Ledger: BANK 50,000.00, REVENUE −50,000.00, no ITBIS payable, AR / contract asset / unapplied receipts at 0; AR-GL,
+  AUTH-CONSUMPTION, BANK-GL, CONTRACT-ASSET, EXEMPT-WITHOUT-AUTH, FISC-DOC, PROFORMA-ASIG and RECEIPT-APPL MATCHED.
+- The customer's statement names the refund: `CustomerRefundReleased` → `DEVOLUCION` with its DEV- number (it was `OTRO`).
+

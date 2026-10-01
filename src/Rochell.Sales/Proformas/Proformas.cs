@@ -10,6 +10,8 @@ public static class ProformaErrors
 {
     public const string MarkInvalid = "PROFORMA_MARK_INVALID";
     public const string Required = "PROFORMA_REQUIRED";
+    public const string NotCertified = "PROFORMA_NOT_CERTIFIED";
+    public const string NotVoidable = "PROFORMA_NOT_VOIDABLE";
 }
 
 /// <summary>One delivered line of a delivery, as its proforma carries it: the quantity that reached the customer at the order price.</summary>

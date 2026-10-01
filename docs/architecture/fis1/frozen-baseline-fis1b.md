@@ -65,7 +65,7 @@ Permiso nuevo `proforma:void` (Facturación). Los demás pasos usan permisos exi
 | PRF-06 | Dos proformas en una autorización ACTIVE | Factura desde las dos | e-CF 44; lo asignado se aplica hasta el total; el ITBIS adelantado queda a favor |
 | PRF-07 | Proforma sin certificación, cobrada con ITBIS | Factura con ITBIS | e-CF 31 pagada: lo asignado cubre neto e ITBIS |
 | PRF-08 | Proforma cobrada sin ITBIS | Factura con ITBIS | e-CF 31 con el ITBIS como saldo |
-| PRF-09 | Saldo a favor tras una e-CF 44 | Cobros prepara la devolución y Tesorería la libera | DEV-000001; el mismo usuario no hace ambas; baja el anticipo contra banco |
+| PRF-09 | Saldo a favor tras una e-CF 44 | Cobros prepara la devolución y el Controller la libera (E-FIS1b-05-1); Tesorería la empareja con el extracto | DEV-000001; el mismo usuario no hace ambas; baja el anticipo contra banco |
 | PRF-10 | Cheque asignado a una proforma | El cheque se devuelve | La asignación se deshace; la proforma recupera su saldo |
 | PRF-11 | Conduce con proforma | Factura por la vía de conduces | Rechazado: se factura desde la proforma |
 | PRF-12 | Proforma sin cobros ni factura | Anular con motivo | VOIDED; el conduce vuelve a la facturación normal |
@@ -102,8 +102,8 @@ Permiso nuevo `proforma:void` (Facturación). Los demás pasos usan permisos exi
 | E-FIS1b-5 | La autorización lista las proformas que cubre; el alcance se arma con sus líneas |
 | E-FIS1b-6 | Se factura desde proformas: e-CF 44 con su autorización, 31 / 32 con ITBIS sin ella; toda exenta o toda gravada |
 | E-FIS1b-7 | La factura hereda lo cobrado; con e-CF 44 el depósito de ITBIS queda como saldo a favor |
-| E-FIS1b-8 | «Devolución al cliente» sobre su saldo a favor: la prepara Cobros, la libera Tesorería |
+| E-FIS1b-8 | «Devolución al cliente» sobre su saldo a favor: la prepara Cobros, la libera el Controller (E-FIS1b-05-1, que enmienda «la libera Tesorería») |
 | E-FIS1b-9 | Vista de proformas por cliente y aviso de proformas viejas sin e-CF (parámetro de política) |
 | E-FIS1b-10 | Una proforma sin cobros ni factura se anula con motivo |
 | E-FIS1b-11 | Conciliaciones que bloquean el cierre de CxC |
-| E-FIS1b-01-1…14 | Ver `errata.md` |
+| E-FIS1b-01-1…14, E-FIS1b-05-1 | Ver `errata.md` |

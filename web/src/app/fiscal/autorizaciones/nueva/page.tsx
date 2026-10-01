@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, useFieldErrors } from "@/components/ui";
+import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, Money, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -14,6 +14,8 @@ import { allCustomers } from "@/lib/paging";
 // FIS1-05 (E-FIS1-05-3): register a CONFOTUR authorization, or edit it while DRAFT (fiscal_authorization:register). The scope is
 // product × sale unit with the authorized quantity and net, as typed from the DGII certificate; the server validates everything
 // (active customer with RNC, unique certificate, active finished goods). Products come from the price list in force (sales:read).
+// FIS1b-07 (E-FIS1b-5, E-FIS1b-01-8): when the certificate cites proformas, they are marked instead and the server computes the
+// scope from their lines; no scope lines are typed.
 
 interface Line {
   itemId: string;
@@ -32,6 +34,7 @@ interface Values {
   projectTermEndsOn: string;
   salesOrderId: string;
   lines: Line[];
+  proformaIds: string[];
 }
 
 const EMPTY_LINE: Line = { itemId: "", uom: "", quantity: "", netAmount: "" };
@@ -51,6 +54,62 @@ function OriginOrder({ partyId, value, onChange }: { partyId: string; value: str
         ))}
       </select>
     </Field>
+  );
+}
+
+/** The customer's OPEN proformas that no other authorization cites, plus those this draft already cites. */
+function CitedProformas({ partyId, own, value, onChange }: { partyId: string; own: readonly string[]; value: readonly string[]; onChange: (proformaIds: string[]) => void }) {
+  const { companyId } = useSession();
+  const { data } = useLoad(
+    partyId ? () => query("/api/v1/companies/{companyId}/sales/proformas", { path: { companyId }, query: { partyId, status: "OPEN", limit: 200 } }) : null,
+    [companyId, partyId],
+  );
+  const proformas = partyId ? (data?.items ?? []).filter((f) => f.certification === "NONE" || own.includes(f.proformaId)) : [];
+  if (proformas.length === 0) {
+    return null;
+  }
+  return (
+    <section data-testid="cited-proformas">
+      <h2>Proformas que cita el certificado</h2>
+      <p className="muted">Marque las proformas que la DGII cita en la certificación. El alcance se calcula de sus líneas y, al activarse, se facturan como e-CF 44 desde Facturación › Proformas.</p>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th />
+              <th>Proforma</th>
+              <th>Conduce</th>
+              <th>Fecha</th>
+              <th className="num">Neto (RD$)</th>
+              <th className="num">ITBIS (RD$)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {proformas.map((f) => (
+              <tr key={f.proformaId}>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Citar ${f.proformaNo}`}
+                    checked={value.includes(f.proformaId)}
+                    onChange={(e) => onChange(e.target.checked ? [...value, f.proformaId] : value.filter((id) => id !== f.proformaId))}
+                  />
+                </td>
+                <td className="mono">{f.proformaNo}</td>
+                <td className="mono">{f.deliveryNo}</td>
+                <td>{formatDate(f.proformaDate)}</td>
+                <td className="num">
+                  <Money value={f.net} />
+                </td>
+                <td className="num">
+                  <Money value={f.itbis} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -111,8 +170,10 @@ function AuthorizationForm() {
           projectTermEndsOn: authorization.projectTermEndsOn ?? "",
           salesOrderId: authorization.salesOrderId ?? "",
           lines: authorization.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.qtyAuthorized, netAmount: l.netAuthorized })),
+          proformaIds: authorization.proformas.map((f) => f.proformaId),
         }
-      : { partyId: "", certificateNo: "", issuedOn: "", validUntil: "", projectName: "", confoturResolutionNo: "", projectTermEndsOn: "", salesOrderId: "", lines: [{ ...EMPTY_LINE }] });
+      : { partyId: "", certificateNo: "", issuedOn: "", validUntil: "", projectName: "", confoturResolutionNo: "", projectTermEndsOn: "", salesOrderId: "", lines: [{ ...EMPTY_LINE }], proformaIds: [] });
+  const byProformas = current.proformaIds.length > 0;
   const set = (change: Partial<Values>) => setValues({ ...current, ...change });
   const setText = (key: "certificateNo" | "issuedOn" | "validUntil" | "projectName" | "confoturResolutionNo" | "projectTermEndsOn") => (e: { target: { value: string } }) =>
     set({ [key]: e.target.value });
@@ -128,7 +189,7 @@ function AuthorizationForm() {
       projectName: current.projectName.trim() === "" && "Indique el proyecto.",
       confoturResolutionNo: current.confoturResolutionNo.trim() === "" && "Indique la resolución CONFOTUR.",
     };
-    lines.forEach((l, index) => {
+    (byProformas ? [] : lines).forEach((l, index) => {
       found[`line-${index}-item`] = !l.itemId && "Elija el producto.";
       found[`line-${index}-quantity`] = !isPositiveDecimal(l.quantity, 6) && "Mayor que cero, hasta 6 decimales.";
       found[`line-${index}-net`] = !isPositiveDecimal(l.netAmount, 2) && "Mayor que cero, hasta 2 decimales.";
@@ -144,7 +205,8 @@ function AuthorizationForm() {
       confoturResolutionNo: current.confoturResolutionNo.trim(),
       projectTermEndsOn: current.projectTermEndsOn === "" ? null : current.projectTermEndsOn,
       salesOrderId: current.salesOrderId === "" ? null : current.salesOrderId,
-      lines,
+      lines: byProformas ? null : lines,
+      proformaIds: byProformas ? current.proformaIds : null,
     };
     const response = authorization
       ? await update.run(
@@ -165,7 +227,7 @@ function AuthorizationForm() {
       <p className="muted">Régimen CONFOTUR. Copie los datos del certificado de exención emitido por la DGII; el certificado se adjunta después, en la autorización.</p>
       <div>
         <Field label="Cliente" required error={fe.errors.partyId}>
-          <select aria-label="Cliente" value={current.partyId} disabled={authorization !== null} onChange={(e) => set({ partyId: e.target.value, salesOrderId: "" })}>
+          <select aria-label="Cliente" value={current.partyId} disabled={authorization !== null} onChange={(e) => set({ partyId: e.target.value, salesOrderId: "", proformaIds: [] })}>
             <option value="">—</option>
             {data.customers.map((c) => (
               <option key={c.partyId} value={c.partyId}>
@@ -194,7 +256,14 @@ function AuthorizationForm() {
         </Field>
         <OriginOrder partyId={current.partyId} value={current.salesOrderId} onChange={(salesOrderId) => set({ salesOrderId })} />
       </div>
+      <CitedProformas partyId={current.partyId} own={authorization?.proformas.map((f) => f.proformaId) ?? []} value={current.proformaIds} onChange={(proformaIds) => set({ proformaIds })} />
       <h2>Alcance</h2>
+      {byProformas ? (
+        <p className="muted" data-testid="scope-from-proformas">
+          El alcance (producto, cantidad y neto) se toma de las {current.proformaIds.length} proforma(s) marcadas; lo verá en la autorización al guardarla.
+        </p>
+      ) : null}
+      <div hidden={byProformas}>
       <LineTable>
         <thead>
           <tr>
@@ -259,10 +328,13 @@ function AuthorizationForm() {
           ))}
         </tbody>
       </LineTable>
+      </div>
       <div className="actions form-actions">
-        <button type="button" onClick={() => set({ lines: [...current.lines, { ...EMPTY_LINE }] })}>
-          Agregar línea
-        </button>
+        {byProformas ? null : (
+          <button type="button" onClick={() => set({ lines: [...current.lines, { ...EMPTY_LINE }] })}>
+            Agregar línea
+          </button>
+        )}
         <button type="button" className="primary" disabled={register.busy || update.busy} onClick={submit}>
           {authorization ? "Guardar borrador" : "Registrar autorización"}
         </button>
