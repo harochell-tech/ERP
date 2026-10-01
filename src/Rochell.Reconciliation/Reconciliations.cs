@@ -119,6 +119,9 @@ public static class Reconciliations
                      FROM fin.receipt CROSS JOIN (VALUES ('BANK-REC'), ('AR-REC')) AS k (component) WHERE company_id = @c
                    UNION ALL SELECT 'BNC', receipt_id, 'POSTED', closing_event_id, 'BANK-REC' FROM fin.receipt WHERE company_id = @c AND status = 'BOUNCED'
                    UNION ALL SELECT 'DEP', deposit_id, 'POSTED', posting_event_id, 'BANK-REC' FROM fin.receipt_deposit WHERE company_id = @c
+                   -- E-FIS1b-01-9: a released customer refund has its P-36 journal.
+                   UNION ALL SELECT 'DEV', refund_id, 'POSTED', posting_event_id, k.component
+                     FROM fin.customer_refund CROSS JOIN (VALUES ('BANK-REC'), ('AR-REC')) AS k (component) WHERE company_id = @c AND status IN ('RELEASED', 'CLEARED')
                    UNION ALL SELECT 'RET', withholding_id, CASE WHEN status = 'REVERSED' THEN 'REVERSED' ELSE 'POSTED' END, posting_event_id, 'AR-REC'
                      FROM fin.customer_withholding WHERE company_id = @c),
                  evidence AS (
@@ -330,9 +333,10 @@ public static class Reconciliations
                           WHERE x.company_id = @c AND x.reverses_application_id IS NULL
                             AND NOT EXISTS (SELECT 1 FROM fin.ar_application u WHERE u.reverses_application_id = x.application_id)),
                  per_receipt AS (SELECT r.receipt_no, r.status, r.amount, r.unapplied_amount,
-                                        coalesce((SELECT sum(l.amount) FROM live l WHERE l.receipt_id = r.receipt_id), 0) AS applied
+                                        coalesce((SELECT sum(l.amount) FROM live l WHERE l.receipt_id = r.receipt_id), 0)
+                                        + coalesce((SELECT sum(f.amount) FROM fin.customer_refund f WHERE f.receipt_id = r.receipt_id AND f.status IN ('RELEASED', 'CLEARED')), 0) AS applied
                                  FROM fin.receipt r WHERE r.company_id = @c)
-            -- (a) a live receipt: applications + unapplied = amount; a bounced or reversed one keeps no live application.
+            -- (a) a live receipt: applications + refunds paid (E-FIS1b-01-9) + unapplied = amount; a bounced or reversed one keeps neither.
             SELECT 'REC:' || receipt_no AS match_key, CASE WHEN status = 'RECORDED' THEN amount ELSE 0 END AS value_a,
                    applied + CASE WHEN status = 'RECORDED' THEN unapplied_amount ELSE 0 END AS value_b,
                    'RECEIPT_APPLICATION_DIFFERENCE' AS classification, 'ERROR' AS severity, NULL::text AS component

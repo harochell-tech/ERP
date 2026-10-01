@@ -117,3 +117,21 @@ the receipt and on the proforma) only keeps that money for the proforma's invoic
 
 The invoice's due date is still the issue date plus the customer's terms (not the proforma's).
 
+## FIS1b-05 — customer refund (migration 0067, E-FIS1b-8, E-FIS1b-01-9)
+
+The credit balance of a receipt — what is neither applied nor allocated, typically the ITBIS advanced on proformas that ended in an
+e-CF 44 — is paid back to the customer.
+
+| Piece | Behaviour |
+| --- | --- |
+| `fin.customer_refund` | DEV-000001 per company: receipt, company bank account, TRANSFER / CHEQUE, amount, reason; PREPARED → RELEASED → CLEARED (⇄ RELEASED on unmatch) or VOIDED; releaser ≠ preparer (`core.four_eyes`); state history; K-25 (a released refund has the live journal of its event) |
+| `PrepareCustomerRefund` (`customer_refund:prepare`, Cobros) | A RECORDED receipt whose money is in the bank (not IN_TRANSIT); amount ≤ unapplied − allocated − other prepared refunds; an ACTIVE bank account. Nothing posts |
+| `ReleaseCustomerRefund` (`customer_refund:release`, step-up) | Not the preparer. **P-36** `CustomerRefundReleased`: Dr UNAPPLIED_RECEIPTS (the receipt) / Cr BANK; the receipt's unapplied amount goes down. Close component BANK-REC, also AR-REC |
+| `VoidCustomerRefund` (`customer_refund:prepare`) | A PREPARED refund, with a reason |
+| `MatchBankLineToRefund` (`bank_line:match`, Treasury) | An UNMATCHED DEBIT line of the refund's account and amount, within ten days of the release → line MATCHED, refund CLEARED; `UnmatchBankLine` returns both |
+| `MarkReceiptBounced` | Refused while the receipt has a refund that is not VOIDED |
+| Reconciliations | RECEIPT-APPL (a) counts released refunds with the applications; ACC-EVIDENCE checks `DEV`; BANK-GL links the P-36 entry and its line (`OUTSTANDING_REFUND` until matched) |
+| Queries | `GET /sales/customer-refunds`, `/{id}` (`sales:read`); `GET /treasury/refunds-to-match` (`bank:read`) |
+
+SoD: `customer_refund:prepare` ≠ `customer_refund:release`. 181 commands, 121 permissions, 45 SoD rules.
+

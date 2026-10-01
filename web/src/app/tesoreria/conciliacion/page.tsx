@@ -28,6 +28,7 @@ const ITEM_KINDS: Readonly<Record<string, string>> = {
   OUTSTANDING_RECEIPT_REVERSAL: "Cobro anulado sin línea",
   OUTSTANDING_DEPOSIT: "Depósito sin crédito en el extracto",
   OUTSTANDING_BOUNCE: "Cheque devuelto sin débito en el extracto",
+  OUTSTANDING_REFUND: "Devolución a cliente sin débito en el extracto",
 };
 
 const RECEIPT_KINDS: Readonly<Record<string, string>> = {

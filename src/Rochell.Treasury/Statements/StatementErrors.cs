@@ -29,4 +29,5 @@ public static class StatementErrors
     public const string AmountInvalid = "AMOUNT_INVALID";
     public const string ReceiptNotMatchable = "RECEIPT_NOT_MATCHABLE";
     public const string MatchTargetRequired = "MATCH_TARGET_REQUIRED";
+    public const string RefundNotMatchable = "REFUND_NOT_MATCHABLE";
 }

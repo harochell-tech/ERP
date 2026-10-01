@@ -18,6 +18,7 @@ using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Customers;
 using Rochell.Sales.Proformas;
 using Rochell.Sales.Queries;
+using Rochell.Sales.Refunds;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
 using Rochell.Tax.Reports;
@@ -57,11 +58,11 @@ public static class QueryEndpoints
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
-        typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler),
+        typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
-        typeof(ListProformasHandler), typeof(GetProformaHandler),
+        typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
@@ -241,6 +242,13 @@ public static class QueryEndpoints
         sales.MapGet("/proformas/{proformaId:guid}", (HttpContext http, Guid companyId, Guid proformaId, GetProformaHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetProforma(companyId, s, proformaId), handler, ct))
             .Describe<ProformaDetail>(nameof(GetProforma), notFound: true);
+        // E-FIS1b-8: refunds of customers' credit balances.
+        sales.MapGet("/customer-refunds", (HttpContext http, Guid companyId, Guid? partyId, string? status, int? limit, int? offset, ListCustomerRefundsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListCustomerRefunds(companyId, s, partyId, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<CustomerRefundList>(nameof(ListCustomerRefunds));
+        sales.MapGet("/customer-refunds/{refundId:guid}", (HttpContext http, Guid companyId, Guid refundId, GetCustomerRefundHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetCustomerRefund(companyId, s, refundId), handler, ct))
+            .Describe<CustomerRefundDetail>(nameof(GetCustomerRefund), notFound: true);
         sales.MapGet("/quotes", (HttpContext http, Guid companyId, string? status, Guid? partyId, bool? expiredOnly, int? limit, int? offset, ListQuotesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListQuotes(companyId, s, status, partyId, expiredOnly ?? false, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<QuoteList>(nameof(ListQuotes));
@@ -426,6 +434,10 @@ public static class QueryEndpoints
         treasury.MapGet("/payments/{paymentId:guid}", (HttpContext http, Guid companyId, Guid paymentId, GetPaymentHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetPayment(companyId, s, paymentId), handler, ct))
             .Describe<PaymentDetail>(nameof(GetPayment), notFound: true);
+        // E-FIS1b-01-9: released customer refunds waiting for their statement line.
+        treasury.MapGet("/refunds-to-match", (HttpContext http, Guid companyId, Guid? bankAccountId, ListRefundsToMatchHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListRefundsToMatch(companyId, s, bankAccountId), handler, ct))
+            .Describe<RefundToMatchList>(nameof(ListRefundsToMatch));
         treasury.MapGet("/bank-accounts", (HttpContext http, Guid companyId, ListBankAccountsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListBankAccounts(companyId, s), handler, ct))
             .Describe<BankAccountList>(nameof(ListBankAccounts));

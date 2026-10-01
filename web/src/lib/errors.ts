@@ -86,6 +86,10 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PROFORMA_NOT_CERTIFIED: "Esa autorización cita proformas: solo cubre la factura de esas proformas.",
   PROFORMA_NOT_VOIDABLE: "Solo se anula una proforma abierta, sin cobros asignados y que ninguna autorización cite.",
   AUTHORIZATION_PROFORMA_INVALID: "Cada proforma debe estar abierta, ser del cliente y no estar en otra autorización.",
+  REFUND_METHOD_INVALID: "La devolución se paga por transferencia o cheque.",
+  REFUND_EXCEEDS_CREDIT_BALANCE: "El monto supera el saldo a favor disponible del recibo.",
+  RECEIPT_NOT_REFUNDABLE: "Solo se devuelve dinero de un recibo vigente cuyo dinero ya está en el banco.",
+  REFUND_NOT_MATCHABLE: "Solo una devolución liberada se empareja con el extracto.",
   // IMP-01: bulk load of suppliers and customers.
   IMPORT_FILE_INVALID: "El archivo no se puede leer como la exportación de ADM Cloud (.xlsx o .csv con «Razón Social» e «ID Fiscal»).",
   IMPORT_FILE_TOO_LARGE: "El archivo supera 5 MB.",
