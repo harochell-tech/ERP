@@ -572,6 +572,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/treasury/match-bank-line-to-refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MatchBankLineToRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/treasury/unmatch-bank-line": {
         parameters: {
             query?: never;
@@ -2332,6 +2348,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/create-invoice-from-proformas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateInvoiceFromProformas"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/void-proforma": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoidProforma"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/issue-invoice": {
         parameters: {
             query?: never;
@@ -2470,6 +2518,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ApplyReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/prepare-customer-refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PrepareCustomerRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/release-customer-refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReleaseCustomerRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/void-customer-refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoidCustomerRefund"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3724,6 +3820,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/customer-refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListCustomerRefunds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/customer-refunds/{refundId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCustomerRefund"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/quotes": {
         parameters: {
             query?: never;
@@ -4580,6 +4708,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetPayment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/treasury/refunds-to-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListRefundsToMatch"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5639,6 +5783,13 @@ export interface components {
             /** Format: uuid */
             fiscalAuthorizationId?: null | string;
         };
+        CreateInvoiceFromProformas: {
+            /** Format: uuid */
+            partyId: string;
+            proformaIds: string[];
+            /** Format: uuid */
+            fiscalAuthorizationId?: null | string;
+        };
         CreateMachine: {
             /** Format: uuid */
             plantId: string;
@@ -5901,6 +6052,45 @@ export interface components {
             limit: number;
             /** Format: int32 */
             offset: number;
+        };
+        CustomerRefundDetail: {
+            header: components["schemas"]["CustomerRefundSummary"];
+            history: components["schemas"]["StateChange"][];
+        };
+        CustomerRefundList: {
+            items: components["schemas"]["CustomerRefundSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        CustomerRefundSummary: {
+            /** Format: uuid */
+            refundId: string;
+            refundNo: string;
+            /** Format: uuid */
+            partyId: string;
+            customerName: string;
+            /** Format: uuid */
+            receiptId: string;
+            receiptNo: string;
+            /** Format: uuid */
+            bankAccountId: string;
+            bankAccountAlias: null | string;
+            bankCode: string;
+            method: string;
+            /** Format: decimal */
+            amount: string;
+            reference: null | string;
+            reason: string;
+            /** Format: date */
+            refundDate: null | string;
+            status: string;
+            preparedBy: null | string;
+            releasedBy: null | string;
+            voidReason: null | string;
+            /** Format: int64 */
+            version: number;
         };
         CustomerStatement: {
             /** Format: uuid */
@@ -6298,6 +6488,7 @@ export interface components {
             documents: components["schemas"]["FiscalAuthorizationDocumentView"][];
             history: components["schemas"]["FiscalAuthorizationHistoryView"][];
             consumptions: components["schemas"]["FiscalAuthorizationConsumptionView"][];
+            proformas: components["schemas"]["FiscalAuthorizationProformaView"][];
         };
         FiscalAuthorizationDocumentView: {
             /** Format: uuid */
@@ -6338,6 +6529,17 @@ export interface components {
         };
         FiscalAuthorizationList: {
             items: components["schemas"]["FiscalAuthorizationSummary"][];
+        };
+        FiscalAuthorizationProformaView: {
+            /** Format: uuid */
+            proformaId: string;
+            proformaNo: string;
+            /** Format: date */
+            proformaDate: string;
+            /** Format: decimal */
+            net: string;
+            status: string;
+            invoiceNo: null | string;
         };
         FiscalAuthorizationSummary: {
             /** Format: uuid */
@@ -7042,6 +7244,16 @@ export interface components {
             /** Format: uuid */
             depositId?: null | string;
         };
+        MatchBankLineToRefund: {
+            /** Format: uuid */
+            lineId: string;
+            /** Format: int64 */
+            expectedLineVersion: number;
+            /** Format: uuid */
+            refundId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         MatchCandidate: {
             /** Format: uuid */
             paymentId: string;
@@ -7466,6 +7678,17 @@ export interface components {
                 [key: string]: string;
             };
             justification: string;
+        };
+        PrepareCustomerRefund: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            bankAccountId: string;
+            method: string;
+            /** Format: decimal */
+            amount: string;
+            reason: string;
+            reference?: null | string;
         };
         PrepareCustomerTerms: {
             /** Format: uuid */
@@ -8544,6 +8767,25 @@ export interface components {
             freshScrapUnits: string;
             consumption: components["schemas"]["ConsumptionInput"][];
         };
+        RefundToMatch: {
+            /** Format: uuid */
+            refundId: string;
+            refundNo: string;
+            customerName: string;
+            /** Format: uuid */
+            bankAccountId: string;
+            method: string;
+            /** Format: decimal */
+            amount: string;
+            reference: null | string;
+            /** Format: date */
+            refundDate: string;
+            /** Format: int64 */
+            version: number;
+        };
+        RefundToMatchList: {
+            items: components["schemas"]["RefundToMatch"][];
+        };
         RegisterBankAccount: {
             bankCode: string;
             accountNumber: string;
@@ -8567,7 +8809,8 @@ export interface components {
             projectTermEndsOn: null | string;
             /** Format: uuid */
             salesOrderId: null | string;
-            lines: components["schemas"]["AuthorizationLineInput"][];
+            lines: null | components["schemas"]["AuthorizationLineInput"][];
+            proformaIds?: null | string[];
         };
         RegisterFiscalSource: {
             officialSource: string;
@@ -8652,6 +8895,12 @@ export interface components {
             /** Format: uuid */
             requestId: string;
             reason: string;
+        };
+        ReleaseCustomerRefund: {
+            /** Format: uuid */
+            refundId: string;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         ReleaseLot: {
             /** Format: uuid */
@@ -9739,7 +9988,8 @@ export interface components {
             projectTermEndsOn: null | string;
             /** Format: uuid */
             salesOrderId: null | string;
-            lines: components["schemas"]["AuthorizationLineInput"][];
+            lines: null | components["schemas"]["AuthorizationLineInput"][];
+            proformaIds?: null | string[];
         };
         UpdateDraftQuote: {
             /** Format: uuid */
@@ -9904,9 +10154,23 @@ export interface components {
             partyBankAccountId: string;
             evidence: string;
         };
+        VoidCustomerRefund: {
+            /** Format: uuid */
+            refundId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            reason: string;
+        };
         VoidPayment: {
             /** Format: uuid */
             paymentId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            reason: string;
+        };
+        VoidProforma: {
+            /** Format: uuid */
+            proformaId: string;
             /** Format: int64 */
             expectedVersion: number;
             reason: string;
@@ -12174,6 +12438,82 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MatchBankLineToReceipt"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    MatchBankLineToRefund: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchBankLineToRefund"];
             };
         };
         responses: {
@@ -20602,6 +20942,158 @@ export interface operations {
             };
         };
     };
+    CreateInvoiceFromProformas: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvoiceFromProformas"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VoidProforma: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidProforma"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     IssueInvoice: {
         parameters: {
             query?: never;
@@ -21227,6 +21719,234 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ApplyReceipt"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PrepareCustomerRefund: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareCustomerRefund"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReleaseCustomerRefund: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseCustomerRefund"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VoidCustomerRefund: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidCustomerRefund"];
             };
         };
         responses: {
@@ -26134,6 +26854,119 @@ export interface operations {
             };
         };
     };
+    ListCustomerRefunds: {
+        parameters: {
+            query?: {
+                partyId?: string;
+                status?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerRefundList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCustomerRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                refundId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerRefundDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListQuotes: {
         parameters: {
             query?: {
@@ -29120,6 +29953,57 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListRefundsToMatch: {
+        parameters: {
+            query?: {
+                bankAccountId?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundToMatchList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

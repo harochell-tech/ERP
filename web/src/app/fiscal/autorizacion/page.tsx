@@ -9,6 +9,7 @@ import { AUTHORIZATION_DOCUMENT_KINDS, authorizationActions, documentKindLabel }
 import { formatQuantity } from "@/lib/decimal";
 import { formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
+import { proformaStatusLabel } from "@/lib/proformas";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -268,6 +269,47 @@ function AuthorizationDetail() {
           ))}
         </tbody>
       </table></div>
+
+      {data.proformas.length > 0 ? (
+        <section data-testid="authorization-proformas">
+          {/* FIS1b-07 (E-FIS1b-5): the proformas the certification cites; the scope above was computed from them. */}
+          <h2>Proformas que cita</h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Proforma</th>
+                  <th>Fecha</th>
+                  <th className="num">Neto (RD$)</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.proformas.map((f) => (
+                  <tr key={f.proformaId}>
+                    <td className="mono">
+                      <Link href={`/facturacion/proforma/?id=${f.proformaId}`}>{f.proformaNo}</Link>
+                    </td>
+                    <td>{formatDate(f.proformaDate)}</td>
+                    <td className="num">
+                      <Money value={f.net} />
+                    </td>
+                    <td>
+                      {proformaStatusLabel(f.status)}
+                      {f.invoiceNo ? <span className="mono"> {f.invoiceNo}</span> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {h.status === "ACTIVE" && data.proformas.some((f) => f.status === "OPEN") ? (
+            <p>
+              <Link href="/facturacion/proformas/">Facturar estas proformas como e-CF 44</Link>
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <h2>Documentos</h2>
       {data.documents.length === 0 ? (

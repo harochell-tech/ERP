@@ -27,6 +27,7 @@ public static class TaxErrors
     public const string AuthorizationExpired = "AUTHORIZATION_EXPIRED";
     public const string AuthorizationFieldInvalid = "AUTHORIZATION_FIELD_INVALID";
     public const string AuthorizationLinesRequired = "AUTHORIZATION_LINES_REQUIRED";
+    public const string AuthorizationProformaInvalid = "AUTHORIZATION_PROFORMA_INVALID";
     public const string AuthorizationCertificateRequired = "AUTHORIZATION_CERTIFICATE_REQUIRED";
     public const string AuthorizationCertificateDuplicate = "AUTHORIZATION_CERTIFICATE_DUPLICATE";
     public const string AuthorizationCustomerInvalid = "AUTHORIZATION_CUSTOMER_INVALID";

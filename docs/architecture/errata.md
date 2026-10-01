@@ -878,6 +878,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS1b-01-12 | FIS-1b | New reconciliation PROFORMA-ASIG (allocations against receipts and proformas); refunds join the receipt and bank reconciliations. They block the AR close. |
 | E-FIS1b-01-13 | FIS-1b | The proforma prints with issuer, customer, lines, ITBIS, total and room for signature and stamp; the order's printable proforma of FIS-1 stays for quoting before delivery. |
 | E-FIS1b-01-14 | FIS-1b | Seven PRs: schema; proforma on delivery, queries and print; allocation, credit and aging; authorization and invoice from proformas; customer refund; reconciliations; screens and end-to-end journey. |
+| E-FIS1b-05-1 | FIS-1b | Amends E-FIS1b-8 and E-FIS1b-01-9: the refund is released by the **Controller**, as supplier payments are (Cobros prepares, the Controller releases with step-up, the Tesorero matches it with the statement). With the Tesorero releasing, who lets the money out would also reconcile the bank, and would need read access to sales. |
 
 Implementation rules derived from the above (no architectural change):
 

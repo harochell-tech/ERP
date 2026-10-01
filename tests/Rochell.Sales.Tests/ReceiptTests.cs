@@ -64,7 +64,7 @@ public sealed class ReceiptTests(PostgresFixture postgres)
         => h.ScalarAsync<string>(
             "SELECT i.commercial_status || ':' || a.open_amount::numeric(19,2)::text FROM sal.invoice i JOIN fin.ar_document a ON a.ar_doc_id = i.ar_doc_id WHERE i.invoice_id = @i", ("i", w.Invoice));
 
-    private static Task<CommandResult> Import(TestHarness h, World w, string key, params string[] rows)
+    internal static Task<CommandResult> Import(TestHarness h, World w, string key, params string[] rows)
     {
         var day = Today(h).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
         var csv = string.Join("\n", ["Fecha,Referencia,Descripcion,Debito,Credito", .. rows.Select(r => day + "," + r)]) + "\n";
@@ -74,10 +74,10 @@ public sealed class ReceiptTests(PostgresFixture postgres)
             new ImportBankStatementHandler());
     }
 
-    private static Task<Guid> LineAsync(TestHarness h, string description)
+    internal static Task<Guid> LineAsync(TestHarness h, string description)
         => h.ScalarAsync<Guid>("SELECT line_id FROM fin.bank_statement_line WHERE description = @d", ("d", description));
 
-    private static async Task<JsonElement> BankGlAsync(TestHarness h, World w)
+    internal static async Task<JsonElement> BankGlAsync(TestHarness h, World w)
         => JsonDocument.Parse(await h.Queries.ExecuteAsync(new GetBankReconciliation(h.CompanyId, w.Treasurer, w.Bank), new GetBankReconciliationHandler())).RootElement;
 
     private static string M(JsonElement e, string property)

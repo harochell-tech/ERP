@@ -42,6 +42,14 @@ public sealed class MarkReceiptBouncedHandler : ICommandHandler<MarkReceiptBounc
             throw new DomainException(ReceiptErrors.NotBounceable, $"Only a deposited cheque bounces ({receipt.No} is {receipt.Method}, {receipt.Status}, {receipt.Bank}, E-VS3-07-8).");
         }
 
+        // E-FIS1b-01-9: money already refunded to the customer (or about to be) is not undone by a bounce.
+        if (await SalesSql.ScalarAsync<bool>(
+                context, "SELECT EXISTS (SELECT 1 FROM fin.customer_refund WHERE company_id = @c AND receipt_id = @r AND status <> 'VOIDED')", cancellationToken,
+                ("c", context.CompanyId), ("r", command.ReceiptId)).ConfigureAwait(false))
+        {
+            throw new DomainException(ReceiptErrors.NotBounceable, $"{receipt.No} has a customer refund; void it (or resolve it apart) before the cheque is marked bounced.");
+        }
+
         var depositNo = (await SalesSql.ScalarAsync<string>(
             context, "SELECT deposit_no FROM fin.receipt_deposit WHERE deposit_id = @d", cancellationToken, ("d", receipt.DepositId.Value)).ConfigureAwait(false))!;
         var bankAccount = (await SalesSql.ScalarAsync<Guid?>(
