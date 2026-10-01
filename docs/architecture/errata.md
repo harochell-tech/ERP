@@ -879,6 +879,27 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FIS1b-01-13 | FIS-1b | The proforma prints with issuer, customer, lines, ITBIS, total and room for signature and stamp; the order's printable proforma of FIS-1 stays for quoting before delivery. |
 | E-FIS1b-01-14 | FIS-1b | Seven PRs: schema; proforma on delivery, queries and print; allocation, credit and aging; authorization and invoice from proformas; customer refund; reconciliations; screens and end-to-end journey. |
 | E-FIS1b-05-1 | FIS-1b | Amends E-FIS1b-8 and E-FIS1b-01-9: the refund is released by the **Controller**, as supplier payments are (Cobros prepares, the Controller releases with step-up, the Tesorero matches it with the statement). With the Tesorero releasing, who lets the money out would also reconcile the bank, and would need read access to sales. |
+| E-MAIL-1 | MAIL | Outgoing mail leaves through the SMTP relay of the Google Workspace of `rochell.com.do` (it already sends through Google: SPF and DMARC are in place); no new provider. |
+| E-MAIL-2 | MAIL | Sender: superseded by E-MAIL-01-1 (one sender). |
+| E-MAIL-3 | MAIL | What is sent: the server builds the document as HTML, with the content of the print view, and converts it to PDF; the PDF is attached. First phase: quote, proforma, delivery note, statement of account and the customer's open invoices by age. |
+| E-MAIL-4 | MAIL | Invoices: superseded by E-MAIL-01-2 (they wait for the e-CF's QR). Their printed representation will also be HTML converted to PDF. |
+| E-MAIL-5 | MAIL | Recipients: the customer's saved e-mails come ticked, can be unticked, and others can be typed when sending (E-IMP-6). |
+| E-MAIL-6 | MAIL | A button «Enviar por correo» on each document, with a permission per role; manual sending only. Automatic collection reminders are for later. |
+| E-MAIL-7 | MAIL | Every sending is recorded — who, when, to whom, which document — and leaves through a queue with retries; its result shows in the document's history. |
+| E-MAIL-8 | MAIL | While the parallel run lasts, staging (real customer data) sends nothing to customers: everything is redirected to an internal mailbox; going live is an explicit decision. |
+| E-MAIL-9 | MAIL | A blind copy of every sending to an archive mailbox. |
+| E-MAIL-10 | MAIL | HTML → PDF by a separate container with a headless Chromium, reachable only from the API, so the PDF equals what the browser prints. |
+| E-MAIL-01-1 | MAIL | One sender for everything: `industrias@rochell.com.do`, shown as «Industrias Rochell»; the customer's replies reach that mailbox (amends E-MAIL-2). |
+| E-MAIL-01-2 | MAIL | Invoices are not sent by e-mail until the e-CF's QR exists (VS#4) (amends E-MAIL-4). |
+| E-MAIL-01-3 | MAIL | The server authenticates to Google by the Workspace SMTP relay authorized for the server's address (2.25.237.35), with no stored password; the owner enables it once in the Google admin console. |
+| E-MAIL-01-4 | MAIL | Three modes per environment: Off, Redirect, Live. Staging runs Redirect: everything goes to `industrias@rochell.com.do` with the intended recipients in the subject. Going Live needs the owner's explicit decision. |
+| E-MAIL-01-5 | MAIL | Archive: a blind copy of every Live sending to `industrias@rochell.com.do` (mail sent through the relay does not show in «Enviados»). |
+| E-MAIL-01-6 | MAIL | Kept for every sending: who, when, recipients, subject, document, result and the exact PDF sent, downloadable from the document's history. |
+| E-MAIL-01-7 | MAIL | A document is sent only when it prints without a watermark: a quote already sent or approved (not a draft), a delivery note after the gate-out, a proforma not voided. The statement and the aging, always. |
+| E-MAIL-01-8 | MAIL | One permission per document. Vendedor: quote. Facturación: proforma and delivery note. Despacho: delivery note. Cobros: statement of account and aging. |
+| E-MAIL-01-9 | MAIL | Subject and greeting fixed in Spanish per document type, plus an optional message typed by the sender. At most 10 recipients. |
+| E-MAIL-01-10 | MAIL | Five attempts, spaced; then the message is «Fallido», visible, with «Reintentar». A bounce for a non-existent address reaches the `industrias@` mailbox, not the system. |
+| E-MAIL-01-11 | MAIL | The server builds its own HTML per document, with the same content as the print view; the browser's print views stay as they are. |
 
 Implementation rules derived from the above (no architectural change):
 

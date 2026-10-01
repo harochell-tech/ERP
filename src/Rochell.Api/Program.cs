@@ -5,12 +5,14 @@ using Rochell.Api.Auth;
 using Rochell.Api.Endpoints;
 using Rochell.Api.Hosting;
 using Rochell.Api.Http;
+using Rochell.Api.Mail;
 using Rochell.Identity;
 using Rochell.Identity.Authorization;
 using Rochell.Identity.Sessions;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Hosting;
 using Rochell.Platform.Json;
+using Rochell.Platform.Mail;
 using Rochell.Platform.Observability;
 using Rochell.Platform.Queries;
 using Rochell.Platform.Time;
@@ -63,6 +65,23 @@ services.AddQueryHandlers();
 services.AddHostedService<RequestLogFlusher>();
 services.AddSingleton<FiscalExpiryService>();
 services.AddHostedService(sp => sp.GetRequiredService<FiscalExpiryService>());
+
+// E-MAIL-01-4: outgoing mail is Off unless configured; Redirect and Live need the sender, the relay and the PDF renderer.
+services.AddSingleton(settings.Mail);
+if (settings.Mail.Mode != MailMode.Off)
+{
+    Required(settings.Mail.FromAddress, "Mail:FromAddress");
+    Required(settings.Mail.Smtp.Host, "Mail:Smtp:Host");
+    Required(settings.Mail.RendererUrl, "Mail:RendererUrl");
+    if (settings.Mail.Mode == MailMode.Redirect)
+    {
+        Required(settings.Mail.RedirectTo, "Mail:RedirectTo");
+    }
+
+    services.AddSingleton<IMailTransport, SmtpMailTransport>();
+    services.AddHttpClient<IPdfRenderer, GotenbergPdfRenderer>(client => client.Timeout = TimeSpan.FromSeconds(60));
+    services.AddHostedService<MailService>();
+}
 
 // E-PR18-5: the sealer and the digest connect as rochell_sealer and are switched on by configuration.
 if (settings.Sealer.Enabled || settings.Digest.Enabled)

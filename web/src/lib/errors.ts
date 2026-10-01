@@ -90,6 +90,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   REFUND_EXCEEDS_CREDIT_BALANCE: "El monto supera el saldo a favor disponible del recibo.",
   RECEIPT_NOT_REFUNDABLE: "Solo se devuelve dinero de un recibo vigente cuyo dinero ya está en el banco.",
   REFUND_NOT_MATCHABLE: "Solo una devolución liberada se empareja con el extracto.",
+  MAIL_RECIPIENT_INVALID: "Revise los destinatarios: de 1 a 10 direcciones de correo válidas.",
+  MAIL_FIELD_INVALID: "Revise el asunto (una línea, hasta 200 caracteres) y el mensaje (hasta 5,000 caracteres).",
   // IMP-01: bulk load of suppliers and customers.
   IMPORT_FILE_INVALID: "El archivo no se puede leer como la exportación de ADM Cloud (.xlsx o .csv con «Razón Social» e «ID Fiscal»).",
   IMPORT_FILE_TOO_LARGE: "El archivo supera 5 MB.",
