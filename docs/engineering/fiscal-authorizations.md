@@ -59,3 +59,22 @@ detail query now returns `consumptions` — each consumption at an invoice's iss
 invoice number. The dev seed adds an ACTIVE authorization `CERT-DEV-0001` of the sample customer (500 blocks / 25,000.00). E2E-F1:
 `FiscalAcceptanceTests` over the API and `web/e2e/fiscal-journey.spec.ts`; acceptance matrix `docs/acceptance/fis1.md`
 (`AcceptanceFis1TraceabilityTests`).
+
+## FIS1b-01 — the proforma as a collection document, schema (migration 0066, E-FIS1b-1…11, E-FIS1b-01-1…14)
+
+Amendment `docs/architecture/fis1/frozen-baseline-fis1b.md`: goods delivered while the DGII certification is in process are
+collected against a numbered proforma, one per delivery, before the fiscal invoice exists.
+
+| Table / column | Rules |
+| --- | --- |
+| `sal.sales_order.exemption_pending`, `proforma_collects_itbis` | The order's mark and whether the customer pays the ITBIS meanwhile; both or neither; frozen once the order leaves DRAFT |
+| `sal.proforma` | PF-000001 per company, one per delivery; date, due date, net, ITBIS, total, what it collects, `allocated_amount` ≤ that; OPEN → INVOICED (back to OPEN when the invoice is voided) or VOIDED with a reason; everything else immutable; `core.state_history` for every status |
+| `sal.proforma_line` | The delivery's lines at the order price with their ITBIS; inserted only with the proforma, from its own delivery |
+| `fin.proforma_allocation` | Receipt → proforma, amount; a release is an inverse row (same receipt, proforma and amount); same customer; append-only |
+| `fin.receipt.allocated_amount` | 0 ≤ allocated ≤ unapplied; 0 unless the receipt is RECORDED |
+| `tax.fiscal_authorization_proforma` | The proformas a certification cites; added and removed only while the authorization is DRAFT; same customer |
+
+Accounting option A (E-FIS1b-01-4): nothing here posts. P-16 already recognised the unbilled receivable; the receipt stays in
+UNAPPLIED_RECEIPTS until the invoice is issued, when its allocations become P-25 applications. Permission `proforma:void`
+(Facturación).
+

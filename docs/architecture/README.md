@@ -13,6 +13,7 @@ editable originals; these Markdown copies are what the code is built against. If
 | 1d | [`fin1/frozen-baseline-fin1.md`](fin1/frozen-baseline-fin1.md) | **Frozen Baseline of FIN-1** (adjustment journal, trial balance, financial statements), approved 2026-09-27 with E-FIN1-1…10. |
 | 1e | [`mfg1/frozen-baseline-mfg1.md`](mfg1/frozen-baseline-mfg1.md) | **Baseline of Manufacturing #1** (production, curing, release, standard cost), approved 2026-09-29 with E-MFG1-1…18. |
 | 1f | [`fis1/frozen-baseline-fis1.md`](fis1/frozen-baseline-fis1.md) | **Baseline of Fiscal #1** (CONFOTUR fiscal authorizations, e-CF 44 exempt sales), approved 2026-09-29 with E-FIS1-1…16. |
+| 1f-b | [`fis1/frozen-baseline-fis1b.md`](fis1/frozen-baseline-fis1b.md) | **Amendment to Fiscal #1**: the proforma as a collection document (one per delivery, receipts allocated before the e-CF, invoice from proformas, customer refund), approved 2026-10-01 with E-FIS1b-1…11 and E-FIS1b-01-1…14. |
 | 1g | [`quo1/frozen-baseline-quo1.md`](quo1/frozen-baseline-quo1.md) | **Baseline of Quotations #1** (sales quotes, special-price approval, conversion into a sales order), approved 2026-09-29 with E-QUO1-1…14. |
 | 1h | [`fis2/frozen-baseline-fis2.md`](fis2/frozen-baseline-fis2.md) | **Baseline of Fiscal #2** (report 606, IT-1 / IR-17 summaries, TAX-606; no 607 / 608 for a fully electronic issuer), approved 2026-09-29 with E-FIS2-1…14. |
 | 2 | [`baseline/06-frozen-baseline-patch-1.1.md`](baseline/06-frozen-baseline-patch-1.1.md) | Patch 1.1: prices > 0, STOCK_COVERAGE naming, deployment environment. |

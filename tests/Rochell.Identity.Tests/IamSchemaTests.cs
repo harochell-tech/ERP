@@ -40,7 +40,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["VENDEDOR"] = "customer:create,customer:import,customer:update,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11
         ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,fiscal_authorization:register,rnc:read,sales:read,sales_order:close",
         ["DESPACHO"] = "delivery:manage,fleet:manage,sales:read",
-        ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,sales:read",
+        ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,proforma:void,sales:read",
         ["COBROS"] = "customer_withholding:record,receipt:apply,receipt:deposit,receipt:record,sales:read",
         ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
         ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,production:read,production_master:manage,recipe:approve,shift_summary:post",
@@ -53,7 +53,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(118L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + supplier:import, customer:import (E-IMP-10)
+        Assert.Equal(119L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + proforma:void (E-FIS1b-01-11)
         Assert.Equal(44L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {
