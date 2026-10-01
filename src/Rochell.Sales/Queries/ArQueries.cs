@@ -249,8 +249,9 @@ public sealed class GetCustomerStatementHandler : IQueryHandler<GetCustomerState
             SELECT m.posting_date, ev.event_type,
                    CASE ev.event_type WHEN 'InvoiceIssued' THEN 'FACTURA' WHEN 'InvoiceVoided' THEN 'FACTURA_ANULADA' WHEN 'CreditNoteIssued' THEN 'NOTA_DE_CREDITO'
                         WHEN 'ReceiptRecorded' THEN 'COBRO' WHEN 'ReceiptReversed' THEN 'COBRO_ANULADO' WHEN 'ReceiptBounced' THEN 'CHEQUE_DEVUELTO'
-                        WHEN 'WithholdingByCustomer' THEN 'RETENCION' WHEN 'CustomerWithholdingReversed' THEN 'RETENCION_REVERSADA' ELSE 'OTRO' END,
-                   coalesce(i.invoice_no, iv.invoice_no, n.credit_note_no, r.receipt_no, rc.receipt_no,
+                        WHEN 'WithholdingByCustomer' THEN 'RETENCION' WHEN 'CustomerWithholdingReversed' THEN 'RETENCION_REVERSADA'
+                        WHEN 'CustomerRefundReleased' THEN 'DEVOLUCION' ELSE 'OTRO' END,
+                   coalesce(i.invoice_no, iv.invoice_no, n.credit_note_no, r.receipt_no, rc.receipt_no, rf.refund_no,
                             (SELECT x.invoice_no FROM sal.invoice x WHERE x.invoice_id = w.invoice_id),
                             (SELECT x.invoice_no FROM sal.invoice x WHERE x.invoice_id = wr.invoice_id)),
                    m.net
@@ -267,6 +268,7 @@ public sealed class GetCustomerStatementHandler : IQueryHandler<GetCustomerState
             LEFT JOIN fin.receipt rc ON rc.closing_event_id = m.source_event_id
             LEFT JOIN fin.customer_withholding w ON w.posting_event_id = m.source_event_id
             LEFT JOIN fin.customer_withholding wr ON wr.reversal_event_id = m.source_event_id
+            LEFT JOIN fin.customer_refund rf ON rf.posting_event_id = m.source_event_id -- FIS1b-07: the refund of a credit balance (P-36)
             ORDER BY m.posting_date, ev.recorded_at, m.journal_id
             """,
             r => new Movement(r.Date(0), r.GetString(1), r.GetString(2), r.NullableString(3), r.GetDecimal(4)),
