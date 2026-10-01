@@ -89,7 +89,7 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await seller.getByRole("button", { name: "Enviar a crédito" }).click();
   await expect(seller.getByTestId("order-status")).toHaveText("Confirmado");
   const orderUrl = seller.url();
-  await seller.getByRole("link", { name: "Proforma" }).click();
+  await seller.getByRole("link", { name: "Proforma", exact: true }).click(); // the menu also has "Proformas" (FIS1b-07)
   await expect(seller.getByTestId("proforma-net")).toHaveText("2,000.00");
   await expect(seller.getByTestId("proforma-itbis")).toHaveText("360.00");
   await expect(seller.getByText("Firma del suplidor")).toBeVisible();

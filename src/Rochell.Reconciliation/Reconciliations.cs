@@ -29,7 +29,7 @@ public static class Reconciliations
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
          "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
          "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER",
-         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED"];
+         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -508,6 +508,32 @@ public static class Reconciliations
             WHERE l.company_id = @c AND (l.net_consumed <> coalesce(c.net, 0) OR l.qty_consumed <> coalesce(c.qty, 0))
             UNION ALL
             SELECT 'invoice-line:' || invoice_line_id::text, expected, consumed, 'INVOICE_CONSUMPTION_DIFFERENCE', 'ERROR', 'AR-REC' FROM il WHERE expected <> consumed) f
+            """,
+            null),
+        ["PROFORMA-ASIG"] = (
+            Findings + """
+            -- E-FIS1b-01-12: what each proforma and each receipt say is allocated = their live allocations; an OPEN proforma's net =
+            -- what its delivery still has delivered and not invoiced, and an INVOICED one leaves nothing unbilled.
+            WITH live AS (SELECT x.* FROM fin.proforma_allocation x
+                          WHERE x.company_id = @c AND x.reverses_allocation_id IS NULL
+                            AND NOT EXISTS (SELECT 1 FROM fin.proforma_allocation u WHERE u.reverses_allocation_id = x.allocation_id)),
+                 unbilled AS (SELECT l.proforma_id, sum(round((dl.qty_delivered - dl.qty_invoiced) * l.unit_price, 2)) AS net
+                              FROM sal.proforma_line l JOIN log.delivery_line dl ON dl.delivery_line_id = l.delivery_line_id
+                              WHERE l.company_id = @c GROUP BY l.proforma_id)
+            SELECT 'PF:' || f.proforma_no AS match_key, f.allocated_amount AS value_a,
+                   coalesce((SELECT sum(l.amount) FROM live l WHERE l.proforma_id = f.proforma_id), 0) AS value_b,
+                   'PROFORMA_ALLOCATION_DIFFERENCE' AS classification, 'ERROR' AS severity, 'AR-REC' AS component
+            FROM sal.proforma f
+            WHERE f.company_id = @c AND f.allocated_amount <> coalesce((SELECT sum(l.amount) FROM live l WHERE l.proforma_id = f.proforma_id), 0)
+            UNION ALL
+            SELECT 'REC:' || r.receipt_no, r.allocated_amount, coalesce((SELECT sum(l.amount) FROM live l WHERE l.receipt_id = r.receipt_id), 0),
+                   'RECEIPT_ALLOCATION_DIFFERENCE', 'ERROR', 'AR-REC'
+            FROM fin.receipt r
+            WHERE r.company_id = @c AND r.allocated_amount <> coalesce((SELECT sum(l.amount) FROM live l WHERE l.receipt_id = r.receipt_id), 0)
+            UNION ALL
+            SELECT 'PF:' || f.proforma_no, CASE WHEN f.status = 'OPEN' THEN f.net_total ELSE 0 END, coalesce(u.net, 0), 'PROFORMA_UNBILLED_DIFFERENCE', 'ERROR', 'AR-REC'
+            FROM sal.proforma f LEFT JOIN unbilled u ON u.proforma_id = f.proforma_id
+            WHERE f.company_id = @c AND f.status IN ('OPEN', 'INVOICED') AND CASE WHEN f.status = 'OPEN' THEN f.net_total ELSE 0 END <> coalesce(u.net, 0)) f
             """,
             null),
         ["EXEMPT-WITHOUT-AUTH"] = (

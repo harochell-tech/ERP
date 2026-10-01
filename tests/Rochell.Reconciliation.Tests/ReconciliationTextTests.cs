@@ -83,7 +83,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
 
         Assert.Contains("CLASSIFICATION_MISSING", produced);   // from tax.report_606
         Assert.Contains("BANK_GL_DIFFERENCE", produced);       // from BankGl.cs
-        Assert.Equal(57, produced.Count);
+        Assert.Equal(60, produced.Count); // + the three of PROFORMA-ASIG (E-FIS1b-01-12)
         Assert.Equal(produced, catalogued);                     // none missing, none stale
         Assert.Equal(Reconciliations.All.Order(StringComparer.Ordinal), definitions.Select(d => d.GetProperty("reconCode").GetString()));
         Assert.All(definitions, d => Assert.False(string.IsNullOrWhiteSpace(d.GetProperty("name").GetString())));
