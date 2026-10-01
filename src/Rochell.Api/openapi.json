@@ -24857,6 +24857,188 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/sales/proformas": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "operationId": "ListProformas",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "partyId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProformaList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/sales/proformas/{proformaId}": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "operationId": "GetProforma",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "proformaId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProformaDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/sales/quotes": {
       "get": {
         "tags": [
@@ -33576,6 +33758,16 @@
             "items": {
               "$ref": "#/components/schemas/SalesOrderLineInput"
             }
+          },
+          "exemptionPending": {
+            "type": "boolean",
+            "default": false
+          },
+          "proformaCollectsItbis": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "additionalProperties": false
@@ -40953,6 +41145,54 @@
         },
         "additionalProperties": false
       },
+      "ProformaDetail": {
+        "required": [
+          "header",
+          "issuerRnc",
+          "issuerName",
+          "siteAddress",
+          "voidReason",
+          "lines",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "header": {
+            "$ref": "#/components/schemas/ProformaSummary"
+          },
+          "issuerRnc": {
+            "type": "string"
+          },
+          "issuerName": {
+            "type": "string"
+          },
+          "siteAddress": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "voidReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProformaLineView"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StateChange"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "ProformaLine": {
         "required": [
           "lineNo",
@@ -41004,6 +41244,220 @@
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
             "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProformaLineView": {
+        "required": [
+          "lineNo",
+          "itemCode",
+          "itemName",
+          "uom",
+          "quantity",
+          "unitPrice",
+          "net",
+          "itbis",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "unitPrice": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "net": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbis": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "total": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProformaList": {
+        "required": [
+          "items",
+          "limit",
+          "offset"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProformaSummary"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProformaSummary": {
+        "required": [
+          "proformaId",
+          "proformaNo",
+          "partyId",
+          "customerName",
+          "customerRnc",
+          "salesOrderId",
+          "orderNo",
+          "deliveryId",
+          "deliveryNo",
+          "proformaDate",
+          "dueDate",
+          "daysOverdue",
+          "collectsItbis",
+          "net",
+          "itbis",
+          "total",
+          "allocated",
+          "deposit",
+          "balance",
+          "status",
+          "certification",
+          "invoiceId",
+          "invoiceNo",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "proformaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "proformaNo": {
+            "type": "string"
+          },
+          "partyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerRnc": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "salesOrderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "deliveryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deliveryNo": {
+            "type": "string"
+          },
+          "proformaDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "daysOverdue": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "collectsItbis": {
+            "type": "boolean"
+          },
+          "net": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbis": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "total": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "allocated": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "deposit": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "balance": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "status": {
+            "type": "string"
+          },
+          "certification": {
+            "type": "string"
+          },
+          "invoiceId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "invoiceNo": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -45379,7 +45833,9 @@
           "cancelReason",
           "lines",
           "creditChecks",
-          "history"
+          "history",
+          "exemptionPending",
+          "proformaCollectsItbis"
         ],
         "type": "object",
         "properties": {
@@ -45436,6 +45892,15 @@
             "items": {
               "$ref": "#/components/schemas/StateChange"
             }
+          },
+          "exemptionPending": {
+            "type": "boolean"
+          },
+          "proformaCollectsItbis": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "additionalProperties": false
@@ -48201,6 +48666,16 @@
             "items": {
               "$ref": "#/components/schemas/SalesOrderLineInput"
             }
+          },
+          "exemptionPending": {
+            "type": "boolean",
+            "default": false
+          },
+          "proformaCollectsItbis": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         },
         "additionalProperties": false

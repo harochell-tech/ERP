@@ -3660,6 +3660,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/proformas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListProformas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/proformas/{proformaId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetProforma"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/quotes": {
         parameters: {
             query?: never;
@@ -5599,6 +5631,9 @@ export interface components {
             requestedDate: null | string;
             customerPoRef: null | string;
             lines: components["schemas"]["SalesOrderLineInput"][];
+            /** @default false */
+            exemptionPending?: boolean;
+            proformaCollectsItbis?: null | boolean;
         };
         CreateSupplier: {
             rnc: string;
@@ -7580,6 +7615,15 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        ProformaDetail: {
+            header: components["schemas"]["ProformaSummary"];
+            issuerRnc: string;
+            issuerName: string;
+            siteAddress: null | string;
+            voidReason: null | string;
+            lines: components["schemas"]["ProformaLineView"][];
+            history: components["schemas"]["StateChange"][];
+        };
         ProformaLine: {
             /** Format: int32 */
             lineNo: number;
@@ -7596,6 +7640,71 @@ export interface components {
             itbis: string;
             /** Format: decimal */
             total: string;
+        };
+        ProformaLineView: {
+            /** Format: int32 */
+            lineNo: number;
+            itemCode: string;
+            itemName: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            unitPrice: string;
+            /** Format: decimal */
+            net: string;
+            /** Format: decimal */
+            itbis: string;
+            /** Format: decimal */
+            total: string;
+        };
+        ProformaList: {
+            items: components["schemas"]["ProformaSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        ProformaSummary: {
+            /** Format: uuid */
+            proformaId: string;
+            proformaNo: string;
+            /** Format: uuid */
+            partyId: string;
+            customerName: string;
+            customerRnc: null | string;
+            /** Format: uuid */
+            salesOrderId: string;
+            orderNo: string;
+            /** Format: uuid */
+            deliveryId: string;
+            deliveryNo: string;
+            /** Format: date */
+            proformaDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: int32 */
+            daysOverdue: number;
+            collectsItbis: boolean;
+            /** Format: decimal */
+            net: string;
+            /** Format: decimal */
+            itbis: string;
+            /** Format: decimal */
+            total: string;
+            /** Format: decimal */
+            allocated: string;
+            /** Format: decimal */
+            deposit: string;
+            /** Format: decimal */
+            balance: string;
+            status: string;
+            certification: string;
+            /** Format: uuid */
+            invoiceId: null | string;
+            invoiceNo: null | string;
+            /** Format: int64 */
+            version: number;
         };
         ProposalInvoice: {
             /** Format: uuid */
@@ -8806,6 +8915,8 @@ export interface components {
             lines: components["schemas"]["SalesOrderLineView"][];
             creditChecks: components["schemas"]["CreditCheckView"][];
             history: components["schemas"]["StateChange"][];
+            exemptionPending: boolean;
+            proformaCollectsItbis: null | boolean;
         };
         SalesOrderLineInput: {
             /** Format: uuid */
@@ -9572,6 +9683,9 @@ export interface components {
             requestedDate: null | string;
             customerPoRef: null | string;
             lines: components["schemas"]["SalesOrderLineInput"][];
+            /** @default false */
+            exemptionPending?: boolean;
+            proformaCollectsItbis?: null | boolean;
         };
         UpdateShiftTimes: {
             /** Format: uuid */
@@ -25580,6 +25694,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SalesOrderDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListProformas: {
+        parameters: {
+            query?: {
+                partyId?: string;
+                status?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProformaList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetProforma: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                proformaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProformaDetail"];
                 };
             };
             /** @description Bad Request */

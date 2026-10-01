@@ -78,3 +78,12 @@ Accounting option A (E-FIS1b-01-4): nothing here posts. P-16 already recognised 
 UNAPPLIED_RECEIPTS until the invoice is issued, when its allocations become P-25 applications. Permission `proforma:void`
 (Facturación).
 
+## FIS1b-02 — the proforma on delivery (E-FIS1b-1…3, E-FIS1b-01-1…3, 6, 13)
+
+| Piece | Behaviour |
+| --- | --- |
+| `CreateSalesOrder` / `UpdateSalesOrderDraft` | `exemptionPending` and `proformaCollectsItbis` (given exactly when the order is marked, else `PROFORMA_MARK_INVALID`); they change only while DRAFT; `GetSalesOrder` returns them |
+| `RecordGateOut` (pickup) / `RecordPod` (site) | In the transaction that delivers the goods of a marked order, `Proformas.IssueOnDeliveryAsync` issues PF-000001: the lines that reached the customer at the order price, the ITBIS of the SALES_ITBIS rule in force that day (`TaxEngine.PreviewSalesItbisAsync`; a closed fiscal gate refuses the delivery), date = the business date of the gate-out or of the POD's `receivedAt`, due date = date + the days of the customer's ACTIVE terms. Event `ProformaIssued`, state history OPEN, **no journal**. The command result carries `proformaId` / `proformaNo` |
+| `CreateInvoiceFromDeliveries`, `ListBillableDeliveries` | A delivery line with a proforma that is not VOIDED is refused (`PROFORMA_REQUIRED`) and not listed: it is invoiced from its proforma (FIS1b-04) |
+| `GET /sales/proformas`, `GET /sales/proformas/{id}` (`sales:read`) | Balance = what the proforma collects (total, or net when it collects without ITBIS) − allocated; deposit = allocated above the net; days overdue; certification NONE / IN_PROCESS / CERTIFIED from the authorizations that list it. The detail adds issuer, site address, lines and history — what the printed proforma shows |
+

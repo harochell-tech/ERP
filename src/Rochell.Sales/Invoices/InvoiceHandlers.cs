@@ -4,6 +4,7 @@ using Rochell.Finance.Posting;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Sales.Deliveries;
+using Rochell.Sales.Proformas;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
 
@@ -118,6 +119,15 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
         if (billable.Count != ids.Count || billable.Any(b => b.Remaining <= 0m))
         {
             throw new DomainException(InvoiceErrors.NotBillable, "Each line must be a delivered, not yet fully invoiced delivery line of this customer (E-VS3-05-3).");
+        }
+
+        // E-FIS1b-01-6: a delivery collected on a proforma is invoiced from the proforma, whole.
+        if (await SalesSql.ScalarAsync<bool>(
+                context,
+                "SELECT EXISTS (SELECT 1 FROM sal.proforma_line l JOIN sal.proforma p ON p.proforma_id = l.proforma_id WHERE l.company_id = @c AND l.delivery_line_id = ANY (@ids) AND p.status <> 'VOIDED')",
+                cancellationToken, ("c", context.CompanyId), ("ids", ids.ToArray())).ConfigureAwait(false))
+        {
+            throw new DomainException(ProformaErrors.Required, "A delivery with a proforma is invoiced from its proforma (E-FIS1b-01-6).");
         }
 
         var lines = billable.OrderBy(b => ids.ToList().IndexOf(b.DeliveryLineId))

@@ -81,14 +81,14 @@ public sealed record CreditCheckView(
 
 public sealed record SalesOrderDetail(
     SalesOrderSummary Header, Guid PlantId, string? SiteAddress, DateOnly? RequestedDate, string? CustomerPoRef, Guid PriceListVersionId, string? CancelReason,
-    IReadOnlyList<SalesOrderLineView> Lines, IReadOnlyList<CreditCheckView> CreditChecks, IReadOnlyList<StateChange> History);
+    IReadOnlyList<SalesOrderLineView> Lines, IReadOnlyList<CreditCheckView> CreditChecks, IReadOnlyList<StateChange> History, bool ExemptionPending, bool? ProformaCollectsItbis);
 
 [RequiresPermission("sales:read")]
 public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
 {
     public string QueryType => "Sales.GetSalesOrder";
 
-    private sealed record Extra(Guid PlantId, string? Site, DateOnly? Requested, string? PoRef, Guid ListId, string? CancelReason);
+    private sealed record Extra(Guid PlantId, string? Site, DateOnly? Requested, string? PoRef, Guid ListId, string? CancelReason, bool ExemptionPending, bool? CollectsItbis);
 
     public async Task<string> HandleAsync(GetSalesOrder query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -101,8 +101,8 @@ public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
         var extra = (await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT plant_id, site_address, requested_date, customer_po_ref, price_list_version_id, cancel_reason FROM sal.sales_order WHERE sales_order_id = @o",
-            r => new Extra(r.GetGuid(0), r.NullableString(1), r.IsDBNull(2) ? null : r.Date(2), r.NullableString(3), r.GetGuid(4), r.NullableString(5)),
+            "SELECT plant_id, site_address, requested_date, customer_po_ref, price_list_version_id, cancel_reason, exemption_pending, proforma_collects_itbis FROM sal.sales_order WHERE sales_order_id = @o",
+            r => new Extra(r.GetGuid(0), r.NullableString(1), r.IsDBNull(2) ? null : r.Date(2), r.NullableString(3), r.GetGuid(4), r.NullableString(5), r.GetBoolean(6), r.IsDBNull(7) ? null : r.GetBoolean(7)),
             cancellationToken,
             ("o", query.SalesOrderId)).ConfigureAwait(false))!;
         var lines = await Reading.ListAsync(
@@ -133,7 +133,7 @@ public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
             cancellationToken,
             ("o", query.SalesOrderId)).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "SalesOrder", query.SalesOrderId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new SalesOrderDetail(header, extra.PlantId, extra.Site, extra.Requested, extra.PoRef, extra.ListId, extra.CancelReason, lines, checks, history));
+        return ApiJson.Serialize(new SalesOrderDetail(header, extra.PlantId, extra.Site, extra.Requested, extra.PoRef, extra.ListId, extra.CancelReason, lines, checks, history, extra.ExemptionPending, extra.CollectsItbis));
     }
 }
 

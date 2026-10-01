@@ -75,6 +75,9 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   RECEIPT_CORRECTION_NOT_PENDING: "La corrección ya no está pendiente.",
   RNC_INVALID: "El RNC no es válido.",
   RNC_DUPLICATE: "Ya existe un proveedor con ese RNC.",
+  // FIS-1b: proformas.
+  PROFORMA_MARK_INVALID: "Un pedido con exención en trámite indica si sus proformas se cobran con ITBIS o sin ITBIS.",
+  PROFORMA_REQUIRED: "Ese conduce tiene proforma: se factura desde su proforma.",
   // IMP-01: bulk load of suppliers and customers.
   IMPORT_FILE_INVALID: "El archivo no se puede leer como la exportación de ADM Cloud (.xlsx o .csv con «Razón Social» e «ID Fiscal»).",
   IMPORT_FILE_TOO_LARGE: "El archivo supera 5 MB.",
