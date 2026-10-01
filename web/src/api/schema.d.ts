@@ -2476,6 +2476,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/allocate-receipt-to-proformas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AllocateReceiptToProformas"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/release-proforma-allocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReleaseProformaAllocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/unapply-receipt": {
         parameters: {
             query?: never;
@@ -4926,6 +4958,13 @@ export interface components {
             total: string;
             documents: components["schemas"]["AgingDocument"][];
         };
+        AllocateReceiptToProformas: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            allocations: components["schemas"]["ProformaAllocationInput"][];
+        };
         ApAging: {
             /** Format: date */
             asOf: string;
@@ -5066,6 +5105,10 @@ export interface components {
             /** Format: decimal */
             net: string;
             bucketTotals: components["schemas"]["ArAgingBucketTotals"];
+            /** Format: decimal */
+            proformas: string;
+            /** Format: decimal */
+            deposits: string;
         };
         ArAgingBucketTotals: {
             /** Format: decimal */
@@ -5110,6 +5153,11 @@ export interface components {
             /** Format: decimal */
             net: string;
             documents: components["schemas"]["ArAgingDocument"][];
+            /** Format: decimal */
+            proformas: string;
+            /** Format: decimal */
+            deposits: string;
+            proformaDocuments: components["schemas"]["ArAgingProforma"][];
         };
         ArAgingDocument: {
             /** Format: uuid */
@@ -5124,6 +5172,23 @@ export interface components {
             dueDate: string;
             /** Format: decimal */
             openAmount: string;
+            /** Format: int32 */
+            daysOverdue: number;
+            bucket: string;
+        };
+        ArAgingProforma: {
+            /** Format: uuid */
+            proformaId: string;
+            proformaNo: string;
+            deliveryNo: string;
+            /** Format: date */
+            proformaDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: decimal */
+            balance: string;
+            /** Format: decimal */
+            deposit: string;
             /** Format: int32 */
             daysOverdue: number;
             bucket: string;
@@ -5855,6 +5920,9 @@ export interface components {
             totalCredit: string;
             /** Format: decimal */
             closing: string;
+            openProformas: components["schemas"]["StatementProforma"][];
+            /** Format: decimal */
+            proformaBalance: string;
         };
         CustomerSummary: {
             /** Format: uuid */
@@ -7615,6 +7683,26 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        ProformaAllocationInput: {
+            /** Format: uuid */
+            proformaId: string;
+            /** Format: decimal */
+            amount: string;
+        };
+        ProformaCollectionView: {
+            /** Format: uuid */
+            allocationId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            receiptId: string;
+            receiptNo: string;
+            method: string;
+            /** Format: decimal */
+            amount: string;
+            /** Format: date-time */
+            at: string;
+        };
         ProformaDetail: {
             header: components["schemas"]["ProformaSummary"];
             issuerRnc: string;
@@ -7623,6 +7711,7 @@ export interface components {
             voidReason: null | string;
             lines: components["schemas"]["ProformaLineView"][];
             history: components["schemas"]["StateChange"][];
+            collections: components["schemas"]["ProformaCollectionView"][];
         };
         ProformaLine: {
             /** Format: int32 */
@@ -8060,6 +8149,22 @@ export interface components {
             expectedVersion: number;
             reason: string;
         };
+        ReceiptAllocationView: {
+            /** Format: uuid */
+            allocationId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            proformaId: string;
+            proformaNo: string;
+            /** Format: decimal */
+            amount: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            reversesAllocationId: null | string;
+            live: boolean;
+        };
         ReceiptApplicationInput: {
             /** Format: uuid */
             invoiceId: string;
@@ -8155,6 +8260,7 @@ export interface components {
             applications: components["schemas"]["ReceiptApplicationView"][];
             matchedLines: components["schemas"]["MatchedLineView"][];
             history: components["schemas"]["StateChange"][];
+            allocations: components["schemas"]["ReceiptAllocationView"][];
         };
         ReceiptList: {
             items: components["schemas"]["ReceiptSummary"][];
@@ -8197,6 +8303,10 @@ export interface components {
             bankAccountAlias: null | string;
             bankCode: null | string;
             bankAccountNumber: null | string;
+            /** Format: decimal */
+            allocated: string;
+            /** Format: decimal */
+            available: string;
         };
         RecipeDetail: {
             recipe: components["schemas"]["RecipeSummary"];
@@ -8552,6 +8662,13 @@ export interface components {
             expectedVersion: number;
             /** Format: uuid */
             toLocationId: string;
+        };
+        ReleaseProformaAllocation: {
+            /** Format: uuid */
+            receiptId: string;
+            /** Format: uuid */
+            allocationEventId: string;
+            reason: string;
         };
         ReleaseSupplierPayment: {
             /** Format: uuid */
@@ -9283,6 +9400,24 @@ export interface components {
             /** Format: decimal */
             amount: string;
             accounts: components["schemas"]["StatementAccount"][];
+        };
+        StatementProforma: {
+            /** Format: uuid */
+            proformaId: string;
+            proformaNo: string;
+            deliveryNo: string;
+            /** Format: date */
+            proformaDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: decimal */
+            total: string;
+            /** Format: decimal */
+            allocated: string;
+            /** Format: decimal */
+            balance: string;
+            /** Format: decimal */
+            deposit: string;
         };
         SubmitForCredit: {
             /** Format: uuid */
@@ -21092,6 +21227,158 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ApplyReceipt"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    AllocateReceiptToProformas: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AllocateReceiptToProformas"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReleaseProformaAllocation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseProformaAllocation"];
             };
         };
         responses: {

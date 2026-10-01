@@ -78,6 +78,11 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // FIS-1b: proformas.
   PROFORMA_MARK_INVALID: "Un pedido con exención en trámite indica si sus proformas se cobran con ITBIS o sin ITBIS.",
   PROFORMA_REQUIRED: "Ese conduce tiene proforma: se factura desde su proforma.",
+  ALLOCATION_EXCEEDS_AVAILABLE: "El monto supera lo que queda disponible del recibo.",
+  ALLOCATION_EXCEEDS_BALANCE: "El monto supera el saldo por cobrar de la proforma.",
+  PROFORMA_NOT_OPEN: "La proforma ya no está abierta.",
+  PROFORMA_OF_ANOTHER_CUSTOMER: "La proforma es de otro cliente.",
+  ALLOCATION_NOT_FOUND: "El recibo no tiene esa asignación vigente.",
   // IMP-01: bulk load of suppliers and customers.
   IMPORT_FILE_INVALID: "El archivo no se puede leer como la exportación de ADM Cloud (.xlsx o .csv con «Razón Social» e «ID Fiscal»).",
   IMPORT_FILE_TOO_LARGE: "El archivo supera 5 MB.",

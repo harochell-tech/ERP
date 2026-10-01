@@ -265,10 +265,14 @@ public sealed class ApplyReceiptHandler : ICommandHandler<ApplyReceipt>
             throw new DomainException(SalesErrors.InvalidState, $"The receipt is {receipt.Status}.");
         }
 
+        // E-FIS1b-01-4: what is allocated to proformas waits for their invoice and is not applied elsewhere.
         var total = input.Sum(a => a.Amount);
-        if (total > receipt.Unapplied)
+        if (total > receipt.Unapplied - receipt.Allocated)
         {
-            throw new DomainException(ReceiptErrors.ExceedsUnapplied, $"{Receipting.Money(total)} exceeds the {Receipting.Money(receipt.Unapplied)} still unapplied on {receipt.No}.");
+            throw new DomainException(
+                ReceiptErrors.ExceedsUnapplied,
+                $"{Receipting.Money(total)} exceeds the {Receipting.Money(receipt.Unapplied - receipt.Allocated)} still unapplied on {receipt.No}"
+                + (receipt.Allocated > 0m ? $" ({Receipting.Money(receipt.Allocated)} is allocated to proformas)." : "."));
         }
 
         var lines = new List<PostingLineInput>();

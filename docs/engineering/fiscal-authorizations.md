@@ -87,3 +87,20 @@ UNAPPLIED_RECEIPTS until the invoice is issued, when its allocations become P-25
 | `CreateInvoiceFromDeliveries`, `ListBillableDeliveries` | A delivery line with a proforma that is not VOIDED is refused (`PROFORMA_REQUIRED`) and not listed: it is invoiced from its proforma (FIS1b-04) |
 | `GET /sales/proformas`, `GET /sales/proformas/{id}` (`sales:read`) | Balance = what the proforma collects (total, or net when it collects without ITBIS) − allocated; deposit = allocated above the net; days overdue; certification NONE / IN_PROCESS / CERTIFIED from the authorizations that list it. The detail adds issuer, site address, lines and history — what the printed proforma shows |
 
+## FIS1b-03 — receipts allocated to proformas (E-FIS1b-3/4, E-FIS1b-01-4/5)
+
+Option A: an allocation posts nothing. The receipt keeps its whole unapplied amount in UNAPPLIED_RECEIPTS; `allocated_amount` (on
+the receipt and on the proforma) only keeps that money for the proforma's invoice.
+
+| Piece | Behaviour |
+| --- | --- |
+| `AllocateReceiptToProformas` (`receipt:apply`, Cobros) | A RECORDED receipt to OPEN proformas of its customer, each up to its balance (total, or net when it collects without ITBIS) and in all up to unapplied − allocated; rows in `fin.proforma_allocation`, event `ReceiptAllocated`. Errors `ALLOCATION_EXCEEDS_AVAILABLE`, `ALLOCATION_EXCEEDS_BALANCE`, `PROFORMA_NOT_OPEN`, `PROFORMA_OF_ANOTHER_CUSTOMER` |
+| `ReleaseProformaAllocation` (`receipt:apply`) | Releases one whole allocation event with a reason (mirror rows, `ReceiptAllocationReleased`) |
+| `ApplyReceipt` | Applies at most unapplied − allocated |
+| `MarkReceiptBounced` | Releases the cheque's live allocations before the bounce; `ReverseReceipt` refuses a receipt with allocations |
+| Lock order | Proformas (by id) → invoices → AR documents → receipt |
+| `CreditExposure` | Delivered-not-invoiced is net of what was allocated to open proformas (up to their net); overdue days also from overdue open proformas with a balance |
+| `GetArAging` | `proformas` / `deposits` per customer and in total, with `proformaDocuments` (balance, deposit, days, bucket), outside `total` and `net`; `unapplied` leaves out what is allocated. CSV: a row per proforma ("Proforma (sin e-CF)"), the deposit and "Total proformas pendientes de e-CF" |
+| `GetCustomerStatement` | `openProformas` and `proformaBalance`, apart from the ledger balance; CSV rows `PROFORMA_SIN_ECF` |
+| `GetReceipt` / `ListReceipts`, `GetProforma` | `allocated`, `available` and the receipt's allocations; the proforma's live collections |
+

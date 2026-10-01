@@ -87,8 +87,12 @@ public sealed record GetProforma(Guid CompanyId, Guid SessionId, Guid ProformaId
 public sealed record ProformaLineView(int LineNo, string ItemCode, string ItemName, string Uom, decimal Quantity, decimal UnitPrice, decimal Net, decimal Itbis, decimal Total);
 
 /// <summary>E-FIS1b-01-13: what prints — issuer, customer, the delivery's lines with their ITBIS and the totals — and the document's history.</summary>
+/// <summary>A live allocation of a receipt to the proforma.</summary>
+public sealed record ProformaCollectionView(Guid AllocationId, Guid EventId, Guid ReceiptId, string ReceiptNo, string Method, decimal Amount, DateTime At);
+
 public sealed record ProformaDetail(
-    ProformaSummary Header, string IssuerRnc, string IssuerName, string? SiteAddress, string? VoidReason, IReadOnlyList<ProformaLineView> Lines, IReadOnlyList<StateChange> History);
+    ProformaSummary Header, string IssuerRnc, string IssuerName, string? SiteAddress, string? VoidReason, IReadOnlyList<ProformaLineView> Lines, IReadOnlyList<StateChange> History,
+    IReadOnlyList<ProformaCollectionView> Collections);
 
 [RequiresPermission("sales:read")]
 public sealed class GetProformaHandler : IQueryHandler<GetProforma>
@@ -130,6 +134,21 @@ public sealed class GetProformaHandler : IQueryHandler<GetProforma>
             cancellationToken,
             ("id", query.ProformaId)).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, Proformas.Aggregate, query.ProformaId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new ProformaDetail(header, extra.IssuerRnc, extra.IssuerName, extra.Site, extra.VoidReason, lines, history));
+        var collections = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT x.allocation_id, x.event_id, r.receipt_id, r.receipt_no, r.method, x.amount::numeric(19,2), e.occurred_at
+            FROM fin.proforma_allocation x
+            JOIN fin.receipt r ON r.receipt_id = x.receipt_id
+            JOIN core.domain_event e ON e.company_id = x.company_id AND e.event_id = x.event_id
+            WHERE x.proforma_id = @id AND x.reverses_allocation_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM fin.proforma_allocation u WHERE u.reverses_allocation_id = x.allocation_id)
+            ORDER BY e.occurred_at, x.allocation_id
+            """,
+            r => new ProformaCollectionView(r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetFieldValue<DateTime>(6)),
+            cancellationToken,
+            ("id", query.ProformaId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new ProformaDetail(header, extra.IssuerRnc, extra.IssuerName, extra.Site, extra.VoidReason, lines, history, collections));
     }
 }

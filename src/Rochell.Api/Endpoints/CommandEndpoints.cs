@@ -32,6 +32,7 @@ using Rochell.Sales.Opening;
 using Rochell.Sales.Orders;
 using Rochell.Sales.Quotes;
 using Rochell.Sales.Pricing;
+using Rochell.Sales.Proformas;
 using Rochell.Sales.Receipts;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
@@ -227,6 +228,8 @@ public static class CommandEndpoints
         sales.MapCommand<RecordReceipt, RecordReceiptHandler>();
         sales.MapCommand<DepositReceipts, DepositReceiptsHandler>();
         sales.MapCommand<ApplyReceipt, ApplyReceiptHandler>();
+        sales.MapCommand<AllocateReceiptToProformas, AllocateReceiptToProformasHandler>();
+        sales.MapCommand<ReleaseProformaAllocation, ReleaseProformaAllocationHandler>();
         sales.MapCommand<UnapplyReceipt, UnapplyReceiptHandler>();
         sales.MapCommand<MarkReceiptBounced, MarkReceiptBouncedHandler>();
         sales.MapCommand<ReverseReceipt, ReverseReceiptHandler>();
@@ -297,7 +300,7 @@ public static class CommandEndpoints
         typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),
-        typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
+        typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(AllocateReceiptToProformasHandler), typeof(ReleaseProformaAllocationHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),

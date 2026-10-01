@@ -33,7 +33,7 @@ internal static class Receipting
 
     public sealed record Row(
         string No, Guid PartyId, string Method, decimal Amount, DateOnly ValueDate, Guid? BankAccountId, string Status, string Application, string Bank, decimal Unapplied,
-        Guid? DepositId, Guid PostingEventId, long Version);
+        Guid? DepositId, Guid PostingEventId, long Version, decimal Allocated);
 
     public static async Task<Row> LockAsync(CommandContext context, Guid receiptId, long? expectedVersion, CancellationToken cancellationToken)
     {
@@ -42,11 +42,11 @@ internal static class Receipting
             context.Transaction,
             """
             SELECT receipt_no, party_id, method, amount::numeric(19,2), value_date, bank_account_id, status, application_status, bank_status, unapplied_amount::numeric(19,2),
-                   deposit_id, posting_event_id, version
+                   deposit_id, posting_event_id, version, allocated_amount::numeric(19,2)
             FROM fin.receipt WHERE company_id = @c AND receipt_id = @r FOR UPDATE
             """,
             r => new Row(r.GetString(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3), r.Date(4), r.NullableGuid(5), r.GetString(6), r.GetString(7), r.GetString(8), r.GetDecimal(9),
-                r.NullableGuid(10), r.GetGuid(11), r.GetInt64(12)),
+                r.NullableGuid(10), r.GetGuid(11), r.GetInt64(12), r.GetDecimal(13)),
             cancellationToken,
             ("c", context.CompanyId),
             ("r", receiptId)).ConfigureAwait(false)

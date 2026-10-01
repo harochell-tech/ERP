@@ -3,6 +3,7 @@ using Rochell.Finance.Posting;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Sales.Invoices;
+using Rochell.Sales.Proformas;
 
 namespace Rochell.Sales.Receipts;
 
@@ -21,14 +22,19 @@ public sealed class MarkReceiptBouncedHandler : ICommandHandler<MarkReceiptBounc
         ArgumentNullException.ThrowIfNull(context);
         var reason = Receipting.Reason(command.Reason);
 
-        // Lock order: the invoices its live applications touch → AR documents → receipt; an application added meanwhile is refused.
+        // Lock order: the proformas its live allocations touch → the invoices its live applications touch → AR documents → receipt;
+        // an application or allocation added meanwhile is refused.
+        var allocatedBefore = await Allocations.LiveOfReceiptAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
+        await Allocations.LockProformasAsync(context, allocatedBefore.Select(a => a.ProformaId), cancellationToken).ConfigureAwait(false);
         var before = await Receipting.LiveApplicationsAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
         var (invoices, _) = await Receipting.LockInvoicesAsync(context, before.Select(a => a.InvoiceId), cancellationToken).ConfigureAwait(false);
         var receipt = await Receipting.LockAsync(context, command.ReceiptId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         var applications = await Receipting.LiveApplicationsAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
-        if (!applications.Select(a => a.ApplicationId).Order().SequenceEqual(before.Select(a => a.ApplicationId).Order()))
+        var allocations = await Allocations.LiveOfReceiptAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
+        if (!applications.Select(a => a.ApplicationId).Order().SequenceEqual(before.Select(a => a.ApplicationId).Order())
+            || !allocations.Select(a => a.AllocationId).Order().SequenceEqual(allocatedBefore.Select(a => a.AllocationId).Order()))
         {
-            throw new DomainException(SalesErrors.VersionConflict, "The receipt's applications changed; reload and retry.");
+            throw new DomainException(SalesErrors.VersionConflict, "The receipt's applications or allocations changed; reload and retry.");
         }
 
         if (receipt.Method != "CHEQUE" || receipt.Status != "RECORDED" || receipt.DepositId is null)
@@ -61,6 +67,13 @@ public sealed class MarkReceiptBouncedHandler : ICommandHandler<MarkReceiptBounc
         var version = receipt.Version;
         var unapplied = receipt.Unapplied;
         var undone = new List<Guid>();
+
+        // E-FIS1b-01-4: a bounced cheque collects nothing — its allocations to proformas are released first.
+        foreach (var group in allocations.GroupBy(a => a.EventId))
+        {
+            await Allocations.ReleaseAsync(context, command.ReceiptId, receipt.No, group.ToList(), ++version, reason, CommandType, null, cancellationToken).ConfigureAwait(false);
+        }
+
         foreach (var group in applications.GroupBy(a => a.EventId))
         {
             var (amount, unapplyEvent) = await Receipting.UndoAsync(context, _engine, command.ReceiptId, receipt, group.ToList(), ++version, reason, null, cancellationToken).ConfigureAwait(false);
@@ -127,11 +140,11 @@ public sealed class ReverseReceiptHandler : ICommandHandler<ReverseReceipt>
         var reason = Receipting.Reason(command.Reason);
         var receipt = await Receipting.LockAsync(context, command.ReceiptId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         var notInBank = receipt.Method == "TRANSFER" ? receipt.Bank == "DEPOSITED" : receipt.Bank == "IN_TRANSIT";
-        if (receipt.Status != "RECORDED" || receipt.Application != "UNAPPLIED" || !notInBank)
+        if (receipt.Status != "RECORDED" || receipt.Application != "UNAPPLIED" || receipt.Allocated > 0m || !notInBank)
         {
             throw new DomainException(
                 ReceiptErrors.NotReversible,
-                $"Only a receipt with nothing applied, not deposited or matched, is reversed ({receipt.No} is {receipt.Status}, {receipt.Application}, {receipt.Bank}; E-VS3-07-9).");
+                $"Only a receipt with nothing applied or allocated, not deposited or matched, is reversed ({receipt.No} is {receipt.Status}, {receipt.Application}, {receipt.Bank}; E-VS3-07-9).");
         }
 
         var journal = (await SalesSql.ScalarAsync<Guid?>(
