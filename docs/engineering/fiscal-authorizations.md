@@ -126,7 +126,7 @@ e-CF 44 — is paid back to the customer.
 | --- | --- |
 | `fin.customer_refund` | DEV-000001 per company: receipt, company bank account, TRANSFER / CHEQUE, amount, reason; PREPARED → RELEASED → CLEARED (⇄ RELEASED on unmatch) or VOIDED; releaser ≠ preparer (`core.four_eyes`); state history; K-25 (a released refund has the live journal of its event) |
 | `PrepareCustomerRefund` (`customer_refund:prepare`, Cobros) | A RECORDED receipt whose money is in the bank (not IN_TRANSIT); amount ≤ unapplied − allocated − other prepared refunds; an ACTIVE bank account. Nothing posts |
-| `ReleaseCustomerRefund` (`customer_refund:release`, step-up) | Not the preparer. **P-36** `CustomerRefundReleased`: Dr UNAPPLIED_RECEIPTS (the receipt) / Cr BANK; the receipt's unapplied amount goes down. Close component BANK-REC, also AR-REC |
+| `ReleaseCustomerRefund` (`customer_refund:release`, step-up, Controller: E-FIS1b-05-1) | Not the preparer. **P-36** `CustomerRefundReleased`: Dr UNAPPLIED_RECEIPTS (the receipt) / Cr BANK; the receipt's unapplied amount goes down. Close component BANK-REC, also AR-REC |
 | `VoidCustomerRefund` (`customer_refund:prepare`) | A PREPARED refund, with a reason |
 | `MatchBankLineToRefund` (`bank_line:match`, Treasury) | An UNMATCHED DEBIT line of the refund's account and amount, within ten days of the release → line MATCHED, refund CLEARED; `UnmatchBankLine` returns both |
 | `MarkReceiptBounced` | Refused while the receipt has a refund that is not VOIDED |
