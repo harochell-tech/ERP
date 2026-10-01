@@ -274,6 +274,40 @@ public sealed class HashChainTests(PostgresFixture postgres) : IDisposable
     }
 
     [Fact]
+    public async Task A_run_digests_the_days_that_earlier_runs_missed()
+    {
+        var clock = new FakeClock();
+        await using var h = await TestHarness.CreateAsync(postgres, clock);
+        var s = await h.CreateStockSetupAsync();
+        var twoDaysAgo = new FakeClock();
+        twoDaysAgo.Advance(TimeSpan.FromDays(-2));
+        var yesterdayClock = new FakeClock();
+        yesterdayClock.Advance(TimeSpan.FromDays(-1));
+        await Receive(h, s, "one");
+        await new LedgerSealer(h.Sealer, twoDaysAgo).SealAllAsync(CancellationToken.None);
+        await Receive(h, s, "two");
+        await new LedgerSealer(h.Sealer, yesterdayClock).SealAllAsync(CancellationToken.None);
+        await Receive(h, s, "three");
+        await new LedgerSealer(h.Sealer, clock).SealAllAsync(CancellationToken.None);
+        var digester = new LedgerDigester(h.Sealer, Worm(), new DigestSigner(_key));
+        var yesterday = BusinessCalendar.DefaultBusinessDate(yesterdayClock.UtcNow);
+
+        var run = await digester.DigestThroughAsync(yesterday, CancellationToken.None);
+        var again = await digester.DigestThroughAsync(yesterday, CancellationToken.None);
+
+        Assert.Equal([yesterday.AddDays(-1), yesterday], run.Where(r => r.Ledger == Chains.Gl && r.Created).Select(r => r.Day));
+        Assert.DoesNotContain(again, r => r.Created);
+        Assert.Equal(2, await h.ScalarAsync<long>("SELECT count(*) FROM audit.ledger_digest WHERE ledger = 'GL'"));
+        Assert.True(await h.ScalarAsync<bool>(
+            "SELECT b.prev_digest_hash = a.digest_hash AND a.prev_digest_hash IS NULL FROM audit.ledger_digest a JOIN audit.ledger_digest b ON b.digest_date > a.digest_date WHERE a.ledger = 'GL' AND b.ledger = 'GL'"));
+
+        var next = await digester.DigestThroughAsync(Today(h), CancellationToken.None);
+
+        Assert.Equal([Today(h)], next.Where(r => r.Ledger == Chains.Gl && r.Created).Select(r => r.Day));
+        Assert.True((await VerifyAsync(h, "verify")).GetProperty("valid").GetBoolean());
+    }
+
+    [Fact]
     public void The_file_system_WORM_store_is_refused_outside_TEST()
     {
         Assert.Throws<InvalidOperationException>(() => FileSystemWormStore.Create(_wormRoot, "PRODUCTION"));
