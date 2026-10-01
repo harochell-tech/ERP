@@ -100,7 +100,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
         Assert.Equal(
             "acc.accounting_policy,acc.accounting_policy_parameter,acc.accounting_policy_version,acc.policy_parameter_definition,"
             + "audit.integrity_state,audit.ledger_digest,audit.ledger_seal,"
-            + "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.outbox,core.state_history,"
+            + "core.command_log,core.deployment_environment,core.document_link,core.domain_event,core.inbox,core.mail_attempt,core.mail_message,core.outbox,core.state_history,"
             + "fin.account,fin.account_role,fin.account_role_map,fin.ap_application,fin.ap_document,fin.ar_application,fin.ar_document,fin.bank_account,fin.bank_statement,fin.bank_statement_file,fin.bank_statement_format,fin.bank_statement_line,fin.close_component_state,fin.close_snapshot,fin.customer_refund,fin.customer_withholding,fin.gl_entry,fin.gl_journal,fin.gl_period_balance,fin.manual_journal,fin.manual_journal_line,"
             + "fin.payment,fin.payment_allocation,fin.period,fin.posting_rule,fin.posting_rule_version,fin.proforma_allocation,fin.receipt,fin.receipt_deposit,fin.reopen_request,fin.report_line,fin.report_line_account,fin.report_structure_version,"
             + "iam.permission,iam.role,iam.role_assignment,iam.role_assignment_request,iam.role_permission,iam.session,iam.sod_rule,iam.user,"

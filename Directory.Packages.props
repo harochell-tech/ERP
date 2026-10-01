@@ -14,6 +14,8 @@
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <!-- WORM digests in S3 Object Lock, compliance mode (B-03, E-B03-3/4). -->
     <PackageVersion Include="AWSSDK.S3" Version="4.0.103.4" />
+    <!-- Outgoing mail through an SMTP relay (E-MAIL-1): EHLO name, STARTTLS and MIME attachments. -->
+    <PackageVersion Include="MailKit" Version="4.18.1" />
     <!-- Analyzers -->
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" />
     <!-- Tests -->
