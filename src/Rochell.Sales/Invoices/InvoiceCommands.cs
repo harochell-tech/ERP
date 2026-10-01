@@ -11,6 +11,13 @@ public sealed record CreateInvoiceFromDeliveries(Guid CompanyId, Guid SessionId,
     : ICommand;
 
 /// <summary>
+/// E-FIS1b-6, E-FIS1b-01-6: a DRAFT invoice from whole OPEN proformas of one customer — e-CF 44 with the authorization that cites
+/// them, 31 / 32 with ITBIS without it. When issued it inherits what receipts were allocated to those proformas (E-FIS1b-01-7).
+/// </summary>
+public sealed record CreateInvoiceFromProformas(
+    Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, IReadOnlyList<Guid> ProformaIds, Guid? FiscalAuthorizationId = null) : ICommand;
+
+/// <summary>
 /// E-VS3-05-2/4/5/8: C-11 — commercial CONFIRMED, accounting POSTED (P-18) and fiscal PENDING_EXTERNAL in one transaction, with
 /// the sales ITBIS of the invoice date, the AR document and the invoiced quantities. <paramref name="EcfType"/> overrides the
 /// default (31 for an RNC, 32 for a cédula).

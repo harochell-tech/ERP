@@ -96,6 +96,78 @@ internal static class Receipting
             context.Connection, context.Transaction, "UPDATE fin.ar_document SET open_amount = open_amount + @d, version = version + 1 WHERE ar_doc_id = @a", cancellationToken,
             ("d", delta), ("a", arDocId));
 
+    /// <summary>An invoice a receipt is applied to, with its AR document and the amount.</summary>
+    public sealed record Target(Guid InvoiceId, string InvoiceNo, Guid ArDocId, decimal Amount);
+
+    /// <summary>
+    /// Writes one application of a receipt (E-VS3-07-5): the ReceiptApplied event with the receipt's <paramref name="version"/>, its
+    /// P-25 journal, the application rows, the open amounts and the receipt's unapplied amount. The caller validated the targets,
+    /// holds the locks (invoices → AR documents → receipt) and refreshes the invoices' standing. E-FIS1b-01-7: issuing an invoice
+    /// from proformas applies what was allocated to them through here.
+    /// </summary>
+    public static async Task<(Guid EventId, Guid JournalId, decimal Unapplied, string Status)> ApplyAsync(
+        CommandContext context, PostingEngine engine, Guid receiptId, Row receipt, long version, IReadOnlyList<Target> targets, Guid? causation, CancellationToken cancellationToken)
+    {
+        var lines = new List<PostingLineInput>();
+        foreach (var t in targets)
+        {
+            var inputs = new Dictionary<string, string> { ["receipt_no"] = receipt.No, ["invoice_no"] = t.InvoiceNo };
+            lines.Add(new PostingLineInput("P25-DR-UNAP", "applied_amount", t.Amount, PartyId: receipt.PartyId, SubledgerRef: receiptId, Inputs: inputs));
+            lines.Add(new PostingLineInput("P25-CR-AR", "applied_amount", t.Amount, PartyId: receipt.PartyId, SubledgerRef: t.ArDocId, Inputs: inputs));
+        }
+
+        var today = SalesSql.Today(context);
+        var plan = await engine.PrepareAsync(context, new PostingRequest("P-25", today, context.Clock.UtcNow, lines), cancellationToken).ConfigureAwait(false);
+        var total = targets.Sum(t => t.Amount);
+        var unapplied = receipt.Unapplied - total;
+        var status = ApplicationStatus(receipt.Amount, unapplied);
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(
+                "ReceiptApplied",
+                1,
+                Aggregate,
+                receiptId,
+                version,
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    receiptId,
+                    receiptNo = receipt.No,
+                    invoices = targets.Select(t => new { invoiceId = t.InvoiceId, invoiceNo = t.InvoiceNo, amount = Money(t.Amount) }),
+                    amount = Money(total),
+                }),
+                Publish: true,
+                BusinessDate: today,
+                CausationId: causation),
+            cancellationToken).ConfigureAwait(false);
+        foreach (var t in targets)
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "INSERT INTO fin.ar_application (application_id, company_id, receipt_id, ar_doc_id, amount, event_id) VALUES (@id, @c, @r, @d, @a, @e)",
+                cancellationToken,
+                ("id", context.Ids.NewId()),
+                ("c", context.CompanyId),
+                ("r", receiptId),
+                ("d", t.ArDocId),
+                ("a", t.Amount),
+                ("e", eventId)).ConfigureAwait(false);
+            await MoveOpenAsync(context, t.ArDocId, -t.Amount, cancellationToken).ConfigureAwait(false);
+        }
+
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE fin.receipt SET unapplied_amount = @u, application_status = @s, version = @v WHERE receipt_id = @r",
+            cancellationToken,
+            ("u", unapplied),
+            ("s", status),
+            ("v", version),
+            ("r", receiptId)).ConfigureAwait(false);
+        var journal = await engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
+        return (eventId, journal.JournalId, unapplied, status);
+    }
+
     /// <summary>A live application: never unapplied (no mirror row).</summary>
     public sealed record Application(Guid ApplicationId, Guid ArDocId, Guid InvoiceId, string InvoiceNo, decimal Amount, Guid EventId);
 

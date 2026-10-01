@@ -104,3 +104,16 @@ the receipt and on the proforma) only keeps that money for the proforma's invoic
 | `GetCustomerStatement` | `openProformas` and `proformaBalance`, apart from the ledger balance; CSV rows `PROFORMA_SIN_ECF` |
 | `GetReceipt` / `ListReceipts`, `GetProforma` | `allocated`, `available` and the receipt's allocations; the proforma's live collections |
 
+## FIS1b-04 — authorization with proformas, invoice from proformas (E-FIS1b-5…7, 10, E-FIS1b-01-6…8, 11)
+
+| Piece | Behaviour |
+| --- | --- |
+| `RegisterFiscalAuthorization` / `UpdateDraftAuthorization` | `proformaIds`: OPEN proformas of the customer that no other live authorization cites (`AUTHORIZATION_PROFORMA_INVALID`); the scope is the sum of their lines by product and unit, so `lines` is not given with them. `GetFiscalAuthorization` returns `proformas` |
+| `CreateInvoiceFromProformas` (`invoice:create`) | Whole OPEN proformas of one customer → the DRAFT invoice of their delivery lines (`InvoiceDrafts.CreateAsync`, shared with the delivery path). With an authorization that cites proformas, every line must come from them (`PROFORMA_NOT_CERTIFIED`) |
+| `IssueInvoice` | Locks the invoice's proformas first. After P-18, `ProformaInvoicing.InheritAsync` releases every live allocation of those proformas and applies it to the new AR document, receipt by receipt, with the usual P-25 (`Receipting.ApplyAsync`), up to the invoice's total; the rest stays unapplied on its receipt — the customer's credit balance. The proformas become INVOICED; the invoice ends CONFIRMED, PARTIALLY_PAID or PAID and the result says `collectedOnProformas` |
+| `VoidUnfiscalizedInvoice` | The proformas of the voided invoice return to OPEN (the receipts were unapplied before: a paid invoice is not voided) |
+| `VoidProforma` (`proforma:void`, Facturación) | OPEN, nothing allocated, cited by no live authorization; reason required; its delivery is billable through the delivery path again |
+| Lock order | Proformas → invoice → AR document → receipts |
+
+The invoice's due date is still the issue date plus the customer's terms (not the proforma's).
+

@@ -2332,6 +2332,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/create-invoice-from-proformas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateInvoiceFromProformas"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/void-proforma": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoidProforma"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/issue-invoice": {
         parameters: {
             query?: never;
@@ -5639,6 +5671,13 @@ export interface components {
             /** Format: uuid */
             fiscalAuthorizationId?: null | string;
         };
+        CreateInvoiceFromProformas: {
+            /** Format: uuid */
+            partyId: string;
+            proformaIds: string[];
+            /** Format: uuid */
+            fiscalAuthorizationId?: null | string;
+        };
         CreateMachine: {
             /** Format: uuid */
             plantId: string;
@@ -6298,6 +6337,7 @@ export interface components {
             documents: components["schemas"]["FiscalAuthorizationDocumentView"][];
             history: components["schemas"]["FiscalAuthorizationHistoryView"][];
             consumptions: components["schemas"]["FiscalAuthorizationConsumptionView"][];
+            proformas: components["schemas"]["FiscalAuthorizationProformaView"][];
         };
         FiscalAuthorizationDocumentView: {
             /** Format: uuid */
@@ -6338,6 +6378,17 @@ export interface components {
         };
         FiscalAuthorizationList: {
             items: components["schemas"]["FiscalAuthorizationSummary"][];
+        };
+        FiscalAuthorizationProformaView: {
+            /** Format: uuid */
+            proformaId: string;
+            proformaNo: string;
+            /** Format: date */
+            proformaDate: string;
+            /** Format: decimal */
+            net: string;
+            status: string;
+            invoiceNo: null | string;
         };
         FiscalAuthorizationSummary: {
             /** Format: uuid */
@@ -8567,7 +8618,8 @@ export interface components {
             projectTermEndsOn: null | string;
             /** Format: uuid */
             salesOrderId: null | string;
-            lines: components["schemas"]["AuthorizationLineInput"][];
+            lines: null | components["schemas"]["AuthorizationLineInput"][];
+            proformaIds?: null | string[];
         };
         RegisterFiscalSource: {
             officialSource: string;
@@ -9739,7 +9791,8 @@ export interface components {
             projectTermEndsOn: null | string;
             /** Format: uuid */
             salesOrderId: null | string;
-            lines: components["schemas"]["AuthorizationLineInput"][];
+            lines: null | components["schemas"]["AuthorizationLineInput"][];
+            proformaIds?: null | string[];
         };
         UpdateDraftQuote: {
             /** Format: uuid */
@@ -9907,6 +9960,13 @@ export interface components {
         VoidPayment: {
             /** Format: uuid */
             paymentId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            reason: string;
+        };
+        VoidProforma: {
+            /** Format: uuid */
+            proformaId: string;
             /** Format: int64 */
             expectedVersion: number;
             reason: string;
@@ -20543,6 +20603,158 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateInvoiceFromDeliveries"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateInvoiceFromProformas: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvoiceFromProformas"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VoidProforma: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidProforma"];
             };
         };
         responses: {

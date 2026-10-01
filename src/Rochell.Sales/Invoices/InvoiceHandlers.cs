@@ -5,6 +5,7 @@ using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Sales.Deliveries;
 using Rochell.Sales.Proformas;
+using Rochell.Sales.Receipts;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
 
@@ -80,25 +81,22 @@ internal static class Invoicing
     public static string M(decimal value) => value.ToString(CultureInfo.InvariantCulture);
 }
 
-[RequiresPermission("invoice:create")]
-public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateInvoiceFromDeliveries>
+/// <summary>The DRAFT invoice of delivered lines, shared by the delivery path (VS#3) and the proforma path (E-FIS1b-01-6).</summary>
+internal static class InvoiceDrafts
 {
-    public string CommandType => "Sales.CreateInvoiceFromDeliveries";
-
     private sealed record Billable(Guid DeliveryLineId, Guid ItemId, string Uom, decimal Remaining, decimal UnitPrice);
 
-    public async Task<string> HandleAsync(CreateInvoiceFromDeliveries command, CommandContext context, CancellationToken cancellationToken)
+    public static async Task<string> CreateAsync(
+        CommandContext context, string commandType, Guid partyId, IReadOnlyList<Guid>? deliveryLineIds, Guid? authorizationId, bool fromProformas, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(command);
-        ArgumentNullException.ThrowIfNull(context);
-        var ids = command.DeliveryLineIds ?? [];
+        var ids = deliveryLineIds ?? [];
         if (ids.Count == 0 || ids.Distinct().Count() != ids.Count)
         {
             throw new DomainException(SalesErrors.LinesRequired, "An invoice has at least one delivery line, each once.");
         }
 
         var rnc = await SalesSql.ScalarAsync<string>(
-            context, "SELECT coalesce(rnc, '') FROM md.party WHERE company_id = @c AND party_id = @p AND is_customer", cancellationToken, ("c", context.CompanyId), ("p", command.PartyId)).ConfigureAwait(false)
+            context, "SELECT coalesce(rnc, '') FROM md.party WHERE company_id = @c AND party_id = @p AND is_customer", cancellationToken, ("c", context.CompanyId), ("p", partyId)).ConfigureAwait(false)
             ?? throw new DomainException(SalesErrors.NotCustomer, "The party is not a customer.");
         var billable = await Reading.ListAsync(
             context.Connection,
@@ -115,14 +113,14 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
             cancellationToken,
             ("c", context.CompanyId),
             ("ids", ids.ToArray()),
-            ("p", command.PartyId)).ConfigureAwait(false);
+            ("p", partyId)).ConfigureAwait(false);
         if (billable.Count != ids.Count || billable.Any(b => b.Remaining <= 0m))
         {
             throw new DomainException(InvoiceErrors.NotBillable, "Each line must be a delivered, not yet fully invoiced delivery line of this customer (E-VS3-05-3).");
         }
 
         // E-FIS1b-01-6: a delivery collected on a proforma is invoiced from the proforma, whole.
-        if (await SalesSql.ScalarAsync<bool>(
+        if (!fromProformas && await SalesSql.ScalarAsync<bool>(
                 context,
                 "SELECT EXISTS (SELECT 1 FROM sal.proforma_line l JOIN sal.proforma p ON p.proforma_id = l.proforma_id WHERE l.company_id = @c AND l.delivery_line_id = ANY (@ids) AND p.status <> 'VOIDED')",
                 cancellationToken, ("c", context.CompanyId), ("ids", ids.ToArray())).ConfigureAwait(false))
@@ -130,14 +128,28 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
             throw new DomainException(ProformaErrors.Required, "A delivery with a proforma is invoiced from its proforma (E-FIS1b-01-6).");
         }
 
+        // E-FIS1b-01-8: an authorization that cites proformas covers the invoices of those proformas and nothing else.
+        if (authorizationId is { } cited && await SalesSql.ScalarAsync<bool>(
+                context,
+                """
+                SELECT EXISTS (SELECT 1 FROM tax.fiscal_authorization_proforma x WHERE x.authorization_id = @a)
+                   AND EXISTS (SELECT 1 FROM unnest(@ids) AS dl (id)
+                               WHERE NOT EXISTS (SELECT 1 FROM sal.proforma_line l JOIN tax.fiscal_authorization_proforma x ON x.proforma_id = l.proforma_id AND x.authorization_id = @a
+                                                 WHERE l.delivery_line_id = dl.id))
+                """,
+                cancellationToken, ("a", cited), ("ids", ids.ToArray())).ConfigureAwait(false))
+        {
+            throw new DomainException(ProformaErrors.NotCertified, "That authorization cites proformas: it covers the invoice of those proformas only (E-FIS1b-01-8).");
+        }
+
         var lines = billable.OrderBy(b => ids.ToList().IndexOf(b.DeliveryLineId))
             .Select(b => (b, Net: decimal.Round(b.Remaining * b.UnitPrice, 2, MidpointRounding.AwayFromZero), LineId: context.Ids.NewId())).ToList();
         var net = lines.Sum(l => l.Net);
-        if (command.FiscalAuthorizationId is { } authorization)
+        if (authorizationId is { } authorization)
         {
             // E-FIS1-03-1 (D-05): an exempt invoice is exempt as a whole; a line out of the scope is invoiced apart with ITBIS.
             await AuthorizationUsage.CoverAsync(
-                context, authorization, command.PartyId, [.. lines.Select(l => new CoveredLine(l.LineId, l.b.ItemId, l.b.Uom, l.b.Remaining, l.Net))], cancellationToken).ConfigureAwait(false);
+                context, authorization, partyId, [.. lines.Select(l => new CoveredLine(l.LineId, l.b.ItemId, l.b.Uom, l.b.Remaining, l.Net))], cancellationToken).ConfigureAwait(false);
         }
 
         var creator = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
@@ -145,7 +157,7 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
         var last = await SalesSql.ScalarAsync<int?>(
             context, "SELECT max(substring(invoice_no from 4)::int) FROM sal.invoice WHERE company_id = @c", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false) ?? 0;
         var invoiceNo = "FA-" + (last + 1).ToString("D6", CultureInfo.InvariantCulture);
-        var ecfType = command.FiscalAuthorizationId is null ? Invoicing.DefaultEcfType(rnc) : Invoicing.ExemptEcfType;
+        var ecfType = authorizationId is null ? Invoicing.DefaultEcfType(rnc) : Invoicing.ExemptEcfType;
         var eventId = await context.AppendEventAsync(
             new EventDraft(
                 "InvoiceCreated",
@@ -153,7 +165,7 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
                 Invoicing.Aggregate,
                 context.ResultRef,
                 1,
-                JsonSerializer.Serialize(new { invoiceId = context.ResultRef, invoiceNo, partyId = command.PartyId, ecfType, fiscalAuthorizationId = command.FiscalAuthorizationId, netTotal = Invoicing.M(net), lines = lines.Select(l => new { deliveryLineId = l.b.DeliveryLineId, quantity = Invoicing.M(l.b.Remaining), net = Invoicing.M(l.Net) }) }),
+                JsonSerializer.Serialize(new { invoiceId = context.ResultRef, invoiceNo, partyId = partyId, ecfType, fiscalAuthorizationId = authorizationId, netTotal = Invoicing.M(net), lines = lines.Select(l => new { deliveryLineId = l.b.DeliveryLineId, quantity = Invoicing.M(l.b.Remaining), net = Invoicing.M(l.Net) }) }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(
@@ -168,11 +180,11 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
             ("id", context.ResultRef),
             ("c", context.CompanyId),
             ("no", invoiceNo),
-            ("p", command.PartyId),
+            ("p", partyId),
             ("ecf", ecfType),
             ("net", net),
             ("by", creator),
-            ("auth", command.FiscalAuthorizationId)).ConfigureAwait(false);
+            ("auth", authorizationId)).ConfigureAwait(false);
         var no = 0;
         foreach (var (b, lineNet, lineId) in lines)
         {
@@ -196,8 +208,54 @@ public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateI
                 ("n", lineNet)).ConfigureAwait(false);
         }
 
-        await context.AppendStateAsync(Invoicing.Aggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        await context.AppendStateAsync(Invoicing.Aggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", commandType, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { invoiceId = context.ResultRef, invoiceNo, commercialStatus = "DRAFT", netTotal = Invoicing.M(net), ecfType, version = 1 });
+    }
+}
+
+[RequiresPermission("invoice:create")]
+public sealed class CreateInvoiceFromDeliveriesHandler : ICommandHandler<CreateInvoiceFromDeliveries>
+{
+    public string CommandType => "Sales.CreateInvoiceFromDeliveries";
+
+    public Task<string> HandleAsync(CreateInvoiceFromDeliveries command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        return InvoiceDrafts.CreateAsync(context, CommandType, command.PartyId, command.DeliveryLineIds, command.FiscalAuthorizationId, fromProformas: false, cancellationToken);
+    }
+}
+
+[RequiresPermission("invoice:create")]
+public sealed class CreateInvoiceFromProformasHandler : ICommandHandler<CreateInvoiceFromProformas>
+{
+    public string CommandType => "Sales.CreateInvoiceFromProformas";
+
+    public async Task<string> HandleAsync(CreateInvoiceFromProformas command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var ids = command.ProformaIds ?? [];
+        if (ids.Count == 0 || ids.Distinct().Count() != ids.Count)
+        {
+            throw new DomainException(SalesErrors.LinesRequired, "An invoice from proformas names one or more proformas, each once.");
+        }
+
+        // E-FIS1b-01-6: whole OPEN proformas of the customer.
+        var proformas = await Allocations.LockProformasAsync(context, ids, cancellationToken).ConfigureAwait(false);
+        if (proformas.Any(f => f.PartyId != command.PartyId || f.Status != "OPEN"))
+        {
+            throw new DomainException(AllocationErrors.ProformaNotOpen, "Each proforma must be an OPEN proforma of this customer.");
+        }
+
+        var lines = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT l.delivery_line_id FROM sal.proforma_line l JOIN sal.proforma p ON p.proforma_id = l.proforma_id WHERE l.proforma_id = ANY (@ids) ORDER BY p.proforma_no, l.line_no",
+            r => r.GetGuid(0),
+            cancellationToken,
+            ("ids", ids.ToArray())).ConfigureAwait(false);
+        return await InvoiceDrafts.CreateAsync(context, CommandType, command.PartyId, lines, command.FiscalAuthorizationId, fromProformas: true, cancellationToken).ConfigureAwait(false);
     }
 }
 
@@ -213,10 +271,31 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
+        // Lock order: proformas → invoice → AR document → receipts. The proformas of the invoice's delivery lines, if any.
+        var proformas = await Allocations.LockProformasAsync(
+            context,
+            await Reading.ListAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                SELECT DISTINCT l.proforma_id FROM sal.invoice_line il
+                JOIN sal.proforma_line l ON l.delivery_line_id = il.delivery_line_id JOIN sal.proforma p ON p.proforma_id = l.proforma_id
+                WHERE il.company_id = @c AND il.invoice_id = @i AND p.status <> 'VOIDED'
+                """,
+                r => r.GetGuid(0),
+                cancellationToken,
+                ("c", context.CompanyId),
+                ("i", command.InvoiceId)).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
         var row = await Invoicing.LockAsync(context, command.InvoiceId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         if (row.Commercial != "DRAFT")
         {
             throw new DomainException(SalesErrors.InvalidState, $"The invoice is {row.Commercial}.");
+        }
+
+        if (proformas.FirstOrDefault(f => f.Status != "OPEN") is { } taken)
+        {
+            throw new DomainException(AllocationErrors.ProformaNotOpen, $"{taken.ProformaNo} is {taken.Status}: it was invoiced already.");
         }
 
         var ecfType = (command.EcfType ?? row.EcfType).Trim();
@@ -370,15 +449,31 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
         await context.AppendStateAsync(Invoicing.Aggregate, command.InvoiceId, "DOCUMENT", "DRAFT", "CONFIRMED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(Invoicing.Aggregate, command.InvoiceId, "ACCOUNTING", "NOT_POSTED", "POSTED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
         var journal = await _engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
+
+        // E-FIS1b-7, E-FIS1b-01-7: the invoice of proformas inherits what was collected on them.
+        var commercial = "CONFIRMED";
+        var inherited = SalesSql.Zero;
+        if (proformas.Count > 0)
+        {
+            inherited += await ProformaInvoicing.InheritAsync(
+                context, _engine, command.InvoiceId, row.InvoiceNo, arDocId, total, proformas, eventId, CommandType, cancellationToken).ConfigureAwait(false);
+            if (inherited > 0m)
+            {
+                commercial = await InvoiceStanding.RefreshAsync(context, command.InvoiceId, CommandType, eventId, cancellationToken).ConfigureAwait(false);
+                version++;
+            }
+        }
+
         return JsonSerializer.Serialize(new
         {
             invoiceId = command.InvoiceId,
-            commercialStatus = "CONFIRMED",
+            commercialStatus = commercial,
             accountingStatus = "POSTED",
             fiscalStatus = "PENDING_EXTERNAL",
             netTotal = Invoicing.M(row.Net),
             taxTotal = Invoicing.M(itbis),
             total = Invoicing.M(total),
+            collectedOnProformas = Invoicing.M(inherited),
             journalId = journal.JournalId,
             version,
         });
@@ -514,6 +609,12 @@ public sealed class VoidUnfiscalizedInvoiceHandler : ICommandHandler<VoidUnfisca
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var reason = SalesSql.Optional(command.Reason, 500, "The reason") ?? throw new DomainException(Orders.OrderErrors.ReasonRequired, "Voiding an invoice needs a reason.");
+        var proformas = await Allocations.LockProformasAsync(
+            context,
+            await Reading.ListAsync(
+                context.Connection, context.Transaction, "SELECT proforma_id FROM sal.proforma WHERE company_id = @c AND invoice_id = @i", r => r.GetGuid(0), cancellationToken,
+                ("c", context.CompanyId), ("i", command.InvoiceId)).ConfigureAwait(false),
+            cancellationToken).ConfigureAwait(false);
         var row = await Invoicing.LockAsync(context, command.InvoiceId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         if (row.Commercial != "CONFIRMED" || row.Fiscal != "PENDING_EXTERNAL")
         {
@@ -570,6 +671,8 @@ public sealed class VoidUnfiscalizedInvoiceHandler : ICommandHandler<VoidUnfisca
                 context, authorization, [.. lines.Select(l => new ReleasedLine(l.InvoiceLineId, l.Quantity, l.Net))], eventId, CommandType, cancellationToken).ConfigureAwait(false);
         }
 
+        // E-FIS1b-1: the proformas of a voided invoice are open again, to be invoiced anew.
+        await ProformaInvoicing.SetStatusAsync(context, proformas.Where(f => f.Status == "INVOICED").ToList(), "OPEN", null, eventId, CommandType, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(Invoicing.Aggregate, command.InvoiceId, "DOCUMENT", "CONFIRMED", "VOIDED", CommandType, eventId, cancellationToken, reason).ConfigureAwait(false);
         await context.AppendStateAsync(Invoicing.Aggregate, command.InvoiceId, "ACCOUNTING", "POSTED", "REVERSED", CommandType, eventId, cancellationToken, reason).ConfigureAwait(false);
         var reversal = await _engine.WriteReversalAsync(context, plan, eventId, occurredAt, cancellationToken).ConfigureAwait(false);

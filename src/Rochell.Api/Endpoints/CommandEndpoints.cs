@@ -219,6 +219,8 @@ public static class CommandEndpoints
         sales.MapCommand<CancelDelivery, CancelDeliveryHandler>();
         sales.MapCommand<CloseShortSalesOrder, CloseShortSalesOrderHandler>();
         sales.MapCommand<CreateInvoiceFromDeliveries, CreateInvoiceFromDeliveriesHandler>();
+        sales.MapCommand<CreateInvoiceFromProformas, CreateInvoiceFromProformasHandler>();
+        sales.MapCommand<VoidProforma, VoidProformaHandler>();
         sales.MapCommand<IssueInvoice, IssueInvoiceHandler>();
         sales.MapCommand<RecordExternalFiscalDocument, RecordExternalFiscalDocumentHandler>();
         sales.MapCommand<VoidUnfiscalizedInvoice, VoidUnfiscalizedInvoiceHandler>();
@@ -298,7 +300,7 @@ public static class CommandEndpoints
         typeof(CreateQuoteHandler), typeof(UpdateDraftQuoteHandler), typeof(SubmitQuoteForApprovalHandler), typeof(ApproveQuotePricesHandler), typeof(ReturnQuoteToDraftHandler),
         typeof(SendQuoteHandler), typeof(MarkQuoteLostHandler), typeof(CancelQuoteHandler), typeof(CopyQuoteHandler), typeof(ConvertQuoteHandler),
         typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
-        typeof(CreateInvoiceFromDeliveriesHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
+        typeof(CreateInvoiceFromDeliveriesHandler), typeof(CreateInvoiceFromProformasHandler), typeof(VoidProformaHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),
         typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(AllocateReceiptToProformasHandler), typeof(ReleaseProformaAllocationHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),

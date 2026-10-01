@@ -83,6 +83,9 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PROFORMA_NOT_OPEN: "La proforma ya no está abierta.",
   PROFORMA_OF_ANOTHER_CUSTOMER: "La proforma es de otro cliente.",
   ALLOCATION_NOT_FOUND: "El recibo no tiene esa asignación vigente.",
+  PROFORMA_NOT_CERTIFIED: "Esa autorización cita proformas: solo cubre la factura de esas proformas.",
+  PROFORMA_NOT_VOIDABLE: "Solo se anula una proforma abierta, sin cobros asignados y que ninguna autorización cite.",
+  AUTHORIZATION_PROFORMA_INVALID: "Cada proforma debe estar abierta, ser del cliente y no estar en otra autorización.",
   // IMP-01: bulk load of suppliers and customers.
   IMPORT_FILE_INVALID: "El archivo no se puede leer como la exportación de ADM Cloud (.xlsx o .csv con «Razón Social» e «ID Fiscal»).",
   IMPORT_FILE_TOO_LARGE: "El archivo supera 5 MB.",
