@@ -91,7 +91,7 @@ grants them to the roles that work each document plus the Controller and the Aud
 | Service | Switch | Behaviour |
 | --- | --- | --- |
 | Sealer | `Rochell:Sealer:Enabled`, `Interval` (5 s) | `LedgerSealer.SealAllAsync` as `rochell_sealer`; a failed pass is logged and retried at the next tick |
-| Daily digest | `Rochell:Digest:Enabled`, `RunAt` (00:15 local), `SigningKeyPem` | Digests the previous day (also on start, if due). **Does not start** without WORM storage or the signing key; logs Critical and sealing continues |
+| Daily digest | `Rochell:Digest:Enabled`, `RunAt` (00:15 local), `SigningKeyPem` | Digests the previous day and any earlier day still without its digest (E-B03-17; also on start, if due). **Does not start** without WORM storage or the signing key; logs Critical and sealing continues |
 | Fiscal expiry | `Rochell:FiscalExpiry:Enabled` (on in Staging), `RunAt` (00:30 local) | Runs `ExpireFiscalAuthorizations` in every company (also on start, if due) through the command pipeline, on a SERVICE session of the daily process that it ends afterwards; idempotency key `daily-expiry:<day>`. A company without `PROCESO_DIARIO` is skipped with a warning (E-FIS1-04-7) |
 | request_log | always | Flushes `obs.request_log` every second and at shutdown |
 

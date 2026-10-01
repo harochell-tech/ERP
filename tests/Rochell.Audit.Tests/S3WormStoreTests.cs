@@ -9,12 +9,15 @@ using Xunit;
 
 namespace Rochell.Audit.Tests;
 
-/// <summary>B-03 / E-B03-3, E-B03-4: digests anchored in S3 Object Lock, compliance mode, written once and never replaced.</summary>
+/// <summary>
+/// B-03 / E-B03-3, E-B03-4: digests anchored in S3 Object Lock, compliance mode, written once and never replaced. The server
+/// refuses <c>If-None-Match</c> like Backblaze B2 (E-B03-16, E-B03-18).
+/// </summary>
 [Collection(PostgresTestGroup.Name)]
 public sealed class S3WormStoreTests(PostgresFixture postgres, S3WormFixture s3) : IClassFixture<S3WormFixture>, IDisposable
 {
     private const int RetentionDays = 7;
-    private readonly AmazonS3Client _client = s3.CreateClient();
+    private readonly AmazonS3Client _client = s3.CreateClient(likeBackblaze: true);
     private readonly ECDsa _key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
 
     public void Dispose()
@@ -52,6 +55,19 @@ public sealed class S3WormStoreTests(PostgresFixture postgres, S3WormFixture s3)
         })).Retention;
         Assert.Equal(ObjectLockRetentionMode.Compliance, retention.Mode);
         Assert.InRange(retention.RetainUntilDate!.Value.ToUniversalTime(), before.AddDays(RetentionDays).AddMinutes(-1), DateTime.UtcNow.AddDays(RetentionDays).AddMinutes(1));
+    }
+
+    [Fact]
+    public async Task The_store_writes_where_conditional_writes_are_not_implemented()
+    {
+        var (store, bucket) = await StoreAsync();
+
+        var conditional = await Assert.ThrowsAsync<AmazonS3Exception>(() => _client.PutObjectAsync(
+            new PutObjectRequest { BucketName = bucket, Key = "conditional.json", ContentBody = "{}", IfNoneMatch = "*" }));
+        await store.PutAsync("digest.json", [1], CancellationToken.None);
+
+        Assert.Equal(System.Net.HttpStatusCode.NotImplemented, conditional.StatusCode);
+        Assert.Equal(new byte[] { 1 }, await store.GetAsync("digest.json", CancellationToken.None));
     }
 
     [Fact]
