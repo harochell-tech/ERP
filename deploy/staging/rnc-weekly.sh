@@ -10,7 +10,8 @@ url=https://dgii.gov.do/app/WebApps/Consultas/RNC/DGII_RNC.zip
 mkdir -p rnc
 
 if [ $# -ge 1 ]; then
-  cp "$1" rnc/DGII_RNC.zip
+  # After a database reset the file already in rnc/ is imported again: cp refuses to copy a file onto itself.
+  [ "$1" -ef rnc/DGII_RNC.zip ] || cp "$1" rnc/DGII_RNC.zip
 else
   status="$(curl -sS -L -o rnc/DGII_RNC.zip.part -w '%{http_code}' "$url" || true)"
   if [ "$status" != "200" ]; then

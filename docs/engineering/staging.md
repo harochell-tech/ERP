@@ -197,11 +197,15 @@ The database is PRODUCTION (`deploy.sh` writes it once; the CLI refuses to chang
 "Actuar como", and activating a fiscal rule needs an official PRODUCTION source (P-7). `Rochell__EnvironmentBadge: PARALELO`
 (`compose.yaml`) is served at `GET /api/v1/environment` and shown in the top bar. `seed*.sh` are for TEST databases only.
 
-Reset (E-PAR-2, done once, only with the owner's explicit confirmation at the time):
+Reset (E-PAR-2, done once, only with the owner's explicit confirmation at the time). Done on 2026-10-01: backup
+`rochell-2026-10-01T133402Z.dump.cms` restored on the owner's computer with the same row counts as staging; company
+`BLOCK ROCHELL SRL` (the legal name in the DGII registry), plant `MATILLA` (area `MATILLA`, "Planta Matilla") with RECEPCION, CURADO
+and TRANSITO, the 2026 periods, the registry of 2026-09-19 and the owner as SUPERADMIN until 2026-12-30.
 
 1. `backup.sh`; check the new object in B2 is CMS-encrypted (it starts with a DER `SEQUENCE`, not the `PGDMP` magic).
-2. Restore test (E-PAR-4, criterion E1) on the owner's computer, where the offline key lives: download the object, `openssl cms
-   -decrypt -inform DER -inkey backup-key.pem -in <file> -out rochell.dump`, `pg_restore` into an empty PostgreSQL 17, count rows.
+2. Restore test (E-PAR-4, criterion E1) on the owner's computer, where the offline key lives: download the object from the B2 web
+   console (the key on the VPS can only write to the backup bucket), `openssl cms -decrypt -inform DER -binary -inkey
+   backup-key.pem -in <file> -out rochell.dump`, `pg_restore` into an empty PostgreSQL 17, count rows.
 3. Review SSH access (`~/.ssh/authorized_keys` fingerprints on the VPS).
 4. Note the real people's `iam.user` rows (e-mail, OIDC subject) to recreate them with `create-user`.
 5. Stop `api`; drop and recreate the `rochell` database (owner `rochell_deploy`); run the deploy workflow (migrations,
