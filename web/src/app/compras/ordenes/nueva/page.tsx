@@ -13,6 +13,7 @@ import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { previewQuery } from "@/lib/ux4a";
 import { itemLabel, previewKey, uomLabel } from "@/lib/ux4a-compras";
+import { allSuppliers } from "@/lib/paging";
 
 interface Line {
   itemId: string;
@@ -140,7 +141,7 @@ export default function NewPurchaseOrder() {
           const plantFilter = permission.companyWide ? undefined : permission.plants[0];
           const [plants, suppliers, items] = await Promise.all([
             query("/api/v1/companies/{companyId}/master-data/plants", { path: { companyId }, query: { plantId: plantFilter } }),
-            query("/api/v1/companies/{companyId}/master-data/suppliers", { path: { companyId }, query: { status: "ACTIVE", plantId: plantFilter, limit: 200 } }),
+            allSuppliers(companyId, { status: "ACTIVE", plantId: plantFilter }),
             query("/api/v1/companies/{companyId}/master-data/items", { path: { companyId }, query: { status: "ACTIVE", plantId: plantFilter, limit: 200 } }),
           ]);
           return {

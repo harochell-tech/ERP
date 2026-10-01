@@ -11,6 +11,7 @@ import { addDays, todayInDominicanRepublic } from "@/lib/labels";
 import { csvUrl, monthStart } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { allCustomers } from "@/lib/paging";
 
 // VS3-10b (E-VS3-09-3/4): a customer's statement of account from the ledger (it always agrees with AR-GL), with a CSV to send.
 // UX4-03 (V-19): and a print view for the customer (letter, without the menu), like the quote's.
@@ -23,7 +24,7 @@ function Statement() {
   const today = todayInDominicanRepublic();
   const [from, setFrom] = useState(params.get("desde") ?? monthStart(addDays(today, -60)));
   const [to, setTo] = useState(params.get("hasta") ?? today);
-  const customers = useLoad(can("sales:read") ? () => query("/api/v1/companies/{companyId}/sales/customers", { path: { companyId }, query: { limit: 200 } }) : null, [companyId]);
+  const customers = useLoad(can("sales:read") ? () => allCustomers(companyId) : null, [companyId]);
   const statement = useLoad(
     can("sales:read") && customer ? () => query("/api/v1/companies/{companyId}/sales/customers/{partyId}/statement", { path: { companyId, partyId: customer }, query: { from, to } }) : null,
     [companyId, customer, from, to],

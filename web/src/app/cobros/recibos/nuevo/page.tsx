@@ -14,6 +14,7 @@ import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { bankAccountLabel, suggestionAmounts } from "@/lib/ux4bSales";
+import { allCustomers } from "@/lib/paging";
 
 // VS3-10b (E-VS3-10-7, E-VS3-07-2): a receipt from an ACTIVE customer. A transfer names our bank account (masked list, E-VS3-10-14)
 // and its value date; a cheque its bank, number and date; cash nothing else.
@@ -145,7 +146,7 @@ export default function Page() {
     allowed
       ? async () => {
           const [customers, banks] = await Promise.all([
-            query("/api/v1/companies/{companyId}/sales/customers", { path: { companyId }, query: { status: "ACTIVE", limit: 200 } }),
+            allCustomers(companyId, { status: "ACTIVE" }),
             query("/api/v1/companies/{companyId}/sales/bank-accounts", { path: { companyId } }),
           ]);
           return { customers: customers.items, banks: banks.items };

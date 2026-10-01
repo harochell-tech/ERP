@@ -587,3 +587,19 @@ every figure shown is the server's string (the previews and suggestions are quer
   Despacho, "Emitida" without accounting status, the folded credit note, AR aging totals, a receipt recorded and applied from the
   suggestion); the quote journey (quote preview, credit preview); the production journey (minimum curing, day totals and
   variances with tolerance, a still-curing lot with remaining hours and no "Liberar").
+
+## IMP-02 — bulk load screens (E-IMP-1…11, E-IMP-02-1…3)
+
+| Screen | What it does |
+| --- | --- |
+| Maestros › Proveedores | «Importar desde ADM Cloud» (`supplier:import`): `PartyImportPanel` reads the `.xlsx` / `.csv` (≤ 5 MB, base64), «Revisar archivo» shows every row with what it would do and writes nothing, «Importar N proveedores» runs the command (step-up; the file is kept through the re-authentication). «Solo borradores», a checkbox per draft and «Activar seleccionados (N)» (`supplier:activate`, confirmation dialog, up to 500) |
+| Maestros › Proveedor | Contact card: phone and e-mails, edited with `supplier:update` (`SetSupplierContact`); e-mails one per line, the first is the principal one |
+| Ventas › Clientes | The same import panel for customers (`customer:import`). For the ticked drafts: «Aprobar términos de los seleccionados» (`customer_terms:approve`; the DRAFT terms of those customers) and «Activar seleccionados» (`customer:activate`); the notice says how many were done and why the others were skipped |
+| Ventas › Cliente | «Correos»: the customer's whole list, one per line |
+
+`lib/partyImport.ts` (unit-tested) holds the Spanish words for outcomes and reasons, the summary sentence, the e-mail list rules
+and the batch summary. `lib/paging.ts` (`allSuppliers`, `allCustomers`) reads every page of the API (200 rows each): the lists
+and the pickers of suppliers and customers no longer stop at the first 200 (E-IMP-02-1). Playwright: `import-journey.spec.ts`
+(Comprador imports suppliers, Controller activates them; Vendedor imports customers, Controller approves their terms, Crédito
+activates them), with synthetic `.csv` files.
+

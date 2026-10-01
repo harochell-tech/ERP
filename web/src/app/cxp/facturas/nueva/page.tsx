@@ -9,6 +9,7 @@ import { addDays, formatDate, todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { allSuppliers } from "@/lib/paging";
 
 interface Values {
   partyId: string;
@@ -35,7 +36,7 @@ export default function NewInvoice() {
   const allowed = can("supplier_invoice:register");
 
   const suppliers = useLoad(
-    allowed ? () => query("/api/v1/companies/{companyId}/master-data/suppliers", { path: { companyId }, query: { status: "ACTIVE", limit: 200 } }) : null,
+    allowed ? () => allSuppliers(companyId, { status: "ACTIVE" }) : null,
     [companyId, allowed],
   );
   const orders = useLoad(

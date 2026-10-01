@@ -11,6 +11,7 @@ import { DELIVERY_TERMS } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { allCustomers } from "@/lib/paging";
 
 // VS3-10a (E-VS3-10-4): a DRAFT order — customer, plant, delivery term, site, lines of products of the price list in force. Prices
 // and totals are the server's; the screen never multiplies.
@@ -51,7 +52,7 @@ function OrderForm() {
     allowed
       ? async () => {
           const [customers, plants, lists, order] = await Promise.all([
-            query("/api/v1/companies/{companyId}/sales/customers", { path: { companyId }, query: { status: "ACTIVE", limit: 200 } }),
+            allCustomers(companyId, { status: "ACTIVE" }),
             query("/api/v1/companies/{companyId}/sales/plants", { path: { companyId } }),
             query("/api/v1/companies/{companyId}/sales/price-lists", { path: { companyId } }),
             editId ? query("/api/v1/companies/{companyId}/sales/orders/{salesOrderId}", { path: { companyId, salesOrderId: editId } }) : Promise.resolve(null),

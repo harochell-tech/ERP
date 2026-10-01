@@ -850,6 +850,9 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-IMP-01-10 | IMP-01 | Implementation choice: an RNC that exists only as a customer is not made a supplier by the supplier import (it is reported); load suppliers first, then customers. |
 | E-IMP-01-11 | IMP-01 | Implementation choice: a supplier that becomes a customer keeps its own phone and e-mails; the file's apply only where it has none. `UpdateCustomer` without the list replaces only the principal e-mail (the form before the screens of IMP-02). |
 | E-IMP-01-12 | IMP-01 | Two PRs: IMP-01 (server: migration 0065, commands, queries, tests) and IMP-02 (screens). |
+| E-IMP-02-1 | IMP-02 | The API pages at 200 rows and the screens asked for one page: with the bulk load the supplier and customer lists and pickers would silently stop at 200. They now read every page (`lib/paging.ts`). |
+| E-IMP-02-2 | IMP-02 | E-mails are edited as one box, one per line (the first is the principal one), on the customer page and on the supplier page; the Controller, who cannot edit a customer, does not see its contact data there (as before). |
+| E-IMP-02-3 | IMP-02 | The batch actions send only what is still a draft on screen, at most 500 per command; "approve the terms of the selected ones" approves each customer's DRAFT terms as they are (the importer's days and limit), so limits are completed before approving. |
 
 Implementation rules derived from the above (no architectural change):
 
