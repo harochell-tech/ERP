@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { query, type Schemas } from "@/api/client";
+import { type Schemas } from "@/api/client";
 import { PartyImportPanel } from "@/components/PartyImportPanel";
 import { RncHint, useRncLookup } from "@/components/RncLookup";
 import { ConfirmAction, ErrorBox, Field, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
