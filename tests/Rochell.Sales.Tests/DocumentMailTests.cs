@@ -153,6 +153,10 @@ public sealed class DocumentMailTests(PostgresFixture postgres)
         var clock = new FakeClock();
         await using var h = await TestHarness.CreateAsync(postgres, clock);
         var w = await ReceiptTests.WorldAsync(h, 100m);
+        var customerVersion = await h.ScalarAsync<long>("SELECT version FROM md.party WHERE party_id = @p", ("p", w.S.Customer));
+        await h.RunAsync(
+            new Customers.UpdateCustomer(h.CompanyId, w.S.Seller, "mails", w.S.Customer, customerVersion, "131925332", "Constructora Uno", null, null, null, ["pagos@constructorauno.com.do", "obra@constructorauno.com.do"]),
+            new Customers.UpdateCustomerHandler());
         var first = (await h.RunAsync(new SendArAgingByEmail(h.CompanyId, w.Cobros, "a", w.S.Customer, To), new SendArAgingByEmailHandler())).ResultRef;
         var transport = new RecordingMailTransport { FailuresLeft = 1 };
         var failing = new MailDispatcher(h.App, transport, new FakePdfRenderer(), Live with { MaxAttempts = 1 }, clock);
@@ -173,6 +177,11 @@ public sealed class DocumentMailTests(PostgresFixture postgres)
         Assert.Equal((DocumentMailErrors.NotRetryable, AuthorizationErrors.NotAuthorized, Platform.Queries.QueryErrors.NotFound), (early.Code, controller.Code, noPdf.Code));
         Assert.Equal(("FAILED", 1, "421 4.7.0 Try again later"), (failed.GetProperty("status").GetString(), failed.GetProperty("attempts").GetInt32(), failed.GetProperty("lastError").GetString()));
         Assert.Equal($"{second}:QUEUED:False,{first}:SENT:True", string.Join(',', history.EnumerateArray().Select(m => $"{m.GetProperty("mailId").GetGuid()}:{m.GetProperty("status").GetString()}:{m.GetProperty("hasPdf").GetBoolean()}")));
+        // E-MAIL-5: the customer's saved e-mails, the principal one first, are what the sender is offered.
+        var offered = JsonDocument.Parse(await h.QueryAsync(new ListDocumentMail(h.CompanyId, w.Cobros, "AR_AGING", w.S.Customer), new ListDocumentMailHandler())).RootElement.GetProperty("savedEmails");
+        Assert.Equal(["pagos@constructorauno.com.do", "obra@constructorauno.com.do"], offered.EnumerateArray().Select(e => e.GetString()));
+        var ofInvoice = JsonDocument.Parse(await h.QueryAsync(new ListDocumentMail(h.CompanyId, w.Cobros, "QUOTE", Guid.CreateVersion7()), new ListDocumentMailHandler())).RootElement;
+        Assert.Equal((0, 0), (ofInvoice.GetProperty("items").GetArrayLength(), ofInvoice.GetProperty("savedEmails").GetArrayLength()));
         Assert.Equal(("LIVE", "compras@constructorauno.com.do"), (history[1].GetProperty("deliveryMode").GetString(), history[1].GetProperty("deliveredTo")[0].GetString()));
         Assert.Equal(Convert.ToBase64String(Assert.Single(transport.Sent).Pdf), pdf.GetProperty("contentBase64").GetString());
         Assert.Equal(await h.ScalarAsync<string>("SELECT pdf_sha256 FROM core.mail_message WHERE mail_id = @id", ("id", first)), pdf.GetProperty("sha256").GetString());

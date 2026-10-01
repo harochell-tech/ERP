@@ -81,3 +81,13 @@ changes; rows are never deleted. Not a business aggregate: no state history — 
 - Tests: `Rochell.Sales.Tests.DocumentMailTests` — who may send what, when; the texts; the HTML against hand-derived amounts; the
   history, the PDF and the retry. `MailDeliveryTests` renders a quote's HTML with the production renderer: one letter page.
 
+## MAIL-03 — screens and staging
+
+- `GET /api/v1/environment` also returns `mailMode` (OFF, REDIRECT, LIVE); `GET /sales/mail` also returns `savedEmails`, the e-mails
+  kept for the document's customer (E-MAIL-5).
+- Web: `components/DocumentMail.tsx` (`QuoteMail`, `ProformaMail`, `DeliveryMail`, `StatementMail`, `AgingMail`) on the quote, the
+  proforma, the delivery note and the statement of account; `lib/mail.ts` (unit-tested). See `web.md`.
+- Dev stack: mail in Redirect mode with `RecordingMailTransport` and `FakePdfRenderer` — nothing leaves; Constructora Uno has two
+  saved e-mails. Playwright `mail-journey.spec.ts` (desktop and mobile).
+- Staging: compose service `pdf` and the `MAIL_*` variables, Off until set; the Workspace relay steps are in `staging.md`.
+

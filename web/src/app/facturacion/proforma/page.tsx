@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
+import { ProformaMail } from "@/components/DocumentMail";
 import { SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, Money, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
@@ -194,6 +195,7 @@ function Proforma() {
         ) : (
           <p className="muted">Aún no se le ha asignado ningún cobro. Se asigna desde el recibo del cliente, en Cobros.</p>
         )}
+        <ProformaMail proformaId={id} proformaNo={f.proformaNo} blocked={f.status === "VOIDED" ? "Una proforma anulada no se envía." : null} />
         <SalesHistory history={data.history} />
       </div>
       <div className="signature">

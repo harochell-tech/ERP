@@ -7,7 +7,7 @@ image="${1:?image required}"
 sed -i "s|^ROCHELL_IMAGE=.*|ROCHELL_IMAGE=${image}|" .env
 set -a; . ./.env; set +a
 
-docker compose pull api
+docker compose pull api pdf
 docker compose up -d postgres
 docker compose run --rm migrate migrate
 # Patch 1.1 / E-PAR-3: staging runs the parallel run with real data, so its database is PRODUCTION (no synthetic users, no
@@ -15,7 +15,7 @@ docker compose run --rm migrate migrate
 docker compose run --rm migrate init-environment PRODUCTION
 docker compose exec -T postgres psql -U rochell_deploy -d rochell -q \
   -v app_password="$APP_DB_PASSWORD" -v sealer_password="$SEALER_DB_PASSWORD" < init-roles.sql
-docker compose up -d --remove-orphans api caddy
+docker compose up -d --remove-orphans pdf api caddy
 
 for attempt in $(seq 1 30); do
   if curl -fsS -o /dev/null "https://${STAGING_HOST}/"; then

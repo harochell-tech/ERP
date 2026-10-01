@@ -11,6 +11,8 @@ import { ConfirmAction, ErrorBox, Money, NoPermission, ReasonAction } from "@/co
 import { formatQuantity } from "@/lib/decimal";
 import { addDays, DELIVERY_TERMS, formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labels";
 import { DEFAULT_QUOTE_VALIDITY_DAYS, quoteActions, quoteStatusLabel } from "@/lib/quotes";
+import { QuoteMail } from "@/components/DocumentMail";
+import { quoteWatermark } from "@/lib/print";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -305,6 +307,12 @@ function QuoteDetail() {
           Todas las líneas están a precio de lista o por encima: no requiere aprobación.
         </p>
       )}
+      {/* MAIL-03 (E-MAIL-01-7): what prints without a watermark is e-mailed — sent and valid, or converted. */}
+      <QuoteMail
+        quoteId={h.quoteId}
+        quoteNo={h.quoteNo}
+        blocked={quoteWatermark(h.status, h.expired) === null ? null : "Solo se envía por correo una cotización enviada y vigente."}
+      />
       <History history={data.history} />
     </>
   );

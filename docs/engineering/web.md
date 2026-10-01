@@ -627,3 +627,22 @@ the certification citing both → Especialista fiscal verifies → one e-CF 44 o
 450.00 and cannot release it → the Controller releases it → the statement shows «Devolución al cliente». The dev seed approves P-36.
 The refund's match with the bank statement is covered by E2E-P1 over the API (`ProformaAcceptanceTests`).
 
+## MAIL-03 — documents by e-mail (E-MAIL-5, 6, 7, E-MAIL-01-4, 6…10)
+
+A «Correo» section (`components/DocumentMail.tsx`) on Ventas › Cotización (`quote:email`), Facturación › Proforma
+(`proforma:email`), Despacho › Conduce (`delivery:email`) and Ventas › Estado de cuenta (two of them, `statement:email`: the
+statement of the period on screen and today's open invoices by age).
+
+- «Enviar por correo» opens a form: the customer's saved e-mails ticked (`savedEmails`), «Otros correos» (commas, semicolons or
+  spaces), an optional message. `recipientsOf` / `recipientsError` check 1–10 valid addresses before the command. The button is
+  disabled, with the reason beside it, while the document would print with a watermark (E-MAIL-01-7) or when the deployment's
+  `mailMode` is OFF; in REDIRECT the form says the mail will not reach the customer.
+- The history lists every sending: recipients, state («En cola», «Enviado», «Fallido») with where it ended up (`deliveryText`),
+  who sent it, «Descargar PDF» (the exact PDF sent) and «Reintentar» for a failed one (`mail:retry`). While a message is queued the
+  list refreshes every 3 seconds.
+- Without the permission the section shows only the history, and nothing when there is none.
+
+Playwright `mail-journey.spec.ts` (desktop and mobile): the Vendedor sends the seeded quote (one saved e-mail unticked, one typed,
+a malformed one refused), sees it «Enviado — Redirigido…» and downloads `COT-….pdf`; the Vendedor is not offered to send the
+statement; Cobros sends it.
+

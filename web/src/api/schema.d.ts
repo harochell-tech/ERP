@@ -28,7 +28,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name). No sign-in needed. */
+        /** E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name) and, E-MAIL-01-4, whether it sends mail (OFF, REDIRECT, LIVE). No sign-in needed. */
         get: operations["GetEnvironment"];
         put?: never;
         post?: never;
@@ -6500,6 +6500,7 @@ export interface components {
         };
         DocumentMailList: {
             items: components["schemas"]["DocumentMailView"][];
+            savedEmails: string[];
         };
         DocumentMailPdf: {
             fileName: string;
@@ -6540,6 +6541,7 @@ export interface components {
         };
         EnvironmentInfo: {
             badge: null | string;
+            mailMode: string;
         };
         EventJournals: {
             /** Format: uuid */
