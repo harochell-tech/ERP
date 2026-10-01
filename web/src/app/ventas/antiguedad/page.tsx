@@ -72,6 +72,9 @@ export default function Page() {
                   <th className="num">Total (RD$)</th>
                   <th className="num">A favor (RD$)</th>
                   <th className="num">Neto (RD$)</th>
+                  {/* FIS1b-07 (E-FIS1b-9): delivered under proforma and not yet invoiced — receivable, but outside the fiscal AR. */}
+                  <th className="num">En proforma (RD$)</th>
+                  <th className="num">Depósito ITBIS (RD$)</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,6 +88,13 @@ export default function Page() {
                             {i > 0 ? " · " : ""}
                             <Link href={`/facturacion/factura/?id=${d.invoiceId}`}>{d.invoiceNo}</Link> vence {formatDate(d.dueDate)}
                             {d.daysOverdue > 0 ? ` (${d.daysOverdue} días vencida)` : ""}
+                          </span>
+                        ))}
+                        {c.proformaDocuments.map((f, i) => (
+                          <span key={f.proformaId}>
+                            {i > 0 || c.documents.length > 0 ? " · " : ""}
+                            <Link href={`/facturacion/proforma/?id=${f.proformaId}`}>{f.proformaNo}</Link> vence {formatDate(f.dueDate)}
+                            {f.daysOverdue > 0 ? ` (${f.daysOverdue} días vencida)` : ""}
                           </span>
                         ))}
                       </div>
@@ -113,11 +123,17 @@ export default function Page() {
                     <td className="num">
                       <Money value={c.net} />
                     </td>
+                    <td className="num">
+                      <Money value={c.proformas} />
+                    </td>
+                    <td className="num">
+                      <Money value={c.deposits} />
+                    </td>
                   </tr>
                 ))}
                 {customers.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="muted">
+                    <td colSpan={11} className="muted">
                       Ningún cliente coincide con el filtro.
                     </td>
                   </tr>
@@ -149,6 +165,12 @@ export default function Page() {
                   </td>
                   <td className="num">
                     <Money value={data.net} testId="aging-net" />
+                  </td>
+                  <td className="num">
+                    <Money value={data.proformas} testId="aging-proformas" />
+                  </td>
+                  <td className="num">
+                    <Money value={data.deposits} testId="aging-deposits" />
                   </td>
                 </tr>
               </tfoot>

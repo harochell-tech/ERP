@@ -45,7 +45,7 @@ internal static class SalesSeed
             $"""
             UPDATE fin.posting_rule_version v SET status = 'ACTIVE', approved_by = '{h.UserId}'
             FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND v.status = 'DRAFT'
-              AND r.code IN ('OPEN-INV', 'P-15', 'P-15R', 'P-16', 'P-30', 'P-18', 'P-22', 'P-23', 'P-24', 'P-25', 'P-27', 'P-29');
+              AND r.code IN ('OPEN-INV', 'P-15', 'P-15R', 'P-16', 'P-30', 'P-18', 'P-22', 'P-23', 'P-24', 'P-25', 'P-27', 'P-29', 'P-36');
             """);
         await h.CreateActivePolicyAsync("CREDIT", new Dictionary<string, string>
         {

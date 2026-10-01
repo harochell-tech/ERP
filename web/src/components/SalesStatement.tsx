@@ -15,6 +15,7 @@ const KINDS: Readonly<Record<string, string>> = {
   CHEQUE_DEVUELTO: "Cheque devuelto",
   RETENCION: "Retención",
   RETENCION_REVERSADA: "Retención reversada",
+  DEVOLUCION: "Devolución al cliente",
   OTRO: "Otro",
 };
 
@@ -72,5 +73,66 @@ export function StatementTable({ statement }: { statement: Schemas["CustomerStat
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * FIS1b-07 (E-FIS1b-9): what the customer owes outside the fiscal receivable — delivered under proforma, waiting for its e-CF. It is
+ * not part of the balance above: it becomes an invoice (and joins it) when the DGII resolves the exemption.
+ */
+export function StatementProformas({ statement }: { statement: Schemas["CustomerStatement"] }) {
+  if (statement.openProformas.length === 0) {
+    return null;
+  }
+  return (
+    <section data-testid="statement-proformas">
+      <h2>Proformas abiertas</h2>
+      <p className="muted">Entregas que esperan su comprobante fiscal. No forman parte del saldo de arriba; se cobran contra la proforma.</p>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Proforma</th>
+              <th>Conduce</th>
+              <th>Fecha</th>
+              <th>Vence</th>
+              <th className="num">Total (RD$)</th>
+              <th className="num">Cobrado (RD$)</th>
+              <th className="num">Saldo (RD$)</th>
+              <th className="num">Depósito ITBIS (RD$)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {statement.openProformas.map((f) => (
+              <tr key={f.proformaId}>
+                <td className="mono">{f.proformaNo}</td>
+                <td className="mono">{f.deliveryNo}</td>
+                <td>{formatDate(f.proformaDate)}</td>
+                <td>{formatDate(f.dueDate)}</td>
+                <td className="num">
+                  <Money value={f.total} />
+                </td>
+                <td className="num">
+                  <Money value={f.allocated} />
+                </td>
+                <td className="num">
+                  <Money value={f.balance} />
+                </td>
+                <td className="num">
+                  <Money value={f.deposit} />
+                </td>
+              </tr>
+            ))}
+            <tr>
+              <th colSpan={6}>Saldo en proformas</th>
+              <td className="num">
+                <Money value={statement.proformaBalance} testId="statement-proforma-balance" />
+              </td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

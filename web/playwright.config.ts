@@ -32,7 +32,7 @@ export default defineConfig({
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     {
       name: "mobile",
-      testMatch: /(sales|purchase|production|treasury|quote|configuration|home)-journey\.spec\.ts/,
+      testMatch: /(sales|purchase|production|treasury|quote|configuration|home|proforma)-journey\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         baseURL: `http://localhost:${mobilePort}`,

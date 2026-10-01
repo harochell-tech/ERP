@@ -24,6 +24,9 @@ interface Line {
   quantity: string;
 }
 
+/** FIS1b-07 (E-FIS1b-2, E-FIS1b-01-1): NONE, or the exemption in process with proformas that collect WITH or WITHOUT ITBIS. */
+type Exemption = "NONE" | "WITH_ITBIS" | "WITHOUT_ITBIS";
+
 interface Values {
   partyId: string;
   plantId: string;
@@ -32,6 +35,7 @@ interface Values {
   requestedDate: string;
   customerPoRef: string;
   lines: Line[];
+  exemption: Exemption;
 }
 
 const EMPTY_LINE: Line = { itemId: "", uom: "", quantity: "" };
@@ -92,8 +96,9 @@ function OrderForm() {
           requestedDate: order.requestedDate ?? "",
           customerPoRef: order.customerPoRef ?? "",
           lines: order.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.qtyOrdered })),
+          exemption: !order.exemptionPending ? "NONE" : order.proformaCollectsItbis ? "WITH_ITBIS" : "WITHOUT_ITBIS",
         }
-      : { partyId: "", plantId: data.plants[0]?.plantId ?? "", deliveryTermCode: "PICKUP_AT_PLANT", siteAddress: "", requestedDate: "", customerPoRef: "", lines: [{ ...EMPTY_LINE }] });
+      : { partyId: "", plantId: data.plants[0]?.plantId ?? "", deliveryTermCode: "PICKUP_AT_PLANT", siteAddress: "", requestedDate: "", customerPoRef: "", lines: [{ ...EMPTY_LINE }], exemption: "NONE" });
   const set = (change: Partial<Values>) => setValues({ ...current, ...change });
   const setLine = (index: number, change: Partial<Line>) => set({ lines: current.lines.map((l, i) => (i === index ? { ...l, ...change } : l)) });
 
@@ -130,6 +135,8 @@ function OrderForm() {
       requestedDate: current.requestedDate === "" ? null : current.requestedDate,
       customerPoRef: current.customerPoRef.trim() === "" ? null : current.customerPoRef.trim(),
       lines,
+      exemptionPending: current.exemption !== "NONE",
+      proformaCollectsItbis: current.exemption === "NONE" ? null : current.exemption === "WITH_ITBIS",
     };
     const response = order
       ? await update.run({ salesOrderId: order.header.salesOrderId, expectedVersion: order.header.version, ...header }, current)
@@ -181,6 +188,16 @@ function OrderForm() {
         </Field>
         <Field label="Orden de compra del cliente (opcional)">
           <input value={current.customerPoRef} onChange={(e) => set({ customerPoRef: e.target.value })} />
+        </Field>
+        <Field
+          label="Exención de ITBIS (CONFOTUR)"
+          hint={current.exemption === "NONE" ? undefined : "Cada entrega generará su proforma, que se cobra antes de la factura fiscal. No cambia después de enviar el pedido a crédito."}
+        >
+          <select aria-label="Exención de ITBIS" value={current.exemption} onChange={(e) => set({ exemption: e.target.value as Exemption })}>
+            <option value="NONE">No aplica: se factura al entregar</option>
+            <option value="WITH_ITBIS">Exención en trámite: las proformas se cobran con ITBIS</option>
+            <option value="WITHOUT_ITBIS">Exención en trámite: las proformas se cobran sin ITBIS</option>
+          </select>
         </Field>
       </div>
       <LineTable>
