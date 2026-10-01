@@ -58,9 +58,10 @@ public sealed record CustomerTermsView(
     Guid TermsVersionId, Guid PartyId, string? CustomerName, int Version, DateOnly EffectiveFrom, int PaymentTermsDays, decimal CreditLimit, bool CreditHold, string Status,
     string? PreparedBy, string? ApprovedBy);
 
+/// <remarks>E-IMP-6: <c>Emails</c> is the whole list; <c>Email</c> is its first entry.</remarks>
 public sealed record CustomerDetail(
     Guid PartyId, string PartyKind, string? Rnc, string LegalName, string PartyStatus, string CustomerStatus, bool IsSupplier, string? Phone, string? Email, string? Address,
-    long Version, IReadOnlyList<CustomerTermsView> Terms, IReadOnlyList<StateChange> History);
+    long Version, IReadOnlyList<CustomerTermsView> Terms, IReadOnlyList<StateChange> History, IReadOnlyList<string> Emails);
 
 internal static class TermsReading
 {
@@ -104,7 +105,8 @@ public sealed class GetCustomerHandler : IQueryHandler<GetCustomer>
             context.Connection, context.Transaction, TermsReading.Select + " WHERE t.company_id = @c AND t.party_id = @p ORDER BY t.version DESC", TermsReading.Map, cancellationToken,
             ("c", context.CompanyId), ("p", query.PartyId)).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "Customer", query.PartyId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new CustomerDetail(query.PartyId, h.Kind, h.Rnc, h.Name, h.PartyStatus, h.CustomerStatus, h.IsSupplier, h.Phone, h.Email, h.Address, h.Version, terms, history));
+        var emails = await Rochell.MasterData.Import.PartyEmails.ListAsync(context.Connection, context.Transaction, context.CompanyId, query.PartyId, cancellationToken).ConfigureAwait(false);
+        return ApiJson.Serialize(new CustomerDetail(query.PartyId, h.Kind, h.Rnc, h.Name, h.PartyStatus, h.CustomerStatus, h.IsSupplier, h.Phone, h.Email, h.Address, h.Version, terms, history, emails));
     }
 }
 
