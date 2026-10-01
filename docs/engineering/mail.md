@@ -55,3 +55,29 @@ changes; rows are never deleted. Not a business aggregate: no state history — 
 - `Rochell.Api.Tests.MailDeliveryTests` (`MailFixture`: Mailpit and the production Gotenberg image): the host's service renders
   and sends a queued message in Redirect mode — the attachment received is the PDF whose SHA-256 was stored; a Live envelope
   reaches its recipients and the blind copy; the host does not start in Live without its settings.
+
+## MAIL-02 — the documents and the commands that send them (migration 0070)
+
+| Command (`Rochell.Sales/Mail`) | Permission (E-MAIL-01-8) | Sendable when (E-MAIL-01-7) |
+| --- | --- | --- |
+| `SendQuoteByEmail` | `quote:email` — Vendedor | SENT and not expired, or CONVERTED |
+| `SendProformaByEmail` | `proforma:email` — Facturación | Not VOIDED |
+| `SendDeliveryByEmail` | `delivery:email` — Facturación, Despacho | After the gate-out |
+| `SendStatementByEmail` (customer, from, to) | `statement:email` — Cobros | Always (≤ 366 days, as on screen) |
+| `SendArAgingByEmail` (customer, today) | `statement:email` — Cobros | The customer has open invoices or proformas |
+| `RetryDocumentEmail` | `mail:retry` — the four roles | The message is FAILED: the same content goes to the same recipients |
+
+- Each command reads its document through the print query's own handler inside its transaction (`DocumentMail.ReadAsync`), so the
+  PDF carries exactly what the print view shows; `DocumentHtml` turns it into self-contained HTML (inline CSS, no scripts, only
+  `& < > " '` escaped). `MAIL_DOCUMENT_NOT_SENDABLE` otherwise.
+- Texts (E-MAIL-01-9): subject `<Documento> <número> — <razón social>`; body «Estimado cliente:», one fixed sentence naming the
+  document, the sender's optional message (≤ 2,000 characters), «Atentamente,», the sender's name and the company.
+- The command's result id is the mail's id; event `DocumentEmailRequested` (aggregate `DocumentMail`), `DocumentEmailRetried`.
+- `MailSwitch` (host: mode ≠ Off): with mail off the commands answer `MAIL_DISABLED` instead of queueing messages that would leave,
+  stale, the day the mode changes.
+- `mail_message_document_type_known`: QUOTE, PROFORMA, DELIVERY, STATEMENT, AR_AGING. Invoices are not sent (E-MAIL-01-2).
+- Queries (`sales:read`): `GET /sales/mail?documentType=&documentId=` (for a statement or the aging the document is the customer)
+  and `GET /sales/mail/{mailId}/pdf` (file name, SHA-256, base64 of the PDF sent).
+- Tests: `Rochell.Sales.Tests.DocumentMailTests` — who may send what, when; the texts; the HTML against hand-derived amounts; the
+  history, the PDF and the retry. `MailDeliveryTests` renders a quote's HTML with the production renderer: one letter page.
+

@@ -85,6 +85,23 @@ public sealed class MailDeliveryTests(PostgresFixture postgres, MailFixture mail
     }
 
     [Fact]
+    public async Task The_production_renderer_turns_a_document_into_a_letter_size_PDF()
+    {
+        using var http = new HttpClient();
+        var quote = new Rochell.Sales.Queries.QuotePrint(
+            "COT-000001", new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31), "SENT", false, "131925332", "BLOCK ROCHELL SRL", "101010101", "Constructora Uno & Hijos", "PICKUP_AT_PLANT", null, "OC-77",
+            "Precios sujetos a disponibilidad", [new(1, "BLOQUE-6", "Bloque de 6 pulgadas", "un", 1000m, 50.00m, 50000.00m, 9000.00m, 59000.00m)], 50000.00m, 9000.00m, 59000.00m);
+
+        var pdf = await new GotenbergPdfRenderer(http, Settings(MailMode.Live)).RenderAsync(Rochell.Sales.Mail.DocumentHtml.Quote(quote), CancellationToken.None);
+
+        // One letter page (612 × 792 points) with embedded text: Chromium laid the document out.
+        var text = System.Text.Encoding.Latin1.GetString(pdf);
+        Assert.StartsWith("%PDF-", text, StringComparison.Ordinal);
+        Assert.Matches(@"/MediaBox\s*\[\s*0 0 612 792\s*\]", text);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, @"/Type\s*/Page\b"));
+    }
+
+    [Fact]
     public async Task Outside_Off_the_host_does_not_start_without_the_sender_the_relay_and_the_renderer()
     {
         await using var h = await TestHarness.CreateAsync(postgres);

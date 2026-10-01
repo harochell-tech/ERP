@@ -68,6 +68,7 @@ services.AddHostedService(sp => sp.GetRequiredService<FiscalExpiryService>());
 
 // E-MAIL-01-4: outgoing mail is Off unless configured; Redirect and Live need the sender, the relay and the PDF renderer.
 services.AddSingleton(settings.Mail);
+services.AddSingleton(new MailSwitch(settings.Mail.Mode != MailMode.Off));
 if (settings.Mail.Mode != MailMode.Off)
 {
     Required(settings.Mail.FromAddress, "Mail:FromAddress");

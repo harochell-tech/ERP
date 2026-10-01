@@ -37,11 +37,11 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["PROCESO_DIARIO"] = "fiscal_authorization:suspend", // E-FIS1-04-7, the API's daily process only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
-        ["VENDEDOR"] = "customer:create,customer:import,customer:update,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11
+        ["VENDEDOR"] = "customer:create,customer:import,customer:update,mail:retry,quote:email,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11
         ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,fiscal_authorization:register,rnc:read,sales:read,sales_order:close",
-        ["DESPACHO"] = "delivery:manage,fleet:manage,sales:read",
-        ["FACTURACION"] = "credit_note:create,credit_note:issue,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,proforma:void,sales:read",
-        ["COBROS"] = "customer_refund:prepare,customer_withholding:record,receipt:apply,receipt:deposit,receipt:record,sales:read",
+        ["DESPACHO"] = "delivery:email,delivery:manage,fleet:manage,mail:retry,sales:read", // + e-mail (E-MAIL-01-8)
+        ["FACTURACION"] = "credit_note:create,credit_note:issue,delivery:email,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,mail:retry,proforma:email,proforma:void,sales:read",
+        ["COBROS"] = "customer_refund:prepare,customer_withholding:record,mail:retry,receipt:apply,receipt:deposit,receipt:record,sales:read,statement:email",
         ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
         ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,production:read,production_master:manage,recipe:approve,shift_summary:post",
         ["CALIDAD"] = "fg_lot:release,master_data:read,production:read",
@@ -53,7 +53,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(121L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
+        Assert.Equal(126L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
         Assert.Equal(45L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {

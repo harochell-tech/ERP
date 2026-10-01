@@ -24,9 +24,10 @@ public sealed class QueueTestMailHandler : ICommandHandler<QueueTestMail>
         var eventId = await context.AppendEventAsync(new EventDraft("TestMailRequested", 1, "TestMail", context.ResultRef, 1, "{}", Publish: false), cancellationToken);
         await using var who = Sql.Command(context.Connection, context.Transaction, "SELECT user_id FROM iam.session WHERE session_id = @s", ("s", context.SessionId));
         var user = (Guid)(await who.ExecuteScalarAsync(cancellationToken))!;
-        var mail = await MailOutbox.EnqueueAsync(
-            context, new MailDraft("QUOTE", context.ResultRef, "COT-000001", null, command.Recipients, command.Subject, command.Body, "COT-000001.pdf", Html), eventId, user, cancellationToken);
-        return JsonSerializer.Serialize(new { mailId = mail });
+        await MailOutbox.EnqueueAsync(
+            context, context.ResultRef, new MailDraft("QUOTE", context.ResultRef, "COT-000001", null, command.Recipients, command.Subject, command.Body, "COT-000001.pdf", Html), eventId, user,
+            cancellationToken);
+        return JsonSerializer.Serialize(new { mailId = context.ResultRef });
     }
 }
 

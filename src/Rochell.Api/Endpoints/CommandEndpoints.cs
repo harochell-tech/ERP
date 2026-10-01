@@ -28,6 +28,7 @@ using Rochell.Sales.Customers;
 using Rochell.Sales.Deliveries;
 using Rochell.Sales.Fleet;
 using Rochell.Sales.Invoices;
+using Rochell.Sales.Mail;
 using Rochell.Sales.Opening;
 using Rochell.Sales.Orders;
 using Rochell.Sales.Quotes;
@@ -235,6 +236,13 @@ public static class CommandEndpoints
         sales.MapCommand<PrepareCustomerRefund, PrepareCustomerRefundHandler>();
         sales.MapCommand<ReleaseCustomerRefund, ReleaseCustomerRefundHandler>();
         sales.MapCommand<VoidCustomerRefund, VoidCustomerRefundHandler>();
+        // MAIL-02 (E-MAIL-6, E-MAIL-01-8, 10): documents by e-mail, one permission per document, and the retry of a failed message.
+        sales.MapCommand<SendQuoteByEmail, SendQuoteByEmailHandler>();
+        sales.MapCommand<SendProformaByEmail, SendProformaByEmailHandler>();
+        sales.MapCommand<SendDeliveryByEmail, SendDeliveryByEmailHandler>();
+        sales.MapCommand<SendStatementByEmail, SendStatementByEmailHandler>();
+        sales.MapCommand<SendArAgingByEmail, SendArAgingByEmailHandler>();
+        sales.MapCommand<RetryDocumentEmail, RetryDocumentEmailHandler>();
         sales.MapCommand<AllocateReceiptToProformas, AllocateReceiptToProformasHandler>();
         sales.MapCommand<ReleaseProformaAllocation, ReleaseProformaAllocationHandler>();
         sales.MapCommand<UnapplyReceipt, UnapplyReceiptHandler>();
@@ -308,6 +316,8 @@ public static class CommandEndpoints
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(CreateInvoiceFromProformasHandler), typeof(VoidProformaHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),
         typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(PrepareCustomerRefundHandler), typeof(ReleaseCustomerRefundHandler), typeof(VoidCustomerRefundHandler),
+        typeof(SendQuoteByEmailHandler), typeof(SendProformaByEmailHandler), typeof(SendDeliveryByEmailHandler), typeof(SendStatementByEmailHandler), typeof(SendArAgingByEmailHandler),
+        typeof(RetryDocumentEmailHandler),
         typeof(AllocateReceiptToProformasHandler), typeof(ReleaseProformaAllocationHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
