@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
-import { StatementTable } from "@/components/SalesStatement";
+import { StatementProformas, StatementTable } from "@/components/SalesStatement";
 import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
 import { Field, NoPermission } from "@/components/ui";
 import { addDays, todayInDominicanRepublic } from "@/lib/labels";
@@ -76,6 +76,7 @@ function Statement() {
             {s.customerName} · RNC {s.rnc ?? "—"}
           </p>
           <StatementTable statement={s} />
+          <StatementProformas statement={s} />
         </>
       )}
     </>

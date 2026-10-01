@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { query } from "@/api/client";
 import { MoneyText } from "@/components/SalesUx4";
-import { StatementTable } from "@/components/SalesStatement";
+import { StatementProformas, StatementTable } from "@/components/SalesStatement";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { NoPermission } from "@/components/ui";
 import { formatDate, todayInDominicanRepublic } from "@/lib/labels";
@@ -70,6 +70,7 @@ function StatementPrint() {
         </dd>
       </dl>
       <StatementTable statement={data} />
+      <StatementProformas statement={data} />
       <p className="muted">Si encuentra alguna diferencia, comuníquese con nuestro departamento de cobros. Documento no fiscal.</p>
     </div>
   );

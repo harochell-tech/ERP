@@ -117,3 +117,46 @@ the receipt and on the proforma) only keeps that money for the proforma's invoic
 
 The invoice's due date is still the issue date plus the customer's terms (not the proforma's).
 
+## FIS1b-05 — customer refund (migration 0067, E-FIS1b-8, E-FIS1b-01-9)
+
+The credit balance of a receipt — what is neither applied nor allocated, typically the ITBIS advanced on proformas that ended in an
+e-CF 44 — is paid back to the customer.
+
+| Piece | Behaviour |
+| --- | --- |
+| `fin.customer_refund` | DEV-000001 per company: receipt, company bank account, TRANSFER / CHEQUE, amount, reason; PREPARED → RELEASED → CLEARED (⇄ RELEASED on unmatch) or VOIDED; releaser ≠ preparer (`core.four_eyes`); state history; K-25 (a released refund has the live journal of its event) |
+| `PrepareCustomerRefund` (`customer_refund:prepare`, Cobros) | A RECORDED receipt whose money is in the bank (not IN_TRANSIT); amount ≤ unapplied − allocated − other prepared refunds; an ACTIVE bank account. Nothing posts |
+| `ReleaseCustomerRefund` (`customer_refund:release`, step-up, Controller: E-FIS1b-05-1) | Not the preparer. **P-36** `CustomerRefundReleased`: Dr UNAPPLIED_RECEIPTS (the receipt) / Cr BANK; the receipt's unapplied amount goes down. Close component BANK-REC, also AR-REC |
+| `VoidCustomerRefund` (`customer_refund:prepare`) | A PREPARED refund, with a reason |
+| `MatchBankLineToRefund` (`bank_line:match`, Treasury) | An UNMATCHED DEBIT line of the refund's account and amount, within ten days of the release → line MATCHED, refund CLEARED; `UnmatchBankLine` returns both |
+| `MarkReceiptBounced` | Refused while the receipt has a refund that is not VOIDED |
+| Reconciliations | RECEIPT-APPL (a) counts released refunds with the applications; ACC-EVIDENCE checks `DEV`; BANK-GL links the P-36 entry and its line (`OUTSTANDING_REFUND` until matched) |
+| Queries | `GET /sales/customer-refunds`, `/{id}` (`sales:read`); `GET /treasury/refunds-to-match` (`bank:read`) |
+
+SoD: `customer_refund:prepare` ≠ `customer_refund:release`. 181 commands, 121 permissions, 45 SoD rules.
+
+## FIS1b-06 — reconciliation PROFORMA-ASIG (migration 0068, E-FIS1b-11, E-FIS1b-01-10, 12)
+
+Blocks AR-REC. Three checks (`Reconciliations.cs`):
+
+| Classification | A | B |
+| --- | --- | --- |
+| `PROFORMA_ALLOCATION_DIFFERENCE` | `sal.proforma.allocated_amount` | Σ live `fin.proforma_allocation` of the proforma |
+| `RECEIPT_ALLOCATION_DIFFERENCE` | `fin.receipt.allocated_amount` | Σ live allocations of the receipt |
+| `PROFORMA_UNBILLED_DIFFERENCE` | Net of an OPEN proforma (0 for an INVOICED one) | Delivered and not invoiced of its delivery lines, at the proforma's price |
+
+Refunds joined RECEIPT-APPL, ACC-EVIDENCE and BANK-GL in FIS1b-05. The warning for proformas waiting too long for their e-CF is
+the existing `UNBILLED_AGED` of CONTRACT-ASSET (`unbilled_aging_alert_days`): no new parameter (E-FIS1b-01-10). 31 reconciliations,
+60 classifications.
+
+## FIS1b-07 — screens, E2E-P1 and acceptance (E-FIS1b-01-14)
+
+- Screens: `web.md` (FIS1b-07). Acceptance matrix: `docs/acceptance/fis1b.md`; `AcceptanceFis1bTraceabilityTests` ties PRF-01…13 and
+  E2E-P1 to their tests.
+- `ProformaAcceptanceTests` (E2E-P1 over HTTP): 1,000 blocks at 50.00 in two pickups → PF-000001 (35,400.00) and PF-000002
+  (23,600.00) → receipt of 59,000.00 allocated (no journal) → certification citing both (scope 1,000 / 50,000.00) → e-CF 44 of
+  50,000.00 paid on issue → refund DEV-000001 of 9,000.00 (Cobros prepares, the Controller releases, P-36) → both statement lines
+  matched. Ledger: BANK 50,000.00, REVENUE −50,000.00, no ITBIS payable, AR / contract asset / unapplied receipts at 0; AR-GL,
+  AUTH-CONSUMPTION, BANK-GL, CONTRACT-ASSET, EXEMPT-WITHOUT-AUTH, FISC-DOC, PROFORMA-ASIG and RECEIPT-APPL MATCHED.
+- The customer's statement names the refund: `CustomerRefundReleased` → `DEVOLUCION` with its DEV- number (it was `OTRO`).
+
