@@ -45,8 +45,9 @@ public sealed class SealerService(SealerSettings settings, SealerDatabase databa
 
 /// <summary>
 /// E-PR18-5 / E-PR15-5: at <see cref="DigestSettings.RunAt"/> local time (America/Santo_Domingo) digests the previous day to
-/// WORM. It does not start without WORM storage (outside TEST, until B-03) or without the signing key; sealing is unaffected.
-/// On start it also digests yesterday if that run is due (digesting a day twice changes nothing).
+/// WORM, and any earlier day still without its digest (E-B03-17). It does not start without WORM storage (outside TEST, until
+/// B-03) or without the signing key; sealing is unaffected. On start it also runs if that run is due (digesting a day twice
+/// changes nothing).
 /// </summary>
 public sealed class DigestService(DigestSettings settings, SealerDatabase database, WormAccess worm, IClock clock, ILogger<DigestService> logger) : BackgroundService
 {
@@ -86,8 +87,8 @@ public sealed class DigestService(DigestSettings settings, SealerDatabase databa
             {
                 try
                 {
-                    var results = await digester.DigestDayAsync(today.AddDays(-1), stoppingToken).ConfigureAwait(false);
-                    logger.LogInformation("Digested {Day}: {Created} new digest(s).", today.AddDays(-1), results.Count(r => r.Created));
+                    var results = await digester.DigestThroughAsync(today.AddDays(-1), stoppingToken).ConfigureAwait(false);
+                    logger.LogInformation("Digested through {Day}: {Created} new digest(s).", today.AddDays(-1), results.Count(r => r.Created));
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {

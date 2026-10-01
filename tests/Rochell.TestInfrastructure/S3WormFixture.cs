@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
@@ -49,7 +51,8 @@ public sealed class S3WormFixture : IAsyncLifetime
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 
-    public AmazonS3Client CreateClient()
+    /// <param name="likeBackblaze">E-B03-18: the server answers 501 to <c>If-None-Match</c>, as Backblaze B2 does.</param>
+    public AmazonS3Client CreateClient(bool likeBackblaze = false)
         => new(new BasicAWSCredentials(AccessKey, SecretKey), new AmazonS3Config
         {
             ServiceURL = ServiceUrl,
@@ -57,6 +60,7 @@ public sealed class S3WormFixture : IAsyncLifetime
             AuthenticationRegion = Region,
             RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED, // as the host (E-B03-10)
             ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+            HttpClientFactory = likeBackblaze ? new NoConditionalWrites() : null,
         });
 
     /// <summary>A new bucket, with Object Lock (and therefore versioning) enabled unless <paramref name="objectLock"/> is false.</summary>
@@ -66,5 +70,25 @@ public sealed class S3WormFixture : IAsyncLifetime
         using var s3 = CreateClient();
         await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket, ObjectLockEnabledForBucket = objectLock });
         return bucket;
+    }
+
+    private sealed class NoConditionalWrites : HttpClientFactory
+    {
+        public override HttpClient CreateHttpClient(IClientConfig clientConfig) => new(new Handler());
+
+        private sealed class Handler() : DelegatingHandler(new HttpClientHandler())
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+                => request.Headers.IfNoneMatch.Count == 0
+                    ? base.SendAsync(request, cancellationToken)
+                    : Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotImplemented)
+                    {
+                        RequestMessage = request,
+                        Content = new StringContent(
+                            "<Error><Code>NotImplemented</Code><Message>A header you provided implies functionality that is not implemented</Message></Error>",
+                            Encoding.UTF8,
+                            "application/xml"),
+                    });
+        }
     }
 }

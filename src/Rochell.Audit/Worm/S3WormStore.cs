@@ -1,4 +1,3 @@
-using System.Net;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Rochell.Platform.Time;
@@ -6,10 +5,13 @@ using Rochell.Platform.Time;
 namespace Rochell.Audit.Worm;
 
 /// <summary>
-/// Digests in S3 Object Lock, compliance mode, at a second provider (E-PR15-4, E-B03-3). Every object is written with
-/// <c>If-None-Match: *</c> and a COMPLIANCE retention of <see cref="RetentionDays"/> days: until then nobody — not even the account
-/// root — can delete or shorten it. Reads take the key's <b>oldest</b> version, so a later version or delete marker written by
-/// anyone never replaces what was anchored, and refuse a version that is not under COMPLIANCE retention (GetObjectRetention).
+/// Digests in S3 Object Lock, compliance mode, at a second provider (E-PR15-4, E-B03-3). Every object is written with a
+/// COMPLIANCE retention of <see cref="RetentionDays"/> days: until then nobody — not even the account root — can delete or shorten
+/// it. Reads take the key's <b>oldest</b> version, so a later version or delete marker written by anyone never replaces what was
+/// anchored, and refuse a version that is not under COMPLIANCE retention (GetObjectRetention).
+/// A key that already has a version is not written again (E-B03-16): the store looks first instead of sending
+/// <c>If-None-Match: *</c>, which Backblaze B2 answers with 501. Two writers racing on a new key leave two versions; the oldest
+/// is the anchor.
 /// </summary>
 public sealed class S3WormStore : IWormStore
 {
@@ -57,29 +59,26 @@ public sealed class S3WormStore : IWormStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentNullException.ThrowIfNull(content);
-        using var body = new MemoryStream(content, writable: false);
-        try
-        {
-            await _s3.PutObjectAsync(
-                new PutObjectRequest
-                {
-                    BucketName = _bucket,
-                    Key = key,
-                    InputStream = body,
-                    ContentType = "application/json",
-                    IfNoneMatch = "*",
-                    // Object Lock writes need an integrity header; Content-MD5 is the one every S3-compatible provider accepts
-                    // (Backblaze B2, E-B03-10), unlike the SDK's newer CRC checksums.
-                    MD5Digest = ContentMd5(content),
-                    ObjectLockMode = ObjectLockMode.Compliance,
-                    ObjectLockRetainUntilDate = _clock.UtcNow.AddDays(RetentionDays),
-                },
-                cancellationToken).ConfigureAwait(false);
-        }
-        catch (AmazonS3Exception ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)
+        if (await OldestVersionAsync(key, cancellationToken).ConfigureAwait(false) is not null)
         {
             throw new WormObjectExistsException(key);
         }
+
+        using var body = new MemoryStream(content, writable: false);
+        await _s3.PutObjectAsync(
+            new PutObjectRequest
+            {
+                BucketName = _bucket,
+                Key = key,
+                InputStream = body,
+                ContentType = "application/json",
+                // Object Lock writes need an integrity header; Content-MD5 is the one every S3-compatible provider accepts
+                // (Backblaze B2, E-B03-10), unlike the SDK's newer CRC checksums.
+                MD5Digest = ContentMd5(content),
+                ObjectLockMode = ObjectLockMode.Compliance,
+                ObjectLockRetainUntilDate = _clock.UtcNow.AddDays(RetentionDays),
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
 #pragma warning disable CA5351 // Content-MD5 is a transport integrity check required by the S3 API, not a security control.
@@ -89,11 +88,7 @@ public sealed class S3WormStore : IWormStore
     public async Task<byte[]?> GetAsync(string key, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var versions = await _s3.ListVersionsAsync(new ListVersionsRequest { BucketName = _bucket, Prefix = key }, cancellationToken).ConfigureAwait(false);
-        var first = (versions.Versions ?? [])
-            .Where(v => v.Key == key && v.IsDeleteMarker != true)
-            .OrderBy(v => v.LastModified)
-            .FirstOrDefault();
+        var first = await OldestVersionAsync(key, cancellationToken).ConfigureAwait(false);
         if (first is null)
         {
             return null;
@@ -110,5 +105,14 @@ public sealed class S3WormStore : IWormStore
         using var buffer = new MemoryStream();
         await response.ResponseStream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
         return buffer.ToArray();
+    }
+
+    private async Task<S3ObjectVersion?> OldestVersionAsync(string key, CancellationToken cancellationToken)
+    {
+        var versions = await _s3.ListVersionsAsync(new ListVersionsRequest { BucketName = _bucket, Prefix = key }, cancellationToken).ConfigureAwait(false);
+        return (versions.Versions ?? [])
+            .Where(v => v.Key == key && v.IsDeleteMarker != true)
+            .OrderBy(v => v.LastModified)
+            .FirstOrDefault();
     }
 }

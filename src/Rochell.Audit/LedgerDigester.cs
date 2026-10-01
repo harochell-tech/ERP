@@ -16,19 +16,8 @@ public sealed class LedgerDigester(DbDataSource sealerDatabase, IWormStore worm,
 {
     public async Task<IReadOnlyList<DigestResult>> DigestDayAsync(DateOnly day, CancellationToken cancellationToken)
     {
-        var companies = new List<Guid>();
-        await using (var connection = await sealerDatabase.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
-        await using (var command = Sql.Command(connection, null, "SELECT company_id FROM md.company ORDER BY company_id"))
-        await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
-        {
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            {
-                companies.Add(reader.GetGuid(0));
-            }
-        }
-
         var results = new List<DigestResult>();
-        foreach (var company in companies)
+        foreach (var company in await CompaniesAsync(cancellationToken).ConfigureAwait(false))
         {
             foreach (var ledger in Chains.All)
             {
@@ -37,6 +26,62 @@ public sealed class LedgerDigester(DbDataSource sealerDatabase, IWormStore worm,
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// E-B03-17: per chain, digests every day up to <paramref name="day"/> that has seals after the chain's last digest, oldest
+    /// first, so a day whose run failed or never happened is anchored by the next run.
+    /// </summary>
+    public async Task<IReadOnlyList<DigestResult>> DigestThroughAsync(DateOnly day, CancellationToken cancellationToken)
+    {
+        var results = new List<DigestResult>();
+        foreach (var company in await CompaniesAsync(cancellationToken).ConfigureAwait(false))
+        {
+            foreach (var ledger in Chains.All)
+            {
+                var first = await FirstUndigestedDayAsync(company, ledger, cancellationToken).ConfigureAwait(false);
+                for (var pending = first; pending is not null && pending <= day; pending = pending.Value.AddDays(1))
+                {
+                    results.Add(await DigestChainAsync(company, ledger, pending.Value, cancellationToken).ConfigureAwait(false));
+                }
+            }
+        }
+
+        return results;
+    }
+
+    private async Task<List<Guid>> CompaniesAsync(CancellationToken cancellationToken)
+    {
+        var companies = new List<Guid>();
+        await using var connection = await sealerDatabase.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = Sql.Command(connection, null, "SELECT company_id FROM md.company ORDER BY company_id");
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            companies.Add(reader.GetGuid(0));
+        }
+
+        return companies;
+    }
+
+    private async Task<DateOnly?> FirstUndigestedDayAsync(Guid companyId, string ledger, CancellationToken cancellationToken)
+    {
+        await using var connection = await sealerDatabase.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(connection, transaction, "SELECT set_config('app.company_id', @c, true)", cancellationToken, ("c", companyId.ToString())).ConfigureAwait(false);
+        await using var command = Sql.Command(
+            connection,
+            transaction,
+            """
+            SELECT min(sealed_at) FROM audit.ledger_seal
+            WHERE company_id = @c AND ledger = @l
+              AND ledger_sequence > coalesce((SELECT max(last_seq) FROM audit.ledger_digest WHERE company_id = @c AND ledger = @l), 0)
+            """,
+            ("c", companyId),
+            ("l", ledger));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is DateTime sealedAt
+            ? BusinessCalendar.DefaultBusinessDate(sealedAt)
+            : null;
     }
 
     public async Task<DigestResult> DigestChainAsync(Guid companyId, string ledger, DateOnly day, CancellationToken cancellationToken)
