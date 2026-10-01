@@ -135,3 +135,17 @@ e-CF 44 — is paid back to the customer.
 
 SoD: `customer_refund:prepare` ≠ `customer_refund:release`. 181 commands, 121 permissions, 45 SoD rules.
 
+## FIS1b-06 — reconciliation PROFORMA-ASIG (migration 0068, E-FIS1b-11, E-FIS1b-01-10, 12)
+
+Blocks AR-REC. Three checks (`Reconciliations.cs`):
+
+| Classification | A | B |
+| --- | --- | --- |
+| `PROFORMA_ALLOCATION_DIFFERENCE` | `sal.proforma.allocated_amount` | Σ live `fin.proforma_allocation` of the proforma |
+| `RECEIPT_ALLOCATION_DIFFERENCE` | `fin.receipt.allocated_amount` | Σ live allocations of the receipt |
+| `PROFORMA_UNBILLED_DIFFERENCE` | Net of an OPEN proforma (0 for an INVOICED one) | Delivered and not invoiced of its delivery lines, at the proforma's price |
+
+Refunds joined RECEIPT-APPL, ACC-EVIDENCE and BANK-GL in FIS1b-05. The warning for proformas waiting too long for their e-CF is
+the existing `UNBILLED_AGED` of CONTRACT-ASSET (`unbilled_aging_alert_days`): no new parameter (E-FIS1b-01-10). 31 reconciliations,
+60 classifications.
+
