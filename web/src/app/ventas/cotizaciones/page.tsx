@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/labels";
 import { QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quotes";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
+import { allCustomers } from "@/lib/paging";
 
 // QUO1-04 (E-QUO1-04-2): sales quotations by status, customer and "solo vencidas" (sales:read); the Vendedor creates them
 // (quote:manage). A SENT quote past its validity reads "Vencida" (the server's flag); the totals are the server's.
@@ -33,7 +34,7 @@ function Quotes() {
       : null,
     [companyId, status, partyId, expiredOnly],
   );
-  const customers = useLoad(allowed ? () => query("/api/v1/companies/{companyId}/sales/customers", { path: { companyId }, query: { limit: 200 } }) : null, [companyId]);
+  const customers = useLoad(allowed ? () => allCustomers(companyId) : null, [companyId]);
   if (!allowed) {
     return <NoPermission />;
   }

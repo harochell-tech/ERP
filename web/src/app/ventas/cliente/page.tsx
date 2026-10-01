@@ -11,6 +11,7 @@ import { isDecimal, normalizeInput } from "@/lib/decimal";
 import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
+import { emailsProblem, parseEmails } from "@/lib/partyImport";
 import { useLoad } from "@/lib/useQuery";
 
 type Customer = Schemas["CustomerDetail"];
@@ -20,16 +21,23 @@ type Customer = Schemas["CustomerDetail"];
 
 function EditCustomer({ customer, onDone }: { customer: Customer; onDone: () => void }) {
   const update = useCommand(`update-customer:${customer.partyId}`, "/api/v1/companies/{companyId}/sales/update-customer", `Datos del cliente ${customer.legalName} guardados.`);
-  const [form, setForm] = useState({ rnc: customer.rnc ?? "", legalName: customer.legalName, phone: customer.phone ?? "", email: customer.email ?? "", address: customer.address ?? "" });
+  const [form, setForm] = useState({ rnc: customer.rnc ?? "", legalName: customer.legalName, phone: customer.phone ?? "", emails: customer.emails.join("\n"), address: customer.address ?? "" });
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
   const draft = customer.customerStatus === "DRAFT";
-  const fe = useFieldErrors<"rnc" | "legalName">();
+  const fe = useFieldErrors<"rnc" | "legalName" | "emails">();
   return (
     <form
       noValidate
       onSubmit={async (e) => {
         e.preventDefault();
-        if (!fe.check({ rnc: form.rnc.trim() === "" && "Indique el RNC o la cédula.", legalName: form.legalName.trim() === "" && "Indique la razón social." })) {
+        const emails = parseEmails(form.emails);
+        if (
+          !fe.check({
+            rnc: form.rnc.trim() === "" && "Indique el RNC o la cédula.",
+            legalName: form.legalName.trim() === "" && "Indique la razón social.",
+            emails: emailsProblem(emails),
+          })
+        ) {
           return;
         }
         const optional = (v: string) => (v.trim() === "" ? null : v.trim());
@@ -40,7 +48,8 @@ function EditCustomer({ customer, onDone }: { customer: Customer; onDone: () => 
             rnc: form.rnc.trim(),
             legalName: form.legalName.trim(),
             phone: optional(form.phone),
-            email: optional(form.email),
+            email: null,
+            emails,
             address: optional(form.address),
           })
         ) {
@@ -57,8 +66,8 @@ function EditCustomer({ customer, onDone }: { customer: Customer; onDone: () => 
       <Field label="Teléfono">
         <input value={form.phone} onChange={set("phone")} />
       </Field>
-      <Field label="Correo">
-        <input type="email" value={form.email} onChange={set("email")} />
+      <Field label="Correos" wide error={fe.errors.emails} hint="Uno por línea, hasta diez. El primero es el principal.">
+        <textarea rows={3} value={form.emails} onChange={set("emails")} />
       </Field>
       <Field label="Dirección">
         <input value={form.address} onChange={set("address")} />

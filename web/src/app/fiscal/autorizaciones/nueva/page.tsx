@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { allCustomers } from "@/lib/paging";
 
 // FIS1-05 (E-FIS1-05-3): register a CONFOTUR authorization, or edit it while DRAFT (fiscal_authorization:register). The scope is
 // product × sale unit with the authorized quantity and net, as typed from the DGII certificate; the server validates everything
@@ -68,7 +69,7 @@ function AuthorizationForm() {
     allowed
       ? async () => {
           const [customers, lists, authorization] = await Promise.all([
-            query("/api/v1/companies/{companyId}/sales/customers", { path: { companyId }, query: { status: "ACTIVE", limit: 200 } }),
+            allCustomers(companyId, { status: "ACTIVE" }),
             query("/api/v1/companies/{companyId}/sales/price-lists", { path: { companyId } }),
             editId ? query("/api/v1/companies/{companyId}/tax/fiscal-authorizations/{authorizationId}", { path: { companyId, authorizationId: editId } }) : Promise.resolve(null),
           ]);

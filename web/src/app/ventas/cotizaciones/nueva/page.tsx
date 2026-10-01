@@ -12,6 +12,7 @@ import { addDays, DELIVERY_TERMS, todayInDominicanRepublic } from "@/lib/labels"
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { allCustomers } from "@/lib/paging";
 
 // QUO1-04 (E-QUO1-04-3): create a quote, or edit it while DRAFT (quote:manage). Customers DRAFT or ACTIVE (only an ACTIVE one is
 // converted later); products of the price list in force, each line with its list price and an optional quoted price (empty = the
@@ -57,7 +58,7 @@ function QuoteForm() {
     allowed
       ? async () => {
           const [customers, plants, lists, quote] = await Promise.all([
-            query("/api/v1/companies/{companyId}/sales/customers", { path: { companyId }, query: { limit: 200 } }),
+            allCustomers(companyId),
             query("/api/v1/companies/{companyId}/sales/plants", { path: { companyId } }),
             query("/api/v1/companies/{companyId}/sales/price-lists", { path: { companyId } }),
             editId ? query("/api/v1/companies/{companyId}/sales/quotes/{quoteId}", { path: { companyId, quoteId: editId } }) : Promise.resolve(null),

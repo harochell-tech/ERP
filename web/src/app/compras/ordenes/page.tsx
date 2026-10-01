@@ -9,6 +9,7 @@ import { formatDate, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 import { pendingMyApproval } from "@/lib/ux4a-compras";
+import { allSuppliers } from "@/lib/paging";
 
 const STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] as const;
 
@@ -44,7 +45,7 @@ function Orders() {
   );
   // C-10: the supplier filter lists the active suppliers (master data) when the reader may see them.
   const suppliers = useLoad(
-    can("master_data:read") ? () => query("/api/v1/companies/{companyId}/master-data/suppliers", { path: { companyId }, query: { limit: 200 } }) : null,
+    can("master_data:read") ? () => allSuppliers(companyId) : null,
     [companyId],
   );
   // C-10: "Pendientes de mi aprobación (n)" for an approver.

@@ -9,7 +9,9 @@ import { LoadingIndicator } from "@/components/StateNotices";
 import { formatDateTime } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
+import { emailsProblem, parseEmails } from "@/lib/partyImport";
 import { useLoad } from "@/lib/useQuery";
+import { allSuppliers } from "@/lib/paging";
 
 type Version = Schemas["PartyBankAccountView"];
 
@@ -181,11 +183,68 @@ function BankAccounts({ partyId }: { partyId: string }) {
   );
 }
 
+// IMP-02 (E-IMP-6, E-IMP-01-2): the supplier's phone and e-mails; the first e-mail is the principal one.
+function Contact({ supplier, onDone }: { supplier: Schemas["SupplierView"]; onDone: () => void }) {
+  const { can } = useSession();
+  const save = useCommand(`supplier-contact:${supplier.supplierId}`, "/api/v1/companies/{companyId}/master-data/set-supplier-contact", `Contacto de ${supplier.legalName} guardado.`);
+  const [editing, setEditing] = useState(false);
+  const [phone, setPhone] = useState(supplier.phone ?? "");
+  const [emails, setEmails] = useState(supplier.emails.join("\n"));
+  const fe = useFieldErrors<"phone" | "emails">();
+  if (!editing) {
+    return (
+      <div className="card" data-testid="supplier-contact">
+        <strong>Teléfono: </strong>
+        {supplier.phone ?? <span className="muted">sin registrar</span>} · <strong>Correos: </strong>
+        {supplier.emails.length > 0 ? supplier.emails.join(", ") : <span className="muted">sin registrar</span>}{" "}
+        {can("supplier:update") ? (
+          <button type="button" onClick={() => setEditing(true)}>
+            Editar contacto
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+  return (
+    <form
+      className="card"
+      noValidate
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const list = parseEmails(emails);
+        if (!fe.check({ phone: phone.trim().length > 30 && "El teléfono tiene hasta 30 caracteres.", emails: emailsProblem(list) })) {
+          return;
+        }
+        if (await save.run({ partyId: supplier.supplierId, expectedVersion: supplier.version, phone: phone.trim() === "" ? null : phone.trim(), emails: list })) {
+          setEditing(false);
+          onDone();
+        }
+      }}
+    >
+      <Field label="Teléfono" error={fe.errors.phone}>
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </Field>
+      <Field label="Correos" wide error={fe.errors.emails} hint="Uno por línea, hasta diez. El primero es el principal.">
+        <textarea rows={4} value={emails} onChange={(e) => setEmails(e.target.value)} />
+      </Field>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={save.busy}>
+          Guardar contacto
+        </button>
+        <button type="button" onClick={() => setEditing(false)}>
+          Cancelar
+        </button>
+      </div>
+      <ErrorBox error={save.error} />
+    </form>
+  );
+}
+
 function Supplier() {
   const { companyId, can } = useSession();
   const id = useSearchParams().get("id") ?? "";
-  const { data, error } = useLoad(
-    can("master_data:read") ? () => query("/api/v1/companies/{companyId}/master-data/suppliers", { path: { companyId }, query: { limit: 200 } }) : null,
+  const { data, error, reload } = useLoad(
+    can("master_data:read") ? () => allSuppliers(companyId) : null,
     [companyId],
   );
   if (!can("master_data:read")) {
@@ -231,7 +290,8 @@ function Supplier() {
           </dd>
         </div>
       </dl>
-      {/* UX4-03 (C-34): where this supplier's documents are. The contact data is not kept in the system yet. */}
+      <Contact key={supplier.version} supplier={supplier} onDone={reload} />
+      {/* UX4-03 (C-34): where this supplier's documents are. */}
       <div className="actions" data-testid="supplier-links">
         {can("purchase_order:read") ? <Link href={`/compras/ordenes/?proveedor=${supplier.supplierId}`}>Órdenes de compra</Link> : null}
         {can("supplier_invoice:read") ? <Link href={`/cxp/facturas/?proveedor=${supplier.supplierId}`}>Facturas del proveedor</Link> : null}

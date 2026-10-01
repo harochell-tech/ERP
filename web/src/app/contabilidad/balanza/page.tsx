@@ -10,6 +10,7 @@ import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 import { bankAccountLabel } from "@/lib/ux4a";
 import { balanceCell } from "@/lib/ux4a-contabilidad";
+import { allSuppliers } from "@/lib/paging";
 
 const PATH = "/api/v1/companies/{companyId}/finance/trial-balance";
 
@@ -31,7 +32,7 @@ export default function Page() {
       ? async () => {
           const [plants, suppliers, banks] = await Promise.all([
             can("master_data:read") ? query("/api/v1/companies/{companyId}/master-data/plants", { path: { companyId } }) : Promise.resolve(null),
-            can("master_data:read") ? query("/api/v1/companies/{companyId}/master-data/suppliers", { path: { companyId }, query: { limit: 200 } }) : Promise.resolve(null),
+            can("master_data:read") ? allSuppliers(companyId) : Promise.resolve(null),
             can("bank:read") ? query("/api/v1/companies/{companyId}/treasury/bank-accounts", { path: { companyId } }) : Promise.resolve(null),
           ]);
           return { plants: plants?.items ?? [], suppliers: suppliers?.items ?? [], banks: banks?.items ?? [] };

@@ -11,6 +11,7 @@ import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { expiryText, expiryTone } from "@/lib/ux4a-auditoria";
+import { allCustomers } from "@/lib/paging";
 
 // FIS1-05 (E-FIS1-05-2): CONFOTUR fiscal authorizations by status and customer (sales:read). Crédito and Facturación register them
 // (fiscal_authorization:register); the Especialista fiscal expires those past their validity (fiscal_authorization:suspend, the same
@@ -66,7 +67,7 @@ function Authorizations() {
     allowed ? () => query("/api/v1/companies/{companyId}/tax/fiscal-authorizations", { path: { companyId }, query: { status, partyId } }) : null,
     [companyId, status, partyId],
   );
-  const customers = useLoad(allowed ? () => query("/api/v1/companies/{companyId}/sales/customers", { path: { companyId }, query: { limit: 200 } }) : null, [companyId]);
+  const customers = useLoad(allowed ? () => allCustomers(companyId) : null, [companyId]);
   if (!allowed) {
     return <NoPermission />;
   }

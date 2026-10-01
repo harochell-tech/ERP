@@ -3,17 +3,20 @@
 import Link from "next/link";
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
+import { PartyImportPanel } from "@/components/PartyImportPanel";
 import { RncHint, useRncLookup } from "@/components/RncLookup";
-import { ErrorBox, Field, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
+import { ConfirmAction, ErrorBox, Field, Money, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
 import { matchesSearch } from "@/lib/ux4b";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { allSuppliers } from "@/lib/paging";
 
 type Supplier = Schemas["SupplierView"];
 
 // E-B03-15-4: suppliers — list, create (supplier:create), edit (supplier:update), activate (supplier:activate).
+// IMP-02 (E-IMP-1, E-IMP-7): import the ADM Cloud export (supplier:import) and activate the selected drafts (supplier:activate).
 
 function CreateSupplier({ onDone }: { onDone: () => void }) {
   const create = useCommand("create-supplier", "/api/v1/companies/{companyId}/master-data/create-supplier");
@@ -55,7 +58,7 @@ function CreateSupplier({ onDone }: { onDone: () => void }) {
   );
 }
 
-function SupplierRow({ supplier, onDone }: { supplier: Supplier; onDone: () => void }) {
+function SupplierRow({ supplier, onDone, selected, onSelect }: { supplier: Supplier; onDone: () => void; selected?: boolean; onSelect?: (on: boolean) => void }) {
   const { can } = useSession();
   const id = supplier.supplierId;
   const update = useCommand(`update-supplier:${id}`, "/api/v1/companies/{companyId}/master-data/update-supplier", `Proveedor ${supplier.legalName} actualizado.`);
@@ -67,6 +70,13 @@ function SupplierRow({ supplier, onDone }: { supplier: Supplier; onDone: () => v
 
   return (
     <tr>
+      {onSelect ? (
+        <td>
+          {supplier.status === "DRAFT" ? (
+            <input type="checkbox" aria-label={`Seleccionar ${supplier.legalName}`} checked={selected ?? false} onChange={(e) => onSelect(e.target.checked)} />
+          ) : null}
+        </td>
+      ) : null}
       <td>
         {editing ? <input aria-label="RNC" value={rnc} onChange={(e) => setRnc(e.target.value)} /> : (supplier.rnc ?? "—")}
       </td>
@@ -131,16 +141,27 @@ function SupplierRow({ supplier, onDone }: { supplier: Supplier; onDone: () => v
 export default function Page() {
   const { companyId, can } = useSession();
   const { data, error, reload } = useLoad(
-    can("master_data:read") ? () => query("/api/v1/companies/{companyId}/master-data/suppliers", { path: { companyId }, query: { limit: 200 } }) : null,
+    can("master_data:read") ? () => allSuppliers(companyId) : null,
     [companyId],
   );
 
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [onlyDrafts, setOnlyDrafts] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const activateMany = useCommand("activate-suppliers", "/api/v1/companies/{companyId}/master-data/activate-suppliers", (response) => {
+    const result = response.result as unknown as { activated: number; skipped: number };
+    return `${result.activated} proveedores activados${result.skipped > 0 ? `; ${result.skipped} no estaban en borrador` : ""}.`;
+  });
   if (!can("master_data:read")) {
     return <NoPermission />;
   }
-  const shown = data?.items.filter((s) => matchesSearch(search, s.legalName, s.rnc)) ?? [];
+  const shown = data?.items.filter((s) => (!onlyDrafts || s.status === "DRAFT") && matchesSearch(search, s.legalName, s.rnc)) ?? [];
+  const selectable = can("supplier:activate");
+  const drafts = shown.filter((s) => s.status === "DRAFT").map((s) => s.supplierId);
+  // Only what is still a draft on screen is sent (the list may have changed since it was ticked); at most 500 per command.
+  const chosen = drafts.filter((id) => picked.has(id)).slice(0, 500);
   return (
     <>
       <h1>Proveedores</h1>
@@ -160,11 +181,48 @@ export default function Page() {
           </div>
         )
       ) : null}
+      {can("supplier:import") ? (
+        importing ? (
+          <PartyImportPanel kind="suppliers" onDone={reload} onClose={() => setImporting(false)} />
+        ) : (
+          <div className="actions">
+            <button type="button" onClick={() => setImporting(true)}>
+              Importar desde ADM Cloud
+            </button>
+          </div>
+        )
+      ) : null}
       <div className="inline-form" role="search">
         <Field label="Buscar proveedor">
           <input type="search" placeholder="Razón social o RNC" value={search} onChange={(e) => setSearch(e.target.value)} />
         </Field>
+        <label className="field">
+          <span>Solo borradores</span>
+          <input type="checkbox" checked={onlyDrafts} onChange={(e) => setOnlyDrafts(e.target.checked)} />
+        </label>
       </div>
+      {selectable && drafts.length > 0 ? (
+        <div className="actions" data-testid="supplier-batch">
+          <button type="button" onClick={() => setPicked(new Set(chosen.length === Math.min(drafts.length, 500) ? [] : drafts.slice(0, 500)))}>
+            {chosen.length === Math.min(drafts.length, 500) ? "Quitar selección" : `Seleccionar los ${Math.min(drafts.length, 500)} borradores`}
+          </button>
+          <ConfirmAction
+            label={`Activar seleccionados (${chosen.length})`}
+            className="primary"
+            stepUp
+            busy={activateMany.busy}
+            disabled={chosen.length === 0}
+            consequence={`${chosen.length} proveedores pasan de borrador a activos: se les podrá comprar y registrar facturas. Su RNC y razón social ya no se podrán cambiar.`}
+            onConfirm={async () => {
+              if (await activateMany.run({ partyIds: chosen })) {
+                setPicked(new Set());
+                reload();
+              }
+            }}
+          />
+          <ErrorBox error={activateMany.error} />
+        </div>
+      ) : null}
       {data === null ? (
         <LoadingIndicator error={error} />
       ) : data.items.length === 0 ? (
@@ -179,6 +237,7 @@ export default function Page() {
         <div className="table-wrap"><table>
           <thead>
             <tr>
+              {selectable ? <th aria-label="Seleccionar" /> : null}
               <th>RNC</th>
               <th>Razón social</th>
               <th>Estado</th>
@@ -189,7 +248,25 @@ export default function Page() {
           </thead>
           <tbody>
             {shown.map((s) => (
-              <SupplierRow key={`${s.supplierId}:${s.version}`} supplier={s} onDone={reload} />
+              <SupplierRow
+                key={`${s.supplierId}:${s.version}`}
+                supplier={s}
+                onDone={reload}
+                selected={picked.has(s.supplierId)}
+                onSelect={
+                  selectable
+                    ? (on) => {
+                        const next = new Set(picked);
+                        if (on) {
+                          next.add(s.supplierId);
+                        } else {
+                          next.delete(s.supplierId);
+                        }
+                        setPicked(next);
+                      }
+                    : undefined
+                }
+              />
             ))}
           </tbody>
         </table></div>
