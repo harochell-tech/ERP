@@ -564,3 +564,37 @@ public sealed class ListBankStatementLinesHandler : IQueryHandler<ListBankStatem
         return ApiJson.Serialize(new BankStatementLineList(items, query.Limit, query.Offset));
     }
 }
+
+// E-FIS1b-01-9: the released customer refunds waiting for their DEBIT line of the statement, read with bank:read by who matches.
+public sealed record ListRefundsToMatch(Guid CompanyId, Guid SessionId, Guid? BankAccountId = null) : IQuery;
+
+public sealed record RefundToMatch(Guid RefundId, string RefundNo, string CustomerName, Guid BankAccountId, string Method, decimal Amount, string? Reference, DateOnly RefundDate, long Version);
+
+public sealed record RefundToMatchList(IReadOnlyList<RefundToMatch> Items);
+
+[RequiresPermission("bank:read")]
+public sealed class ListRefundsToMatchHandler : IQueryHandler<ListRefundsToMatch>
+{
+    public string QueryType => "Treasury.ListRefundsToMatch";
+
+    public async Task<string> HandleAsync(ListRefundsToMatch query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT f.refund_id, f.refund_no, p.legal_name, f.bank_account_id, f.method, f.amount::numeric(19,2), f.reference, f.refund_date, f.version
+            FROM fin.customer_refund f JOIN md.party p ON p.party_id = f.party_id
+            WHERE f.company_id = @c AND f.status = 'RELEASED' AND (CAST(@b AS uuid) IS NULL OR f.bank_account_id = CAST(@b AS uuid))
+            ORDER BY f.refund_date, f.refund_no LIMIT 500
+            """,
+            r => new RefundToMatch(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetDecimal(5), r.NullableString(6), r.Date(7), r.GetInt64(8)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("b", query.BankAccountId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new RefundToMatchList(items));
+    }
+}
+

@@ -140,6 +140,13 @@ function OrderDetail() {
         {order.requestedDate ? ` · solicitado para ${formatDate(order.requestedDate)}` : ""}
         {order.customerPoRef ? ` · OC del cliente ${order.customerPoRef}` : ""}
       </p>
+      {order.exemptionPending ? (
+        <p className="notice" data-testid="order-exemption">
+          {/* FIS1b-07 (E-FIS1b-2): each delivery of this order issues a proforma, collected before the fiscal invoice. */}
+          Exención de ITBIS en trámite: cada entrega genera su proforma, que se cobra {order.proformaCollectsItbis ? "con ITBIS" : "sin ITBIS"}.{" "}
+          <Link href="/facturacion/proformas/">Ver proformas</Link>
+        </p>
+      ) : null}
       {h.quoteId && h.quoteNo ? (
         <p data-testid="order-quote">
           {/* QUO1-04 (E-QUO1-04-6): the quote the order came from, at its quoted prices. */}

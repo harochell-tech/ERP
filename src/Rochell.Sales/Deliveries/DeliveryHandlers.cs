@@ -5,7 +5,9 @@ using Rochell.Finance.Posting;
 using Rochell.Inventory;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
+using Rochell.Platform.Time;
 using Rochell.Sales.Orders;
+using Rochell.Sales.Proformas;
 
 namespace Rochell.Sales.Deliveries;
 
@@ -592,6 +594,7 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
         var movementEvent = control ?? issued;
         var dates = new MovementDates(occurredAt, businessDate, postingDate);
         var delivered = new Dictionary<Guid, decimal>();
+        var reached = new List<DeliveredLine>();
         foreach (var line in lines)
         {
             var baseQuantity = Deliveries.Base(line.Planned, line.Factor!.Value);
@@ -626,8 +629,10 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
 
             if (atGate)
             {
-                posting.Revenue_(line.Id, line.ItemId, decimal.Round(line.Planned * line.UnitPrice, 2, MidpointRounding.AwayFromZero));
+                var revenue = decimal.Round(line.Planned * line.UnitPrice, 2, MidpointRounding.AwayFromZero);
+                posting.Revenue_(line.Id, line.ItemId, revenue);
                 delivered[line.OrderLineId] = line.Planned;
+                reached.Add(new DeliveredLine(line.Id, line.ItemId, line.Uom, line.Planned, line.UnitPrice, revenue));
             }
 
             await Sql.ExecuteAsync(
@@ -671,7 +676,11 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
             await posting.WriteAsync(_engine, context, "P-16", c, businessDate, occurredAt, postingDate, cancellationToken).ConfigureAwait(false);
         }
 
-        return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = to, controlTransferred = atGate, version });
+        // E-FIS1b-1: a pickup of an order whose exemption is in process is delivered here, and so is its proforma.
+        var proforma = atGate
+            ? await Proformas.Proformas.IssueOnDeliveryAsync(context, CommandType, row.SalesOrderId, command.DeliveryId, row.DeliveryNo, party.Value, businessDate, reached, cancellationToken).ConfigureAwait(false)
+            : null;
+        return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = to, controlTransferred = atGate, version, proformaId = proforma?.ProformaId, proformaNo = proforma?.ProformaNo });
     }
 }
 
@@ -774,6 +783,7 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
             : (Guid?)null;
         var dates = new MovementDates(occurredAt, businessDate, postingDate);
         var delivered = new Dictionary<Guid, decimal>();
+        var reached = new List<DeliveredLine>();
         foreach (var line in lines)
         {
             var i = input.Single(x => x.DeliveryLineId == line.Id);
@@ -792,8 +802,10 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
 
             if (i.QtyReceived > 0m)
             {
-                posting.Revenue_(line.Id, line.ItemId, decimal.Round(i.QtyReceived * line.UnitPrice, 2, MidpointRounding.AwayFromZero));
+                var revenue = decimal.Round(i.QtyReceived * line.UnitPrice, 2, MidpointRounding.AwayFromZero);
+                posting.Revenue_(line.Id, line.ItemId, revenue);
                 delivered[line.OrderLineId] = i.QtyReceived;
+                reached.Add(new DeliveredLine(line.Id, line.ItemId, line.Uom, i.QtyReceived, line.UnitPrice, revenue));
             }
 
             await TransitMoves.ReturnAsync(
@@ -854,7 +866,10 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
             await posting.WriteAsync(_engine, context, "P-30", le, businessDate, occurredAt, postingDate, cancellationToken).ConfigureAwait(false);
         }
 
-        return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = to, version });
+        // E-FIS1b-01-2: the proforma of a site delivery carries the day the customer received it.
+        var proforma = await Proformas.Proformas.IssueOnDeliveryAsync(
+            context, CommandType, row.SalesOrderId, command.DeliveryId, row.DeliveryNo, party.Value, BusinessCalendar.DefaultBusinessDate(command.ReceivedAt), reached, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = to, version, proformaId = proforma?.ProformaId, proformaNo = proforma?.ProformaNo });
     }
 }
 

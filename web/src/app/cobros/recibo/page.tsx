@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
+import { AllocateToProformas, ReceiptAllocations, ReceiptRefunds } from "@/components/ReceiptProformas";
 import { MoneyText, SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, FieldMessage, fieldAria, LineTable, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
@@ -31,11 +32,11 @@ function Apply({ receipt, onDone }: { receipt: Receipt; onDone: () => void }) {
     async () => {
       const [invoices, suggestion] = await Promise.all([
         query("/api/v1/companies/{companyId}/sales/invoices", { path: { companyId }, query: { partyId: h.partyId, openOnly: "true", limit: 200 } }),
-        query("/api/v1/companies/{companyId}/sales/customers/{partyId}/receipt-application-suggestion", { path: { companyId, partyId: h.partyId }, query: { amount: h.unapplied } }),
+        query("/api/v1/companies/{companyId}/sales/customers/{partyId}/receipt-application-suggestion", { path: { companyId, partyId: h.partyId }, query: { amount: h.available } }),
       ]);
       return { items: invoices.items, suggested: suggestionAmounts(suggestion.invoices) };
     },
-    [companyId, h.partyId, h.unapplied],
+    [companyId, h.partyId, h.available],
   );
   if (data === null) {
     return <LoadingIndicator error={error} />;
@@ -171,7 +172,14 @@ function ReceiptDetail() {
         {h.depositNo && h.depositId ? <Link href={`/cobros/deposito/?id=${h.depositId}`}>{h.depositNo}</Link> : null}
       </p>
       <p>
-        Sin aplicar: <MoneyText value={h.unapplied} testId="receipt-unapplied" /> · registró {data.recordedBy ?? "—"}
+        Sin aplicar: <MoneyText value={h.unapplied} testId="receipt-unapplied" />
+        {Number(h.allocated) > 0 ? (
+          <>
+            {" "}
+            · asignado a proformas: <MoneyText value={h.allocated} testId="receipt-allocated" /> · disponible: <MoneyText value={h.available} testId="receipt-available" />
+          </>
+        ) : null}{" "}
+        · registró {data.recordedBy ?? "—"}
       </p>
       {data.closingReason ? <p className="muted">Motivo: {data.closingReason}</p> : null}
       {reversible && can("receipt:reverse") ? (
@@ -180,7 +188,10 @@ function ReceiptDetail() {
           <ErrorBox error={reverse.error} />
         </div>
       ) : null}
-      {h.status === "RECORDED" && h.applicationStatus !== "APPLIED" && can("receipt:apply") ? <Apply receipt={data} onDone={reload} /> : null}
+      {h.status === "RECORDED" && Number(h.available) > 0 && can("receipt:apply") ? <Apply receipt={data} onDone={reload} /> : null}
+      {h.status === "RECORDED" && Number(h.available) > 0 && can("receipt:apply") ? <AllocateToProformas receipt={data} onDone={reload} /> : null}
+      <ReceiptAllocations receipt={data} onDone={reload} />
+      <ReceiptRefunds receipt={data} onDone={reload} />
 
       <h2>Aplicaciones</h2>
       {data.applications.length === 0 ? (

@@ -75,7 +75,10 @@ public sealed record FiscalAuthorizationConsumptionView(Guid ConsumptionId, int 
 public sealed record FiscalAuthorizationDetail(
     FiscalAuthorizationSummary Header, string ConfoturResolutionNo, DateOnly? ProjectTermEndsOn, Guid? SalesOrderId, Guid RegisteredBy, Guid? VerifiedBy,
     IReadOnlyList<FiscalAuthorizationLineView> Lines, IReadOnlyList<FiscalAuthorizationDocumentView> Documents, IReadOnlyList<FiscalAuthorizationHistoryView> History,
-    IReadOnlyList<FiscalAuthorizationConsumptionView> Consumptions);
+    IReadOnlyList<FiscalAuthorizationConsumptionView> Consumptions, IReadOnlyList<FiscalAuthorizationProformaView> Proformas);
+
+/// <summary>E-FIS1b-5: a proforma the certification cites.</summary>
+public sealed record FiscalAuthorizationProformaView(Guid ProformaId, string ProformaNo, DateOnly ProformaDate, decimal Net, string Status, string? InvoiceNo);
 
 [RequiresPermission("sales:read")]
 public sealed class GetFiscalAuthorizationHandler : IQueryHandler<GetFiscalAuthorization>
@@ -146,8 +149,21 @@ public sealed class GetFiscalAuthorizationHandler : IQueryHandler<GetFiscalAutho
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.AuthorizationId)).ConfigureAwait(false);
+        var proformas = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT pf.proforma_id, pf.proforma_no, pf.proforma_date, pf.net_total::numeric(19,2), pf.status, i.invoice_no
+            FROM tax.fiscal_authorization_proforma x
+            JOIN sal.proforma pf ON pf.proforma_id = x.proforma_id
+            LEFT JOIN sal.invoice i ON i.invoice_id = pf.invoice_id
+            WHERE x.authorization_id = @id ORDER BY pf.proforma_no
+            """,
+            r => new FiscalAuthorizationProformaView(r.GetGuid(0), r.GetString(1), r.Date(2), r.GetDecimal(3), r.GetString(4), r.NullableString(5)),
+            cancellationToken,
+            ("id", query.AuthorizationId)).ConfigureAwait(false);
         return ApiJson.Serialize(new FiscalAuthorizationDetail(
-            header, extra.ResolutionNo, extra.TermEndsOn, extra.SalesOrderId, extra.RegisteredBy, extra.VerifiedBy, lines, documents, history, consumptions));
+            header, extra.ResolutionNo, extra.TermEndsOn, extra.SalesOrderId, extra.RegisteredBy, extra.VerifiedBy, lines, documents, history, consumptions, proformas));
     }
 }
 
