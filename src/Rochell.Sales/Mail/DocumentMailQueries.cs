@@ -12,7 +12,8 @@ public sealed record DocumentMailView(
     Guid MailId, string DocumentNo, string Status, IReadOnlyList<string> Recipients, string Subject, string RequestedBy, DateTime RequestedAt, int Attempts, string? LastError,
     DateTime? SentAt, string? DeliveryMode, IReadOnlyList<string>? DeliveredTo, string FileName, bool HasPdf);
 
-public sealed record DocumentMailList(IReadOnlyList<DocumentMailView> Items);
+/// <summary><c>SavedEmails</c>: the e-mails kept for the document's customer, the principal one first (E-MAIL-5) — what the sender is offered.</summary>
+public sealed record DocumentMailList(IReadOnlyList<DocumentMailView> Items, IReadOnlyList<string> SavedEmails);
 
 [RequiresPermission("sales:read")]
 public sealed class ListDocumentMailHandler : IQueryHandler<ListDocumentMail>
@@ -41,7 +42,24 @@ public sealed class ListDocumentMailHandler : IQueryHandler<ListDocumentMail>
             ("c", context.CompanyId),
             ("t", query.DocumentType),
             ("d", query.DocumentId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new DocumentMailList(items));
+        var saved = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT e.email FROM md.party_email e
+            WHERE e.company_id = @c AND e.party_id = CASE @t
+                    WHEN 'QUOTE' THEN (SELECT q.party_id FROM sal.quote q WHERE q.company_id = @c AND q.quote_id = @d)
+                    WHEN 'PROFORMA' THEN (SELECT f.party_id FROM sal.proforma f WHERE f.company_id = @c AND f.proforma_id = @d)
+                    WHEN 'DELIVERY' THEN (SELECT o.party_id FROM log.delivery x JOIN sal.sales_order o ON o.sales_order_id = x.sales_order_id WHERE x.company_id = @c AND x.delivery_id = @d)
+                    ELSE @d END
+            ORDER BY e.position
+            """,
+            r => r.GetString(0),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("t", query.DocumentType),
+            ("d", query.DocumentId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new DocumentMailList(items, saved));
     }
 }
 

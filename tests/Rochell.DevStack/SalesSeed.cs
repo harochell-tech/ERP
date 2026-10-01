@@ -99,6 +99,12 @@ internal static class SalesSeed
             .RootElement.GetProperty("termsVersionId").GetGuid();
         await h.RunAsync(new ApproveCustomerTerms(h.CompanyId, controller, "dev-terms-a", terms), new ApproveCustomerTermsHandler());
         await h.RunAsync(new ActivateCustomer(h.CompanyId, credit, "dev-customer-a", customer, 1), new ActivateCustomerHandler());
+
+        // MAIL-03: the e-mails the sender is offered when a document of the customer goes by mail.
+        var customerVersion = await h.ScalarAsync<long>("SELECT version FROM md.party WHERE party_id = @p", ("p", customer));
+        await h.RunAsync(
+            new UpdateCustomer(h.CompanyId, seller, "dev-customer-mail", customer, customerVersion, "131925332", "Constructora Uno", null, null, null, ["compras@constructorauno.test", "obra@constructorauno.test"]),
+            new UpdateCustomerHandler());
         await h.RunAsync(new RegisterVehicle(h.CompanyId, dispatch, "dev-truck", "L123456", 12000m), new RegisterVehicleHandler());
         await h.RunAsync(new RegisterDriver(h.CompanyId, dispatch, "dev-driver", "Juan Pérez", "00112345678"), new RegisterDriverHandler());
         await h.RunAsync(new RegisterBankAccount(h.CompanyId, controller, "dev-sales-bank", "TEST_BANK", "5555554321", "1102"), new RegisterBankAccountHandler());

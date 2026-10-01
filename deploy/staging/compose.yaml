@@ -56,6 +56,15 @@ services:
       AWS_ACCESS_KEY_ID: ${WORM_ACCESS_KEY_ID:?}
       AWS_SECRET_ACCESS_KEY: ${WORM_SECRET_ACCESS_KEY:?}
       Rochell__ReverseProxy__TrustedNetworks__0: 172.30.0.0/24
+      # E-MAIL-01-3 / E-MAIL-01-4: outgoing mail. Off until MAIL_MODE is set in .env (Redirect during the parallel run: everything
+      # goes to MAIL_REDIRECT_TO). The Workspace relay authorizes this server's address; no password is stored.
+      Rochell__Mail__Mode: ${MAIL_MODE:-Off}
+      Rochell__Mail__FromAddress: ${MAIL_FROM:-}
+      Rochell__Mail__RedirectTo: ${MAIL_REDIRECT_TO:-}
+      Rochell__Mail__ArchiveBcc: ${MAIL_ARCHIVE_BCC:-}
+      Rochell__Mail__RendererUrl: http://pdf:3000
+      Rochell__Mail__Smtp__Host: ${MAIL_SMTP_HOST:-smtp-relay.gmail.com}
+      Rochell__Mail__Smtp__LocalDomain: ${MAIL_EHLO_NAME:-staging.industriasrochell.com.do}
     volumes:
       - dpkeys:/var/lib/rochell/keys
       - ./secrets/digest-signing.pem:/run/secrets/digest-signing.pem:ro
@@ -63,6 +72,14 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
     networks: [internal, edge]
+
+  # E-MAIL-10: HTML → PDF with headless Chromium, reachable only from the API (no route outside the host: the documents are
+  # self-contained).
+  pdf:
+    image: gotenberg/gotenberg:8.37.0-chromium
+    restart: unless-stopped
+    mem_limit: 1g
+    networks: [internal]
 
   caddy:
     image: caddy:2.10-alpine

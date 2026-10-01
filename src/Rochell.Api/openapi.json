@@ -47,7 +47,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name). No sign-in needed.",
+        "summary": "E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name) and, E-MAIL-01-4, whether it sends mail (OFF, REDIRECT, LIVE). No sign-in needed.",
         "operationId": "GetEnvironment",
         "responses": {
           "200": {
@@ -37983,7 +37983,8 @@
       },
       "DocumentMailList": {
         "required": [
-          "items"
+          "items",
+          "savedEmails"
         ],
         "type": "object",
         "properties": {
@@ -37991,6 +37992,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DocumentMailView"
+            }
+          },
+          "savedEmails": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         },
@@ -38149,7 +38156,8 @@
       },
       "EnvironmentInfo": {
         "required": [
-          "badge"
+          "badge",
+          "mailMode"
         ],
         "type": "object",
         "properties": {
@@ -38158,6 +38166,9 @@
               "null",
               "string"
             ]
+          },
+          "mailMode": {
+            "type": "string"
           }
         },
         "additionalProperties": false
