@@ -44,6 +44,7 @@ const STATUS: Readonly<Record<string, string>> = {
   BLOCKED: "Bloqueado",
   INACTIVE: "Inactivo",
   PENDING_CREDIT: "Pendiente de crédito",
+  PENDING_PAYMENT: "Pendiente de pago", // CF1-02 (E-CF1-01-3)
   CONFIRMED: "Confirmado",
   PARTIALLY_DELIVERED: "Entregado parcialmente",
   DELIVERED: "Entregado",
@@ -119,7 +120,7 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   MATCH_EXCEPTION: "attention", UNMATCHED: "attention", HOLD_PENDING: "attention", POSTING_BLOCKED: "attention", BLOCKED_PENDING_SOURCE: "attention",
   REJECTED: "error", EXCEPTIONS: "error", FAILED: "error",
   INACTIVE: "neutral", PLANNED: "neutral", RETAINED: "neutral",
-  PENDING_CREDIT: "progress", PARTIALLY_DELIVERED: "progress", LOADING: "progress", LOADED: "progress", IN_TRANSIT: "progress", NEEDS_APPROVAL: "progress",
+  PENDING_CREDIT: "progress", PENDING_PAYMENT: "progress", PARTIALLY_DELIVERED: "progress", LOADING: "progress", LOADED: "progress", IN_TRANSIT: "progress", NEEDS_APPROVAL: "progress",
   CONFIRMED: "done", DELIVERED: "done", AUTO_APPROVED: "done", TRANSFERRED: "done",
   BLOCKED: "attention", DELIVERED_WITH_EXCEPTIONS: "attention", RETURNED: "attention",
   PENDING_EXTERNAL: "attention", UNAPPLIED: "attention", BOUNCED: "error",

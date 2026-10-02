@@ -417,7 +417,7 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
             }
         }
 
-        if (version.RuleKind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis or FiscalRuleKinds.Report606Classification)
+        if (version.RuleKind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis or FiscalRuleKinds.Report606Classification or FiscalRuleKinds.ConsumerIdThreshold)
         {
             await using var other = Sql.Command(
                 context.Connection,
@@ -437,7 +437,7 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
                 throw new DomainException(
                     TaxErrors.AnotherItbisRuleActive,
                     FiscalRuleKinds.IsReport(version.RuleKind)
-                        ? "Another 606 classification is active; only one may apply at a time (E-FIS2-01-10)."
+                        ? "Another rule of this kind is active; only one may apply at a time (E-FIS2-01-10, E-CF1-01-6)."
                         : "Another ITBIS rule of this kind is active; only one may apply at a time.");
             }
         }

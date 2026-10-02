@@ -18,3 +18,28 @@ Whether a cheque counts (its deposit matched with the statement, E-CF1-4) is dec
 (CF1-02): the schema only requires the assigned amount to cover what must be paid.
 
 Tests: `Rochell.Sales.Tests.CashSaleSchemaTests`.
+
+## CF1-02 — the cash sale and its payment (migration 0073; E-CF1-02-1…3)
+
+| Command (`Rochell.Sales/CashSales`) | Permission | What |
+| --- | --- | --- |
+| `CreateCashSale` | `cash_sale:create` | A DRAFT order of the company's «Consumidor final» with its buyer. The consumer is created by the first sale (`FinalConsumerCreated`, ACTIVE, under an advisory lock) |
+| `UpdateCashSaleDraft` | `cash_sale:create` | Header, lines and buyer of a DRAFT |
+| `SubmitCashSaleForPayment` | `cash_sale:create` | DRAFT → PENDING_PAYMENT; `payment_total` = net + the ITBIS of today's rules (`TaxEngine.PreviewSalesItbisAsync`). Needs the `CONSUMER_ID_THRESHOLD` rule in force (`CONSUMER_ID_RULE_MISSING`); from its amount the buyer's identification is required (`BUYER_ID_REQUIRED`), compared with the order's total with ITBIS (E-CF1-02-3) |
+| `ReturnCashSaleToDraft` | `cash_sale:create` | PENDING_PAYMENT → DRAFT, with nothing assigned |
+| `AllocateReceiptToOrder` | `receipt:apply` | A receipt of the consumer assigned to the order, up to what is still to pay (`ALLOCATION_EXCEEDS_DUE`) and to what the receipt has free; no journal. Confirms the order at once when the money that counts covers it |
+| `ReleaseOrderAllocation` | `receipt:apply` | Releases an assignment with a reason while the order is PENDING_PAYMENT |
+| `ConfirmCashSale` | `cash_sale:create` | «Verificar pago»: confirms when covered, else `CASH_SALE_NOT_PAID` (E-CF1-02-1: a cheque is matched in Treasury, a separate module, so someone asks again) |
+
+- **Money that counts** (`CashSaleStore.PaidAsync`): live assignments of RECORDED receipts — cash and transfers at once, a cheque
+  only when its deposit is MATCHED with the bank statement — plus what the order's invoices already took.
+- **Dispatch** (E-CF1-02-2): `PlanDelivery` and `RecordGateOut` refuse a cash order that is not covered. A bounced cheque releases
+  its assignments (`MarkReceiptBounced`), the order keeps its state, and nothing more is planned or leaves until it is paid again.
+- **Credit commands refuse cash sales** (`USE_CASH_SALE`): `CreateSalesOrder` for the consumer, `UpdateSalesOrderDraft`,
+  `SubmitForCredit`. A quote of the consumer converts into a cash order. `CancelSalesOrder` also cancels a PENDING_PAYMENT order and
+  refuses one with receipts assigned (the paid cancellation comes in CF1-03).
+- **Fiscal rule kind `CONSUMER_ID_THRESHOLD`**: `{"amount":"250000.00"}`; computes no tax (no test runs, READY with its source,
+  one active at a time); `TaxEngine.ConsumerIdThresholdAsync`. Migration 0073 exempts it from the test-run gate, like the 606
+  classification. The rule screen's guided form for it comes with CF1-05; until then it is loaded with the configuration load.
+- 194 commands. Tests: `Rochell.Sales.Tests.CashSaleTests` (CF-01…07).
+
