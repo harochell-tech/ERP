@@ -1,0 +1,42 @@
+# Purchases of expenses and services (GAS-1)
+
+Baseline: `docs/architecture/gas1/frozen-baseline-gas1.md` (E-GAS-1…12). Purchase orders and supplier invoices take expense lines —
+a free description, a quantity, a price, an expense category and a tax type — that never go through the warehouse. Raw materials
+keep their registered item, their receipt, the three-way match and their automatic ITBIS.
+
+## GAS1-01 — schema (migration 0077; E-GAS-01-1…11)
+
+Schema only: no command writes these columns yet, and every existing row is of class INVENTORY.
+
+| Object | What |
+| --- | --- |
+| `pur.expense_category` | Code (unique among those not INACTIVE), name, `account_id`, `goods_type_606` ("01"…"11"), `line_class` (SERVICE / GOODS), status DRAFT → ACTIVE ⇄ INACTIVE, `prepared_by`, `approved_by`. The account is an ACTIVE account of class EXPENSE that is not a control account, and never changes; name, 606 type and class change only while DRAFT (E-GAS-01-3). Approver ≠ preparer (`core.four_eyes`, E-GAS-01-4). State history required (ADR-027). |
+| `pur.purchase_order.doc_class` | INVENTORY or EXPENSE, immutable. An EXPENSE order is never `PARTIALLY_RECEIVED` / `RECEIVED`; it goes APPROVED ⇄ CLOSED (E-GAS-01-10). |
+| `pur.purchase_order_line` | `item_id` and `uom` are now nullable; `description`, `expense_category_id`, `tax_rule_id`. A line is an inventory line (item and unit) or an expense line (description, category, tax type, never received, no unit — E-GAS-01-2), of the class of its order. `qty_invoiced` ≤ `qty_received` for inventory, ≤ `qty_ordered` for expenses. |
+| `pur.supplier_invoice` | `doc_class` and `plant_id` (required for EXPENSE, absent for INVENTORY — E-GAS-01-8), both immutable. |
+| `pur.supplier_invoice_line` | `line_kind` INVENTORY_PO or EXPENSE; `po_line_id` nullable; `description`, `expense_category_id`, `tax_rule_id`. A line is of the class of its invoice; with an order line, of the invoice's supplier and with the order line's own category and tax type. |
+| `pur.expense_line_valid` | An expense line names an ACTIVE category and a fiscal rule of kind `PURCHASE_TAX_TYPE`. |
+| Fiscal rule kind `PURCHASE_TAX_TYPE` | The tax type of an expense line (E-GAS-3); several in force at once. Effects `SELECTIVE_TAX`, `OTHER_TAX`, `LEGAL_TIP` on determination lines (E-GAS-10). The definition and the calculation come in GAS1-02. |
+| Account roles | `SELECTIVE_TAX_EXPENSE`, `OTHER_TAX_EXPENSE`, `LEGAL_TIP_EXPENSE` (mapped by the Controller) and the technical `PURCHASE_EXPENSE` (never mapped: the account is the category's; excluded from the map lists and from the setup status). |
+| Posting rule P-37 | `ExpenseInvoicePosted`, AP-REC, seeded DRAFT: Dr `PURCHASE_EXPENSE` (`expense_net`), Dr `ITBIS_RECOVERABLE`, Dr the three tax expense roles; Cr `AP_CONTROL` (`payable`, subledger AP), Cr `WITHHOLDING_PAYABLE`. Its reversal is the exact inverse of its journal, as R-07 is of R-04. |
+| Policy parameter | `expense_invoice_approval_threshold` (PURCHASING, AMOUNT): from this total an expense invoice without an order needs another person's approval (E-GAS-01-9). |
+| Permissions | `expense_category:prepare` (CONTADOR, CONTROLLER), `expense_category:approve` (CONTROLLER). 129 permissions. |
+
+Tests: `Rochell.Procurement.Tests.ExpensePurchaseSchemaTests` (each case sets its rows up inside one block and rolls back with a
+sentinel, since no command exists yet).
+
+## Block Rochell's chart (A-01)
+
+From the ADM Cloud export of 2026-10-02 (E-GAS-11, E-GAS-12). The Controller approves the categories and their accounts; the
+accountant confirms the 606 types.
+
+- Existing accounts that become categories: 63200 Electricidad, 63300 Teléfono, 63400 Suministros de oficina, 63500 Combustible
+  (one category), 63600 Mantenimiento de oficina, 63700 Reparaciones, 63800 Servicios de limpieza, 64000 Seguros (606 type 11),
+  64100 / 64200 / 64300 / 64900 servicios, 63100 / 63150 rentas (type 03), 62100 / 62200 / 62250 / 62500 mercadeo, 62300 viajes,
+  62400 representación (type 05), 61200 / 60900 / 61100 / 60800 / 61000 / 60700 personal bought from third parties (type 01). The
+  rest propose type 02.
+- Tax accounts: 63950 Impuesto selectivo al consumo, 63900 Propinas.
+- To create: 14400 ITBIS adelantado en compras, 63550 Peajes, 63960 Otros impuestos y tasas, and the plant and fleet accounts
+  66100 Mantenimiento de maquinaria y planta, 66150 Repuestos de maquinaria, 66200 Lubricantes y grasas, 66250 Neumáticos,
+  66300 Mantenimiento de vehículos, 66350 Fletes y acarreos contratados, 66400 Seguridad y vigilancia, 66450 Agua,
+  66500 Herramientas menores, 66550 Equipos de protección personal (codes proposed; the accountant may change them).

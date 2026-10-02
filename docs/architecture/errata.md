@@ -960,6 +960,17 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-GAS-10 | GAS-1 | Selective tax, CDT and legal tip post to their own expense accounts (63950, the other-taxes account, 63900 in the owner's chart) and to their 606 columns (supersedes the first proposal of posting them to the line's expense account). |
 | E-GAS-11 | GAS-1 | Expense categories come from the owner's chart of accounts (ADM Cloud export of 2026-10-02): utilities, operation, professional services, rents, insurance, marketing, representation, personnel bought from third parties, and the plant and fleet accounts, all as expense (6xxxx); fuel is one category. 606 types are the accountant's to confirm. |
 | E-GAS-12 | GAS-1 | Accounts to create before the module is used: ITBIS advanced on purchases, a coded account for other taxes, a coded account for tolls, and the plant and fleet expense accounts. |
+| E-GAS-01-1 | GAS-1 | Purchase order and supplier invoice carry their class, INVENTORY or EXPENSE; mixing lines of both classes is refused (the owner confirmed no mixed documents are needed). |
+| E-GAS-01-2 | GAS-1 | An expense line has no unit of measure: description, quantity and price. |
+| E-GAS-01-3 | GAS-1 | An ACTIVE category never changes its account (nor its 606 type or class): it is made INACTIVE and another is created, so what was posted keeps its meaning. |
+| E-GAS-01-4 | GAS-1 | Categories are prepared by the Contador or the Controller and approved by the Controller, a different person from who prepared. |
+| E-GAS-01-5 | GAS-1 | «Exento» is a tax type without components, also with its official source. |
+| E-GAS-01-6 | GAS-1 | Every component of a tax type is computed on the line's net. If the accountant states that the telecom ITBIS is on the service plus the selective tax, the rule is adjusted before it is activated. |
+| E-GAS-01-7 | GAS-1 | A withholding rule may be limited to service lines, to goods lines or to inventory; the existing ones keep applying to everything. |
+| E-GAS-01-8 | GAS-1 | The plant of an expense invoice is mandatory; with an order it is the order's. |
+| E-GAS-01-9 | GAS-1 | New PURCHASING parameter `expense_invoice_approval_threshold`; the invoice over it is approved by who approves match exceptions today, the Controller. |
+| E-GAS-01-10 | GAS-1 | An expense order goes to CLOSED when billed in full or when Compras closes it with a reason; it never shows in «Por recibir». |
+| E-GAS-01-11 | GAS-1 | Two new permissions, to prepare and to approve categories. Registering and posting expense invoices uses the current permissions of Cuentas por pagar. |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |
