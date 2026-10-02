@@ -900,6 +900,40 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MAIL-01-9 | MAIL | Subject and greeting fixed in Spanish per document type, plus an optional message typed by the sender. At most 10 recipients. |
 | E-MAIL-01-10 | MAIL | Five attempts, spaced; then the message is «Fallido», visible, with «Reintentar». A bounce for a non-existent address reaches the `industrias@` mailbox, not the system. |
 | E-MAIL-01-11 | MAIL | The server builds its own HTML per document, with the same content as the print view; the browser's print views stay as they are. |
+| E-CF1-1 | CF-1 | A buyer without RNC or cédula is sold to through one system customer per company, «Consumidor final», without RNC, never created or edited by hand. Customers with a cédula stay ordinary customers (they already get e-CF 32). |
+| E-CF1-2 | CF-1 | On each sale the buyer's name and phone are written, optionally, and an identification (cédula, RNC or passport) when given; they stay on the order and the invoice. |
+| E-CF1-3 | CF-1 | From the amount the DGII sets (understood to be DOP 250,000; the accountant confirms it and its norm, X-1) the identification is mandatory. The amount is a fiscal rule with its source, never a number in code. |
+| E-CF1-4 | CF-1 | Always cash: the final consumer's order never goes through credit. Cash and transfers count as collected when recorded; a cheque only when its deposit is matched with the bank statement — nothing is dispatched before. |
+| E-CF1-5 | CF-1 | The receipt is assigned to the order, as to a proforma, without a journal; when the invoice is issued the system applies it and the invoice is born paid. |
+| E-CF1-6 | CF-1 | Invoice: e-CF 32 with ITBIS, from the delivery as today. The e-CF record accepts a receiver without identification; the print says «Consumidor final» and the name written. |
+| E-CF1-7 | CF-1 | A screen «Venta de contado» makes the order and the payment in one step; dispatch and invoicing follow as always. |
+| E-CF1-8 | CF-1 | Returns: credit note e-CF 34 on the E32; the money goes back through the existing customer refund (Cobros prepares, the Controller releases). |
+| E-CF1-9 | CF-1 | No CONFOTUR exemption for the final consumer: no fiscal authorization, no proforma. |
+| E-CF1-10 | CF-1 | The final consumer never has a balance; a new reconciliation warns, and blocks the close, when one of its deliveries is not fully collected. |
+| E-CF1-11 | CF-1 | New role «Caja»: the same person makes the cash sale and records the payment. The deposit and the match with the bank stay with Cobros and Tesorería; a reconciliation warns of cash not deposited. The Vendedor may also make cash sales. |
+| E-CF1-12 | CF-1 | The summarised submission of low-amount e-CF 32 to the DGII belongs to the e-CF provider connection (VS#4). |
+| E-CF1-13 | CF-1 | The customer pays the whole order and withdraws in several deliveries; each delivery is invoiced (e-CF 32) and the payment assigned to the order is applied to each invoice. |
+| E-CF1-14 | CF-1 | Delivery to the site with our own truck is allowed, with its freight line (SRV-1). |
+| E-CF1-01-1 | CF-1 | The final consumer is a new kind of party, without RNC, one per company, created by the system; it is not edited and takes no credit terms. |
+| E-CF1-01-2 | CF-1 | Buyer on the order: name, phone, kind of identification (cédula, RNC, passport) and number; they pass to the invoice. |
+| E-CF1-01-3 | CF-1 | A new order state «Pendiente de pago» instead of «Pendiente de crédito»; it becomes «Confirmado» when what is assigned covers the total with ITBIS. |
+| E-CF1-01-4 | CF-1 | What must be paid: net plus the ITBIS of the rule in force that day. If the rule changed before invoicing, the difference stays as credit balance or receivable. |
+| E-CF1-01-5 | CF-1 | A new table of receipt-to-order assignments, like the proformas': no journal. A cheque counts only when its deposit is matched with the statement. |
+| E-CF1-01-6 | CF-1 | The identification amount is a new fiscal rule with its official source; without the rule in force no sale to the final consumer is confirmed (the system says so clearly). |
+| E-CF1-01-7 | CF-1 | The e-CF 32 record may have no receiver, or a passport, when the invoice is the final consumer's. |
+| E-CF1-01-8 | CF-1 | Cancelling a paid order releases its assignments; the money is returned through the existing customer refund. |
+| E-CF1-01-9 | CF-1 | Five PRs: schema; cash order and payment; invoice, credit note and refund; reconciliations; the «Venta de contado» screen with the Caja role and the end-to-end journey. |
+| E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
+| E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
+| E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |
+| E-PRC1-4 | PRC-1 | The existing list becomes «General» and every customer starts on it. |
+| E-SRV1-1 | SRV-1 | A new item type «Servicio» («Transporte de blocks»): no stock, no standard cost. |
+| E-SRV1-2 | SRV-1 | A master of delivery zones (Higüey, Bávaro, Cap Cana, Punta Cana, Macao, Uvero Alto, Miches, Hato Mayor, El Seibo, San Pedro, … added on screen). In each price list freight is priced per product and per zone. |
+| E-SRV1-3 | SRV-1 | Freight comes only from the customer's own list (no fallback to «General»): if that list has no freight price for the product and zone, there is no freight line — it is included in the block's price. |
+| E-SRV1-4 | SRV-1 | On an order delivered with our own truck the zone is chosen and the system adds the line: blocks × the zone's price. It is rendered with each delivered delivery note. |
+| E-SRV1-5 | SRV-1 | Freight of cargo carries no ITBIS, as a fiscal rule with its official source (the accountant confirms), not a constant in code; the invoice shows the exempt line apart. |
+| E-SRV1-6 | SRV-1 | CONFOTUR never invoices freight: orders with an exemption never carry the line; those customers use their own price list. |
+| E-SRV1-7 | SRV-1 | Account «Ingresos por transporte», recognised at delivery, without cost of sales. |
 
 Implementation rules derived from the above (no architectural change):
 
