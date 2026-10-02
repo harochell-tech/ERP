@@ -657,3 +657,21 @@ statement; Cobros sends it.
   shows «Ficha BR 09 · Placa … · chofer».
 - Playwright: the sales journey edits the driver's licence date, sees the warning in both places and the ficha on the print.
 
+## CF1-05 — «Venta de contado» (E-CF1-05-1…14)
+
+- Ventas › Venta de contado (`/ventas/contado/`, with `cash_sale:create`): the cash sales, with buyer and total to pay. «Nueva venta
+  de contado» (`/ventas/contado/nueva/`): plant, delivery, products (server preview with ITBIS and total) and the buyer; the notice
+  on top states the identification amount of the rule in force, or that the rule is missing.
+- The sale (`/ventas/venta-contado/?id=`): the three steps; «Enviar a pago» fixes the total; the «Cobro» block shows ITBIS, total,
+  assigned, what counts and what is still owed (all from the server), the payments with their situation, and for Caja
+  (`receipt:record` + `receipt:apply`) the payment form — «Cobrar» records the receipt and assigns it (`amountToAssign`: the smaller
+  of the receipt and what is owed). Cash and cheques over what is owed are refused by the form (`paymentAmountError`). Without those
+  permissions the block says «El cobro lo registra Caja». «Verificar pago», «Volver a borrador», «Quitar <recibo>» (with a reason),
+  «Cancelar venta», «Planificar conduce».
+- Ventas › Pedidos marks cash sales «Contado» and opens them on their screen; the credit order page sends a cash sale there.
+- Facturación: the fiscal package of an E32 shows the buyer as receiver; `RecordEcfForm` with `consumer` makes the receiver optional
+  (cédula or RNC, or passport, or none) for an E32 and for the E34 of an E32.
+- Fiscal › Reglas fiscales: kind «Identificación del consumidor final» with a single amount field.
+- Inicio: «Hacer una venta de contado» and «Ventas de contado pendientes de pago».
+- `lib/cashSales.ts` (buyer identification, payment checks, steps); Playwright `cash-sale-journey.spec.ts` (desktop and mobile).
+

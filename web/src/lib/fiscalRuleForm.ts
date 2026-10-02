@@ -1,7 +1,7 @@
 // E-UX2-8: the guided fiscal rule form. It builds exactly the JSON the Tax Engine accepts (src/Rochell.Tax/FiscalRuleDefinition.cs:
 // the same keys, in the templates' order, rates as fraction strings) and reads a stored definition back into the form. The rate is
 // typed in % and only its decimal point moves (E-UX2-1); no tax is computed here — expected amounts in the test cases are typed.
-import { formatPercent, fractionToPercent, isDecimal, normalizeInput, percentToFraction, shiftDecimalPoint } from "./decimal";
+import { formatDecimal, formatPercent, fractionToPercent, isDecimal, isPositiveDecimal, normalizeInput, percentToFraction, shiftDecimalPoint } from "./decimal";
 import { GOODS_TYPES } from "./fiscalReports";
 import type { FiscalRuleKind } from "./configuration";
 
@@ -90,13 +90,15 @@ export interface FiscalRuleForm {
   /** "" when the rule has none. */
   isrWithholdingType: string;
   classes: Record<string, string>;
+  /** CONSUMER_ID_THRESHOLD (E-CF1-05-7): the amount in pesos, as typed. */
+  amount: string;
 }
 
 const ITBIS_KEYS = ["tax_code", "rate", "effect", "exempt_item_categories"];
 const WITHHOLDING_KEYS = ["tax_code", "rate", "base", "party_types", "isr_withholding_type"];
 
 function blankForm(): FiscalRuleForm {
-  return { taxCode: "", ratePercent: "", effect: "", exemptItemCategories: [], base: "", partyTypes: [], isrWithholdingType: "", classes: {} };
+  return { taxCode: "", ratePercent: "", effect: "", exemptItemCategories: [], base: "", partyTypes: [], isrWithholdingType: "", classes: {}, amount: "" };
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -119,6 +121,13 @@ export function parseFiscalDefinition(kind: string, json: string): { form: Fisca
   }
   const obj = root as Record<string, unknown>;
   const form = blankForm();
+  if (kind === "CONSUMER_ID_THRESHOLD") {
+    if (Object.keys(obj).some((k) => k !== "amount") || typeof obj.amount !== "string") {
+      return { form: null, error: "El formulario solo muestra \"amount\": el monto en pesos, como texto (\"250000.00\")." };
+    }
+    form.amount = obj.amount;
+    return { form, error: null };
+  }
   if (kind === "REPORT_606_CLASSIFICATION") {
     const unknown = Object.keys(obj).filter((k) => k !== "classes");
     const classes = obj.classes;
@@ -171,6 +180,9 @@ function inOrder(values: readonly string[], order: readonly string[]): string[] 
  * the typed percentage; a percentage that is not a decimal goes as typed so the server names the error.
  */
 export function buildFiscalDefinition(kind: FiscalRuleKind | string, form: FiscalRuleForm): string {
+  if (kind === "CONSUMER_ID_THRESHOLD") {
+    return JSON.stringify({ amount: normalizeInput(form.amount) }, null, 2);
+  }
   if (kind === "REPORT_606_CLASSIFICATION") {
     const classes: Record<string, string> = {};
     for (const category of inOrder(Object.keys(form.classes), RAW_MATERIAL_CATEGORIES)) {
@@ -202,11 +214,17 @@ export function buildFiscalDefinition(kind: FiscalRuleKind | string, form: Fisca
   );
 }
 
-export type FiscalFormField = "taxCode" | "ratePercent" | "effect" | "base" | "partyTypes" | "isrWithholdingType" | `class-${string}`;
+export type FiscalFormField = "amount" | "taxCode" | "ratePercent" | "effect" | "base" | "partyTypes" | "isrWithholdingType" | `class-${string}`;
 
 /** The form's own checks, in Spanish (the server checks the same and more). */
 export function validateFiscalForm(kind: string, form: FiscalRuleForm): Partial<Record<FiscalFormField, string>> {
   const errors: Partial<Record<FiscalFormField, string>> = {};
+  if (kind === "CONSUMER_ID_THRESHOLD") {
+    if (!isPositiveDecimal(normalizeInput(form.amount), 2)) {
+      errors.amount = "Monto en pesos mayor que cero, con hasta 2 decimales (el que fija la norma de la DGII).";
+    }
+    return errors;
+  }
   if (kind === "REPORT_606_CLASSIFICATION") {
     for (const category of RAW_MATERIAL_CATEGORIES) {
       const code = form.classes[category] ?? "";
@@ -254,6 +272,9 @@ export function describeFiscalDefinition(kind: string, json: string): string[] {
     return [json];
   }
   const form = parsed.form;
+  if (kind === "CONSUMER_ID_THRESHOLD") {
+    return [`Identificación del comprador obligatoria desde RD$ ${formatDecimal(form.amount)} (total con ITBIS)`];
+  }
   if (kind === "REPORT_606_CLASSIFICATION") {
     return Object.entries(form.classes).map(([category, code]) => `${itemCategoryLabel(category)}: ${code} ${GOODS_TYPES[code] ?? ""}`.trim());
   }

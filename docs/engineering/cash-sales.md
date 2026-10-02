@@ -81,3 +81,26 @@ Blocks AR-REC. Per cash order sent to payment (`Reconciliations.cs`):
 - 32 reconciliations, 63 classifications. Tests: `Rochell.Sales.Tests.CashSaleReconciliationTests` (CF-12; a bounced cheque after
   dispatch and cash three days in the drawer; the missing parameter; a tampered order).
 
+## CF1-05 — the «Venta de contado» screen (E-CF1-05-1…13)
+
+Server (no migration):
+
+- `ListSalesOrders` takes `cashSale` (true / false) and each row carries `cashSale`, `buyerName`, `paymentTotal`.
+- `GetSalesOrder` returns `cashSale` for a cash order (`CashSaleView`): the buyer, `itbis`, `paymentTotal`, `assigned` (live
+  assignments), `invoiced` (what its invoices took), `counted` (the money that counts, as `CashSaleStore.PaidAsync`), `stillToPay`
+  (payment total − assigned − invoiced), `covered`, the `payments` (receipt, method, amount, whether it counts, bank status, the
+  assignment's event to release it) and the consumer's `unassigned` receipts. The screen does no arithmetic.
+- `GET /sales/cash-sale-setup` (`GetCashSaleSetup`, `sales:read`): `buyerIdRequiredFrom`, null without the rule in force.
+- `POST /sales/cash-sales/preview` (`PreviewCashSale`, `cash_sale:create`): the order preview for who sells cash and may not
+  create credit orders (Caja).
+- The fiscal packages of an invoice and of a credit note name the buyer as receiver: `receiverRnc` is the buyer's cédula or RNC
+  (empty without one), `receiverPassport` the passport, `receiverName` the buyer's name.
+
+Screens: `web.md`. Tests: `CashSaleTests` (the view, the setup, the preview), `Rochell.Api.Tests.CashSaleAcceptanceTests` (E2E-C1),
+`web/e2e/cash-sale-journey.spec.ts`, `web/tests/unit/cashSales.test.ts`. Acceptance matrix: `docs/acceptance/cf1.md`.
+
+**Confirmation after a cheque (E-CF1-05-8, E-CF1-05-14).** `MatchBankLineToReceipt` lives in Treasury, which may not use Sales, so
+the bank match itself confirms nothing. `PlanDelivery` does: a cash order still PENDING_PAYMENT is confirmed there when the money
+that counts covers it (`CashSaleStore.ConfirmIfPaidAsync`; the state history names `Sales.PlanDelivery`), and refused with
+`CASH_SALE_NOT_PAID` otherwise. The dispatch board lists covered PENDING_PAYMENT cash sales among the orders to dispatch;
+«Verificar pago» (`ConfirmCashSale`) confirms earlier. Test: `CashSaleTests.Planning_the_first_delivery_confirms_…`.

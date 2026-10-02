@@ -82,6 +82,16 @@ const TASKS: readonly Task[] = [
   { href: "/ventas/pedidos/nuevo/", label: "Crear un pedido de venta", permission: "sales_order:create" },
   // QUO1-04 (E-QUO1-04-7): quotes with special prices waiting for the Aprobador de políticas.
   { href: "/ventas/cotizaciones/nueva/", label: "Crear una cotización", permission: "quote:manage" },
+  // CF1-05 (E-CF1-05-10): cash sales to the final consumer, for Vendedor and Caja.
+  { href: "/ventas/contado/nueva/", label: "Hacer una venta de contado", permission: "cash_sale:create" },
+  {
+    href: "/ventas/contado/",
+    label: "Ventas de contado pendientes de pago",
+    permission: "cash_sale:create",
+    countPermission: "sales:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "PENDING_PAYMENT", cashSale: "true", limit: COUNT_LIMIT } })).items.length,
+  },
   {
     href: "/ventas/cotizaciones/?estado=PENDING_APPROVAL",
     label: "Precios de cotización por aprobar",

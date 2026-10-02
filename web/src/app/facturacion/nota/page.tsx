@@ -37,6 +37,7 @@ function NotePackage({ creditNoteId }: { creditNoteId: string }) {
           <CopyField label="e-NCF modificado" value={data.modifiedEncf} />
           <CopyField label="RNC del emisor" value={data.issuerRnc} />
           <CopyField label="RNC del receptor" value={data.receiverRnc} />
+          {data.receiverPassport ? <CopyField label="Pasaporte del receptor" value={data.receiverPassport} /> : null}
           <CopyField label="Receptor" value={data.receiverName} />
           <CopyField label="Fecha" value={data.creditDate} />
           <CopyField label="Motivo" value={`${creditNoteReasonLabel(data.reasonCategory)}: ${data.reason}`} />
@@ -153,7 +154,7 @@ function NoteDetail() {
       {h.fiscalStatus === "PENDING_EXTERNAL" && can("fiscal_document:record") ? (
         <>
           <h2>Registrar el e-CF 34 emitido en el portal</h2>
-          <RecordEcfForm prefix="E34" busy={record.busy} error={record.error} onSubmit={async (v) => (await record.run({ creditNoteId: h.creditNoteId, expectedVersion: h.version, ...v })) && reload()} />
+          <RecordEcfForm consumer={h.invoiceEncf?.startsWith("E32") ?? false} prefix="E34" busy={record.busy} error={record.error} onSubmit={async (v) => (await record.run({ creditNoteId: h.creditNoteId, expectedVersion: h.version, ...v })) && reload()} />
         </>
       ) : null}
       {data.fiscalRecord ? (

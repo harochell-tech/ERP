@@ -184,7 +184,7 @@ describe("guided fiscal rule form builds the server's JSON (E-UX2-8)", () => {
     }
   });
 
-  const base: FiscalRuleForm = { taxCode: "ITBIS", ratePercent: "18", effect: "RECOVERABLE_INPUT", exemptItemCategories: [], base: "", partyTypes: [], isrWithholdingType: "", classes: {} };
+  const base: FiscalRuleForm = { taxCode: "ITBIS", ratePercent: "18", effect: "RECOVERABLE_INPUT", exemptItemCategories: [], base: "", partyTypes: [], isrWithholdingType: "", classes: {}, amount: "" };
 
   it("purchase ITBIS: rate as a fraction, exempt categories in catalogue order", () => {
     const json = buildFiscalDefinition("PURCHASE_ITBIS", { ...base, ratePercent: "16", effect: "NON_RECOVERABLE_INPUT", exemptItemCategories: ["ADITIVO", "CEMENTO"] });

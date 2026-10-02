@@ -126,6 +126,14 @@ function OrderDetail() {
   }
   const { order, deliveries, exposure } = data;
   const h = order.header;
+  if (h.cashSale) {
+    // CF1-05 (E-CF1-05-1): a cash sale has no credit; it lives on its own screen.
+    return (
+      <p data-testid="order-is-cash-sale">
+        {h.orderNo} es una venta de contado. <Link href={`/ventas/venta-contado/?id=${h.salesOrderId}`}>Abrir la venta de contado</Link>
+      </p>
+    );
+  }
   return (
     <>
       <p>

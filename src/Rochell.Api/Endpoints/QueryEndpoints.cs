@@ -48,7 +48,7 @@ public static class QueryEndpoints
     [
         typeof(ListSuppliersHandler), typeof(ListItemsHandler), typeof(ListPlantsHandler), typeof(ListUomsHandler), typeof(GetCompanyHandler), typeof(GetRncHandler), typeof(GetRncRegistryStatusHandler),
         typeof(PreviewSupplierImportHandler), typeof(PreviewCustomerImportHandler),
-        typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
+        typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewCashSaleHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
         typeof(ListLatestReconciliationRunsHandler), typeof(SearchJournalsHandler), typeof(GetIntegrityStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
         typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(GetSupplierInvoiceHandler),
@@ -64,7 +64,7 @@ public static class QueryEndpoints
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
-        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
+        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
@@ -230,12 +230,16 @@ public static class QueryEndpoints
         sales.MapGet("/opening-batches/{batchId:guid}", (HttpContext http, Guid companyId, Guid batchId, GetOpeningBatchHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetOpeningBatch(companyId, s, batchId), handler, ct))
             .Describe<OpeningBatchDetail>(nameof(GetOpeningBatch), notFound: true);
-        sales.MapGet("/orders", (HttpContext http, Guid companyId, string? status, Guid? partyId, int? limit, int? offset, DateOnly? from, DateOnly? to, ListSalesOrdersHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunAsync(http, s => new ListSalesOrders(companyId, s, status, partyId, limit ?? DefaultLimit, offset ?? 0, from, to), handler, ct))
+        sales.MapGet("/orders", (HttpContext http, Guid companyId, string? status, Guid? partyId, int? limit, int? offset, DateOnly? from, DateOnly? to, bool? cashSale, ListSalesOrdersHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListSalesOrders(companyId, s, status, partyId, limit ?? DefaultLimit, offset ?? 0, from, to, cashSale), handler, ct))
             .Describe<SalesOrderList>(nameof(ListSalesOrders));
         sales.MapGet("/orders/{salesOrderId:guid}", (HttpContext http, Guid companyId, Guid salesOrderId, GetSalesOrderHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetSalesOrder(companyId, s, salesOrderId), handler, ct))
             .Describe<SalesOrderDetail>(nameof(GetSalesOrder), notFound: true);
+        // E-CF1-05-6: the amount from which a cash sale must identify its buyer.
+        sales.MapGet("/cash-sale-setup", (HttpContext http, Guid companyId, GetCashSaleSetupHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetCashSaleSetup(companyId, s), handler, ct))
+            .Describe<CashSaleSetup>(nameof(GetCashSaleSetup));
         // E-FIS1b-9: the proformas (collection documents of deliveries whose exemption is in process).
         sales.MapGet("/proformas", (HttpContext http, Guid companyId, Guid? partyId, string? status, int? limit, int? offset, ListProformasHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListProformas(companyId, s, partyId, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
@@ -271,6 +275,10 @@ public static class QueryEndpoints
         sales.MapPost("/orders/preview", (HttpContext http, Guid companyId, PreviewSalesOrderHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewSalesOrder>(http, (s, b) => new PreviewSalesOrder(companyId, s, b.PlantId, b.Lines), handler, ct))
             .Describe<SalesPreview>(nameof(PreviewSalesOrder))
+            .Accepts<SalesOrderPreviewRequest>("application/json");
+        sales.MapPost("/cash-sales/preview", (HttpContext http, Guid companyId, PreviewCashSaleHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewCashSale>(http, (s, b) => new PreviewCashSale(companyId, s, b.PlantId, b.Lines), handler, ct))
+            .Describe<SalesPreview>(nameof(PreviewCashSale))
             .Accepts<SalesOrderPreviewRequest>("application/json");
         sales.MapPost("/quotes/preview", (HttpContext http, Guid companyId, PreviewQuoteHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunBodyAsync<QuotePreviewRequest, PreviewQuote>(http, (s, b) => new PreviewQuote(companyId, s, b.PlantId, b.Lines), handler, ct))
