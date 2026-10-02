@@ -73,6 +73,9 @@ internal static class SalesSeed
         await h.ActivateRuleAsync(actors, "clasif-606", "CLASIF_606", FiscalRuleKinds.Report606Classification,
             """{"classes":{"CEMENTO":"09","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"}}""", new DateOnly(2026, 1, 1));
 
+        // CF1-05 (E-CF1-05-7): the amount from which a final consumer's sale must identify its buyer (a development value).
+        await h.ActivateRuleAsync(actors, "consumidor-id", "CONSUMIDOR_ID", FiscalRuleKinds.ConsumerIdThreshold, """{"amount":"250000.00"}""", new DateOnly(2026, 1, 1));
+
         // The product, its cost and price, and the opening stock in the plant's first stock location.
         var block = Guid.CreateVersion7();
         await h.AdminRequireAsync($"INSERT INTO md.item VALUES ('{block}', '{h.CompanyId}', 'BLOQUE-6', 'Bloque de 6 pulgadas', 'FINISHED_GOOD', 'un', 'BLOQUE', 'ACTIVE', 1)");
@@ -95,6 +98,7 @@ internal static class SalesSeed
         var dispatch = await h.SessionWithRolesAsync("DESPACHO");
         await h.SessionWithRolesAsync("FACTURACION");
         await h.SessionWithRolesAsync("COBROS");
+        await h.SessionWithRolesAsync("CAJA"); // CF1-05 (E-CF1-05-11): sells to the final consumer and collects
         var customer = (await h.RunAsync(new CreateCustomer(h.CompanyId, seller, "dev-customer", "131925332", "Constructora Uno"), new CreateCustomerHandler())).ResultRef;
         var terms = JsonDocument.Parse((await h.RunAsync(new PrepareCustomerTerms(h.CompanyId, credit, "dev-terms", customer, 30, 1000000.00m, false), new PrepareCustomerTermsHandler())).ResultPayload)
             .RootElement.GetProperty("termsVersionId").GetGuid();

@@ -70,6 +70,24 @@ public sealed class PreviewSalesOrderHandler : IQueryHandler<PreviewSalesOrder>
     }
 }
 
+/// <summary>E-CF1-05-2: a cash sale's lines priced as CreateCashSale prices them, with the ITBIS of today's rules. Needs <c>cash_sale:create</c>.</summary>
+public sealed record PreviewCashSale(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines) : IQuery;
+
+[RequiresPermission("cash_sale:create")]
+public sealed class PreviewCashSaleHandler : IQueryHandler<PreviewCashSale>
+{
+    public string QueryType => "Sales.PreviewCashSale";
+
+    public async Task<string> HandleAsync(PreviewCashSale query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var (list, lines, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.Lines, cancellationToken).ConfigureAwait(false);
+        return await SalesPreviews.BuildAsync(
+            context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.UnitPrice, l.UnitPrice, false, l.Net, null))], cancellationToken).ConfigureAwait(false);
+    }
+}
+
 [RequiresPermission("quote:manage")]
 public sealed class PreviewQuoteHandler : IQueryHandler<PreviewQuote>
 {

@@ -27339,6 +27339,13 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "cashSale",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -27459,6 +27466,72 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/sales/cash-sale-setup": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "operationId": "GetCashSaleSetup",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashSaleSetup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -28287,6 +28360,94 @@
           "Sales"
         ],
         "operationId": "PreviewSalesOrder",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Rochell-Csrf",
+            "in": "header",
+            "description": "Anti-CSRF header; must be \"1\".",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/sales/cash-sales/preview": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "operationId": "PreviewCashSale",
         "parameters": [
           {
             "name": "companyId",
@@ -35977,6 +36138,213 @@
         },
         "additionalProperties": false
       },
+      "CashSalePayment": {
+        "required": [
+          "receiptId",
+          "receiptNo",
+          "receiptDate",
+          "method",
+          "amount",
+          "counts",
+          "receiptStatus",
+          "bankStatus",
+          "allocationEventId"
+        ],
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptNo": {
+            "type": "string"
+          },
+          "receiptDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "method": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "counts": {
+            "type": "boolean"
+          },
+          "receiptStatus": {
+            "type": "string"
+          },
+          "bankStatus": {
+            "type": "string"
+          },
+          "allocationEventId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CashSaleSetup": {
+        "required": [
+          "businessDate",
+          "buyerIdRequiredFrom"
+        ],
+        "type": "object",
+        "properties": {
+          "businessDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "buyerIdRequiredFrom": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CashSaleUnassignedReceipt": {
+        "required": [
+          "receiptId",
+          "receiptNo",
+          "receiptDate",
+          "method",
+          "available",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptNo": {
+            "type": "string"
+          },
+          "receiptDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "method": {
+            "type": "string"
+          },
+          "available": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CashSaleView": {
+        "required": [
+          "buyerName",
+          "buyerPhone",
+          "buyerIdKind",
+          "buyerId",
+          "itbis",
+          "paymentTotal",
+          "assigned",
+          "invoiced",
+          "counted",
+          "stillToPay",
+          "covered",
+          "payments",
+          "unassigned"
+        ],
+        "type": "object",
+        "properties": {
+          "buyerName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "buyerPhone": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "buyerIdKind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "buyerId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "itbis": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "paymentTotal": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "assigned": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "invoiced": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "counted": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "stillToPay": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "covered": {
+            "type": "boolean"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashSalePayment"
+            }
+          },
+          "unassigned": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashSaleUnassignedReceipt"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "ChainState": {
         "required": [
           "ledger",
@@ -37346,6 +37714,12 @@
           },
           "fiscalStatus": {
             "type": "string"
+          },
+          "receiverPassport": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -40971,6 +41345,12 @@
               {
                 "$ref": "#/components/schemas/FiscalPackageExemption"
               }
+            ]
+          },
+          "receiverPassport": {
+            "type": [
+              "null",
+              "string"
             ]
           }
         },
@@ -49952,7 +50332,8 @@
           "creditChecks",
           "history",
           "exemptionPending",
-          "proformaCollectsItbis"
+          "proformaCollectsItbis",
+          "cashSale"
         ],
         "type": "object",
         "properties": {
@@ -50017,6 +50398,16 @@
             "type": [
               "null",
               "boolean"
+            ]
+          },
+          "cashSale": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CashSaleView"
+              }
             ]
           }
         },
@@ -50239,7 +50630,10 @@
           "createdBy",
           "version",
           "quoteId",
-          "quoteNo"
+          "quoteNo",
+          "cashSale",
+          "buyerName",
+          "paymentTotal"
         ],
         "type": "object",
         "properties": {
@@ -50297,6 +50691,23 @@
               "null",
               "string"
             ]
+          },
+          "cashSale": {
+            "type": "boolean"
+          },
+          "buyerName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "paymentTotal": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false

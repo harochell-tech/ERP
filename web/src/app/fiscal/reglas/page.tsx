@@ -42,7 +42,7 @@ type Source = Schemas["FiscalSourceView"];
 function templateForm(kind: FiscalRuleKind): FiscalRuleForm {
   const parsed = parseFiscalDefinition(kind, DEFINITION_TEMPLATES[kind]);
   // The templates always parse; the fallback only satisfies the type.
-  return parsed.form ?? { taxCode: "", ratePercent: "", effect: "", exemptItemCategories: [], base: "", partyTypes: [], isrWithholdingType: "", classes: {} };
+  return parsed.form ?? { taxCode: "", ratePercent: "", effect: "", exemptItemCategories: [], base: "", partyTypes: [], isrWithholdingType: "", classes: {}, amount: "" };
 }
 
 function toggle(list: readonly string[], value: string, on: boolean): string[] {
@@ -80,6 +80,14 @@ function CheckGroup({
 
 function GuidedFields({ kind, form, onChange, errors }: { kind: FiscalRuleKind; form: FiscalRuleForm; onChange: (form: FiscalRuleForm) => void; errors: Partial<Record<string, string>> }) {
   const set = (patch: Partial<FiscalRuleForm>) => onChange({ ...form, ...patch });
+  if (kind === "CONSUMER_ID_THRESHOLD") {
+    // CF1-05 (E-CF1-05-7): one amount, the accountant's, with its official source linked afterwards.
+    return (
+      <Field label="Monto desde el cual se identifica al comprador (RD$, con ITBIS)" required error={errors.amount}>
+        <input aria-label="Monto de identificación del consumidor" inputMode="decimal" value={form.amount} onChange={(e) => set({ amount: e.target.value })} />
+      </Field>
+    );
+  }
   if (kind === "REPORT_606_CLASSIFICATION") {
     return (
       <>

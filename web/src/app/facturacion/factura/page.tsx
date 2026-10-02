@@ -86,7 +86,8 @@ function FiscalPackage({ invoiceId }: { invoiceId: string }) {
         <tbody>
           <CopyField label="Tipo de e-CF" value={data.ecfType} />
           <CopyField label="RNC del emisor" value={data.issuerRnc} />
-          <CopyField label="RNC del receptor" value={data.receiverRnc} />
+          <CopyField label={data.ecfType === "32" ? "Cédula o RNC del receptor" : "RNC del receptor"} value={data.receiverRnc} />
+          {data.receiverPassport ? <CopyField label="Pasaporte del receptor" value={data.receiverPassport} /> : null}
           <CopyField label="Receptor" value={data.receiverName} />
           <CopyField label="Fecha" value={data.invoiceDate} />
           <CopyField label="Vence" value={data.dueDate} />
@@ -460,6 +461,7 @@ function InvoiceDetail() {
         <>
           <h2>Registrar el e-CF emitido en el portal</h2>
           <RecordEcfForm
+            consumer={h.ecfType === "32"}
             prefix={invoiceEncfPrefix(h.ecfType)}
             busy={record.busy}
             error={record.error}

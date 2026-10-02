@@ -75,7 +75,7 @@ type Preview = Schemas["SalesPreview"];
  * when every line has a product and a quantity. A failure is a gentle note, never a blocking error.
  */
 export function useSalesPreview(
-  kind: "order" | "quote",
+  kind: "order" | "quote" | "cash",
   plantId: string,
   lines: readonly { itemId: string; uom: string; quantity: string; unitPrice?: string }[],
 ): { preview: Preview | null; pending: boolean; problem: string | null } {
@@ -94,8 +94,8 @@ export function useSalesPreview(
         const parsed = JSON.parse(key) as [string, string, [string, string, string, string][]];
         const body = parsed[2];
         const result =
-          kind === "order"
-            ? await previewQuery("/api/v1/companies/{companyId}/sales/orders/preview", companyId, {
+          kind === "order" || kind === "cash"
+            ? await previewQuery(kind === "cash" ? "/api/v1/companies/{companyId}/sales/cash-sales/preview" : "/api/v1/companies/{companyId}/sales/orders/preview", companyId, {
                 plantId,
                 lines: body.map(([itemId, uom, quantity]) => ({ itemId, uom, quantity })),
               })
@@ -121,7 +121,7 @@ export function useSalesPreview(
 }
 
 /** V-11: the preview's totals: net, estimated ITBIS (or why not) and total. */
-export function PreviewTotals({ preview, pending, problem }: { preview: Preview | null; pending: boolean; problem: string | null }) {
+export function PreviewTotals({ preview, pending, problem, note }: { preview: Preview | null; pending: boolean; problem: string | null; note?: string }) {
   if (problem) {
     return (
       <p className="muted" data-testid="preview-problem">
@@ -151,7 +151,7 @@ export function PreviewTotals({ preview, pending, problem }: { preview: Preview 
         <dt>Total</dt>
         <dd>{preview.total !== null ? <MoneyText value={preview.total} testId="preview-total" /> : "—"}</dd>
       </dl>
-      <p className="muted">El ITBIS definitivo se calcula al facturar (una exención CONFOTUR se decide ahí).</p>
+      <p className="muted">{note ?? "El ITBIS definitivo se calcula al facturar (una exención CONFOTUR se decide ahí)."}</p>
     </div>
   );
 }

@@ -4012,6 +4012,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/cash-sale-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetCashSaleSetup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/proformas": {
         parameters: {
             query?: never;
@@ -4166,6 +4182,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["PreviewSalesOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/cash-sales/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PreviewCashSale"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5842,6 +5874,60 @@ export interface components {
             expectedVersion: number;
             reason: string;
         };
+        CashSalePayment: {
+            /** Format: uuid */
+            receiptId: string;
+            receiptNo: string;
+            /** Format: date */
+            receiptDate: string;
+            method: string;
+            /** Format: decimal */
+            amount: string;
+            counts: boolean;
+            receiptStatus: string;
+            bankStatus: string;
+            /** Format: uuid */
+            allocationEventId: string;
+        };
+        CashSaleSetup: {
+            /** Format: date */
+            businessDate: string;
+            /** Format: decimal */
+            buyerIdRequiredFrom: null | string;
+        };
+        CashSaleUnassignedReceipt: {
+            /** Format: uuid */
+            receiptId: string;
+            receiptNo: string;
+            /** Format: date */
+            receiptDate: string;
+            method: string;
+            /** Format: decimal */
+            available: string;
+            /** Format: int64 */
+            version: number;
+        };
+        CashSaleView: {
+            buyerName: null | string;
+            buyerPhone: null | string;
+            buyerIdKind: null | string;
+            buyerId: null | string;
+            /** Format: decimal */
+            itbis: null | string;
+            /** Format: decimal */
+            paymentTotal: null | string;
+            /** Format: decimal */
+            assigned: string;
+            /** Format: decimal */
+            invoiced: string;
+            /** Format: decimal */
+            counted: string;
+            /** Format: decimal */
+            stillToPay: null | string;
+            covered: boolean;
+            payments: components["schemas"]["CashSalePayment"][];
+            unassigned: components["schemas"]["CashSaleUnassignedReceipt"][];
+        };
         ChainState: {
             ledger: string;
             /** Format: date */
@@ -6205,6 +6291,7 @@ export interface components {
             /** Format: decimal */
             total: string;
             fiscalStatus: string;
+            receiverPassport?: null | string;
         };
         CreditNoteLineInput: {
             /** Format: uuid */
@@ -7163,6 +7250,7 @@ export interface components {
             total: string;
             fiscalStatus: string;
             exemption?: null | components["schemas"]["FiscalPackageExemption"];
+            receiverPassport?: null | string;
         };
         InvoiceLineView: {
             /** Format: int32 */
@@ -9633,6 +9721,7 @@ export interface components {
             history: components["schemas"]["StateChange"][];
             exemptionPending: boolean;
             proformaCollectsItbis: null | boolean;
+            cashSale: null | components["schemas"]["CashSaleView"];
         };
         SalesOrderLineInput: {
             /** Format: uuid */
@@ -9713,6 +9802,10 @@ export interface components {
             /** Format: uuid */
             quoteId: null | string;
             quoteNo: null | string;
+            cashSale: boolean;
+            buyerName: null | string;
+            /** Format: decimal */
+            paymentTotal: null | string;
         };
         SalesPlantList: {
             items: components["schemas"]["SalesPlantView"][];
@@ -28112,6 +28205,7 @@ export interface operations {
                 offset?: number;
                 from?: string;
                 to?: string;
+                cashSale?: boolean;
             };
             header?: never;
             path: {
@@ -28209,6 +28303,55 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetCashSaleSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashSaleSetup"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -28729,6 +28872,62 @@ export interface operations {
         };
     };
     PreviewSalesOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOrderPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PreviewCashSale: {
         parameters: {
             query?: never;
             header: {

@@ -43,6 +43,7 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/ventas/cotizaciones/", label: "Cotizaciones", permission: "sales:read" }, // QUO1-04 (E-QUO1-04-1)
       { href: "/ventas/pedidos/", label: "Pedidos", permission: "sales:read" },
+      { href: "/ventas/contado/", label: "Venta de contado", permission: "cash_sale:create" }, // CF1-05 (E-CF1-05-1)
       { href: "/ventas/clientes/", label: "Clientes", permission: "sales:read" },
       { href: "/ventas/antiguedad/", label: "Cuentas por cobrar por antigüedad", permission: "sales:read" },
       { href: "/ventas/estado-de-cuenta/", label: "Estado de cuenta", permission: "sales:read" },

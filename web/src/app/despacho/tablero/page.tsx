@@ -21,14 +21,19 @@ export default function Page() {
   const { data, error } = useLoad(
     can("sales:read")
       ? async () => {
-          const [confirmed, partial, ...columns] = await Promise.all([
+          // CF1-05 (E-CF1-05-14): a cash sale paid with money that counts is planned without waiting for «Verificar pago».
+          const [paidCash, confirmed, partial, ...columns] = await Promise.all([
+            query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "PENDING_PAYMENT", cashSale: "true", limit: 200 } }),
             query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "CONFIRMED", limit: 200 } }),
             query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "PARTIALLY_DELIVERED", limit: 200 } }),
             ...BOARD_COLUMNS.map((c) => query("/api/v1/companies/{companyId}/sales/deliveries", { path: { companyId }, query: { status: c.status, limit: 200 } })),
           ]);
-          const orders = [...confirmed.items, ...partial.items];
+          const orders = [...confirmed.items, ...partial.items, ...paidCash.items];
           const details = await Promise.all(orders.map((o) => query("/api/v1/companies/{companyId}/sales/orders/{salesOrderId}", { path: { companyId, salesOrderId: o.salesOrderId } })));
-          return { orders: orders.map((o, i) => ({ ...o, detail: details[i] })), columns: columns.map((c) => c.items) };
+          return {
+            orders: orders.map((o, i) => ({ ...o, detail: details[i] })).filter((o) => o.status !== "PENDING_PAYMENT" || o.detail?.cashSale?.covered === true),
+            columns: columns.map((c) => c.items),
+          };
         }
       : null,
     [companyId],

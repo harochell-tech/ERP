@@ -42,7 +42,9 @@ export interface EcfValues {
   securityCode: string;
   evidenceRef: string;
   evidenceSha256: string;
-  receiverRnc: string;
+  /** null on an e-CF of the final consumer that carries no receiver, or a passport (E-CF1-6). */
+  receiverRnc: string | null;
+  receiverPassport: string | null;
   netTotal: string;
   taxTotal: string;
   total: string;
@@ -58,13 +60,17 @@ export function RecordEcfForm({
   busy,
   error,
   onSubmit,
+  consumer = false,
 }: {
+  /** CF1-05 (E-CF1-6): the e-CF of a final consumer — the receiver is optional: nobody, a cédula or RNC, or a passport. */
+  consumer?: boolean;
   prefix: "E31" | "E32" | "E34" | "E44";
   busy: boolean;
   error: unknown;
   onSubmit: (values: EcfValues) => Promise<unknown>;
 }) {
-  const [form, setForm] = useState<EcfValues>({ encf: prefix, issuedAt: "", securityCode: "", evidenceRef: "", evidenceSha256: "", receiverRnc: "", netTotal: "", taxTotal: "", total: "" });
+  type Typed = { [K in keyof EcfValues]: string };
+  const [form, setForm] = useState<Typed>({ encf: prefix, issuedAt: "", securityCode: "", evidenceRef: "", evidenceSha256: "", receiverRnc: "", receiverPassport: "", netTotal: "", taxTotal: "", total: "" });
   const fe = useFieldErrors<keyof EcfValues>();
   const set = (key: keyof EcfValues) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
   const amount = "Monto del portal, hasta 2 decimales.";
@@ -80,7 +86,9 @@ export function RecordEcfForm({
           securityCode: form.securityCode.trim() === "" && "Indique el código de seguridad.",
           evidenceRef: form.evidenceRef.trim() === "" && "Adjunte el archivo o escriba su referencia.",
           evidenceSha256: !/^[0-9a-fA-F]{64}$/.test(form.evidenceSha256.trim()) && "El SHA-256 tiene 64 caracteres hexadecimales (se calcula al adjuntar el archivo).",
-          receiverRnc: form.receiverRnc.trim() === "" && "Indique el RNC del receptor según el portal.",
+          receiverRnc: consumer
+            ? form.receiverRnc.trim() !== "" && form.receiverPassport.trim() !== "" && "El e-CF lleva una sola identificación: cédula o RNC, o pasaporte."
+            : form.receiverRnc.trim() === "" && "Indique el RNC del receptor según el portal.",
           netTotal: !isDecimal(totals.netTotal, 2) && amount,
           taxTotal: !isDecimal(totals.taxTotal, 2) && amount,
           total: !isDecimal(totals.total, 2) && amount,
@@ -88,7 +96,15 @@ export function RecordEcfForm({
         if (!valid) {
           return;
         }
-        await onSubmit({ ...form, ...totals, encf: form.encf.trim().toUpperCase(), issuedAt: new Date(form.issuedAt).toISOString() });
+        const optional = (v: string) => (v.trim() === "" ? null : v.trim());
+        await onSubmit({
+          ...form,
+          ...totals,
+          encf: form.encf.trim().toUpperCase(),
+          issuedAt: new Date(form.issuedAt).toISOString(),
+          receiverRnc: consumer ? optional(form.receiverRnc) : form.receiverRnc,
+          receiverPassport: consumer ? optional(form.receiverPassport.toUpperCase()) : null,
+        });
       }}
     >
       <Field label="e-NCF" required error={fe.errors.encf}>
@@ -118,9 +134,24 @@ export function RecordEcfForm({
       <Field label="SHA-256" required error={fe.errors.evidenceSha256} wide>
         <input className="mono" value={form.evidenceSha256} onChange={set("evidenceSha256")} />
       </Field>
-      <Field label="RNC del receptor (según el portal)" required error={fe.errors.receiverRnc}>
-        <input value={form.receiverRnc} onChange={set("receiverRnc")} />
-      </Field>
+      {consumer ? (
+        <>
+          <Field
+            label="Cédula o RNC del receptor (si el e-CF lo lleva)"
+            error={fe.errors.receiverRnc}
+            hint="Déjelo vacío si el e-CF de consumo salió sin receptor: debe coincidir con la identificación del comprador en la venta."
+          >
+            <input value={form.receiverRnc} onChange={set("receiverRnc")} />
+          </Field>
+          <Field label="Pasaporte del receptor (si el e-CF lo lleva)">
+            <input value={form.receiverPassport} onChange={set("receiverPassport")} />
+          </Field>
+        </>
+      ) : (
+        <Field label="RNC del receptor (según el portal)" required error={fe.errors.receiverRnc}>
+          <input value={form.receiverRnc} onChange={set("receiverRnc")} />
+        </Field>
+      )}
       <Field label="Neto (según el portal)" required error={fe.errors.netTotal}>
         <input inputMode="decimal" value={form.netTotal} onChange={set("netTotal")} />
       </Field>
