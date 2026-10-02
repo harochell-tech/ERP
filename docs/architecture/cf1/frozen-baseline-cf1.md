@@ -20,8 +20,8 @@ emite e-CF: estas ventas se facturan como e-CF 32 (consumo).
   solo cuando su depósito está conciliado con el extracto del banco.
 - El cliente paga el pedido completo y puede retirar en varios conduces, en planta o entregado en camión propio. Cada conduce se
   factura como e-CF 32 y el cobro asignado al pedido se aplica a cada factura al emitirla.
-- Nota de crédito e-CF 34 sobre la E32; el dinero se devuelve con la devolución al cliente de FIS-1b (prepara Cobros o Caja,
-  libera el Controller). Cancelar un pedido ya pagado libera sus asignaciones y deja el dinero para devolver.
+- Nota de crédito e-CF 34 sobre la E32; el dinero se devuelve con la devolución al cliente de FIS-1b (prepara Cobros, libera el
+  Controller; siempre por banco, nunca en efectivo). Cancelar un pedido ya pagado libera sus asignaciones y deja el dinero para devolver.
 - Sin exención CONFOTUR, autorización fiscal ni proforma para consumidor final.
 - Rol «Caja»: hace la venta de contado y registra y asigna el cobro. El depósito y la conciliación con el banco siguen en Cobros y
   Tesorería.

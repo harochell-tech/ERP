@@ -345,13 +345,12 @@ public sealed class RecordExternalCreditNoteDocumentHandler : ICommandHandler<Re
             throw new DomainException(InvoiceErrors.FiscalDocumentMismatch, "The e-CF cannot be issued in the future.");
         }
 
-        var rnc = await SalesSql.ScalarAsync<string>(context, "SELECT coalesce(rnc, '') FROM md.party WHERE party_id = @p", cancellationToken, ("p", note.PartyId)).ConfigureAwait(false);
-        var receiver = new string((command.ReceiverRnc ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+        // E-CF1-8: the e-CF 34 names the receiver of the invoice it credits (the final consumer's buyer, or nobody).
+        var credited = await SalesSql.ScalarAsync<Guid?>(context, "SELECT invoice_id FROM sal.credit_note WHERE credit_note_id = @n", cancellationToken, ("n", command.CreditNoteId)).ConfigureAwait(false);
+        var expected = await Invoices.FiscalReceiver.ExpectedAsync(context, credited!.Value, cancellationToken).ConfigureAwait(false);
+        var (receiver, passport) = Invoices.FiscalReceiver.Given(command.ReceiverRnc, command.ReceiverPassport);
         var differences = new List<string>();
-        if (receiver != rnc)
-        {
-            differences.Add($"receiver {receiver} ≠ {rnc}");
-        }
+        differences.AddRange(Invoices.FiscalReceiver.Differences(expected, receiver, passport));
 
         if (command.NetTotal != note.Net)
         {
@@ -395,8 +394,9 @@ public sealed class RecordExternalCreditNoteDocumentHandler : ICommandHandler<Re
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO tax.external_fiscal_record (record_id, company_id, credit_note_id, encf, issued_at, security_code, evidence_ref, evidence_sha256, receiver_rnc, net_total, tax_total, total, recorded_by, event_id)
-            VALUES (@id, @c, @n, @e, @at, @sec, @ref, @hash, @rnc, @net, @tax, @total, @by, @ev)
+            INSERT INTO tax.external_fiscal_record (record_id, company_id, credit_note_id, encf, issued_at, security_code, evidence_ref, evidence_sha256, receiver_rnc, net_total, tax_total, total, recorded_by, event_id,
+                                                    receiver_passport)
+            VALUES (@id, @c, @n, @e, @at, @sec, @ref, @hash, @rnc, @net, @tax, @total, @by, @ev, @passport)
             """,
             cancellationToken,
             ("id", recordId),
@@ -407,7 +407,8 @@ public sealed class RecordExternalCreditNoteDocumentHandler : ICommandHandler<Re
             ("sec", security),
             ("ref", evidence),
             ("hash", hash),
-            ("rnc", receiver),
+            ("rnc", receiver.Length == 0 ? null : receiver),
+            ("passport", passport),
             ("net", command.NetTotal),
             ("tax", command.TaxTotal),
             ("total", command.Total),

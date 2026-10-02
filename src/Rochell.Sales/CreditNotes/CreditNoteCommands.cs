@@ -21,4 +21,4 @@ public sealed record IssueCreditNote(Guid CompanyId, Guid SessionId, string Idem
 /// <summary>E-VS3-06-8: the e-CF type 34 issued in the provider's portal, checked against the note like an invoice's.</summary>
 public sealed record RecordExternalCreditNoteDocument(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid CreditNoteId, long ExpectedVersion, string Encf, DateTime IssuedAt, string SecurityCode, string EvidenceRef,
-    string EvidenceSha256, string ReceiverRnc, decimal NetTotal, decimal TaxTotal, decimal Total) : ICommand;
+    string EvidenceSha256, string? ReceiverRnc, decimal NetTotal, decimal TaxTotal, decimal Total, string? ReceiverPassport = null) : ICommand;

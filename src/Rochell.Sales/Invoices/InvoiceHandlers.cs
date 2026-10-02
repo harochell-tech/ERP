@@ -21,6 +21,9 @@ public static class InvoiceErrors
     public const string FiscalDocumentMismatch = "FISCAL_DOCUMENT_MISMATCH";
     public const string NotVoidable = "INVOICE_NOT_VOIDABLE";
     public const string TermsMissing = "CUSTOMER_TERMS_REQUIRED";
+
+    /// <summary>E-CF1-03-1: an invoice of the final consumer comes from one order — each order has its buyer.</summary>
+    public const string OneCashOrder = "CASH_INVOICE_ONE_ORDER";
 }
 
 internal static class Invoicing
@@ -82,9 +85,49 @@ internal static class Invoicing
 }
 
 /// <summary>The DRAFT invoice of delivered lines, shared by the delivery path (VS#3) and the proforma path (E-FIS1b-01-6).</summary>
+/// <summary>
+/// E-CF1-6, E-CF1-01-7: who the e-CF of an invoice names as its receiver. A customer's invoice names the customer's RNC or cédula;
+/// the final consumer's names the buyer of its order — a cédula or RNC, a passport, or nobody.
+/// </summary>
+internal static class FiscalReceiver
+{
+    public sealed record Expected(string Rnc, string? Passport);
+
+    public static async Task<Expected> ExpectedAsync(CommandContext context, Guid invoiceId, CancellationToken cancellationToken)
+        => (await Reading.SingleOrDefaultAsync(
+               context.Connection,
+               context.Transaction,
+               """
+               SELECT CASE WHEN p.party_kind = 'CONSUMER' THEN CASE WHEN i.buyer_id_kind IN ('CEDULA', 'RNC') THEN i.buyer_id ELSE '' END ELSE coalesce(p.rnc, '') END,
+                      CASE WHEN p.party_kind = 'CONSUMER' AND i.buyer_id_kind = 'PASAPORTE' THEN i.buyer_id END
+               FROM sal.invoice i JOIN md.party p ON p.party_id = i.party_id WHERE i.invoice_id = @i
+               """,
+               r => new Expected(r.GetString(0), r.NullableString(1)),
+               cancellationToken,
+               ("i", invoiceId)).ConfigureAwait(false))!;
+
+    public static (string Rnc, string? Passport) Given(string? rnc, string? passport)
+        => (new string([.. (rnc ?? string.Empty).Where(char.IsAsciiDigit)]), string.IsNullOrWhiteSpace(passport) ? null : passport.Trim().ToUpperInvariant());
+
+    public static IEnumerable<string> Differences(Expected expected, string rnc, string? passport)
+    {
+        if (rnc != expected.Rnc)
+        {
+            yield return $"receiver {(rnc.Length == 0 ? "(none)" : rnc)} ≠ {(expected.Rnc.Length == 0 ? "(none)" : expected.Rnc)}";
+        }
+
+        if (passport != expected.Passport)
+        {
+            yield return $"receiver passport {passport ?? "(none)"} ≠ {expected.Passport ?? "(none)"}";
+        }
+    }
+}
+
 internal static class InvoiceDrafts
 {
-    private sealed record Billable(Guid DeliveryLineId, Guid ItemId, string Uom, decimal Remaining, decimal UnitPrice);
+    private sealed record Billable(Guid DeliveryLineId, Guid ItemId, string Uom, decimal Remaining, decimal UnitPrice, Guid OrderId);
+
+    private sealed record Buyer(string? Name, string? IdKind, string? Id);
 
     public static async Task<string> CreateAsync(
         CommandContext context, string commandType, Guid partyId, IReadOnlyList<Guid>? deliveryLineIds, Guid? authorizationId, bool fromProformas, CancellationToken cancellationToken)
@@ -102,14 +145,14 @@ internal static class InvoiceDrafts
             context.Connection,
             context.Transaction,
             """
-            SELECT dl.delivery_line_id, dl.item_id, dl.uom, dl.qty_delivered - dl.qty_invoiced, ol.unit_price
+            SELECT dl.delivery_line_id, dl.item_id, dl.uom, dl.qty_delivered - dl.qty_invoiced, ol.unit_price, o.sales_order_id
             FROM log.delivery_line dl
             JOIN log.delivery d ON d.delivery_id = dl.delivery_id
             JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id
             JOIN sal.sales_order_line ol ON ol.line_id = dl.sales_order_line_id
             WHERE dl.company_id = @c AND dl.delivery_line_id = ANY (@ids) AND o.party_id = @p AND d.status IN ('DELIVERED', 'DELIVERED_WITH_EXCEPTIONS')
             """,
-            r => new Billable(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4)),
+            r => new Billable(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetGuid(5)),
             cancellationToken,
             ("c", context.CompanyId),
             ("ids", ids.ToArray()),
@@ -117,6 +160,25 @@ internal static class InvoiceDrafts
         if (billable.Count != ids.Count || billable.Any(b => b.Remaining <= 0m))
         {
             throw new DomainException(InvoiceErrors.NotBillable, "Each line must be a delivered, not yet fully invoiced delivery line of this customer (E-VS3-05-3).");
+        }
+
+        // E-CF1-6, E-CF1-9, E-CF1-03-1: the final consumer's invoice comes from one cash order, carries its buyer and is never exempt.
+        Buyer? buyer = null;
+        if (await SalesSql.ScalarAsync<string>(context, "SELECT party_kind FROM md.party WHERE party_id = @p", cancellationToken, ("p", partyId)).ConfigureAwait(false) == "CONSUMER")
+        {
+            if (authorizationId is not null)
+            {
+                throw new DomainException(InvoiceErrors.EcfTypeInvalid, "A sale to the final consumer has no fiscal authorization: it is an e-CF 32 with ITBIS (E-CF1-9).");
+            }
+
+            if (billable.Select(b => b.OrderId).Distinct().Count() != 1)
+            {
+                throw new DomainException(InvoiceErrors.OneCashOrder, "An invoice of the final consumer takes the deliveries of one order: each order has its buyer (E-CF1-03-1).");
+            }
+
+            buyer = await Reading.SingleOrDefaultAsync(
+                context.Connection, context.Transaction, "SELECT buyer_name, buyer_id_kind, buyer_id FROM sal.sales_order WHERE sales_order_id = @o",
+                r => new Buyer(r.NullableString(0), r.NullableString(1), r.NullableString(2)), cancellationToken, ("o", billable[0].OrderId)).ConfigureAwait(false);
         }
 
         // E-FIS1b-01-6: a delivery collected on a proforma is invoiced from the proforma, whole.
@@ -173,8 +235,8 @@ internal static class InvoiceDrafts
             context.Transaction,
             """
             INSERT INTO sal.invoice (invoice_id, company_id, invoice_no, party_id, ecf_type, commercial_status, accounting_status, fiscal_status, net_total, created_by, version,
-                                     fiscal_authorization_id)
-            VALUES (@id, @c, @no, @p, @ecf, 'DRAFT', 'NOT_POSTED', 'PENDING', @net, @by, 1, @auth)
+                                     fiscal_authorization_id, buyer_name, buyer_id_kind, buyer_id)
+            VALUES (@id, @c, @no, @p, @ecf, 'DRAFT', 'NOT_POSTED', 'PENDING', @net, @by, 1, @auth, @bname, @bkind, @bid)
             """,
             cancellationToken,
             ("id", context.ResultRef),
@@ -184,7 +246,10 @@ internal static class InvoiceDrafts
             ("ecf", ecfType),
             ("net", net),
             ("by", creator),
-            ("auth", authorizationId)).ConfigureAwait(false);
+            ("auth", authorizationId),
+            ("bname", buyer?.Name),
+            ("bkind", buyer?.IdKind),
+            ("bid", buyer?.Id)).ConfigureAwait(false);
         var no = 0;
         foreach (var (b, lineNet, lineId) in lines)
         {
@@ -271,7 +336,23 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
-        // Lock order: proformas → invoice → AR document → receipts. The proformas of the invoice's delivery lines, if any.
+        // Lock order: sales order (a cash sale's) → proformas → invoice → AR document → receipts.
+        var cashOrder = await SalesSql.ScalarAsync<Guid?>(
+            context,
+            """
+            SELECT DISTINCT o.sales_order_id FROM sal.invoice_line il JOIN log.delivery_line dl ON dl.delivery_line_id = il.delivery_line_id
+            JOIN log.delivery d ON d.delivery_id = dl.delivery_id JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id
+            WHERE il.company_id = @c AND il.invoice_id = @i AND o.cash_sale
+            """,
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("i", command.InvoiceId)).ConfigureAwait(false);
+        if (cashOrder is { } locked)
+        {
+            await Orders.Orders.LockCurrentAsync(context, locked, cancellationToken).ConfigureAwait(false);
+        }
+
+        // The proformas of the invoice's delivery lines, if any.
         var proformas = await Allocations.LockProformasAsync(
             context,
             await Reading.ListAsync(
@@ -323,10 +404,13 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
         }
 
         var today = SalesSql.Today(context);
-        var days = await SalesSql.ScalarAsync<int?>(
-            context, "SELECT payment_terms_days FROM sal.customer_terms_version WHERE company_id = @c AND party_id = @p AND status = 'ACTIVE'", cancellationToken,
-            ("c", context.CompanyId), ("p", row.PartyId)).ConfigureAwait(false)
-            ?? throw new DomainException(InvoiceErrors.TermsMissing, "The customer has no approved payment terms.");
+        // E-CF1-4: a cash sale is due the day it is invoiced; the final consumer has no terms.
+        var days = cashOrder is not null
+            ? 0
+            : await SalesSql.ScalarAsync<int?>(
+                context, "SELECT payment_terms_days FROM sal.customer_terms_version WHERE company_id = @c AND party_id = @p AND status = 'ACTIVE'", cancellationToken,
+                ("c", context.CompanyId), ("p", row.PartyId)).ConfigureAwait(false)
+              ?? throw new DomainException(InvoiceErrors.TermsMissing, "The customer has no approved payment terms.");
         var determination = await _tax.DetermineAsync(
             context,
             new TaxRequest("SalesInvoice", command.InvoiceId, today, row.PartyId, lines.Select(l => new TaxLineInput(l.InvoiceLineId, l.ItemId, l.Net)).ToList(), TaxDirections.Sale, exemption),
@@ -464,6 +548,19 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
             }
         }
 
+        // E-CF1-5, E-CF1-13: the invoice of a cash order takes what it needs of the receipts assigned to the order.
+        var fromOrder = SalesSql.Zero;
+        if (cashOrder is { } paidOrder)
+        {
+            fromOrder += await CashSales.CashSaleStore.InheritAsync(context, _engine, paidOrder, command.InvoiceId, row.InvoiceNo, arDocId, total, eventId, CommandType, cancellationToken)
+                .ConfigureAwait(false);
+            if (fromOrder > 0m)
+            {
+                commercial = await InvoiceStanding.RefreshAsync(context, command.InvoiceId, CommandType, eventId, cancellationToken).ConfigureAwait(false);
+                version++;
+            }
+        }
+
         return JsonSerializer.Serialize(new
         {
             invoiceId = command.InvoiceId,
@@ -474,6 +571,7 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
             taxTotal = Invoicing.M(itbis),
             total = Invoicing.M(total),
             collectedOnProformas = Invoicing.M(inherited),
+            collectedOnOrder = Invoicing.M(fromOrder),
             journalId = journal.JournalId,
             version,
         });
@@ -509,13 +607,10 @@ public sealed class RecordExternalFiscalDocumentHandler : ICommandHandler<Record
             throw new DomainException(InvoiceErrors.FiscalDocumentMismatch, "The e-CF cannot be issued in the future.");
         }
 
-        var rnc = await SalesSql.ScalarAsync<string>(context, "SELECT coalesce(rnc, '') FROM md.party WHERE party_id = @p", cancellationToken, ("p", row.PartyId)).ConfigureAwait(false);
-        var receiver = new string((command.ReceiverRnc ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+        var expected = await FiscalReceiver.ExpectedAsync(context, command.InvoiceId, cancellationToken).ConfigureAwait(false);
+        var (receiver, passport) = FiscalReceiver.Given(command.ReceiverRnc, command.ReceiverPassport);
         var differences = new List<string>();
-        if (receiver != rnc)
-        {
-            differences.Add($"receiver {receiver} ≠ {rnc}");
-        }
+        differences.AddRange(FiscalReceiver.Differences(expected, receiver, passport));
 
         if (command.NetTotal != row.Net)
         {
@@ -559,8 +654,9 @@ public sealed class RecordExternalFiscalDocumentHandler : ICommandHandler<Record
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO tax.external_fiscal_record (record_id, company_id, invoice_id, encf, issued_at, security_code, evidence_ref, evidence_sha256, receiver_rnc, net_total, tax_total, total, recorded_by, event_id)
-            VALUES (@id, @c, @i, @e, @at, @sec, @ref, @hash, @rnc, @net, @tax, @total, @by, @ev)
+            INSERT INTO tax.external_fiscal_record (record_id, company_id, invoice_id, encf, issued_at, security_code, evidence_ref, evidence_sha256, receiver_rnc, net_total, tax_total, total, recorded_by, event_id,
+                                                    receiver_passport)
+            VALUES (@id, @c, @i, @e, @at, @sec, @ref, @hash, @rnc, @net, @tax, @total, @by, @ev, @passport)
             """,
             cancellationToken,
             ("id", recordId),
@@ -571,7 +667,8 @@ public sealed class RecordExternalFiscalDocumentHandler : ICommandHandler<Record
             ("sec", security),
             ("ref", evidence),
             ("hash", hash),
-            ("rnc", receiver),
+            ("rnc", receiver.Length == 0 ? null : receiver),
+            ("passport", passport),
             ("net", command.NetTotal),
             ("tax", command.TaxTotal),
             ("total", command.Total),

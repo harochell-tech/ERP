@@ -245,6 +245,7 @@ public static class CommandEndpoints
         sales.MapCommand<AllocateReceiptToOrder, AllocateReceiptToOrderHandler>();
         sales.MapCommand<ReleaseOrderAllocation, ReleaseOrderAllocationHandler>();
         sales.MapCommand<ConfirmCashSale, ConfirmCashSaleHandler>();
+        sales.MapCommand<CancelCashSale, CancelCashSaleHandler>();
         // MAIL-02 (E-MAIL-6, E-MAIL-01-8, 10): documents by e-mail, one permission per document, and the retry of a failed message.
         sales.MapCommand<SendQuoteByEmail, SendQuoteByEmailHandler>();
         sales.MapCommand<SendProformaByEmail, SendProformaByEmailHandler>();
@@ -328,7 +329,7 @@ public static class CommandEndpoints
         typeof(SendQuoteByEmailHandler), typeof(SendProformaByEmailHandler), typeof(SendDeliveryByEmailHandler), typeof(SendStatementByEmailHandler), typeof(SendArAgingByEmailHandler),
         typeof(RetryDocumentEmailHandler),
         typeof(CreateCashSaleHandler), typeof(UpdateCashSaleDraftHandler), typeof(SubmitCashSaleForPaymentHandler), typeof(ReturnCashSaleToDraftHandler), typeof(AllocateReceiptToOrderHandler),
-        typeof(ReleaseOrderAllocationHandler), typeof(ConfirmCashSaleHandler),
+        typeof(ReleaseOrderAllocationHandler), typeof(ConfirmCashSaleHandler), typeof(CancelCashSaleHandler),
         typeof(AllocateReceiptToProformasHandler), typeof(ReleaseProformaAllocationHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
