@@ -221,6 +221,7 @@ export const ROLES: Readonly<Record<string, string>> = {
   DESPACHO: "Despacho",
   FACTURACION: "Facturación",
   COBROS: "Cobros",
+  CAJA: "Caja",
   // MFG-1 (E-MFG1-14)
   SUPERVISOR_PRODUCCION: "Supervisor de producción",
   GERENTE_PLANTA: "Gerente de planta",
