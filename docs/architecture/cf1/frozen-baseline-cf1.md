@@ -82,4 +82,4 @@ asignado al pedido se aplica con P-25. La devolución es P-36.
 
 ## 8. Decisiones aprobadas
 
-E-CF1-1…14 y E-CF1-01-1…9 en `../errata.md`.
+E-CF1-1…14, E-CF1-01-1…9, E-CF1-02-1…3, E-CF1-03-1…3 y E-CF1-05-1…14 en `../errata.md`. Matriz de aceptación: `../../acceptance/cf1.md`.

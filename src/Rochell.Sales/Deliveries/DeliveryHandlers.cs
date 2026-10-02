@@ -304,6 +304,19 @@ public sealed class PlanDeliveryHandler : ICommandHandler<PlanDelivery>
         }
 
         var order = await Orders.Orders.LockCurrentAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
+
+        // E-CF1-05-14: a cash sale still waiting for its payment is confirmed here once the money that counts covers it (a cheque
+        // whose deposit Treasury matched with the bank), so nobody has to press «Verificar pago» before the first delivery.
+        if (order.CashSale && order.Status == "PENDING_PAYMENT")
+        {
+            if (!await CashSales.CashSaleStore.ConfirmIfPaidAsync(context, command.SalesOrderId, CommandType, cancellationToken).ConfigureAwait(false))
+            {
+                await CashSales.CashSaleStore.EnsureCoveredAsync(context, command.SalesOrderId, order, cancellationToken).ConfigureAwait(false);
+            }
+
+            order = await Orders.Orders.LockCurrentAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
+        }
+
         if (order.Status is not ("CONFIRMED" or "PARTIALLY_DELIVERED"))
         {
             throw new DomainException(SalesErrors.InvalidState, $"The order is {order.Status}; only CONFIRMED or PARTIALLY_DELIVERED orders are delivered.");

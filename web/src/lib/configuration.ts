@@ -7,7 +7,7 @@ export async function sha256Hex(data: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export const FISCAL_RULE_KINDS = ["PURCHASE_ITBIS", "PURCHASE_WITHHOLDING", "SALES_ITBIS", "REPORT_606_CLASSIFICATION"] as const;
+export const FISCAL_RULE_KINDS = ["PURCHASE_ITBIS", "PURCHASE_WITHHOLDING", "SALES_ITBIS", "REPORT_606_CLASSIFICATION", "CONSUMER_ID_THRESHOLD"] as const;
 export type FiscalRuleKind = (typeof FISCAL_RULE_KINDS)[number];
 
 export const FISCAL_KIND_LABELS: Readonly<Record<string, string>> = {
@@ -15,11 +15,15 @@ export const FISCAL_KIND_LABELS: Readonly<Record<string, string>> = {
   PURCHASE_WITHHOLDING: "Retención en compras",
   SALES_ITBIS: "ITBIS de ventas",
   REPORT_606_CLASSIFICATION: "Clasificación del 606", // FIS2-03 (E-FIS2-03-5)
+  CONSUMER_ID_THRESHOLD: "Identificación del consumidor final", // CF1-05 (E-CF1-05-7)
 };
 
-/** FIS2-01: the 606 classification is READY with its official source alone; the server refuses test runs for it. */
+/**
+ * FIS2-01: the 606 classification is READY with its official source alone; the server refuses test runs for it. So is the amount
+ * from which a final consumer must be identified (E-CF1-01-6).
+ */
 export function ruleKindRunsTests(kind: string): boolean {
-  return kind !== "REPORT_606_CLASSIFICATION";
+  return kind !== "REPORT_606_CLASSIFICATION" && kind !== "CONSUMER_ID_THRESHOLD";
 }
 
 /** FIS2-03 (E-FIS2-03-5): the help shown under the definition of each kind; none for the tax kinds. */
@@ -32,6 +36,10 @@ export const DEFINITION_HELP: Readonly<Partial<Record<FiscalRuleKind, readonly s
     "01 Gastos de personal · 02 Gastos por trabajos, suministros y servicios · 03 Arrendamientos · 04 Gastos de activos fijos · 05 Gastos de representación · 06 Otras deducciones admitidas · 07 Gastos financieros · 08 Gastos extraordinarios · 09 Compras y gastos que formarán parte del costo de venta · 10 Adquisiciones de activos · 11 Gastos de seguros.",
     "No lleva pruebas de regresión: queda lista para activar al vincular su fuente oficial (el instructivo del 606).",
   ],
+  CONSUMER_ID_THRESHOLD: [
+    "El monto, con ITBIS, desde el cual una venta a consumidor final debe llevar la identificación del comprador (cédula, RNC o pasaporte). Sin esta regla activa no se envía a pago ninguna venta de contado.",
+    "Confirme el monto con su contador contra la norma de la DGII y vincule esa norma como fuente oficial. No lleva pruebas de regresión.",
+  ],
 };
 
 /**
@@ -43,6 +51,8 @@ export const DEFINITION_TEMPLATES: Readonly<Record<FiscalRuleKind, string>> = {
   PURCHASE_WITHHOLDING: JSON.stringify({ tax_code: "RET_ITBIS", rate: "0.30", base: "ITBIS", party_types: ["INDIVIDUAL"] }, null, 2),
   SALES_ITBIS: JSON.stringify({ tax_code: "ITBIS", rate: "0.18", effect: "OUTPUT", exempt_item_categories: [] }, null, 2),
   REPORT_606_CLASSIFICATION: JSON.stringify({ classes: { CEMENTO: "09", AGREGADO: "09", ADITIVO: "09", OTRA_MATERIA_PRIMA: "09" } }, null, 2),
+  // No amount to start from: it is the accountant's, read from the DGII norm (E-CF1-05-7).
+  CONSUMER_ID_THRESHOLD: JSON.stringify({ amount: "" }, null, 2),
 };
 
 /** One regression case to start from; the analyst writes the expected taxes the source dictates. */

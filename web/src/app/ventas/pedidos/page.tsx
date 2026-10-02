@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { query } from "@/api/client";
 import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
 import { Money, NoPermission, StatusBadge } from "@/components/ui";
+import { cashCustomerName } from "@/lib/cashSales";
 import { DELIVERY_TERMS, formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
@@ -75,10 +76,12 @@ function Orders() {
             {data.items.map((o) => (
               <tr key={o.salesOrderId}>
                 <td className="mono">
-                  <Link href={`/ventas/pedido/?id=${o.salesOrderId}`}>{o.orderNo}</Link>
+                  {/* CF1-05 (E-CF1-05-1): a cash sale opens on its own screen and names its buyer. */}
+                  <Link href={o.cashSale ? `/ventas/venta-contado/?id=${o.salesOrderId}` : `/ventas/pedido/?id=${o.salesOrderId}`}>{o.orderNo}</Link>
+                  {o.cashSale ? <span className="badge">Contado</span> : null}
                 </td>
                 <td>{formatDate(o.orderDate)}</td>
-                <td className="wrap">{o.customerName}</td>
+                <td className="wrap">{o.cashSale ? cashCustomerName(o.customerName, o.buyerName) : o.customerName}</td>
                 <td>{plantName(o.plantCode)}</td>
                 <td>{DELIVERY_TERMS[o.deliveryTermCode] ?? o.deliveryTermCode}</td>
                 <td className="num">

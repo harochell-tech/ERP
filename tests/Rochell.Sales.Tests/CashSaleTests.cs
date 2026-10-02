@@ -1,8 +1,10 @@
+using System.Text.Json;
 using Rochell.Platform.Commands;
 using Rochell.Sales.CashSales;
 using Rochell.Sales.Deliveries;
 using Rochell.Sales.Orders;
 using Rochell.Sales.Proformas;
+using Rochell.Sales.Queries;
 using Rochell.Sales.Receipts;
 using Rochell.Tax;
 using Rochell.TestInfrastructure;
@@ -175,6 +177,34 @@ public sealed class CashSaleTests(PostgresFixture postgres)
         Assert.Equal("PARTIALLY_DELIVERED:5900.00:5900.00", await OrderAsync(h, order));
     }
 
+    /// <summary>E-CF1-05-14: nobody has to press «Verificar pago» — planning the first delivery confirms a sale that the money covers.</summary>
+    [Fact]
+    public async Task Planning_the_first_delivery_confirms_a_sale_covered_by_a_cheque_the_bank_credited_and_refuses_one_that_is_not()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        var order = await PendingAsync(h, w, "s", 100m);
+        var line = await h.ScalarAsync<Guid>("SELECT line_id FROM sal.sales_order_line WHERE sales_order_id = @o", ("o", order));
+        var cheque = (await h.RunAsync(
+            new RecordReceipt(h.CompanyId, w.Cashier, "chq", await ConsumerAsync(h), "CHEQUE", 5900.00m, ChequeBank: "Banco Popular", ChequeNo: "000778", ChequeDate: ReceiptTests.Today(h)),
+            new RecordReceiptHandler())).ResultRef;
+        await h.RunAsync(new AllocateReceiptToOrder(h.CompanyId, w.Cashier, "a", cheque, 1, order, 5900.00m), new AllocateReceiptToOrderHandler());
+        var early = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new PlanDelivery(h.CompanyId, w.W.S.Dispatch, "plan-0", order, [new(line, 60m)]), new PlanDeliveryHandler()));
+        var waiting = await OrderAsync(h, order);
+
+        var deposit = (await h.RunAsync(new DepositReceipts(h.CompanyId, w.W.Cobros, "dep", w.W.Bank, [cheque]), new DepositReceiptsHandler())).ResultRef;
+        await ReceiptTests.Import(h, w.W, "st", "DEP-8,Deposito cheque 000778,,5900.00");
+        await h.RunAsync(
+            new MatchBankLineToReceipt(h.CompanyId, w.W.Treasurer, "m", await ReceiptTests.LineAsync(h, "Deposito cheque 000778"), 1, 1, DepositId: deposit), new MatchBankLineToReceiptHandler());
+        await h.RunAsync(new PlanDelivery(h.CompanyId, w.W.S.Dispatch, "plan", order, [new(line, 60m)]), new PlanDeliveryHandler());
+
+        Assert.Equal((CashSaleErrors.NotPaid, "PENDING_PAYMENT:5900.00:5900.00"), (early.Code, waiting));
+        Assert.Equal("CONFIRMED:5900.00:5900.00", await OrderAsync(h, order));
+        Assert.Equal(
+            "PENDING_PAYMENT>CONFIRMED:Sales.PlanDelivery",
+            await h.ScalarAsync<string>($"SELECT from_state || '>' || to_state || ':' || command FROM core.state_history WHERE aggregate_id = '{order}' ORDER BY state_history_id DESC LIMIT 1"));
+    }
+
     [Trait("AcceptanceCf1", "CF-06")]
     [Trait("AcceptanceCf1", "CF-07")]
     [Fact]
@@ -229,5 +259,61 @@ public sealed class CashSaleTests(PostgresFixture postgres)
         Assert.Equal((SalesErrors.InvalidState, SalesErrors.InvalidState, ReceiptErrors.ReasonRequired, AllocationErrors.NotFound), (redraft.Code, cancel.Code, noReason.Code, twice.Code));
         Assert.Equal(("PENDING_PAYMENT:5900.00:0.00", "DRAFT:-:0.00"), (released, await OrderAsync(h, order)));
         Assert.Equal("3000.00:0.00", await h.ScalarAsync<string>("SELECT unapplied_amount::numeric(19,2) || ':' || allocated_amount::numeric(19,2) FROM fin.receipt WHERE receipt_id = @r", ("r", cash)));
+    }
+
+    /// <summary>CF1-05 (E-CF1-05-2…6): what the «Venta de contado» screen reads — every amount computed by the server.</summary>
+    [Fact]
+    public async Task The_order_query_shows_the_buyer_what_is_owed_which_payments_count_and_the_receipts_still_free()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        var seller = await h.SessionWithRolesAsync("VENDEDOR");
+        var draft = (await h.RunAsync(Sale(h, w, "s", 100m, "CEDULA", "001-1234567-8"), new CreateCashSaleHandler())).ResultRef;
+        var before = JsonDocument.Parse(await h.QueryAsync(new GetSalesOrder(h.CompanyId, seller, draft), new GetSalesOrderHandler())).RootElement.GetProperty("cashSale");
+        await h.RunAsync(new SubmitCashSaleForPayment(h.CompanyId, w.Cashier, "s-pay", draft, 1), new SubmitCashSaleForPaymentHandler());
+
+        // 100 blocks at 50.00: 5,900.00 with ITBIS. A cheque of 4,000.00 assigned (it does not count yet) and 2,500.00 in cash recorded
+        // and not assigned.
+        var consumer = await ConsumerAsync(h);
+        var cheque = (await h.RunAsync(
+            new RecordReceipt(h.CompanyId, w.Cashier, "chq", consumer, "CHEQUE", 4000.00m, ChequeBank: "Banco Popular", ChequeNo: "000123", ChequeDate: ReceiptTests.Today(h)), new RecordReceiptHandler())).ResultRef;
+        await h.RunAsync(new AllocateReceiptToOrder(h.CompanyId, w.Cashier, "a", cheque, 1, draft, 4000.00m), new AllocateReceiptToOrderHandler());
+        await CashAsync(h, w, "cash", 2500.00m);
+        var detail = JsonDocument.Parse(await h.QueryAsync(new GetSalesOrder(h.CompanyId, seller, draft), new GetSalesOrderHandler())).RootElement;
+        var cash = detail.GetProperty("cashSale");
+        var onlyCash = JsonDocument.Parse(await h.QueryAsync(new ListSalesOrders(h.CompanyId, seller, CashSale: true), new ListSalesOrdersHandler())).RootElement.GetProperty("items");
+        var onlyCredit = JsonDocument.Parse(await h.QueryAsync(new ListSalesOrders(h.CompanyId, seller, CashSale: false), new ListSalesOrdersHandler())).RootElement.GetProperty("items");
+        var setup = JsonDocument.Parse(await h.QueryAsync(new GetCashSaleSetup(h.CompanyId, seller), new GetCashSaleSetupHandler())).RootElement;
+
+        Assert.Equal("María Pérez|CEDULA|00112345678", $"{before.GetProperty("buyerName").GetString()}|{before.GetProperty("buyerIdKind").GetString()}|{before.GetProperty("buyerId").GetString()}");
+        Assert.Equal((JsonValueKind.Null, JsonValueKind.Null, false), (before.GetProperty("paymentTotal").ValueKind, before.GetProperty("stillToPay").ValueKind, before.GetProperty("covered").GetBoolean()));
+        Assert.Equal(
+            "900.00|5900.00|4000.00|0.00|0.00|1900.00|False",
+            string.Join('|', new[] { "itbis", "paymentTotal", "assigned", "invoiced", "counted", "stillToPay" }.Select(n => cash.GetProperty(n).GetString()).Append(cash.GetProperty("covered").GetBoolean().ToString())));
+        Assert.Equal("CHEQUE:4000.00:False:IN_TRANSIT", string.Join(',', cash.GetProperty("payments").EnumerateArray().Select(p =>
+            $"{p.GetProperty("method").GetString()}:{p.GetProperty("amount").GetString()}:{p.GetProperty("counts").GetBoolean()}:{p.GetProperty("bankStatus").GetString()}")));
+        Assert.Equal("CASH:2500.00", string.Join(',', cash.GetProperty("unassigned").EnumerateArray().Select(r => $"{r.GetProperty("method").GetString()}:{r.GetProperty("available").GetString()}")));
+        Assert.Equal("True|María Pérez|5900.00", $"{detail.GetProperty("header").GetProperty("cashSale").GetBoolean()}|{detail.GetProperty("header").GetProperty("buyerName").GetString()}|" +
+            $"{detail.GetProperty("header").GetProperty("paymentTotal").GetString()}");
+        // The world's own order to its credit customer is the only one that is not a cash sale.
+        Assert.Equal((1, 1, false), (onlyCash.GetArrayLength(), onlyCredit.GetArrayLength(), onlyCredit[0].GetProperty("cashSale").GetBoolean()));
+        Assert.Equal("250000.00", setup.GetProperty("buyerIdRequiredFrom").GetString());
+    }
+
+    [Fact]
+    public async Task Without_the_identification_rule_the_setup_says_so_and_the_preview_prices_the_sale_for_who_sells()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h, threshold: null);
+        var billing = await h.SessionWithRolesAsync("FACTURACION");
+        var lines = new[] { new SalesOrderLineInput(w.W.S.Block, "un", 100m) };
+
+        var setup = JsonDocument.Parse(await h.QueryAsync(new GetCashSaleSetup(h.CompanyId, w.Cashier), new GetCashSaleSetupHandler())).RootElement;
+        var preview = JsonDocument.Parse(await h.QueryAsync(new PreviewCashSale(h.CompanyId, w.Cashier, w.W.S.Plant, lines), new PreviewCashSaleHandler())).RootElement;
+        var denied = await Assert.ThrowsAsync<DomainException>(() => h.QueryAsync(new PreviewCashSale(h.CompanyId, billing, w.W.S.Plant, lines), new PreviewCashSaleHandler()));
+
+        Assert.Equal(JsonValueKind.Null, setup.GetProperty("buyerIdRequiredFrom").ValueKind);
+        Assert.Equal("5000.00|900.00|5900.00", $"{preview.GetProperty("netTotal").GetString()}|{preview.GetProperty("itbisTotal").GetString()}|{preview.GetProperty("total").GetString()}");
+        Assert.Equal(AuthorizationErrors.NotAuthorized, denied.Code);
     }
 }

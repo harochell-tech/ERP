@@ -929,6 +929,20 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-CF1-03-1 | CF-1 | An invoice of the final consumer comes from one order: each order has its buyer. |
 | E-CF1-03-2 | CF-1 | A paid cash sale is cancelled by the Vendedor or by Caja, with a reason; the receipts assigned are released and the money stays on the receipt to be refunded — prepared by Cobros, released by the Controller, as today. |
 | E-CF1-03-3 | CF-1 | Refunds to the final consumer leave from the bank (transfer or cheque), never in cash («no devolvemos dinero en efectivo»). |
+| E-CF1-05-1 | CF-1 | The screen lives at Ventas › «Venta de contado», visible with `cash_sale:create` (Vendedor, Caja). Cash sales also show in Ventas › Pedidos marked «Contado», and their customer reads «Consumidor final — <buyer>». |
+| E-CF1-05-2 | CF-1 | One screen in three steps: products and buyer; payment; ready to dispatch. The total with ITBIS is shown (server preview) before the sale is sent to payment. |
+| E-CF1-05-3 | CF-1 | «Cobrar» runs the two existing commands in a row (`RecordReceipt`, `AllocateReceiptToOrder`). If the second fails the receipt stays listed as «recibido sin asignar» with an «Asignar» button. |
+| E-CF1-05-4 | CF-1 | Several payments per sale (mixed methods). Total, collected, what counts and what is still owed are computed by the server (`SalesOrderDetail.cashSale`). |
+| E-CF1-05-5 | CF-1 | A cash or cheque receipt is recorded for what is still owed, never more (change is handed over, not recorded); a transfer may exceed it, and the excess stays on the receipt to be refunded through the bank. Checked by the screen. |
+| E-CF1-05-6 | CF-1 | The screen states the amount from which the buyer's identification is mandatory (`GET /sales/cash-sale-setup`, from the rule in force), or that no sale can go to payment without the rule. |
+| E-CF1-05-7 | CF-1 | Guided form for `CONSUMER_ID_THRESHOLD` in Fiscal › Reglas fiscales: one amount; its official source is linked as for any rule. The value is the accountant's. |
+| E-CF1-05-8 | CF-1 | A cheque reads «Pendiente: el cheque cuenta cuando el banco lo acredite». Approved as "the sale confirms by itself when the deposit is matched"; built as E-CF1-02-1 has it — «Verificar pago» confirms once the money counts — because the match runs in Treasury, which may not call Sales (E-VS2-02-1). Completed by E-CF1-05-14. |
+| E-CF1-05-9 | CF-1 | «Cancelar venta» with a reason, only without deliveries; it warns that the money stays on the receipts to be refunded through the bank. |
+| E-CF1-05-10 | CF-1 | Inicio: «Hacer una venta de contado» and the counter «Ventas de contado pendientes de pago» for whoever has `cash_sale:create`. |
+| E-CF1-05-11 | CF-1 | E2E-C1 over the API and in the browser (desktop and mobile), the dev identity «Caja», the acceptance matrix `docs/acceptance/cf1.md` and its traceability test. |
+| E-CF1-05-12 | CF-1 | No printed payment receipt for cash sales: the customer leaves with the delivery note and the invoice. |
+| E-CF1-05-13 | CF-1 | Only Caja records and assigns payments. The Vendedor creates the sale and sends it to payment; the payment step shows him «El cobro lo registra Caja». |
+| E-CF1-05-14 | CF-1 | A cash sale still PENDING_PAYMENT whose money that counts covers it (a cheque whose deposit Treasury matched) is confirmed when Despacho plans its first delivery (`PlanDelivery`); the dispatch board lists it and «Verificar pago» stays for whoever wants to confirm it earlier. No periodic process, no new permission. |
 | E-FLT-1 | FLT | Each vehicle carries its «ficha», the code the plant knows it by ("BR 09", "HR 114"): capitals, digits and single spaces, 2 to 12 characters, unique per company, required when a vehicle is registered or edited. It is printed on the delivery note (conduce) beside the driver who delivers, and shown in the dispatch board, so deliveries can be reported by vehicle and driver. |
 | E-FLT-2 | FLT | Insurance: only the policy number, optional (the owner declined insurer and expiry date). |
 | E-FLT-3 | FLT | Each driver carries the date the licence expires, optional (licence number and category are out). |

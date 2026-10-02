@@ -136,7 +136,8 @@ public sealed record GetCreditNoteFiscalPackage(Guid CompanyId, Guid SessionId, 
 /// <summary>E-VS3-06-5: what the user types into the provider's portal for the e-CF type 34, including the e-NCF it modifies.</summary>
 public sealed record CreditNoteFiscalPackage(
     string CreditNoteNo, string EcfType, DateOnly CreditDate, string ModifiedEncf, string InvoiceNo, DateOnly InvoiceDate, string ReasonCategory, string Reason, string IssuerRnc,
-    string IssuerName, string ReceiverRnc, string ReceiverName, IReadOnlyList<CreditNoteLineView> Lines, decimal NetTotal, decimal TaxTotal, decimal Total, string FiscalStatus);
+    string IssuerName, string ReceiverRnc, string ReceiverName, IReadOnlyList<CreditNoteLineView> Lines, decimal NetTotal, decimal TaxTotal, decimal Total, string FiscalStatus,
+    string? ReceiverPassport = null);
 
 [RequiresPermission("sales:read")]
 public sealed class GetCreditNoteFiscalPackageHandler : IQueryHandler<GetCreditNoteFiscalPackage>
@@ -147,7 +148,7 @@ public sealed class GetCreditNoteFiscalPackageHandler : IQueryHandler<GetCreditN
 
     private sealed record Head(
         string No, DateOnly? Date, string? ModifiedEncf, string InvoiceNo, DateOnly? InvoiceDate, string Category, string Reason, string IssuerRnc, string IssuerName, string ReceiverRnc,
-        string ReceiverName, decimal Net, decimal Tax, decimal Total, string Fiscal);
+        string ReceiverName, decimal Net, decimal Tax, decimal Total, string Fiscal, string? Passport);
 
     public async Task<string> HandleAsync(GetCreditNoteFiscalPackage query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -157,13 +158,14 @@ public sealed class GetCreditNoteFiscalPackageHandler : IQueryHandler<GetCreditN
             context.Connection,
             context.Transaction,
             """
-            SELECT n.credit_note_no, n.credit_date, i.encf, i.invoice_no, i.invoice_date, n.reason_category, n.reason, c.rnc, c.legal_name, coalesce(p.rnc, ''), p.legal_name,
-                   n.net_total::numeric(19,2), n.tax_total::numeric(19,2), n.total::numeric(19,2), n.fiscal_status
+            SELECT n.credit_note_no, n.credit_date, i.encf, i.invoice_no, i.invoice_date, n.reason_category, n.reason, c.rnc, c.legal_name,
+                   coalesce(CASE WHEN i.buyer_id_kind IN ('CEDULA', 'RNC') THEN i.buyer_id END, p.rnc, ''), coalesce(i.buyer_name, p.legal_name),
+                   n.net_total::numeric(19,2), n.tax_total::numeric(19,2), n.total::numeric(19,2), n.fiscal_status, CASE WHEN i.buyer_id_kind = 'PASAPORTE' THEN i.buyer_id END
             FROM sal.credit_note n JOIN sal.invoice i ON i.invoice_id = n.invoice_id JOIN md.party p ON p.party_id = n.party_id JOIN md.company c ON c.company_id = n.company_id
             WHERE n.company_id = @c AND n.credit_note_id = @n
             """,
             r => new Head(r.GetString(0), r.IsDBNull(1) ? null : r.Date(1), r.NullableString(2), r.GetString(3), r.IsDBNull(4) ? null : r.Date(4), r.GetString(5), r.GetString(6),
-                r.GetString(7), r.GetString(8), r.GetString(9), r.GetString(10), r.GetDecimal(11), r.GetDecimal(12), r.GetDecimal(13), r.GetString(14)),
+                r.GetString(7), r.GetString(8), r.GetString(9), r.GetString(10), r.GetDecimal(11), r.GetDecimal(12), r.GetDecimal(13), r.GetString(14), r.NullableString(15)),
             cancellationToken,
             ("c", context.CompanyId),
             ("n", query.CreditNoteId)).ConfigureAwait(false)
@@ -176,6 +178,6 @@ public sealed class GetCreditNoteFiscalPackageHandler : IQueryHandler<GetCreditN
         var lines = await CreditNoteLines.ReadAsync(context, query.CreditNoteId, cancellationToken).ConfigureAwait(false);
         return ApiJson.Serialize(new CreditNoteFiscalPackage(
             h.No, EcfType, h.Date.Value, h.ModifiedEncf, h.InvoiceNo, h.InvoiceDate.Value, h.Category, h.Reason, h.IssuerRnc, h.IssuerName, h.ReceiverRnc, h.ReceiverName, lines, h.Net, h.Tax,
-            h.Total, h.Fiscal));
+            h.Total, h.Fiscal, h.Passport));
     }
 }

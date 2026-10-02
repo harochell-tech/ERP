@@ -173,14 +173,16 @@ public sealed record FiscalPackageExemption(string Regime, string CertificateNo,
 
 public sealed record InvoiceFiscalPackage(
     string InvoiceNo, string EcfType, DateOnly InvoiceDate, DateOnly DueDate, string IssuerRnc, string IssuerName, string ReceiverRnc, string ReceiverName,
-    IReadOnlyList<InvoiceLineView> Lines, decimal NetTotal, decimal TaxTotal, decimal Total, string FiscalStatus, FiscalPackageExemption? Exemption = null);
+    IReadOnlyList<InvoiceLineView> Lines, decimal NetTotal, decimal TaxTotal, decimal Total, string FiscalStatus, FiscalPackageExemption? Exemption = null,
+    string? ReceiverPassport = null);
 
 [RequiresPermission("sales:read")]
 public sealed class GetInvoiceFiscalPackageHandler : IQueryHandler<GetInvoiceFiscalPackage>
 {
     public string QueryType => "Sales.GetInvoiceFiscalPackage";
 
-    private sealed record Head(string No, string Type, DateOnly? Date, DateOnly? Due, string IssuerRnc, string IssuerName, string ReceiverRnc, string ReceiverName, decimal Net, decimal? Tax, decimal? Total, string Fiscal);
+    private sealed record Head(string No, string Type, DateOnly? Date, DateOnly? Due, string IssuerRnc, string IssuerName, string ReceiverRnc, string ReceiverName, decimal Net, decimal? Tax, decimal? Total, string Fiscal,
+        string? Passport);
 
     public async Task<string> HandleAsync(GetInvoiceFiscalPackage query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -190,13 +192,13 @@ public sealed class GetInvoiceFiscalPackageHandler : IQueryHandler<GetInvoiceFis
             context.Connection,
             context.Transaction,
             """
-            SELECT i.invoice_no, i.ecf_type, i.invoice_date, i.due_date, c.rnc, c.legal_name, coalesce(p.rnc, ''), p.legal_name, i.net_total::numeric(19,2), i.tax_total::numeric(19,2),
-                   i.total::numeric(19,2), i.fiscal_status
+            SELECT i.invoice_no, i.ecf_type, i.invoice_date, i.due_date, c.rnc, c.legal_name, coalesce(CASE WHEN i.buyer_id_kind IN ('CEDULA', 'RNC') THEN i.buyer_id END, p.rnc, ''), coalesce(i.buyer_name, p.legal_name),
+                   i.net_total::numeric(19,2), i.tax_total::numeric(19,2), i.total::numeric(19,2), i.fiscal_status, CASE WHEN i.buyer_id_kind = 'PASAPORTE' THEN i.buyer_id END
             FROM sal.invoice i JOIN md.party p ON p.party_id = i.party_id JOIN md.company c ON c.company_id = i.company_id
             WHERE i.company_id = @c AND i.invoice_id = @i
             """,
             r => new Head(r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.Date(2), r.IsDBNull(3) ? null : r.Date(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetString(7),
-                r.GetDecimal(8), r.IsDBNull(9) ? null : r.GetDecimal(9), r.IsDBNull(10) ? null : r.GetDecimal(10), r.GetString(11)),
+                r.GetDecimal(8), r.IsDBNull(9) ? null : r.GetDecimal(9), r.IsDBNull(10) ? null : r.GetDecimal(10), r.GetString(11), r.NullableString(12)),
             cancellationToken,
             ("c", context.CompanyId),
             ("i", query.InvoiceId)).ConfigureAwait(false)
@@ -219,7 +221,7 @@ public sealed class GetInvoiceFiscalPackageHandler : IQueryHandler<GetInvoiceFis
             cancellationToken,
             ("i", query.InvoiceId)).ConfigureAwait(false);
         return ApiJson.Serialize(new InvoiceFiscalPackage(
-            h.No, h.Type, h.Date.Value, h.Due.Value, h.IssuerRnc, h.IssuerName, h.ReceiverRnc, h.ReceiverName, lines, h.Net, h.Tax.Value, h.Total.Value, h.Fiscal, exemption));
+            h.No, h.Type, h.Date.Value, h.Due.Value, h.IssuerRnc, h.IssuerName, h.ReceiverRnc, h.ReceiverName, lines, h.Net, h.Tax.Value, h.Total.Value, h.Fiscal, exemption, h.Passport));
     }
 }
 
