@@ -49,10 +49,19 @@ public static class FiscalRuleKinds
     /// <summary>E-FIS2-01-1: the 606 goods-and-services classification; read by the reports, never applied by the Tax Engine.</summary>
     public const string Report606Classification = "REPORT_606_CLASSIFICATION";
 
+    /// <summary>
+    /// E-CF1-3, E-CF1-01-6: the total from which a sale to the final consumer must identify its buyer; read by the cash sale, never
+    /// applied by the Tax Engine.
+    /// </summary>
+    public const string ConsumerIdThreshold = "CONSUMER_ID_THRESHOLD";
+
     public static bool IsSales(string kind) => kind == SalesItbis;
 
-    /// <summary>E-FIS2-01-3: a rule kind that only the reports read.</summary>
-    public static bool IsReport(string kind) => kind == Report606Classification;
+    /// <summary>
+    /// E-FIS2-01-3: a rule kind that computes no tax — the reports or a command read it; it has no test runs, is READY with its
+    /// official source, and neither applies in a determination nor closes the fiscal gate.
+    /// </summary>
+    public static bool IsReport(string kind) => kind is Report606Classification or ConsumerIdThreshold;
 }
 
 public static class TaxEffects

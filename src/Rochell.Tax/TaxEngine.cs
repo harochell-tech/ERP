@@ -242,6 +242,29 @@ public sealed class TaxEngine
         return rules;
     }
 
+    /// <summary>
+    /// E-CF1-3, E-CF1-01-6: the total from which a sale to the final consumer must identify its buyer, from the CONSUMER_ID_THRESHOLD
+    /// rule in force on <paramref name="date"/>. Null when no such rule is active: the caller refuses the sale.
+    /// </summary>
+    public static async Task<decimal?> ConsumerIdThresholdAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly date, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            connection,
+            transaction,
+            """
+            SELECT v.definition::text FROM tax.fiscal_rule r JOIN tax.fiscal_rule_version v ON v.rule_id = r.rule_id
+            WHERE r.company_id = @c AND r.rule_kind = @kind AND v.status = 'ACTIVE' AND v.effective_from <= @d AND (v.effective_to IS NULL OR v.effective_to > @d)
+            ORDER BY v.effective_from DESC LIMIT 1
+            """,
+            ("c", companyId),
+            ("kind", FiscalRuleKinds.ConsumerIdThreshold),
+            ("d", date));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string definition
+            ? FiscalRuleDefinition.Parse(FiscalRuleKinds.ConsumerIdThreshold, definition).Amount
+            : null;
+    }
+
     private static async Task<string> PartyTypeAsync(CommandContext context, Guid partyId, CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(context.Connection, context.Transaction, "SELECT coalesce(rnc, '') FROM md.party WHERE company_id = @c AND party_id = @p", ("c", context.CompanyId), ("p", partyId));

@@ -14,6 +14,9 @@ public static class OrderErrors
     public const string TermsMissing = "CUSTOMER_TERMS_REQUIRED";
     public const string SiteRequired = "SITE_ADDRESS_REQUIRED";
     public const string ReasonRequired = "REASON_REQUIRED";
+
+    /// <summary>E-CF1-4: the final consumer's orders are cash sales, with their own commands.</summary>
+    public const string UseCashSale = "USE_CASH_SALE";
 }
 
 internal static class Orders
@@ -124,8 +127,11 @@ internal static class Orders
     /// <summary>Creates a DRAFT order PV-… (numbered under a lock) with its lines, event and state history; <paramref name="quoteId"/> links a converted quote.</summary>
     public static async Task<string> InsertAsync(
         CommandContext context, Guid orderId, Guid partyId, Header header, Guid priceList, List<PricedLine> lines, decimal total, Guid? quoteId, string commandType,
-        CancellationToken cancellationToken, (bool Pending, bool? CollectsItbis) exemption = default)
+        CancellationToken cancellationToken, (bool Pending, bool? CollectsItbis) exemption = default, Buyer? buyer = null)
     {
+        // E-CF1-4: the order of the final consumer is a cash sale, and only it (a quote of the consumer converts into one).
+        var cash = await SalesSql.ScalarAsync<string>(context, "SELECT party_kind FROM md.party WHERE company_id = @c AND party_id = @p", cancellationToken, ("c", context.CompanyId), ("p", partyId))
+            .ConfigureAwait(false) == "CONSUMER";
         var creator = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         await SalesSql.LockAsync(context, "sales-order-no", cancellationToken).ConfigureAwait(false);
         var last = await SalesSql.ScalarAsync<int?>(
@@ -150,6 +156,8 @@ internal static class Orders
                     quoteId,
                     exemptionPending = exemption.Pending,
                     proformaCollectsItbis = exemption.CollectsItbis,
+                    cashSale = cash,
+                    buyer = buyer is null ? null : new { name = buyer.Name, phone = buyer.Phone, idKind = buyer.IdKind, id = buyer.Id },
                     totalNet = M(total),
                     lines = lines.Select(l => new { itemId = l.ItemId, uom = l.Uom, quantity = M(l.Quantity), unitPrice = M(l.UnitPrice), net = M(l.Net) }),
                 }),
@@ -160,8 +168,10 @@ internal static class Orders
             context.Transaction,
             """
             INSERT INTO sal.sales_order (sales_order_id, company_id, order_no, party_id, plant_id, order_date, delivery_term_code, site_address, requested_date, customer_po_ref,
-              price_list_version_id, status, total_net, lines_version, created_by, version, quote_id, exemption_pending, proforma_collects_itbis)
-            VALUES (@id, @c, @no, @p, @plant, @date, @term, @site, @req, @po, @list, 'DRAFT', @total, 1, @by, 1, @quote, @pending, @collects)
+              price_list_version_id, status, total_net, lines_version, created_by, version, quote_id, exemption_pending, proforma_collects_itbis,
+              cash_sale, buyer_name, buyer_phone, buyer_id_kind, buyer_id)
+            VALUES (@id, @c, @no, @p, @plant, @date, @term, @site, @req, @po, @list, 'DRAFT', @total, 1, @by, 1, @quote, @pending, @collects,
+              @cash, @bname, @bphone, @bkind, @bid)
             """,
             cancellationToken,
             ("id", orderId),
@@ -179,7 +189,12 @@ internal static class Orders
             ("by", creator),
             ("quote", quoteId),
             ("pending", exemption.Pending),
-            ("collects", exemption.CollectsItbis)).ConfigureAwait(false);
+            ("collects", exemption.CollectsItbis),
+            ("cash", cash),
+            ("bname", buyer?.Name),
+            ("bphone", buyer?.Phone),
+            ("bkind", buyer?.IdKind),
+            ("bid", buyer?.Id)).ConfigureAwait(false);
         await WriteLinesAsync(context, orderId, 1, lines, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(Aggregate, orderId, "DOCUMENT", null, "DRAFT", commandType, eventId, cancellationToken).ConfigureAwait(false);
         return orderNo;
@@ -210,7 +225,13 @@ internal static class Orders
         }
     }
 
-    public sealed record Row(Guid PartyId, string Status, decimal Total, int LinesVersion, Guid CreatedBy, long Version, string OrderNo);
+    /// <summary>E-CF1-2: who buys on a cash sale; every member optional.</summary>
+    public sealed record Buyer(string? Name, string? Phone, string? IdKind, string? Id);
+
+    /// <remarks>E-CF1-01-3…5: <c>CashSale</c>, what must be paid and what receipts are assigned to it (zero and null on a credit order).</remarks>
+    public sealed record Row(
+        Guid PartyId, string Status, decimal Total, int LinesVersion, Guid CreatedBy, long Version, string OrderNo, bool CashSale = false, decimal? PaymentTotal = null, decimal Allocated = 0m,
+        string? BuyerId = null);
 
     public static async Task<Row> LockAsync(CommandContext context, Guid orderId, long expectedVersion, CancellationToken cancellationToken)
     {
@@ -229,8 +250,12 @@ internal static class Orders
         => await Reading.SingleOrDefaultAsync(
                context.Connection,
                context.Transaction,
-               "SELECT party_id, status, total_net, lines_version, created_by, version, order_no FROM sal.sales_order WHERE company_id = @c AND sales_order_id = @o FOR UPDATE",
-               r => new Row(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetInt32(3), r.GetGuid(4), r.GetInt64(5), r.GetString(6)),
+               """
+               SELECT party_id, status, total_net, lines_version, created_by, version, order_no, cash_sale, payment_total::numeric(19,2), allocated_amount::numeric(19,2), buyer_id
+               FROM sal.sales_order WHERE company_id = @c AND sales_order_id = @o FOR UPDATE
+               """,
+               r => new Row(
+                   r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetInt32(3), r.GetGuid(4), r.GetInt64(5), r.GetString(6), r.GetBoolean(7), r.NullableDecimal(8), r.GetDecimal(9), r.NullableString(10)),
                cancellationToken,
                ("c", context.CompanyId),
                ("o", orderId)).ConfigureAwait(false)
@@ -311,6 +336,11 @@ public sealed class CreateSalesOrderHandler : ICommandHandler<CreateSalesOrder>
             throw new DomainException(OrderErrors.CustomerNotActive, "The customer is blocked.");
         }
 
+        if (await SalesSql.ScalarAsync<string>(context, "SELECT party_kind FROM md.party WHERE party_id = @p", cancellationToken, ("p", command.PartyId)).ConfigureAwait(false) == "CONSUMER")
+        {
+            throw new DomainException(OrderErrors.UseCashSale, "A sale to the final consumer is a cash sale: use CreateCashSale (E-CF1-4).");
+        }
+
         var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken).ConfigureAwait(false);
         var orderNo = await Orders.InsertAsync(context, context.ResultRef, command.PartyId, header, list, lines, total, null, CommandType, cancellationToken, exemption).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.M(total), version = 1 });
@@ -332,6 +362,11 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
         if (row.Status != "DRAFT")
         {
             throw new DomainException(SalesErrors.InvalidState, $"The order is {row.Status}; only a DRAFT changes.");
+        }
+
+        if (row.CashSale)
+        {
+            throw new DomainException(OrderErrors.UseCashSale, "A cash sale is edited with UpdateCashSaleDraft (E-CF1-4).");
         }
 
         var quoted = await Orders.QuotedPricesAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
@@ -389,6 +424,11 @@ public sealed class SubmitForCreditHandler : ICommandHandler<SubmitForCredit>
         if (row.Status != "DRAFT")
         {
             throw new DomainException(SalesErrors.InvalidState, $"The order is {row.Status}.");
+        }
+
+        if (row.CashSale)
+        {
+            throw new DomainException(OrderErrors.UseCashSale, "A cash sale does not go through credit: it is sent to payment (E-CF1-4).");
         }
 
         if (await Orders.CustomerStatusAsync(context, row.PartyId, cancellationToken).ConfigureAwait(false) != "ACTIVE")
@@ -541,9 +581,14 @@ public sealed class CancelSalesOrderHandler : ICommandHandler<CancelSalesOrder>
         }
 
         var row = await Orders.LockAsync(context, command.SalesOrderId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
-        if (row.Status is not ("DRAFT" or "PENDING_CREDIT" or "CONFIRMED"))
+        if (row.Status is not ("DRAFT" or "PENDING_CREDIT" or "PENDING_PAYMENT" or "CONFIRMED"))
         {
-            throw new DomainException(SalesErrors.InvalidState, $"The order is {row.Status}; only DRAFT, PENDING_CREDIT or CONFIRMED orders without deliveries are cancelled.");
+            throw new DomainException(SalesErrors.InvalidState, $"The order is {row.Status}; only DRAFT, PENDING_CREDIT, PENDING_PAYMENT or CONFIRMED orders without deliveries are cancelled.");
+        }
+
+        if (row.Allocated > 0m)
+        {
+            throw new DomainException(SalesErrors.InvalidState, $"{row.OrderNo} has receipts assigned: release them before cancelling the order (E-CF1-01-8).");
         }
 
         if (await SalesSql.ScalarAsync<bool?>(

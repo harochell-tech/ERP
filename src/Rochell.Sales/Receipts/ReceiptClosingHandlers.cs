@@ -24,6 +24,9 @@ public sealed class MarkReceiptBouncedHandler : ICommandHandler<MarkReceiptBounc
 
         // Lock order: the proformas its live allocations touch → the invoices its live applications touch → AR documents → receipt;
         // an application or allocation added meanwhile is refused.
+        // E-CF1-02-2: the cash orders it is assigned to come first of all (lock order: sales order → … → receipt).
+        var assignedBefore = await CashSales.CashSaleStore.LiveOfReceiptAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
+        await CashSales.CashSaleStore.LockOrdersAsync(context, assignedBefore.Select(a => a.SalesOrderId), cancellationToken).ConfigureAwait(false);
         var allocatedBefore = await Allocations.LiveOfReceiptAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
         await Allocations.LockProformasAsync(context, allocatedBefore.Select(a => a.ProformaId), cancellationToken).ConfigureAwait(false);
         var before = await Receipting.LiveApplicationsAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
@@ -31,8 +34,10 @@ public sealed class MarkReceiptBouncedHandler : ICommandHandler<MarkReceiptBounc
         var receipt = await Receipting.LockAsync(context, command.ReceiptId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         var applications = await Receipting.LiveApplicationsAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
         var allocations = await Allocations.LiveOfReceiptAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
+        var assigned = await CashSales.CashSaleStore.LiveOfReceiptAsync(context, command.ReceiptId, cancellationToken).ConfigureAwait(false);
         if (!applications.Select(a => a.ApplicationId).Order().SequenceEqual(before.Select(a => a.ApplicationId).Order())
-            || !allocations.Select(a => a.AllocationId).Order().SequenceEqual(allocatedBefore.Select(a => a.AllocationId).Order()))
+            || !allocations.Select(a => a.AllocationId).Order().SequenceEqual(allocatedBefore.Select(a => a.AllocationId).Order())
+            || !assigned.Select(a => a.AllocationId).Order().SequenceEqual(assignedBefore.Select(a => a.AllocationId).Order()))
         {
             throw new DomainException(SalesErrors.VersionConflict, "The receipt's applications or allocations changed; reload and retry.");
         }
@@ -80,6 +85,12 @@ public sealed class MarkReceiptBouncedHandler : ICommandHandler<MarkReceiptBounc
         foreach (var group in allocations.GroupBy(a => a.EventId))
         {
             await Allocations.ReleaseAsync(context, command.ReceiptId, receipt.No, group.ToList(), ++version, reason, CommandType, null, cancellationToken).ConfigureAwait(false);
+        }
+
+        // E-CF1-02-2: so are its assignments to cash orders; the order keeps its state and dispatches nothing more until it is covered.
+        foreach (var group in assigned.GroupBy(a => a.EventId))
+        {
+            await CashSales.CashSaleStore.ReleaseAsync(context, command.ReceiptId, receipt.No, group.ToList(), ++version, reason, CommandType, cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var group in applications.GroupBy(a => a.EventId))

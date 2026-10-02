@@ -24,6 +24,7 @@ using Rochell.Procurement.ReceiptCorrections;
 using Rochell.Procurement.SupplierInvoices;
 using Rochell.Reconciliation;
 using Rochell.Sales.CreditNotes;
+using Rochell.Sales.CashSales;
 using Rochell.Sales.Customers;
 using Rochell.Sales.Deliveries;
 using Rochell.Sales.Fleet;
@@ -236,6 +237,14 @@ public static class CommandEndpoints
         sales.MapCommand<PrepareCustomerRefund, PrepareCustomerRefundHandler>();
         sales.MapCommand<ReleaseCustomerRefund, ReleaseCustomerRefundHandler>();
         sales.MapCommand<VoidCustomerRefund, VoidCustomerRefundHandler>();
+        // CF1-02 (E-CF1-1…7, E-CF1-02-1…3): cash sales to the final consumer and their payment.
+        sales.MapCommand<CreateCashSale, CreateCashSaleHandler>();
+        sales.MapCommand<UpdateCashSaleDraft, UpdateCashSaleDraftHandler>();
+        sales.MapCommand<SubmitCashSaleForPayment, SubmitCashSaleForPaymentHandler>();
+        sales.MapCommand<ReturnCashSaleToDraft, ReturnCashSaleToDraftHandler>();
+        sales.MapCommand<AllocateReceiptToOrder, AllocateReceiptToOrderHandler>();
+        sales.MapCommand<ReleaseOrderAllocation, ReleaseOrderAllocationHandler>();
+        sales.MapCommand<ConfirmCashSale, ConfirmCashSaleHandler>();
         // MAIL-02 (E-MAIL-6, E-MAIL-01-8, 10): documents by e-mail, one permission per document, and the retry of a failed message.
         sales.MapCommand<SendQuoteByEmail, SendQuoteByEmailHandler>();
         sales.MapCommand<SendProformaByEmail, SendProformaByEmailHandler>();
@@ -318,6 +327,8 @@ public static class CommandEndpoints
         typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(PrepareCustomerRefundHandler), typeof(ReleaseCustomerRefundHandler), typeof(VoidCustomerRefundHandler),
         typeof(SendQuoteByEmailHandler), typeof(SendProformaByEmailHandler), typeof(SendDeliveryByEmailHandler), typeof(SendStatementByEmailHandler), typeof(SendArAgingByEmailHandler),
         typeof(RetryDocumentEmailHandler),
+        typeof(CreateCashSaleHandler), typeof(UpdateCashSaleDraftHandler), typeof(SubmitCashSaleForPaymentHandler), typeof(ReturnCashSaleToDraftHandler), typeof(AllocateReceiptToOrderHandler),
+        typeof(ReleaseOrderAllocationHandler), typeof(ConfirmCashSaleHandler),
         typeof(AllocateReceiptToProformasHandler), typeof(ReleaseProformaAllocationHandler), typeof(UnapplyReceiptHandler), typeof(MarkReceiptBouncedHandler),
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),

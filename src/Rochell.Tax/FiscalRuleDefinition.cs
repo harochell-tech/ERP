@@ -11,6 +11,7 @@ namespace Rochell.Tax;
 /// SALES_ITBIS (E-VS3-05-1): {"tax_code","rate","effect" (OUTPUT), "exempt_item_categories"?}.
 /// PURCHASE_WITHHOLDING: {"tax_code","rate","base" (NET | ITBIS),"party_types" (COMPANY | INDIVIDUAL),"isr_withholding_type"? ("1"…"9", E-FIS2-01-4)}.
 /// REPORT_606_CLASSIFICATION (E-FIS2-01-1/2): {"classes": {"&lt;raw-material category&gt;": "01"…"11"}} covering every raw-material category.
+/// CONSUMER_ID_THRESHOLD (E-CF1-01-6): {"amount"} — a decimal string greater than 0, at most 2 decimals.
 /// Rates are decimal strings (E-PR06-5), 0 &lt; rate ≤ 1, at most 6 decimals.
 /// </summary>
 public sealed record FiscalRuleDefinition(
@@ -22,7 +23,8 @@ public sealed record FiscalRuleDefinition(
     string? Base,
     IReadOnlySet<string> PartyTypes,
     string? IsrWithholdingType = null,
-    IReadOnlyDictionary<string, string>? Classes = null)
+    IReadOnlyDictionary<string, string>? Classes = null,
+    decimal? Amount = null)
 {
     /// <summary>E-FIS2-01-2: the purchased categories the 606 classifies (the raw materials of md.item).</summary>
     public static readonly IReadOnlySet<string> RawMaterialCategories = new HashSet<string>(StringComparer.Ordinal) { "CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA" };
@@ -36,6 +38,7 @@ public sealed record FiscalRuleDefinition(
     private static readonly string[] ItbisKeys = ["tax_code", "rate", "effect", "exempt_item_categories"];
     private static readonly string[] WithholdingKeys = ["tax_code", "rate", "base", "party_types", "isr_withholding_type"];
     private static readonly string[] ClassificationKeys = ["classes"];
+    private static readonly string[] ThresholdKeys = ["amount"];
 
     public static FiscalRuleDefinition Parse(string kind, string json)
     {
@@ -59,6 +62,7 @@ public sealed record FiscalRuleDefinition(
             FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis => ItbisKeys,
             FiscalRuleKinds.PurchaseWithholding => WithholdingKeys,
             FiscalRuleKinds.Report606Classification => ClassificationKeys,
+            FiscalRuleKinds.ConsumerIdThreshold => ThresholdKeys,
             _ => throw Invalid($"Unknown rule kind {kind}."),
         };
         foreach (var property in root.EnumerateObject().Where(p => !allowed.Contains(p.Name)))
@@ -69,6 +73,14 @@ public sealed record FiscalRuleDefinition(
         if (kind == FiscalRuleKinds.Report606Classification)
         {
             return new FiscalRuleDefinition(kind, kind, 0m, kind, new HashSet<string>(StringComparer.Ordinal), null, new HashSet<string>(StringComparer.Ordinal), null, ParseClasses(root));
+        }
+
+        if (kind == FiscalRuleKinds.ConsumerIdThreshold)
+        {
+            // E-CF1-01-6: {"amount": "250000.00"} — the invoice total, in pesos, from which the buyer's identification is mandatory.
+            return decimal.TryParse(RequiredString(root, "amount"), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var amount) && amount > 0 && decimal.Round(amount, 2) == amount
+                ? new FiscalRuleDefinition(kind, kind, 0m, kind, new HashSet<string>(StringComparer.Ordinal), null, new HashSet<string>(StringComparer.Ordinal), null, null, amount)
+                : throw Invalid("amount must be a decimal string greater than 0 with at most 2 decimals.");
         }
 
         var taxCode = RequiredString(root, "tax_code");

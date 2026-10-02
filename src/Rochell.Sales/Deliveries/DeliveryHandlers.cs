@@ -309,6 +309,9 @@ public sealed class PlanDeliveryHandler : ICommandHandler<PlanDelivery>
             throw new DomainException(SalesErrors.InvalidState, $"The order is {order.Status}; only CONFIRMED or PARTIALLY_DELIVERED orders are delivered.");
         }
 
+        // E-CF1-4, E-CF1-02-2: a cash sale is planned only while the money that counts covers it.
+        await CashSales.CashSaleStore.EnsureCoveredAsync(context, command.SalesOrderId, order, cancellationToken).ConfigureAwait(false);
+
         var head = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
@@ -563,6 +566,9 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
         {
             throw new DomainException(SalesErrors.InvalidState, $"The delivery is {row.Status}.");
         }
+
+        // E-CF1-4, E-CF1-02-2: a cash sale leaves the gate only while the money that counts covers it (a bounced cheque stops it).
+        await CashSales.CashSaleStore.EnsureCoveredAsync(context, row.SalesOrderId, order, cancellationToken).ConfigureAwait(false);
 
         if (row.VehicleId is { } vehicle && await SalesSql.ScalarAsync<decimal?>(context, "SELECT capacity_kg FROM log.vehicle WHERE vehicle_id = @v", cancellationToken, ("v", vehicle)).ConfigureAwait(false) is { } capacity
             && command.GrossKg - command.TareKg > capacity)
