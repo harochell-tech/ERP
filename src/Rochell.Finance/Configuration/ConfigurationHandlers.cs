@@ -46,7 +46,7 @@ public sealed class PrepareAccountRoleMapHandler : ICommandHandler<PrepareAccoun
         }
 
         await using (var role = Sql.Command(
-            context.Connection, context.Transaction, "SELECT is_control FROM fin.account_role WHERE role_code = @r AND role_code <> 'MANUAL_ADJUSTMENT'", ("r", command.AccountRole)))
+            context.Connection, context.Transaction, "SELECT is_control FROM fin.account_role WHERE role_code = @r AND role_code NOT IN ('MANUAL_ADJUSTMENT', 'PURCHASE_EXPENSE')", ("r", command.AccountRole)))
         await using (var account = Sql.Command(
             context.Connection, context.Transaction, "SELECT is_control FROM fin.account WHERE company_id = @c AND account_id = @a AND status = 'ACTIVE'", ("c", context.CompanyId), ("a", command.AccountId)))
         {

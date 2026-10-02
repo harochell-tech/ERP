@@ -181,7 +181,7 @@ public sealed class ListAccountRolesHandler : IQueryHandler<ListAccountRoles>
                            WHERE m.company_id = @c AND m.account_role = ar.role_code AND m.status = 'ACTIVE'
                              AND m.effective_from <= @today AND (m.effective_to IS NULL OR m.effective_to > @today))
             FROM fin.account_role ar
-            WHERE ar.role_code <> 'MANUAL_ADJUSTMENT'
+            WHERE ar.role_code NOT IN ('MANUAL_ADJUSTMENT', 'PURCHASE_EXPENSE')
             ORDER BY ar.name
             """,
             r => new AccountRoleView(r.GetString(0), r.NullableString(1), r.GetString(2), r.GetBoolean(3), r.GetBoolean(4), r.GetBoolean(5)),
