@@ -62,3 +62,20 @@ export function deliveryText(item: Pick<MailItem, "status" | "deliveryMode" | "d
   }
   return item.attempts > 0 ? `Reintentando (${item.attempts} intento${item.attempts === 1 ? "" : "s"}): ${item.lastError ?? ""}`.trim() : "Saldrá en unos segundos";
 }
+
+/** E-MAIL-01-7: why a quote cannot be e-mailed yet, saying what to do first; null when it can. */
+export function quoteMailBlocked(status: string, expired: boolean): string | null {
+  switch (status) {
+    case "DRAFT":
+      return "Primero pulse «Marcar enviada al cliente»: una cotización en borrador no se envía por correo.";
+    case "PENDING_APPROVAL":
+      return "Falta la aprobación de precios; después márquela como enviada al cliente.";
+    case "CONVERTED":
+      return null;
+    case "SENT":
+      return expired ? "La cotización está vencida: cópiela con una nueva vigencia para enviarla." : null;
+    default:
+      return "Una cotización perdida o cancelada no se envía por correo.";
+  }
+}
+

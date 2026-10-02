@@ -12,7 +12,7 @@ import { formatQuantity } from "@/lib/decimal";
 import { addDays, DELIVERY_TERMS, formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labels";
 import { DEFAULT_QUOTE_VALIDITY_DAYS, quoteActions, quoteStatusLabel } from "@/lib/quotes";
 import { QuoteMail } from "@/components/DocumentMail";
-import { quoteWatermark } from "@/lib/print";
+import { quoteMailBlocked } from "@/lib/mail";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -311,7 +311,7 @@ function QuoteDetail() {
       <QuoteMail
         quoteId={h.quoteId}
         quoteNo={h.quoteNo}
-        blocked={quoteWatermark(h.status, h.expired) === null ? null : "Solo se envía por correo una cotización enviada y vigente."}
+        blocked={quoteMailBlocked(h.status, h.expired)}
       />
       <History history={data.history} />
     </>
