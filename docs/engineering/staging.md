@@ -218,7 +218,9 @@ and TRANSITO, the 2026 periods, the registry of 2026-09-19 and the owner as SUPE
 ## Outgoing mail (MAIL-03, E-MAIL-01-3 / E-MAIL-01-4)
 
 The compose file runs `pdf` (Gotenberg with Chromium, internal network only) and passes the mail settings to the API. Mail stays
-**Off** until `MAIL_MODE` is set in `/opt/rochell-staging/.env`:
+**Off** until `MAIL_MODE` is set as a **variable of the GitHub Environment `staging`** (Settings → Environments → staging →
+Variables) — the deploy rewrites `/opt/rochell-staging/.env` from that environment every time, so a value typed on the server is
+lost at the next deploy:
 
 ```
 MAIL_MODE=Redirect
@@ -228,7 +230,7 @@ MAIL_ARCHIVE_BCC=industrias@rochell.com.do
 ```
 
 `MAIL_SMTP_HOST` (default `smtp-relay.gmail.com`) and `MAIL_EHLO_NAME` (default `staging.industriasrochell.com.do`) rarely change.
-Then `docker compose up -d api`. With **Redirect** every message goes only to `MAIL_REDIRECT_TO`, the intended recipients named in
+Then run `deploy-staging`. With **Redirect** every message goes only to `MAIL_REDIRECT_TO`, the intended recipients named in
 the subject and the body; **Live** (customers receive mail) is set only on the owner's explicit decision (E-MAIL-8).
 
 One-time, by the Workspace administrator (no password is stored on the server):

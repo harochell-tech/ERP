@@ -64,6 +64,11 @@ jobs:
           BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
           BACKUP_ACCESS_KEY_ID: ${{ secrets.BACKUP_ACCESS_KEY_ID }}
           BACKUP_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_SECRET_ACCESS_KEY }}
+          # E-MAIL-01-4: optional. Without MAIL_MODE the compose file leaves outgoing mail Off.
+          MAIL_MODE: ${{ vars.MAIL_MODE }}
+          MAIL_FROM: ${{ vars.MAIL_FROM }}
+          MAIL_REDIRECT_TO: ${{ vars.MAIL_REDIRECT_TO }}
+          MAIL_ARCHIVE_BCC: ${{ vars.MAIL_ARCHIVE_BCC }}
         run: |
           scp deploy/staging/compose.yaml deploy/staging/Caddyfile deploy/staging/init-roles.sql \
               deploy/staging/deploy.sh deploy/staging/backup.sh deploy/staging/seed.sh deploy/staging/seed-vs3.sh deploy/staging/seed-mfg.sh deploy/staging/rnc-weekly.sh "${TARGET}:/opt/rochell-staging/"
@@ -73,11 +78,18 @@ jobs:
                 OIDC_CLIENT_SECRET WORM_BUCKET WORM_REGION WORM_ENDPOINT WORM_ACCESS_KEY_ID WORM_SECRET_ACCESS_KEY BACKUP_BUCKET
                 BACKUP_ACCESS_KEY_ID BACKUP_SECRET_ACCESS_KEY"
           ROCHELL_IMAGE="${IMAGE}"
-          for name in ${vars}; do
-            value="${!name}"
-            test -n "${value}" || { echo "Missing ${name} in the staging environment" >&2; exit 1; }
-            printf '%s=%s\n' "${name}" "${value}"
-          done | ssh "${TARGET}" 'umask 077; cat > /opt/rochell-staging/.env'
+          {
+            for name in ${vars}; do
+              value="${!name}"
+              test -n "${value}" || { echo "Missing ${name} in the staging environment" >&2; exit 1; }
+              printf '%s=%s\n' "${name}" "${value}"
+            done
+            # Optional variables: written only when the environment defines them.
+            for name in MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC; do
+              value="${!name}"
+              if test -n "${value}"; then printf '%s=%s\n' "${name}" "${value}"; fi
+            done
+          } | ssh "${TARGET}" 'umask 077; cat > /opt/rochell-staging/.env'
 
       - name: Deploy
         env:
