@@ -71,7 +71,7 @@ public sealed class CloseTests(PostgresFixture postgres)
 
         // STRUCT-COVERAGE (FIN1-03) only warns: this fixture's accounts have no class and there is no report structure.
         Assert.All(result.GetProperty("runs").EnumerateArray().Where(r => r.GetProperty("code").GetString() is not ("STRUCT-COVERAGE" or "MIGRATION-CLEARING")), r => Assert.Equal("MATCHED", r.GetProperty("status").GetString()));
-        Assert.Equal(31L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_run")); // 8 of VS#1 + BANK-GL and PAY-APPL (VS2-06) + MANUAL-EVIDENCE and TB-BALANCED (FIN1-02) + STRUCT-COVERAGE + MIGRATION-CLEARING + 5 of VS3-08 + 6 of MFG1-05 + 3 of FIS1-04 + TAX-606 (FIS2-02) + CONTROLS-WAIVED (ADM-2)
+        Assert.Equal(32L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_run")); // 8 of VS#1 + BANK-GL and PAY-APPL (VS2-06) + MANUAL-EVIDENCE and TB-BALANCED (FIN1-02) + STRUCT-COVERAGE + MIGRATION-CLEARING + 5 of VS3-08 + 6 of MFG1-05 + 3 of FIS1-04 + TAX-606 (FIS2-02) + CONTROLS-WAIVED (ADM-2)
         Assert.Equal(0L, await h.ScalarAsync<long>("SELECT count(*) FROM rec.recon_exception WHERE severity <> 'WARNING'"));
     }
 
