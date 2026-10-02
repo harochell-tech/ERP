@@ -80,6 +80,12 @@ public static class TaxSetup
     {
         var rule = new ApplicableRule(Guid.Empty, "X", FiscalRuleDefinition.Parse(kind, definition));
         var line = new TaxableLine(Guid.Empty, "CEMENTO", 1000m);
+        if (kind == FiscalRuleKinds.PurchaseTaxType)
+        {
+            // E-GAS-02-3: a tax type is tested on the net alone — every component, or none for an exempt type.
+            return new FiscalTestCase(id, PartyTaxTypes.Company, string.Empty, 1000m, 0m, [.. TaxCalculator.Components(rule, line).Select(t => new ExpectedTax(t.TaxCode, t.Amount, t.Effect))]);
+        }
+
         var tax = kind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis ? TaxCalculator.Itbis(rule, line) : TaxCalculator.Withholding(rule, line, PartyTaxTypes.Individual, 180m);
         return new FiscalTestCase(id, PartyTaxTypes.Individual, "CEMENTO", 1000m, 180m, tax is null ? [] : [new ExpectedTax(tax.TaxCode, tax.Amount, tax.Effect)]);
     }

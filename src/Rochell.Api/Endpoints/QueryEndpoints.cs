@@ -58,7 +58,7 @@ public static class QueryEndpoints
         typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
-        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
+        typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListPurchaseTaxTypesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
@@ -409,6 +409,10 @@ public static class QueryEndpoints
         tax.MapGet("/fiscal-rules", (HttpContext http, Guid companyId, ListFiscalRulesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListFiscalRules(companyId, s), handler, ct))
             .Describe<FiscalRuleList>(nameof(ListFiscalRules));
+        // E-GAS-02-7: the tax types in force on a date, for the expense lines of purchase orders and supplier invoices.
+        tax.MapGet("/purchase-tax-types", (HttpContext http, Guid companyId, DateOnly? date, ListPurchaseTaxTypesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPurchaseTaxTypes(companyId, s, date), handler, ct))
+            .Describe<PurchaseTaxTypeList>(nameof(ListPurchaseTaxTypes));
         // E-FIS2-02-1…7: the 606 (?format=csv: the DGII tool's columns, no BOM) and the IT-1 / IR-17 summaries (fiscal_report:read).
         tax.MapGet("/reports/606", (HttpContext http, Guid companyId, string period, string? format, GetReport606Handler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunReportAsync(http, format, s => new GetReport606(companyId, s, period), handler, Report606Csv.Build, $"606-{period}.csv", ct, byteOrderMark: false))

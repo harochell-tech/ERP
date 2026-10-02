@@ -4,6 +4,9 @@ using Rochell.Platform.Commands;
 
 namespace Rochell.Tax;
 
+/// <summary>One tax of a purchase tax type (E-GAS-02-1): its code, its rate on the line's net and where it goes.</summary>
+public sealed record TaxComponent(string TaxCode, decimal Rate, string Effect);
+
 /// <summary>
 /// E-PR12-3: declarative definition of a purchase fiscal rule. Every normative value (code, rate, exemptions, who is
 /// withheld) comes from the activated definition, never from code.
@@ -12,6 +15,9 @@ namespace Rochell.Tax;
 /// PURCHASE_WITHHOLDING: {"tax_code","rate","base" (NET | ITBIS),"party_types" (COMPANY | INDIVIDUAL),"isr_withholding_type"? ("1"…"9", E-FIS2-01-4)}.
 /// REPORT_606_CLASSIFICATION (E-FIS2-01-1/2): {"classes": {"&lt;raw-material category&gt;": "01"…"11"}} covering every raw-material category.
 /// CONSUMER_ID_THRESHOLD (E-CF1-01-6): {"amount"} — a decimal string greater than 0, at most 2 decimals.
+/// PURCHASE_TAX_TYPE (E-GAS-02-1): {"label","components": [{"tax_code","rate","effect" (RECOVERABLE_INPUT | SELECTIVE_TAX | OTHER_TAX |
+/// LEGAL_TIP)}]} — no components is «exento» (E-GAS-01-5); each component is computed on the line's net (E-GAS-01-6).
+/// PURCHASE_WITHHOLDING may carry "applies_to" (INVENTORY | EXPENSE_SERVICE | EXPENSE_GOODS, E-GAS-01-7); without it, every line.
 /// Rates are decimal strings (E-PR06-5), 0 &lt; rate ≤ 1, at most 6 decimals.
 /// </summary>
 public sealed record FiscalRuleDefinition(
@@ -24,7 +30,10 @@ public sealed record FiscalRuleDefinition(
     IReadOnlySet<string> PartyTypes,
     string? IsrWithholdingType = null,
     IReadOnlyDictionary<string, string>? Classes = null,
-    decimal? Amount = null)
+    decimal? Amount = null,
+    string? Label = null,
+    IReadOnlyList<TaxComponent>? Components = null,
+    IReadOnlySet<string>? AppliesTo = null)
 {
     /// <summary>E-FIS2-01-2: the purchased categories the 606 classifies (the raw materials of md.item).</summary>
     public static readonly IReadOnlySet<string> RawMaterialCategories = new HashSet<string>(StringComparer.Ordinal) { "CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA" };
@@ -36,7 +45,13 @@ public sealed record FiscalRuleDefinition(
     };
 
     private static readonly string[] ItbisKeys = ["tax_code", "rate", "effect", "exempt_item_categories"];
-    private static readonly string[] WithholdingKeys = ["tax_code", "rate", "base", "party_types", "isr_withholding_type"];
+    private static readonly string[] WithholdingKeys = ["tax_code", "rate", "base", "party_types", "isr_withholding_type", "applies_to"];
+    private static readonly string[] TaxTypeKeys = ["label", "components"];
+    private static readonly string[] ComponentKeys = ["tax_code", "rate", "effect"];
+    private static readonly IReadOnlySet<string> ComponentEffects = new HashSet<string>(StringComparer.Ordinal)
+    {
+        TaxEffects.RecoverableInput, TaxEffects.SelectiveTax, TaxEffects.OtherTax, TaxEffects.LegalTip,
+    };
     private static readonly string[] ClassificationKeys = ["classes"];
     private static readonly string[] ThresholdKeys = ["amount"];
 
@@ -63,6 +78,7 @@ public sealed record FiscalRuleDefinition(
             FiscalRuleKinds.PurchaseWithholding => WithholdingKeys,
             FiscalRuleKinds.Report606Classification => ClassificationKeys,
             FiscalRuleKinds.ConsumerIdThreshold => ThresholdKeys,
+            FiscalRuleKinds.PurchaseTaxType => TaxTypeKeys,
             _ => throw Invalid($"Unknown rule kind {kind}."),
         };
         foreach (var property in root.EnumerateObject().Where(p => !allowed.Contains(p.Name)))
@@ -83,17 +99,13 @@ public sealed record FiscalRuleDefinition(
                 : throw Invalid("amount must be a decimal string greater than 0 with at most 2 decimals.");
         }
 
-        var taxCode = RequiredString(root, "tax_code");
-        if (!System.Text.RegularExpressions.Regex.IsMatch(taxCode, "^[A-Z][A-Z0-9_]*$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)))
+        if (kind == FiscalRuleKinds.PurchaseTaxType)
         {
-            throw Invalid("tax_code must be uppercase letters, digits and underscores.");
+            return ParseTaxType(kind, root);
         }
 
-        var rateText = RequiredString(root, "rate");
-        if (!decimal.TryParse(rateText, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var rate) || rate <= 0 || rate > 1 || decimal.Round(rate, 6) != rate)
-        {
-            throw Invalid("rate must be a decimal string greater than 0 and at most 1, with at most 6 decimals.");
-        }
+        var taxCode = TaxCodeOf(root);
+        var rate = RateOf(root);
 
         if (kind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis)
         {
@@ -137,8 +149,76 @@ public sealed record FiscalRuleDefinition(
                 : throw Invalid("isr_withholding_type is one of \"1\"…\"9\" (the 606's ISR withholding types).");
         }
 
-        return new FiscalRuleDefinition(kind, taxCode, rate, TaxEffects.Withholding, new HashSet<string>(StringComparer.Ordinal), @base, parties, isrType);
+        IReadOnlySet<string>? appliesTo = null;
+        if (root.TryGetProperty("applies_to", out var scopes))
+        {
+            appliesTo = StringSet(scopes, "applies_to", TaxLineScopes.All);
+            if (appliesTo.Count == 0)
+            {
+                throw Invalid("applies_to cannot be empty; leave it out to withhold on every line.");
+            }
+        }
+
+        return new FiscalRuleDefinition(kind, taxCode, rate, TaxEffects.Withholding, new HashSet<string>(StringComparer.Ordinal), @base, parties, isrType, AppliesTo: appliesTo);
     }
+
+    /// <summary>E-GAS-02-1: the label shown to whoever registers and the components, each with its own tax code.</summary>
+    private static FiscalRuleDefinition ParseTaxType(string kind, JsonElement root)
+    {
+        var label = RequiredString(root, "label").Trim();
+        if (label.Length is 0 or > 60)
+        {
+            throw Invalid("label has 1 to 60 characters.");
+        }
+
+        if (!root.TryGetProperty("components", out var list) || list.ValueKind != JsonValueKind.Array)
+        {
+            throw Invalid("components is required: an array (empty for an exempt type).");
+        }
+
+        var components = new List<TaxComponent>();
+        foreach (var element in list.EnumerateArray())
+        {
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                throw Invalid("components must contain only objects.");
+            }
+
+            foreach (var property in element.EnumerateObject().Where(p => !ComponentKeys.Contains(p.Name)))
+            {
+                throw Invalid($"Unknown key '{property.Name}' in a component.");
+            }
+
+            var effect = RequiredString(element, "effect");
+            if (!ComponentEffects.Contains(effect))
+            {
+                throw Invalid("effect of a component is RECOVERABLE_INPUT, SELECTIVE_TAX, OTHER_TAX or LEGAL_TIP.");
+            }
+
+            var component = new TaxComponent(TaxCodeOf(element), RateOf(element), effect);
+            if (components.Any(c => c.TaxCode == component.TaxCode))
+            {
+                throw Invalid($"components: tax_code '{component.TaxCode}' is repeated.");
+            }
+
+            components.Add(component);
+        }
+
+        return new FiscalRuleDefinition(kind, kind, 0m, kind, new HashSet<string>(StringComparer.Ordinal), null, new HashSet<string>(StringComparer.Ordinal), Label: label, Components: components);
+    }
+
+    private static string TaxCodeOf(JsonElement root)
+    {
+        var taxCode = RequiredString(root, "tax_code");
+        return System.Text.RegularExpressions.Regex.IsMatch(taxCode, "^[A-Z][A-Z0-9_]*$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1))
+            ? taxCode
+            : throw Invalid("tax_code must be uppercase letters, digits and underscores.");
+    }
+
+    private static decimal RateOf(JsonElement root)
+        => decimal.TryParse(RequiredString(root, "rate"), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var rate) && rate > 0 && rate <= 1 && decimal.Round(rate, 6) == rate
+            ? rate
+            : throw Invalid("rate must be a decimal string greater than 0 and at most 1, with at most 6 decimals.");
 
     /// <summary>E-FIS2-01-2: every raw-material category mapped to a 606 goods-and-services code "01"…"11".</summary>
     private static Dictionary<string, string> ParseClasses(JsonElement root)

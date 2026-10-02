@@ -4812,6 +4812,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/tax/purchase-tax-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListPurchaseTaxTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/tax/reports/606": {
         parameters: {
             query?: never;
@@ -7041,6 +7057,7 @@ export interface components {
             /** Format: decimal */
             itbisAmount: string;
             expected: components["schemas"]["ExpectedTax"][];
+            scope?: null | string;
         };
         FiscalTestRunView: {
             passed: boolean;
@@ -8649,6 +8666,24 @@ export interface components {
             limit: number;
             /** Format: int32 */
             offset: number;
+        };
+        PurchaseTaxComponentView: {
+            taxCode: string;
+            /** Format: decimal */
+            rate: string;
+            effect: string;
+        };
+        PurchaseTaxTypeList: {
+            /** Format: date */
+            date: string;
+            items: components["schemas"]["PurchaseTaxTypeView"][];
+        };
+        PurchaseTaxTypeView: {
+            /** Format: uuid */
+            taxTypeId: string;
+            code: string;
+            label: string;
+            components: components["schemas"]["PurchaseTaxComponentView"][];
         };
         QuoteDetail: {
             header: components["schemas"]["QuoteSummary"];
@@ -31062,6 +31097,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FiscalRuleList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPurchaseTaxTypes: {
+        parameters: {
+            query?: {
+                date?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseTaxTypeList"];
                 };
             };
             /** @description Bad Request */

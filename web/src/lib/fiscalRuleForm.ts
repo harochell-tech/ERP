@@ -28,6 +28,17 @@ export const TAX_EFFECT_LABELS: Readonly<Record<string, string>> = {
   NON_RECOVERABLE_INPUT: "No adelantable (va al costo)",
   OUTPUT: "ITBIS facturado en ventas (por pagar)",
   WITHHOLDING: "Retención",
+  // GAS1-02 (E-GAS-10): taxes of an expense purchase that are not credited.
+  SELECTIVE_TAX: "Selectivo al consumo (va a gasto, no se acredita)",
+  OTHER_TAX: "Otros impuestos y tasas (va a gasto, no se acredita)",
+  LEGAL_TIP: "Propina legal (va a gasto)",
+};
+
+/** GAS1-02 (E-GAS-01-7): the lines a withholding rule may be limited to. */
+export const WITHHOLDING_SCOPE_LABELS: Readonly<Record<string, string>> = {
+  INVENTORY: "Materias primas (inventario)",
+  EXPENSE_SERVICE: "Gastos que son servicios",
+  EXPENSE_GOODS: "Gastos que son bienes",
 };
 
 /** The effects each ITBIS kind accepts. */
@@ -92,10 +103,12 @@ export interface FiscalRuleForm {
   classes: Record<string, string>;
   /** CONSUMER_ID_THRESHOLD (E-CF1-05-7): the amount in pesos, as typed. */
   amount: string;
+  /** PURCHASE_WITHHOLDING (E-GAS-01-7): the lines it applies to; absent or empty = every line. */
+  appliesTo?: string[];
 }
 
 const ITBIS_KEYS = ["tax_code", "rate", "effect", "exempt_item_categories"];
-const WITHHOLDING_KEYS = ["tax_code", "rate", "base", "party_types", "isr_withholding_type"];
+const WITHHOLDING_KEYS = ["tax_code", "rate", "base", "party_types", "isr_withholding_type", "applies_to"];
 
 function blankForm(): FiscalRuleForm {
   return { taxCode: "", ratePercent: "", effect: "", exemptItemCategories: [], base: "", partyTypes: [], isrWithholdingType: "", classes: {}, amount: "" };
@@ -152,7 +165,7 @@ export function parseFiscalDefinition(kind: string, json: string): { form: Fisca
       return { form: null, error: `"${key}" debe ser texto.` };
     }
   }
-  for (const key of ["exempt_item_categories", "party_types"]) {
+  for (const key of ["exempt_item_categories", "party_types", "applies_to"]) {
     if (obj[key] !== undefined && !isStringArray(obj[key])) {
       return { form: null, error: `"${key}" debe ser una lista de textos.` };
     }
@@ -166,6 +179,9 @@ export function parseFiscalDefinition(kind: string, json: string): { form: Fisca
   form.base = (obj.base as string | undefined) ?? "";
   form.partyTypes = [...((obj.party_types as string[] | undefined) ?? [])];
   form.isrWithholdingType = (obj.isr_withholding_type as string | undefined) ?? "";
+  if (obj.applies_to !== undefined) {
+    form.appliesTo = [...(obj.applies_to as string[])];
+  }
   return { form, error: null };
 }
 
@@ -204,6 +220,9 @@ export function buildFiscalDefinition(kind: FiscalRuleKind | string, form: Fisca
     };
     if (form.isrWithholdingType !== "") {
       definition.isr_withholding_type = form.isrWithholdingType;
+    }
+    if (form.appliesTo && form.appliesTo.length > 0) {
+      definition.applies_to = inOrder(form.appliesTo, Object.keys(WITHHOLDING_SCOPE_LABELS));
     }
     return JSON.stringify(definition, null, 2);
   }
@@ -267,6 +286,9 @@ function isAtMostOne(fraction: string): boolean {
 
 /** E-UX2-8: a stored definition in words, one line per element; the JSON itself when it cannot be read. */
 export function describeFiscalDefinition(kind: string, json: string): string[] {
+  if (kind === "PURCHASE_TAX_TYPE") {
+    return describeTaxType(json) ?? [json];
+  }
   const parsed = parseFiscalDefinition(kind, json);
   if (parsed.form === null) {
     return [json];
@@ -286,9 +308,40 @@ export function describeFiscalDefinition(kind: string, json: string): string[] {
     if (form.isrWithholdingType) {
       lines.push(`Tipo de retención del 606: ${isrWithholdingTypeLabel(form.isrWithholdingType)}`);
     }
+    if (form.appliesTo && form.appliesTo.length > 0) {
+      lines.push(`Aplica solo a: ${form.appliesTo.map((s) => WITHHOLDING_SCOPE_LABELS[s] ?? s).join(", ")}`);
+    }
   } else {
     lines.push(TAX_EFFECT_LABELS[form.effect] ?? form.effect);
     lines.push(form.exemptItemCategories.length === 0 ? "Sin categorías exentas" : `Exentas: ${form.exemptItemCategories.map(itemCategoryLabel).join(", ")}`);
+  }
+  return lines;
+}
+
+/**
+ * GAS1-02 (E-GAS-02-1): a purchase tax type in words — its label, then each component with its rate and where it goes; an exempt
+ * type has none. Null when the JSON is not a tax type.
+ */
+function describeTaxType(json: string): string[] | null {
+  let root: unknown;
+  try {
+    root = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  const obj = root as { label?: unknown; components?: unknown } | null;
+  if (obj === null || typeof obj !== "object" || typeof obj.label !== "string" || !Array.isArray(obj.components)) {
+    return null;
+  }
+  const lines = [obj.label];
+  if (obj.components.length === 0) {
+    lines.push("Sin impuestos (exento)");
+  }
+  for (const component of obj.components as { tax_code?: unknown; rate?: unknown; effect?: unknown }[]) {
+    if (typeof component?.tax_code !== "string" || typeof component.rate !== "string" || typeof component.effect !== "string") {
+      return null;
+    }
+    lines.push(`${component.tax_code} al ${formatPercent(component.rate)} — ${TAX_EFFECT_LABELS[component.effect] ?? component.effect}`);
   }
   return lines;
 }

@@ -322,12 +322,19 @@ public sealed class RunFiscalRuleTestsHandler : ICommandHandler<RunFiscalRuleTes
         var results = new List<object>();
         foreach (var testCase in command.Cases)
         {
-            var line = new TaxableLine(Guid.Empty, testCase.ItemCategory, testCase.NetAmount);
-            var actual = (version.RuleKind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis
+            if (testCase.Scope is { } scope && !TaxLineScopes.All.Contains(scope))
+            {
+                throw new DomainException(TaxErrors.SubjectInvalid, $"Case {testCase.CaseId}: scope is one of {string.Join(", ", TaxLineScopes.All.Order(StringComparer.Ordinal))}.");
+            }
+
+            var line = new TaxableLine(Guid.Empty, testCase.ItemCategory ?? string.Empty, testCase.NetAmount, Scope: testCase.Scope ?? TaxLineScopes.Inventory);
+            ExpectedTax[] actual = version.RuleKind == FiscalRuleKinds.PurchaseTaxType
+                ? [.. TaxCalculator.Components(rule, line).Select(t => new ExpectedTax(t.TaxCode, t.Amount, t.Effect))] // E-GAS-02-3: every component, on the net
+                : (version.RuleKind is FiscalRuleKinds.PurchaseItbis or FiscalRuleKinds.SalesItbis
                     ? TaxCalculator.Itbis(rule, line)
                     : TaxCalculator.Withholding(rule, line, testCase.PartyType, testCase.ItbisAmount)) is { } tax
-                ? new[] { new ExpectedTax(tax.TaxCode, tax.Amount, tax.Effect) }
-                : [];
+                    ? [new ExpectedTax(tax.TaxCode, tax.Amount, tax.Effect)]
+                    : [];
             var expected = testCase.Expected ?? [];
             var matches = actual.Length == expected.Count
                 && actual.All(a => expected.Any(e => e.TaxCode == a.TaxCode && e.Effect == a.Effect && e.Amount == a.Amount));

@@ -47,9 +47,12 @@ public sealed record ExpectedTax(string TaxCode, decimal Amount, string Effect);
 
 /// <summary>
 /// A regression case supplied by the fiscal team: the context and the taxes the version must produce.
-/// <paramref name="ItbisAmount"/> feeds withholding rules whose base is ITBIS.
+/// <paramref name="ItbisAmount"/> feeds withholding rules whose base is ITBIS. <paramref name="Scope"/> (E-GAS-02-5): what the line
+/// is for a withholding rule limited by "applies_to" (<see cref="TaxLineScopes"/>; an inventory line when absent). A purchase tax
+/// type (E-GAS-02-3) is tested on the net alone.
 /// </summary>
-public sealed record FiscalTestCase(string CaseId, string PartyType, string ItemCategory, decimal NetAmount, decimal ItbisAmount, IReadOnlyList<ExpectedTax> Expected);
+public sealed record FiscalTestCase(
+    string CaseId, string PartyType, string ItemCategory, decimal NetAmount, decimal ItbisAmount, IReadOnlyList<ExpectedTax> Expected, string? Scope = null);
 
 /// <summary>Runs the regression cases against one version, in this environment (E-PR12-5), and records the result.</summary>
 public sealed record RunFiscalRuleTests(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid RuleVersionId, IReadOnlyList<FiscalTestCase> Cases) : ICommand;

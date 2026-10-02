@@ -31878,6 +31878,80 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/tax/purchase-tax-types": {
+      "get": {
+        "tags": [
+          "Tax"
+        ],
+        "operationId": "ListPurchaseTaxTypes",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseTaxTypeList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/tax/reports/606": {
       "get": {
         "tags": [
@@ -40561,6 +40635,12 @@
             "items": {
               "$ref": "#/components/schemas/ExpectedTax"
             }
+          },
+          "scope": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -46425,6 +46505,76 @@
           "offset": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PurchaseTaxComponentView": {
+        "required": [
+          "taxCode",
+          "rate",
+          "effect"
+        ],
+        "type": "object",
+        "properties": {
+          "taxCode": {
+            "type": "string"
+          },
+          "rate": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "effect": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PurchaseTaxTypeList": {
+        "required": [
+          "date",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseTaxTypeView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PurchaseTaxTypeView": {
+        "required": [
+          "taxTypeId",
+          "code",
+          "label",
+          "components"
+        ],
+        "type": "object",
+        "properties": {
+          "taxTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseTaxComponentView"
+            }
           }
         },
         "additionalProperties": false
