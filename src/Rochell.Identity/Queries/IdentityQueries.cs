@@ -135,7 +135,7 @@ public sealed class ListRolesHandler : IQueryHandler<ListRoles>
             SELECT r.code, r.name, r.description, coalesce(array_agg(rp.permission_code ORDER BY rp.permission_code) FILTER (WHERE rp.permission_code IS NOT NULL), '{}')
             FROM iam.role r
             LEFT JOIN iam.role_permission rp ON rp.role_id = r.role_id
-            WHERE r.code NOT IN ('PROCESO_DIARIO', 'PROBADOR')
+            WHERE r.code NOT IN ('PROCESO_DIARIO', 'CARGA_CONFIGURACION', 'PROBADOR')
             GROUP BY r.code, r.name, r.description
             ORDER BY r.name
             """,

@@ -1,0 +1,57 @@
+{
+  "pack": "2026-10",
+  "sources": [
+    {
+      "key": "CT-TITULO-III",
+      "file": "titulo3.pdf",
+      "officialSource": "DGII",
+      "documentTitle": "Código Tributario (Ley 11-92), Título III — ITBIS",
+      "documentVersion": "Texto con la Ley 253-12 (2012-11-09)",
+      "publicationDate": "2012-11-09",
+      "effectiveFrom": "2013-01-01",
+      "url": "https://dgii.gov.do/legislacion/codigotributario/cdigo%20tributario/titulo3.pdf"
+    },
+    {
+      "key": "NG-07-2018",
+      "file": "Norma07-18.pdf",
+      "officialSource": "DGII",
+      "documentTitle": "Norma General 07-2018 — remisión de informaciones (formatos 606, 607, 608, 609)",
+      "documentVersion": "2018-03-09",
+      "publicationDate": "2018-03-09",
+      "effectiveFrom": "2018-05-01",
+      "url": "https://dgii.gov.do/legislacion/normasGenerales/Documents/NG%20sobre%20Comprobantes%20Fiscales/Norma07-18.pdf"
+    }
+  ],
+  "rules": [
+    {
+      "code": "ITBIS_COMPRAS",
+      "kind": "PURCHASE_ITBIS",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "tax_code": "ITBIS", "rate": "0.18", "effect": "RECOVERABLE_INPUT", "exempt_item_categories": [] },
+      "sources": [ "CT-TITULO-III" ],
+      "cases": [
+        { "caseId": "cemento-1000", "partyType": "COMPANY", "itemCategory": "CEMENTO", "netAmount": "1000.00", "itbisAmount": "0.00",
+          "expected": [ { "taxCode": "ITBIS", "amount": "180.00", "effect": "RECOVERABLE_INPUT" } ] }
+      ]
+    },
+    {
+      "code": "ITBIS_VENTAS",
+      "kind": "SALES_ITBIS",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "tax_code": "ITBIS", "rate": "0.18", "effect": "OUTPUT", "exempt_item_categories": [] },
+      "sources": [ "CT-TITULO-III" ],
+      "cases": [
+        { "caseId": "bloque-1000", "partyType": "COMPANY", "itemCategory": "BLOQUE", "netAmount": "1000.00", "itbisAmount": "0.00",
+          "expected": [ { "taxCode": "ITBIS", "amount": "180.00", "effect": "OUTPUT" } ] }
+      ]
+    },
+    {
+      "code": "CLASIF_606",
+      "kind": "REPORT_606_CLASSIFICATION",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "classes": { "CEMENTO": "09", "AGREGADO": "09", "ADITIVO": "09", "OTRA_MATERIA_PRIMA": "09" } },
+      "sources": [ "NG-07-2018" ],
+      "cases": []
+    }
+  ]
+}
