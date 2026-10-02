@@ -934,6 +934,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-SRV1-5 | SRV-1 | Freight of cargo carries no ITBIS, as a fiscal rule with its official source (the accountant confirms), not a constant in code; the invoice shows the exempt line apart. |
 | E-SRV1-6 | SRV-1 | CONFOTUR never invoices freight: orders with an exemption never carry the line; those customers use their own price list. |
 | E-SRV1-7 | SRV-1 | Account «Ingresos por transporte», recognised at delivery, without cost of sales. |
+| E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
+| E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
+| E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
+| E-CFG-4 | CFG | The owner downloads the official PDFs in his browser; they are kept in `docs/fiscal/fuentes/` and their SHA-256 is computed from those files. Without the file the source is not registered. |
+| E-CFG-5 | CFG | Activation stays with a person: one «Activar» per rule. |
+| E-CFG-6 | CFG | Rule versions a person already configured are completed (source linked, tests run) when they match the file, and left alone when they differ. The rules start on 2026-10-01 («desde hoy», said on 2026-10-01). |
 
 Implementation rules derived from the above (no architectural change):
 

@@ -27,6 +27,9 @@ public static class IdentityConstants
     /// <summary>E-FIS1-04-7: the daily process of the API (role PROCESO_DIARIO), acting through SERVICE sessions.</summary>
     public static readonly Guid DailyProcessUserId = Guid.Parse("00000000-0000-7000-8000-00000000d002");
 
+    /// <summary>E-CFG-1: the configuration load of the deployment CLI (role CARGA_CONFIGURACION): it prepares fiscal sources and rules, never activates.</summary>
+    public static readonly Guid ConfigurationLoadUserId = Guid.Parse("00000000-0000-7000-8000-00000000d003");
+
     public const string AuthMethodOidcGoogle = "OIDC_GOOGLE";
 
     public const string AuthMethodService = "SERVICE";

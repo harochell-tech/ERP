@@ -8,6 +8,8 @@
     <ProjectReference Include="..\Rochell.Migrations\Rochell.Migrations.csproj" />
     <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
     <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
+    <ProjectReference Include="..\Rochell.Identity\Rochell.Identity.csproj" />
+    <ProjectReference Include="..\Rochell.Tax\Rochell.Tax.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" />

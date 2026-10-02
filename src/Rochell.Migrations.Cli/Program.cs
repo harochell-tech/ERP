@@ -135,6 +135,19 @@ try
                 daily.Parameters.AddWithValue("id", Guid.CreateVersion7());
                 daily.Parameters.AddWithValue("company", companyId);
                 await daily.ExecuteNonQueryAsync();
+
+                // E-CFG-1: so does the configuration load of this CLI.
+                await using var load = new NpgsqlCommand(
+                    """
+                    INSERT INTO iam.role_assignment (assignment_id, company_id, user_id, role_id, plant_id, valid_from, granted_by)
+                    SELECT @id, @company, '00000000-0000-7000-8000-00000000d003', role_id, NULL, now(), '00000000-0000-7000-8000-00000000d001'
+                    FROM iam.role WHERE code = 'CARGA_CONFIGURACION'
+                    """,
+                    connection,
+                    transaction);
+                load.Parameters.AddWithValue("id", Guid.CreateVersion7());
+                load.Parameters.AddWithValue("company", companyId);
+                await load.ExecuteNonQueryAsync();
                 await transaction.CommitAsync();
 
                 Console.WriteLine($"Company {args[1]} created: {companyId}.");
@@ -476,6 +489,66 @@ try
                 var components = await open.ExecuteNonQueryAsync();
                 Console.WriteLine($"{components / 3} period(s) opened for {year}.");
                 return 0;
+            }
+
+        case "load-fiscal-rules":
+            {
+                // E-CFG-1…6: prepares the fiscal sources and rules of a pack through the commands of the application, as the
+                // configuration-load service identity. Each source needs its official document in the folder (its SHA-256 is
+                // computed from the file); nothing is activated — a person activates each rule in the application.
+                if (args.Length != 4 || !File.Exists(args[2]) || !Directory.Exists(args[3]))
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate load-fiscal-rules <company-rnc> <pack.json> <documents-folder>");
+                    return 1;
+                }
+
+                await using var dataSource = NpgsqlDataSource.Create(connectionString);
+                Guid? company;
+                string? deployment;
+                await using (var connection = await dataSource.OpenConnectionAsync())
+                {
+                    await using var find = new NpgsqlCommand("SELECT company_id FROM md.company WHERE rnc = @rnc", connection);
+                    find.Parameters.AddWithValue("rnc", args[1]);
+                    company = (Guid?)await find.ExecuteScalarAsync();
+                    await using var where = new NpgsqlCommand("SELECT environment FROM core.deployment_environment", connection);
+                    deployment = (string?)await where.ExecuteScalarAsync();
+                }
+
+                if (company is null || deployment is null)
+                {
+                    await Console.Error.WriteLineAsync(company is null ? $"Company {args[1]} does not exist." : "The deployment environment is not initialised (init-environment).");
+                    return 2;
+                }
+
+                var pack = Rochell.Tax.Packs.FiscalRulePack.Parse(await File.ReadAllTextAsync(args[2]));
+                var clock = Rochell.Platform.Time.SystemClock.Instance;
+                var options = new Rochell.Identity.IdentityOptions { HostedDomain = "service.invalid" };
+                var sessions = new Rochell.Identity.Sessions.SessionService(dataSource, options, clock);
+                var log = new Rochell.Platform.Observability.RequestLogWriter(dataSource, ex => Console.Error.WriteLine($"request_log: {ex.Message}"));
+                var pipeline = new Rochell.Platform.Commands.CommandPipeline(dataSource, new Rochell.Identity.Authorization.SqlCommandAuthorizer(options, clock), log, clock);
+                var session = await sessions.StartServiceSessionAsync(Rochell.Identity.IdentityConstants.ConfigurationLoadUserId);
+                try
+                {
+                    var steps = await new Rochell.Tax.Packs.FiscalRulePackLoader(pipeline, dataSource).LoadAsync(
+                        company.Value,
+                        session,
+                        pack,
+                        file => File.Exists(Path.Combine(args[3], Path.GetFileName(file))) ? File.ReadAllBytes(Path.Combine(args[3], Path.GetFileName(file))) : null,
+                        deployment == "PRODUCTION" ? Rochell.Tax.FiscalSourceEnvironments.Production : Rochell.Tax.FiscalSourceEnvironments.Test,
+                        clock.UtcNow.AddSeconds(-1));
+                    foreach (var step in steps)
+                    {
+                        Console.WriteLine($"{step.Subject}: {step.Outcome} — {step.Detail}");
+                    }
+
+                    Console.WriteLine("Nothing was activated: activate each READY rule in Configuración › Reglas fiscales.");
+                    return steps.Any(s => s.Outcome is "MISSING_FILE" or "SKIPPED" or "DIFFERENT") ? 3 : 0;
+                }
+                finally
+                {
+                    await log.FlushAsync();
+                    await sessions.EndSessionAsync(session);
+                }
             }
 
         case "import-rnc-registry":

@@ -1,0 +1,134 @@
+using System.Security.Cryptography;
+using Npgsql;
+using Rochell.Identity;
+using Rochell.Platform.Commands;
+using Rochell.Tax.Packs;
+using Rochell.TestInfrastructure;
+using Xunit;
+
+namespace Rochell.Tax.Tests;
+
+/// <summary>
+/// CFG-01 (E-CFG-1…6): the configuration load prepares fiscal sources and rules through the application's commands as its own
+/// service identity, from the pack and the official documents kept in the repository; it never activates and never overrides.
+/// </summary>
+[Collection(PostgresTestGroup.Name)]
+public sealed class FiscalRulePackTests(PostgresFixture postgres)
+{
+    private static readonly Guid Loader = IdentityConstants.ConfigurationLoadUserId;
+
+    private static string Root()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Rochell.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory!.FullName;
+    }
+
+    private static FiscalRulePack Pack() => FiscalRulePack.Parse(File.ReadAllText(Path.Combine(Root(), "deploy", "fiscal", "rules-2026-10.json")));
+
+    private static byte[]? Document(string file)
+    {
+        var path = Path.Combine(Root(), "docs", "fiscal", "fuentes", file);
+        return File.Exists(path) ? File.ReadAllBytes(path) : null;
+    }
+
+    private static async Task<Guid> ServiceSessionAsync(TestHarness h)
+    {
+        await h.GrantAsync(h.CompanyId, Loader, "CARGA_CONFIGURACION");
+        return await h.Sessions.StartServiceSessionAsync(Loader);
+    }
+
+    private static Task<IReadOnlyList<PackStep>> LoadAsync(TestHarness h, Guid session, Func<string, byte[]?>? read = null)
+        => new FiscalRulePackLoader(h.Pipeline, h.App).LoadAsync(h.CompanyId, session, Pack(), read ?? Document, FiscalSourceEnvironments.Test, h.Clock.UtcNow.AddSeconds(-1));
+
+    private static string Outcomes(IReadOnlyList<PackStep> steps) => string.Join(',', steps.Select(s => $"{s.Subject}:{s.Outcome}"));
+
+    private static Task<string?> RulesAsync(TestHarness h)
+        => h.ScalarAsync<string>(
+            """
+            SELECT string_agg(r.code || ':' || v.version || ':' || v.status || ':' || (v.configured_by = '00000000-0000-7000-8000-00000000d003')::text, ',' ORDER BY r.code, v.version)
+            FROM tax.fiscal_rule r JOIN tax.fiscal_rule_version v ON v.rule_id = r.rule_id
+            """);
+
+    [Fact]
+    public async Task The_pack_of_the_repository_is_loaded_with_the_fingerprints_of_its_documents_and_left_ready_not_active()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        await h.FiscalActorsAsync();
+        var session = await ServiceSessionAsync(h);
+
+        var first = await LoadAsync(h, session);
+        var again = await LoadAsync(h, session);
+
+        Assert.Equal("CT-TITULO-III:REGISTERED,NG-07-2018:REGISTERED,ITBIS_COMPRAS:READY,ITBIS_VENTAS:READY,CLASIF_606:READY", Outcomes(first));
+        Assert.Equal("CT-TITULO-III:EXISTS,NG-07-2018:EXISTS,ITBIS_COMPRAS:READY,ITBIS_VENTAS:READY,CLASIF_606:READY", Outcomes(again));
+        Assert.Equal("CLASIF_606:1:READY:true,ITBIS_COMPRAS:1:READY:true,ITBIS_VENTAS:1:READY:true", await RulesAsync(h));
+        Assert.Equal(
+            $"Código Tributario (Ley 11-92), Título III — ITBIS:{Convert.ToHexStringLower(SHA256.HashData(Document("titulo3.pdf")!))}:TEST:true," +
+            $"Norma General 07-2018 — remisión de informaciones (formatos 606, 607, 608, 609):{Convert.ToHexStringLower(SHA256.HashData(Document("Norma07-18.pdf")!))}:TEST:true",
+            await h.ScalarAsync<string>(
+                """
+                SELECT string_agg(document_title || ':' || encode(file_hash, 'hex') || ':' || environment || ':' || (approved_by = '00000000-0000-7000-8000-00000000d003')::text, ',' ORDER BY document_title)
+                FROM tax.fiscal_rule_source
+                """));
+        Assert.Equal((2L, 3L, 2L), (await h.CountAsync("tax.fiscal_rule_source"), await h.CountAsync("tax.fiscal_rule_version"), await h.CountAsync("tax.fiscal_rule_test_run")));
+    }
+
+    [Fact]
+    public async Task What_a_person_configured_is_completed_when_it_matches_and_left_alone_when_it_differs()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var actors = await h.FiscalActorsAsync();
+        var session = await ServiceSessionAsync(h);
+        var from = new DateOnly(2026, 10, 1);
+
+        // As on staging: the same ITBIS rules, typed by a person, waiting for their source; and a 606 classification of their own.
+        var purchases = await h.ConfigureAsync(actors, "p", "ITBIS_COMPRAS", FiscalRuleKinds.PurchaseItbis, """{"rate": "0.18", "effect": "RECOVERABLE_INPUT", "tax_code": "ITBIS", "exempt_item_categories": []}""", from);
+        await h.ConfigureAsync(actors, "c", "CLASIF_606", FiscalRuleKinds.Report606Classification, """{"classes":{"CEMENTO":"02","AGREGADO":"09","ADITIVO":"09","OTRA_MATERIA_PRIMA":"09"}}""", from);
+
+        var steps = await LoadAsync(h, session);
+
+        Assert.Equal("CT-TITULO-III:REGISTERED,NG-07-2018:REGISTERED,ITBIS_COMPRAS:READY,ITBIS_VENTAS:READY,CLASIF_606:DIFFERENT", Outcomes(steps));
+        Assert.Equal("CLASIF_606:1:BLOCKED_PENDING_SOURCE:false,ITBIS_COMPRAS:1:READY:false,ITBIS_VENTAS:1:READY:true", await RulesAsync(h));
+        Assert.Equal(purchases, await h.ScalarAsync<Guid>("SELECT v.rule_version_id FROM tax.fiscal_rule r JOIN tax.fiscal_rule_version v ON v.rule_id = r.rule_id WHERE r.code = 'ITBIS_COMPRAS'"));
+    }
+
+    [Fact]
+    public async Task Without_its_document_a_source_is_not_registered_and_the_service_identity_cannot_activate()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var actors = await h.FiscalActorsAsync();
+        var session = await ServiceSessionAsync(h);
+
+        var missing = await LoadAsync(h, session, file => file == "titulo3.pdf" ? null : Document(file));
+        var complete = await LoadAsync(h, session);
+        var sales = await h.ScalarAsync<Guid>("SELECT v.rule_version_id FROM tax.fiscal_rule r JOIN tax.fiscal_rule_version v ON v.rule_id = r.rule_id WHERE r.code = 'ITBIS_VENTAS'");
+        var byLoader = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new ActivateFiscalRuleVersion(h.CompanyId, session, "loader", sales), new ActivateFiscalRuleVersionHandler()));
+        await h.RunAsync(new ActivateFiscalRuleVersion(h.CompanyId, actors.Specialist, "person", sales), new ActivateFiscalRuleVersionHandler());
+
+        Assert.Equal("CT-TITULO-III:MISSING_FILE,NG-07-2018:REGISTERED,ITBIS_COMPRAS:SKIPPED,ITBIS_VENTAS:SKIPPED,CLASIF_606:READY", Outcomes(missing));
+        Assert.Equal("CT-TITULO-III:REGISTERED,NG-07-2018:EXISTS,ITBIS_COMPRAS:READY,ITBIS_VENTAS:READY,CLASIF_606:READY", Outcomes(complete));
+        Assert.Equal(AuthorizationErrors.NotAuthorized, byLoader.Code);
+        Assert.Equal("CLASIF_606:1:READY:true,ITBIS_COMPRAS:1:READY:true,ITBIS_VENTAS:1:ACTIVE:true", await RulesAsync(h));
+    }
+
+    [Fact]
+    public async Task The_load_role_is_only_for_its_service_identity_which_holds_nothing_else()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var person = await h.CreateUserAsync();
+
+        var toPerson = await Record.ExceptionAsync(() => h.GrantAsync(h.CompanyId, person, "CARGA_CONFIGURACION"));
+        var otherRole = await Record.ExceptionAsync(() => h.GrantAsync(h.CompanyId, Loader, "CONTROLLER"));
+        var crossed = await Record.ExceptionAsync(() => h.GrantAsync(h.CompanyId, Loader, "PROCESO_DIARIO"));
+        await h.GrantAsync(h.CompanyId, Loader, "CARGA_CONFIGURACION");
+
+        Assert.All(new[] { toPerson, otherRole, crossed }, e => Assert.Equal("P0001", (e as PostgresException)?.SqlState));
+        Assert.Equal("fiscal_rule:configure,fiscal_rule_source:register", await h.ScalarAsync<string>(
+            "SELECT string_agg(permission_code, ',' ORDER BY permission_code) FROM iam.role r JOIN iam.role_permission USING (role_id) WHERE r.code = 'CARGA_CONFIGURACION'"));
+    }
+}
