@@ -60,6 +60,7 @@ internal static class SalesSeed
             ["unbilled_aging_alert_days"] = "30",
             ["delivery_open_alert_hours"] = "24",
             ["authorization_expiry_alert_days"] = "15",
+            ["cash_deposit_alert_days"] = "2",
         });
 
         // SALES_ITBIS through the gate by the fiscal users the purchase setup already created (no duplicate sign-in names).

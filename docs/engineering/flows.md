@@ -27,7 +27,7 @@ today) does not count for a past period. `CloseReadinessTests` covers a blocking
 
 ## Reconciliations in words (E-UX3-2)
 
-- `rec.recon_definition.name` and `.guidance` (NOT NULL from 0063): the Spanish name of each of the reconciliations (31 with PROFORMA-ASIG) and what
+- `rec.recon_definition.name` and `.guidance` (NOT NULL from 0063): the Spanish name of each of the reconciliations (32 with PROFORMA-ASIG and CASH-SALE) and what
   to do about its findings, written from what its SQL compares. A migration that adds a reconciliation must give both.
 - `rec.recon_classification (classification, name, guidance)`, immutable, `SELECT` for `rochell_app`: the 57 classifications the
   reconciliations produce.

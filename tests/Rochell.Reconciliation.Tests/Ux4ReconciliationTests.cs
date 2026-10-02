@@ -42,7 +42,7 @@ public sealed class Ux4ReconciliationTests(PostgresFixture postgres)
             (Latest("GRNI-AGING").GetProperty("latestRun").GetProperty("cutoffDate").GetString(), Latest("GRNI-AGING").GetProperty("sideALabel").ValueKind));
         Assert.Equal(JsonValueKind.Null, Latest("AP-GL").GetProperty("latestRun").ValueKind);
         Assert.Equal(("Saldo abierto de cuentas por pagar", "Saldo de la cuenta de control de proveedores"), (Latest("AP-GL").GetProperty("sideALabel").GetString(), Latest("AP-GL").GetProperty("sideBLabel").GetString()));
-        Assert.Equal(31, latest.GetArrayLength()); // + PROFORMA-ASIG (E-FIS1b-01-12)
+        Assert.Equal(32, latest.GetArrayLength()); // + CASH-SALE (E-CF1-10); // + PROFORMA-ASIG (E-FIS1b-01-12)
         Assert.Equal(cutoff.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), Assert.Single(runs.EnumerateArray()).GetProperty("cutoffDate").GetString());
         Assert.Equal(WithTotals, definitions.EnumerateArray().Where(d => d.GetProperty("sideALabel").ValueKind == JsonValueKind.String).Select(d => d.GetProperty("reconCode").GetString()).ToArray());
         Assert.Equal(12, periods.GetArrayLength());

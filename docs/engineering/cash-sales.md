@@ -64,3 +64,20 @@ Tests: `Rochell.Sales.Tests.CashSaleSchemaTests`.
   on the receipts, to be refunded or assigned to another sale. 195 commands.
 - Tests: `Rochell.Sales.Tests.CashSaleInvoiceTests` (CF-08…11).
 
+## CF1-04 — reconciliation CASH-SALE (migration 0075; E-CF1-10, E-CF1-11, E-CF1-02-2)
+
+Blocks AR-REC. Per cash order sent to payment (`Reconciliations.cs`):
+
+| Classification | Severity | A | B |
+| --- | --- | --- | --- |
+| `CASH_SALE_UNPAID` | ERROR | What was delivered, at its price with the ITBIS share of `payment_total` | The money that counts: live assignments of RECORDED receipts (a cheque only once MATCHED) plus what the order's invoices took |
+| `ORDER_ALLOCATION_DIFFERENCE` | ERROR | `sal.sales_order.allocated_amount` | Σ live `fin.order_allocation` of the order |
+| `CASH_UNDEPOSITED` | WARNING | The receipt's amount | Days since a CASH or CHEQUE receipt still IN_TRANSIT was recorded, above `cash_deposit_alert_days` |
+
+- New REVENUE_ACCOUNTING parameter `cash_deposit_alert_days` (INTEGER 1–365, value approved by the Controller, A-01). Without it
+  the run is FAILED only when cash or cheques wait for their deposit (as AUTH-EXPIRY does without authorizations).
+- PROFORMA-ASIG's `RECEIPT_ALLOCATION_DIFFERENCE` now compares a receipt's allocated amount with its live assignments to proformas
+  **and** to cash orders (both share `fin.receipt.allocated_amount`).
+- 32 reconciliations, 63 classifications. Tests: `Rochell.Sales.Tests.CashSaleReconciliationTests` (CF-12; a bounced cheque after
+  dispatch and cash three days in the drawer; the missing parameter; a tampered order).
+

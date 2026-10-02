@@ -29,7 +29,7 @@ public static class Reconciliations
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
          "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
          "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER",
-         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG"];
+         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG", "CASH-SALE"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -526,14 +526,58 @@ public static class Reconciliations
             FROM sal.proforma f
             WHERE f.company_id = @c AND f.allocated_amount <> coalesce((SELECT sum(l.amount) FROM live l WHERE l.proforma_id = f.proforma_id), 0)
             UNION ALL
-            SELECT 'REC:' || r.receipt_no, r.allocated_amount, coalesce((SELECT sum(l.amount) FROM live l WHERE l.receipt_id = r.receipt_id), 0),
-                   'RECEIPT_ALLOCATION_DIFFERENCE', 'ERROR', 'AR-REC'
+            -- CF1-04 (E-CF1-01-5): a receipt's allocated amount counts its live assignments to proformas and to cash orders.
+            SELECT 'REC:' || r.receipt_no, r.allocated_amount, x.assigned, 'RECEIPT_ALLOCATION_DIFFERENCE', 'ERROR', 'AR-REC'
             FROM fin.receipt r
-            WHERE r.company_id = @c AND r.allocated_amount <> coalesce((SELECT sum(l.amount) FROM live l WHERE l.receipt_id = r.receipt_id), 0)
+            CROSS JOIN LATERAL (SELECT coalesce((SELECT sum(l.amount) FROM live l WHERE l.receipt_id = r.receipt_id), 0)
+                                     + coalesce((SELECT sum(o.amount) FROM fin.order_allocation o
+                                                 WHERE o.receipt_id = r.receipt_id AND o.reverses_allocation_id IS NULL
+                                                   AND NOT EXISTS (SELECT 1 FROM fin.order_allocation u WHERE u.reverses_allocation_id = o.allocation_id)), 0) AS assigned) x
+            WHERE r.company_id = @c AND r.allocated_amount <> x.assigned
             UNION ALL
             SELECT 'PF:' || f.proforma_no, CASE WHEN f.status = 'OPEN' THEN f.net_total ELSE 0 END, coalesce(u.net, 0), 'PROFORMA_UNBILLED_DIFFERENCE', 'ERROR', 'AR-REC'
             FROM sal.proforma f LEFT JOIN unbilled u ON u.proforma_id = f.proforma_id
             WHERE f.company_id = @c AND f.status IN ('OPEN', 'INVOICED') AND CASE WHEN f.status = 'OPEN' THEN f.net_total ELSE 0 END <> coalesce(u.net, 0)) f
+            """,
+            null),
+        ["CASH-SALE"] = (
+            Findings + """
+            -- E-CF1-10, E-CF1-02-2: per cash order, what was delivered (at its price, with the ITBIS share of what had to be paid)
+            -- against the money that counts — live assignments of RECORDED receipts (a cheque only once its deposit is matched) plus
+            -- what its invoices took; what the order says is assigned against its live assignments; and (E-CF1-11) cash or cheques
+            -- still in transit after cash_deposit_alert_days.
+            WITH live AS (SELECT x.* FROM fin.order_allocation x
+                          WHERE x.company_id = @c AND x.reverses_allocation_id IS NULL
+                            AND NOT EXISTS (SELECT 1 FROM fin.order_allocation u WHERE u.reverses_allocation_id = x.allocation_id)),
+                 sale AS (SELECT o.sales_order_id, o.order_no, o.allocated_amount,
+                                 round((SELECT coalesce(sum(l.qty_delivered * l.unit_price), 0) FROM sal.sales_order_line l
+                                        WHERE l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version) * o.payment_total / o.total_net, 2) AS delivered,
+                                 coalesce((SELECT sum(l.amount) FROM live l JOIN fin.receipt r ON r.receipt_id = l.receipt_id
+                                           WHERE l.sales_order_id = o.sales_order_id AND r.status = 'RECORDED' AND (r.method <> 'CHEQUE' OR r.bank_status = 'MATCHED')), 0)
+                                 + coalesce((SELECT sum(a.amount) FROM fin.ar_application a JOIN sal.invoice i ON i.ar_doc_id = a.ar_doc_id
+                                             WHERE a.reverses_application_id IS NULL
+                                               AND NOT EXISTS (SELECT 1 FROM fin.ar_application u WHERE u.reverses_application_id = a.application_id)
+                                               AND EXISTS (SELECT 1 FROM sal.invoice_line il JOIN log.delivery_line dl ON dl.delivery_line_id = il.delivery_line_id
+                                                           JOIN log.delivery d ON d.delivery_id = dl.delivery_id
+                                                           WHERE il.invoice_id = i.invoice_id AND d.sales_order_id = o.sales_order_id)), 0) AS paid,
+                                 coalesce((SELECT sum(l.amount) FROM live l WHERE l.sales_order_id = o.sales_order_id), 0) AS assigned
+                          FROM sal.sales_order o
+                          WHERE o.company_id = @c AND o.cash_sale AND o.payment_total IS NOT NULL)
+            SELECT 'PV:' || s.order_no AS match_key, s.delivered AS value_a, s.paid AS value_b, 'CASH_SALE_UNPAID' AS classification, 'ERROR' AS severity, 'AR-REC' AS component
+            FROM sale s WHERE s.delivered > s.paid
+            UNION ALL
+            SELECT 'PV:' || s.order_no, s.allocated_amount, s.assigned, 'ORDER_ALLOCATION_DIFFERENCE', 'ERROR', 'AR-REC'
+            FROM sale s WHERE s.allocated_amount <> s.assigned
+            UNION ALL
+            SELECT 'PV:' || o.order_no, o.allocated_amount, coalesce((SELECT sum(l.amount) FROM live l WHERE l.sales_order_id = o.sales_order_id), 0), 'ORDER_ALLOCATION_DIFFERENCE', 'ERROR', 'AR-REC'
+            FROM sal.sales_order o
+            WHERE o.company_id = @c AND o.payment_total IS NULL
+              AND o.allocated_amount <> coalesce((SELECT sum(l.amount) FROM live l WHERE l.sales_order_id = o.sales_order_id), 0)
+            UNION ALL
+            SELECT 'REC:' || r.receipt_no, r.amount, (@cutoff - r.receipt_date)::numeric, 'CASH_UNDEPOSITED', 'WARNING', NULL::text
+            FROM fin.receipt r
+            WHERE r.company_id = @c AND r.status = 'RECORDED' AND r.method IN ('CASH', 'CHEQUE') AND r.bank_status = 'IN_TRANSIT' AND r.receipt_date <= @cutoff
+              AND @cutoff - r.receipt_date > @cdays) f
             """,
             null),
         ["EXEMPT-WITHOUT-AUTH"] = (
@@ -672,6 +716,23 @@ public static class Reconciliations
                 }
             }
 
+            int? cashDays = null;
+            if (code == "CASH-SALE")
+            {
+                cashDays = await PolicyIntegerAsync(context, asOf, "REVENUE_ACCOUNTING", "cash_deposit_alert_days", cancellationToken).ConfigureAwait(false);
+
+                // E-CF1-11: without cash or cheques in transit there is nothing to warn about, so the missing policy only fails a run that has some.
+                await using var inTransit = Sql.Command(
+                    context.Connection, context.Transaction,
+                    "SELECT EXISTS (SELECT 1 FROM fin.receipt WHERE company_id = @c AND status = 'RECORDED' AND method IN ('CASH', 'CHEQUE') AND bank_status = 'IN_TRANSIT')",
+                    ("c", context.CompanyId));
+                if (cashDays is null && await inTransit.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
+                {
+                    runs.Add(await StoreAsync(context, runId, code, asOf, cutoff, "FAILED", null, null, [], cancellationToken).ConfigureAwait(false));
+                    continue;
+                }
+            }
+
             var unbilledDays = code == "CONTRACT-ASSET"
                 ? await PolicyIntegerAsync(context, asOf, "REVENUE_ACCOUNTING", "unbilled_aging_alert_days", cancellationToken).ConfigureAwait(false)
                 : null;
@@ -687,6 +748,7 @@ public static class Reconciliations
                 ("udays", unbilledDays),
                 ("tol", tolerance ?? 0m),
                 ("adays", alertDays ?? 0),
+                ("cdays", cashDays ?? 0),
                 ("cutoff", cutoff ?? Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(asOf))))
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
