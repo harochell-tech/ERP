@@ -69,8 +69,20 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await submit(dispatch, "Planificar conduce");
   const status = dispatch.getByTestId("delivery-status");
   await expect(status).toHaveText("Planificado");
-  await dispatch.getByLabel("Camión").selectOption({ label: "L123456 (12,000 kg)" });
+  // FLT-01 (E-FLT-1…4): the truck is picked by its ficha; a licence about to expire warns and does not block the dispatch.
+  const planned = dispatch.url();
+  await dispatch.goto("/maestros/flota/");
+  await expect(dispatch.getByRole("row", { name: /BR 09/ })).toContainText("AUTO-2026-000123");
+  const driverRow = dispatch.getByRole("row", { name: /Juan Pérez/ });
+  await driverRow.getByRole("button", { name: "Editar" }).click();
+  await dispatch.getByLabel("Vencimiento de la licencia 00112345678").fill(dominicanNow(10 * 24 * 60).date);
+  await dispatch.getByRole("button", { name: "Guardar" }).click();
+  await expect(dispatch.getByRole("row", { name: /Juan Pérez/ }).getByTestId("license-warning")).toHaveText("Licencia: vence en 10 días");
+  await expectFits(dispatch);
+  await dispatch.goto(planned);
+  await dispatch.getByLabel("Camión").selectOption({ label: "BR 09 · L123456 (12,000 kg)" });
   await dispatch.getByLabel("Chofer").selectOption({ label: "Juan Pérez" });
+  await expect(dispatch.getByTestId("license-warning")).toContainText("Licencia: vence en 10 días");
   await dispatch.getByRole("button", { name: "Iniciar carga" }).click();
   await expect(status).toHaveText("Cargando");
   await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
@@ -80,6 +92,7 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await dispatch.getByRole("link", { name: "Imprimir conduce" }).click();
   await expect(dispatch.getByTestId("watermark")).toHaveText("BORRADOR – NO DESPACHADO");
   await expect(dispatch.getByTestId("conduce-customer")).toContainText("Constructora Uno");
+  await expect(dispatch.getByTestId("conduce-ficha")).toContainText("Ficha BR 09");
   await expectFits(dispatch);
   await dispatch.goto(deliveryUrl);
   await dispatch.getByLabel("Peso bruto (kg)").fill("9000");

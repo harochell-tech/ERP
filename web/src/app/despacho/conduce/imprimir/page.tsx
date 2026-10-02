@@ -75,6 +75,7 @@ function DeliveryPrint() {
         <dd data-testid="conduce-gate-out">{data.gateOutAt ? formatDateTime(data.gateOutAt) : "Todavía no ha salido"}</dd>
         <dt>Vehículo y chofer</dt>
         <dd>
+          {data.vehicleFleetCode ? <strong data-testid="conduce-ficha">Ficha {data.vehicleFleetCode} · </strong> : null}
           {plate ? `Placa ${plate}` : "—"}
           {driver ? ` · ${driver}` : ""}
           {data.customerVehiclePlate ? " (del cliente)" : ""}

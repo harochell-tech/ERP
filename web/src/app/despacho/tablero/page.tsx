@@ -113,6 +113,8 @@ export default function Page() {
                     <th>Cliente</th>
                     <th>Planta</th>
                     <th>Entrega</th>
+                    <th>Ficha</th>
+                    <th>Chofer</th>
                     <th>Salida</th>
                   </tr>
                 </thead>
@@ -126,6 +128,8 @@ export default function Page() {
                       <td className="wrap">{d.customerName}</td>
                       <td>{plantName(d.plantCode)}</td>
                       <td>{DELIVERY_TERMS[d.deliveryTermCode] ?? d.deliveryTermCode}</td>
+                      <td className="mono">{d.fleetCode ?? "—"}</td>
+                      <td className="wrap">{d.driverName ?? "—"}</td>
                       <td>{d.gateOutAt ? formatDateTime(d.gateOutAt) : "—"}</td>
                     </tr>
                   ))}

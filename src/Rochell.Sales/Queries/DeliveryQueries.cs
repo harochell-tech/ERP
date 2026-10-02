@@ -12,18 +12,21 @@ namespace Rochell.Sales.Queries;
 /// (Dominican Republic), or the business date it was planned on while it has not left.
 /// </summary>
 public sealed record ListDeliveries(
-    Guid CompanyId, Guid SessionId, string? Status = null, Guid? SalesOrderId = null, int Limit = 50, int Offset = 0, Guid? PartyId = null, DateOnly? From = null, DateOnly? To = null) : IQuery;
+    Guid CompanyId, Guid SessionId, string? Status = null, Guid? SalesOrderId = null, int Limit = 50, int Offset = 0, Guid? PartyId = null, DateOnly? From = null, DateOnly? To = null,
+    Guid? VehicleId = null, Guid? DriverId = null) : IQuery;
 
 public sealed record DeliverySummary(
     Guid DeliveryId, string DeliveryNo, Guid SalesOrderId, string OrderNo, string CustomerName, string PlantCode, string DeliveryTermCode, string ControlTransfersAt, string Status,
-    DateTime? GateOutAt, long Version);
+    DateTime? GateOutAt, long Version, string? FleetCode, string? DriverName);
 
 public sealed record DeliveryList(IReadOnlyList<DeliverySummary> Items, int Limit, int Offset);
 
 internal static class DeliveryReading
 {
     public const string Select = """
-        SELECT d.delivery_id, d.delivery_no, d.sales_order_id, o.order_no, p.legal_name, pl.code, d.delivery_term_code, d.control_transfers_at, d.status, d.gate_out_at, d.version
+        SELECT d.delivery_id, d.delivery_no, d.sales_order_id, o.order_no, p.legal_name, pl.code, d.delivery_term_code, d.control_transfers_at, d.status, d.gate_out_at, d.version,
+               (SELECT v.fleet_code FROM log.vehicle v WHERE v.vehicle_id = d.vehicle_id),
+               coalesce((SELECT dr.full_name FROM log.driver dr WHERE dr.driver_id = d.driver_id), d.customer_driver_name)
         FROM log.delivery d
         JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id
         JOIN md.party p ON p.party_id = o.party_id
@@ -32,7 +35,7 @@ internal static class DeliveryReading
 
     public static DeliverySummary Map(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetString(7), r.GetString(8),
-            r.IsDBNull(9) ? null : r.GetFieldValue<DateTime>(9), r.GetInt64(10));
+            r.IsDBNull(9) ? null : r.GetFieldValue<DateTime>(9), r.GetInt64(10), r.NullableString(11), r.NullableString(12));
 }
 
 [RequiresPermission("sales:read")]
@@ -51,6 +54,7 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
             DeliveryReading.Select + """
              WHERE d.company_id = @c AND (CAST(@s AS text) IS NULL OR d.status = CAST(@s AS text)) AND (CAST(@o AS uuid) IS NULL OR d.sales_order_id = CAST(@o AS uuid))
               AND (CAST(@p AS uuid) IS NULL OR o.party_id = CAST(@p AS uuid))
+              AND (CAST(@veh AS uuid) IS NULL OR d.vehicle_id = CAST(@veh AS uuid)) AND (CAST(@drv AS uuid) IS NULL OR d.driver_id = CAST(@drv AS uuid))
               AND ((CAST(@from AS date) IS NULL AND CAST(@to AS date) IS NULL) OR coalesce((d.gate_out_at AT TIME ZONE 'America/Santo_Domingo')::date,
                      (SELECT min(e.business_date) FROM core.domain_event e WHERE e.company_id = d.company_id AND e.aggregate_id = d.delivery_id))
                    BETWEEN coalesce(CAST(@from AS date), DATE '0001-01-01') AND coalesce(CAST(@to AS date), DATE '9999-12-31'))
@@ -63,6 +67,8 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
             ("s", query.Status),
             ("o", query.SalesOrderId),
             ("p", query.PartyId),
+            ("veh", query.VehicleId),
+            ("drv", query.DriverId),
             ("from", query.From),
             ("to", query.To),
             ("limit", query.Limit),
@@ -177,7 +183,7 @@ public sealed record DeliveryPrint(
     string IssuerName, string IssuerRnc, string CustomerName, string CustomerRnc, string? SiteAddress, string PlantCode, string? PlantName,
     string DeliveryNo, string OrderNo, DateOnly OrderDate, DateOnly? PlannedOn, string Status, string DeliveryTermCode, DateTime? GateOutAt,
     string? VehiclePlate, string? DriverName, string? CustomerVehiclePlate, string? CustomerDriverName, decimal? GrossKg, decimal? TareKg, decimal? NetKg,
-    string? WeighTicketRef, IReadOnlyList<DeliveryPrintLine> Lines, string? ReceivedByName, DateTime? ReceivedAt);
+    string? WeighTicketRef, IReadOnlyList<DeliveryPrintLine> Lines, string? ReceivedByName, DateTime? ReceivedAt, string? VehicleFleetCode);
 
 [RequiresPermission("sales:read")]
 public sealed class GetDeliveryPrintHandler : IQueryHandler<GetDeliveryPrint>
@@ -195,7 +201,7 @@ public sealed class GetDeliveryPrintHandler : IQueryHandler<GetDeliveryPrint>
             SELECT c.legal_name, c.rnc, p.legal_name, p.rnc, o.site_address, pl.code, pl.name, d.delivery_no, o.order_no, o.order_date,
                    (SELECT min(e.business_date) FROM core.domain_event e WHERE e.company_id = d.company_id AND e.aggregate_id = d.delivery_id),
                    d.status, d.delivery_term_code, d.gate_out_at, v.plate, dr.full_name, d.customer_vehicle_plate, d.customer_driver_name,
-                   d.gross_kg, d.tare_kg, d.gross_kg - d.tare_kg, d.weigh_ticket_ref, pod.received_by_name, pod.received_at
+                   d.gross_kg, d.tare_kg, d.gross_kg - d.tare_kg, d.weigh_ticket_ref, pod.received_by_name, pod.received_at, v.fleet_code
             FROM log.delivery d
             JOIN md.company c ON c.company_id = d.company_id
             JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id
@@ -210,7 +216,7 @@ public sealed class GetDeliveryPrintHandler : IQueryHandler<GetDeliveryPrint>
                 r.GetString(0), r.GetString(1), r.GetString(2), r.NullableString(3) ?? string.Empty, r.NullableString(4), r.GetString(5), r.NullableString(6),
                 r.GetString(7), r.GetString(8), r.Date(9), r.IsDBNull(10) ? null : r.Date(10), r.GetString(11), r.GetString(12), r.NullableUtc(13),
                 r.NullableString(14), r.NullableString(15), r.NullableString(16), r.NullableString(17), r.NullableDecimal(18), r.NullableDecimal(19), r.NullableDecimal(20),
-                r.NullableString(21), [], r.NullableString(22), r.NullableUtc(23)),
+                r.NullableString(21), [], r.NullableString(22), r.NullableUtc(23), r.NullableString(24)),
             cancellationToken,
             ("c", context.CompanyId),
             ("d", query.DeliveryId)).ConfigureAwait(false)

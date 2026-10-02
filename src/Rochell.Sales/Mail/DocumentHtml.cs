@@ -165,7 +165,7 @@ public static class DocumentHtml
             .Fact("Planta", E(d.PlantName is null ? d.PlantCode : $"{d.PlantName} ({d.PlantCode})"))
             .Fact("Entrega", Term(d.DeliveryTermCode, d.SiteAddress))
             .Fact("Salida por portería", d.GateOutAt is { } gate ? LocalDateTime(gate) : "Todavía no ha salido")
-            .Fact("Vehículo y chofer", (plate is null ? "—" : "Placa " + E(plate)) + (driver is null ? string.Empty : " · " + E(driver)) + (d.CustomerVehiclePlate is null ? string.Empty : " (del cliente)"))
+            .Fact("Vehículo y chofer", (d.VehicleFleetCode is null ? string.Empty : "Ficha " + E(d.VehicleFleetCode) + " · ") + (plate is null ? "—" : "Placa " + E(plate)) + (driver is null ? string.Empty : " · " + E(driver)) + (d.CustomerVehiclePlate is null ? string.Empty : " (del cliente)"))
             .Fact("Pesada", d.GrossKg is { } gross
                 ? $"Bruto {Quantity(gross)} kg · tara {Quantity(d.TareKg ?? 0m)} kg · neto {Quantity(d.NetKg ?? 0m)} kg" + (d.WeighTicketRef is null ? string.Empty : " · ticket " + E(d.WeighTicketRef))
                 : "Sin pesar")

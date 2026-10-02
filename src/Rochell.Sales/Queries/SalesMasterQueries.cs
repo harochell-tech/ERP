@@ -2,6 +2,7 @@ using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Json;
 using Rochell.Platform.Queries;
+using Rochell.Platform.Time;
 
 namespace Rochell.Sales.Queries;
 
@@ -248,7 +249,8 @@ public sealed class GetPriceListHandler : IQueryHandler<GetPriceList>
 
 public sealed record ListVehicles(Guid CompanyId, Guid SessionId, string? Status = null) : IQuery;
 
-public sealed record VehicleView(Guid VehicleId, string Plate, decimal CapacityKg, string Status, long Version);
+/// <summary>E-FLT-1, E-FLT-2: <see cref="FleetCode"/> is the «ficha» ("BR 09"); null on vehicles registered before it existed (E-FLT-5).</summary>
+public sealed record VehicleView(Guid VehicleId, string Plate, decimal CapacityKg, string Status, long Version, string? FleetCode, string? InsurancePolicyNo);
 
 public sealed record VehicleList(IReadOnlyList<VehicleView> Items);
 
@@ -264,8 +266,8 @@ public sealed class ListVehiclesHandler : IQueryHandler<ListVehicles>
         var items = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT vehicle_id, plate, capacity_kg, status, version FROM log.vehicle WHERE company_id = @c AND (CAST(@s AS text) IS NULL OR status = CAST(@s AS text)) ORDER BY plate",
-            r => new VehicleView(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetString(3), r.GetInt64(4)),
+            "SELECT vehicle_id, plate, capacity_kg, status, version, fleet_code, insurance_policy_no FROM log.vehicle WHERE company_id = @c AND (CAST(@s AS text) IS NULL OR status = CAST(@s AS text)) ORDER BY fleet_code NULLS LAST, plate",
+            r => new VehicleView(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetString(3), r.GetInt64(4), r.NullableString(5), r.NullableString(6)),
             cancellationToken,
             ("c", context.CompanyId),
             ("s", query.Status)).ConfigureAwait(false);
@@ -275,7 +277,11 @@ public sealed class ListVehiclesHandler : IQueryHandler<ListVehicles>
 
 public sealed record ListDrivers(Guid CompanyId, Guid SessionId, string? Status = null) : IQuery;
 
-public sealed record DriverView(Guid DriverId, string FullName, string NationalId, string Status, long Version);
+/// <summary>
+/// E-FLT-3, E-FLT-4: <see cref="DaysToLicenseExpiry"/> = licence expiry − today's business date (0 on its last day, negative once past);
+/// null without a date. An expired licence only warns.
+/// </summary>
+public sealed record DriverView(Guid DriverId, string FullName, string NationalId, string Status, long Version, DateOnly? LicenseExpiresOn, int? DaysToLicenseExpiry);
 
 public sealed record DriverList(IReadOnlyList<DriverView> Items);
 
@@ -291,9 +297,13 @@ public sealed class ListDriversHandler : IQueryHandler<ListDrivers>
         var items = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT driver_id, full_name, national_id, status, version FROM log.driver WHERE company_id = @c AND (CAST(@s AS text) IS NULL OR status = CAST(@s AS text)) ORDER BY full_name",
-            r => new DriverView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetInt64(4)),
+            """
+            SELECT driver_id, full_name, national_id, status, version, license_expires_on, license_expires_on - CAST(@today AS date)
+            FROM log.driver WHERE company_id = @c AND (CAST(@s AS text) IS NULL OR status = CAST(@s AS text)) ORDER BY full_name
+            """,
+            r => new DriverView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetInt64(4), r.IsDBNull(5) ? null : r.Date(5), r.IsDBNull(6) ? null : r.GetInt32(6)),
             cancellationToken,
+            ("today", BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow)),
             ("c", context.CompanyId),
             ("s", query.Status)).ConfigureAwait(false);
         return ApiJson.Serialize(new DriverList(items));

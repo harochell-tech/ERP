@@ -173,6 +173,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MATERIAL_PRICES_MISMATCH: "Debe dar un precio estándar para cada material de la receta, y solo para ellos.",
   PLATE_INVALID: "La placa no tiene un formato válido.",
   PLATE_DUPLICATE: "Ya existe un vehículo con esa placa.",
+  FLEET_CODE_INVALID: "Indique la ficha del vehículo: de 2 a 12 letras, números y espacios, como BR 09.",
+  FLEET_CODE_DUPLICATE: "Otro vehículo ya tiene esa ficha.",
   NATIONAL_ID_INVALID: "La cédula debe tener 11 dígitos.",
   NATIONAL_ID_DUPLICATE: "Ya existe un chofer con esa cédula.",
   OPENING_FILE_INVALID: "El archivo de apertura tiene errores; revise el detalle.",

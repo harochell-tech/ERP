@@ -106,7 +106,7 @@ internal static class SalesSeed
         await h.RunAsync(
             new UpdateCustomer(h.CompanyId, seller, "dev-customer-mail", customer, customerVersion, "131925332", "Constructora Uno", null, null, null, ["compras@constructorauno.test", "obra@constructorauno.test"]),
             new UpdateCustomerHandler());
-        await h.RunAsync(new RegisterVehicle(h.CompanyId, dispatch, "dev-truck", "L123456", 12000m), new RegisterVehicleHandler());
+        await h.RunAsync(new RegisterVehicle(h.CompanyId, dispatch, "dev-truck", "L123456", 12000m, "BR 09", "AUTO-2026-000123"), new RegisterVehicleHandler());
         await h.RunAsync(new RegisterDriver(h.CompanyId, dispatch, "dev-driver", "Juan Pérez", "00112345678"), new RegisterDriverHandler());
         await h.RunAsync(new RegisterBankAccount(h.CompanyId, controller, "dev-sales-bank", "TEST_BANK", "5555554321", "1102"), new RegisterBankAccountHandler());
 

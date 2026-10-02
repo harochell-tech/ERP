@@ -646,3 +646,14 @@ Playwright `mail-journey.spec.ts` (desktop and mobile): the Vendedor sends the s
 a malformed one refused), sees it «Enviado — Redirigido…» and downloads `COT-….pdf`; the Vendedor is not offered to send the
 statement; Cobros sends it.
 
+## FLT-01 — fleet details (E-FLT-1…5)
+
+- Maestros › Vehículos y choferes: the vehicle form asks for the Ficha (required) and the insurance policy number; the table shows
+  Ficha, Placa, Capacidad and Póliza, with one «Editar» per row (a vehicle from before shows «Sin ficha»). The driver form and row
+  carry «Vencimiento de la licencia»; from 30 days before, the row shows «Licencia: vence en N días» / «venció hace N días»
+  (`lib/fleet.ts`: `normalizeFleetCode`, `isFleetCode`, `vehicleName`, `licenseWarning`).
+- Despacho: the truck picker names each vehicle «BR 09 · L123456 (12,000 kg)»; picking a driver whose licence is about to expire or
+  expired shows the warning and lets the dispatch go on (E-FLT-4). The board lists Ficha and Chofer per conduce; the printed conduce
+  shows «Ficha BR 09 · Placa … · chofer».
+- Playwright: the sales journey edits the driver's licence date, sees the warning in both places and the ficha on the print.
+

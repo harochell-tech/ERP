@@ -84,7 +84,7 @@ public sealed class DeliveryTests(PostgresFixture postgres)
             .RootElement.GetProperty("termsVersionId").GetGuid();
         await h.RunAsync(new ApproveCustomerTerms(h.CompanyId, controller, "t-a", terms), new ApproveCustomerTermsHandler());
         await h.RunAsync(new ActivateCustomer(h.CompanyId, credit, "act", customer, 1), new ActivateCustomerHandler());
-        var truck = (await h.RunAsync(new RegisterVehicle(h.CompanyId, dispatch, "truck", "L123456", 12000m), new RegisterVehicleHandler())).ResultRef;
+        var truck = (await h.RunAsync(new RegisterVehicle(h.CompanyId, dispatch, "truck", "L123456", 12000m, "BR 09"), new RegisterVehicleHandler())).ResultRef;
         var driver = (await h.RunAsync(new RegisterDriver(h.CompanyId, dispatch, "driver", "Juan Pérez", "00112345678"), new RegisterDriverHandler())).ResultRef;
         return new Setup(seller, credit, dispatch, customer, plant, patio, block, truck, driver, accounts);
     }
