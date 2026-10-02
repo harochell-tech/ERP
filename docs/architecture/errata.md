@@ -934,6 +934,18 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-FLT-3 | FLT | Each driver carries the date the licence expires, optional (licence number and category are out). |
 | E-FLT-4 | FLT | An expired licence only warns: nothing blocks loading or dispatch. The warning shows from 30 days before the expiry, in the driver list and when the driver is picked for a delivery. |
 | E-FLT-5 | FLT | Vehicles and drivers registered before stay without these data until someone edits them; editing a vehicle then asks for its ficha. |
+| E-GAS-1 | GAS-1 | Purchase orders and supplier invoices take expense lines: free description, quantity, price. Raw materials that enter inventory keep their registered item. |
+| E-GAS-2 | GAS-1 | Each expense line names an expense category of a catalogue; the category carries its GL account and its 606 type of goods and services. Whoever registers never chooses an account. |
+| E-GAS-3 | GAS-1 | The tax type of an expense line is chosen from a list of the types in force; each type is a fiscal rule with its official source. Registered raw materials keep their automatic ITBIS by rule (the owner's answer). |
+| E-GAS-4 | GAS-1 | Telecommunications is one type that computes ITBIS 18 %, selective tax 10 % and CDT 2 %, each to its account and to its 606 column; the accountant confirms rates and bases. |
+| E-GAS-5 | GAS-1 | An expense line never goes through the warehouse. The invoice is matched against its order when there is one; without an order a second person approves it. |
+| E-GAS-6 | GAS-1 | Invoices without a purchase order are allowed for expenses; from a policy amount they need another person's approval before posting. |
+| E-GAS-7 | GAS-1 | Withholdings are computed as today, by fiscal rule and supplier type; never chosen by hand. |
+| E-GAS-8 | GAS-1 | Out of scope: fixed assets, petty cash, purchases in USD. |
+| E-GAS-9 | GAS-1 | Initial tax types: ITBIS 18 %, ITBIS 16 %, exempt, telecommunications (18 + 10 + 2), insurance (selective tax 16 %, no ITBIS), consumption with legal tip (ITBIS 18 % + tip 10 %); also legal tip per the owner. Each is loaded as a fiscal rule with its norm and activated by a person. |
+| E-GAS-10 | GAS-1 | Selective tax, CDT and legal tip post to their own expense accounts (63950, the other-taxes account, 63900 in the owner's chart) and to their 606 columns (supersedes the first proposal of posting them to the line's expense account). |
+| E-GAS-11 | GAS-1 | Expense categories come from the owner's chart of accounts (ADM Cloud export of 2026-10-02): utilities, operation, professional services, rents, insurance, marketing, representation, personnel bought from third parties, and the plant and fleet accounts, all as expense (6xxxx); fuel is one category. 606 types are the accountant's to confirm. |
+| E-GAS-12 | GAS-1 | Accounts to create before the module is used: ITBIS advanced on purchases, a coded account for other taxes, a coded account for tolls, and the plant and fleet expense accounts. |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |
