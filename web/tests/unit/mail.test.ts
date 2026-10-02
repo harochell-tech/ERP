@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { deliveryText, mailModeNotice, mailStatusLabel, mailStatusTone, parseAddresses, recipientsError, recipientsOf } from "@/lib/mail";
+import { quoteWatermark } from "@/lib/print";
+import { deliveryText, quoteMailBlocked, mailModeNotice, mailStatusLabel, mailStatusTone, parseAddresses, recipientsError, recipientsOf } from "@/lib/mail";
 
 describe("mail", () => {
   it("names the states of a sending", () => {
@@ -41,5 +42,16 @@ describe("mail", () => {
       "Redirigido a industrias@rochell.com.do (no llegó al cliente)",
     );
     expect(deliveryText({ status: "FAILED", deliveryMode: null, deliveredTo: null, attempts: 5, lastError: "550 rechazado" })).toBe("No se pudo enviar tras 5 intentos: 550 rechazado");
+  });
+
+  it("says what to do before a quote can be e-mailed, exactly when it would print with a watermark", () => {
+    expect(quoteMailBlocked("DRAFT", false)).toContain("Marcar enviada al cliente");
+    expect(quoteMailBlocked("PENDING_APPROVAL", false)).toContain("aprobación de precios");
+    expect(quoteMailBlocked("SENT", true)).toContain("vencida");
+    for (const status of ["DRAFT", "PENDING_APPROVAL", "SENT", "CONVERTED", "LOST", "CANCELLED"]) {
+      for (const expired of [false, true]) {
+        expect(quoteMailBlocked(status, expired) === null).toBe(quoteWatermark(status, expired) === null);
+      }
+    }
   });
 });
