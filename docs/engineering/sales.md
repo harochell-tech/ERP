@@ -61,6 +61,20 @@ Queries (`sales:read`): `GET /sales/customers[/{partyId}]`, `/sales/customer-ter
 
 Tests: `CustomerTests`, `PricingTests`, `FleetTests` (`tests/Rochell.Sales.Tests`), `SupplierTests` (payment terms), `ItemTests` (finished goods).
 
+### Fleet details (FLT-01, migration 0076; E-FLT-1…5)
+
+- `log.vehicle.fleet_code` — the «ficha» ("BR 09"): `^[A-Z0-9]+( [A-Z0-9]+)*$`, 2–12 characters, unique per company where present
+  (partial unique index); `insurance_policy_no` (≤ 40). `log.driver.license_expires_on`. All nullable: rows from before stay without
+  them (E-FLT-5).
+- `RegisterVehicle` / `UpdateVehicle` take `FleetCode` (required, normalized to capitals with single spaces; `FLEET_CODE_INVALID`,
+  `FLEET_CODE_DUPLICATE`) and `InsurancePolicyNo`; `RegisterDriver` / `UpdateDriver` take `LicenseExpiresOn`. An update writes the
+  three vehicle members (or the driver's name and date) as given: the screen sends the current values back.
+- Queries: `VehicleView.fleetCode` / `insurancePolicyNo`; `DriverView.licenseExpiresOn` / `daysToLicenseExpiry` (expiry − today's
+  business date; the screen warns at ≤ 30, E-FLT-4 — nothing in the server blocks on it). `DeliverySummary.fleetCode` / `driverName`
+  (our driver, or the customer's for a pickup); `GetDeliveryPrint.vehicleFleetCode`, also in the conduce sent by e-mail;
+  `GET /sales/deliveries` filters by `vehicleId` and `driverId`.
+- Tests: `FleetTests` (ficha normalization and uniqueness, policy, licence days, the delivery print and the list filters).
+
 ## Opening finished goods (VS3-02b)
 
 Migration `0039__opening_finished_goods.sql`: movement type OPENING, schema `mig` (`migration_batch`,

@@ -929,6 +929,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-CF1-03-1 | CF-1 | An invoice of the final consumer comes from one order: each order has its buyer. |
 | E-CF1-03-2 | CF-1 | A paid cash sale is cancelled by the Vendedor or by Caja, with a reason; the receipts assigned are released and the money stays on the receipt to be refunded — prepared by Cobros, released by the Controller, as today. |
 | E-CF1-03-3 | CF-1 | Refunds to the final consumer leave from the bank (transfer or cheque), never in cash («no devolvemos dinero en efectivo»). |
+| E-FLT-1 | FLT | Each vehicle carries its «ficha», the code the plant knows it by ("BR 09", "HR 114"): capitals, digits and single spaces, 2 to 12 characters, unique per company, required when a vehicle is registered or edited. It is printed on the delivery note (conduce) beside the driver who delivers, and shown in the dispatch board, so deliveries can be reported by vehicle and driver. |
+| E-FLT-2 | FLT | Insurance: only the policy number, optional (the owner declined insurer and expiry date). |
+| E-FLT-3 | FLT | Each driver carries the date the licence expires, optional (licence number and category are out). |
+| E-FLT-4 | FLT | An expired licence only warns: nothing blocks loading or dispatch. The warning shows from 30 days before the expiry, in the driver list and when the driver is picked for a delivery. |
+| E-FLT-5 | FLT | Vehicles and drivers registered before stay without these data until someone edits them; editing a vehicle then asks for its ficha. |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |

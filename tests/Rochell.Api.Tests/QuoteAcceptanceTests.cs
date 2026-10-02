@@ -98,7 +98,7 @@ public sealed class QuoteAcceptanceTests(PostgresFixture postgres)
             .GetProperty("result").GetProperty("termsVersionId").GetGuid();
         await controller.OkAsync(c, "sales", "approve-customer-terms", new { termsVersionId = terms });
         await credit.OkAsync(c, "sales", "activate-customer", new { partyId = customer, expectedVersion = 1 });
-        var truck = Ref(await dispatch.OkAsync(c, "sales", "register-vehicle", new { plate = "L123456", capacityKg = "12000" }));
+        var truck = Ref(await dispatch.OkAsync(c, "sales", "register-vehicle", new { plate = "L123456", fleetCode = "BR 09", capacityKg = "12000" }));
         var driver = Ref(await dispatch.OkAsync(c, "sales", "register-driver", new { fullName = "Juan Pérez", nationalId = "00112345678" }));
 
         // The quote: 1,000 blocks at 45.00 (the list says 50.00) — a special price the Vendedor cannot send alone.

@@ -23,6 +23,10 @@ public static class SalesErrors
     public const string MaterialPricesMismatch = "MATERIAL_PRICES_MISMATCH";
     public const string PlateInvalid = "PLATE_INVALID";
     public const string PlateDuplicate = "PLATE_DUPLICATE";
+
+    /// <summary>E-FLT-1: the vehicle's «ficha» — letters, digits and single spaces, 2 to 12 characters, unique in the company.</summary>
+    public const string FleetCodeInvalid = "FLEET_CODE_INVALID";
+    public const string FleetCodeDuplicate = "FLEET_CODE_DUPLICATE";
     public const string NationalIdInvalid = "NATIONAL_ID_INVALID";
     public const string NationalIdDuplicate = "NATIONAL_ID_DUPLICATE";
 }

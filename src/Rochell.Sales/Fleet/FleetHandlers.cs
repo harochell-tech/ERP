@@ -58,6 +58,17 @@ internal static class FleetRows
             : throw new DomainException(SalesErrors.PlateInvalid, "The plate has 5 to 10 letters and digits.");
     }
 
+    /// <summary>E-FLT-1: the «ficha» in capitals with single spaces ("br  09" → "BR 09"); required.</summary>
+    public static string FleetCode(string? code)
+    {
+        var normalized = string.Join(' ', (code ?? string.Empty).ToUpperInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length is >= 2 and <= 12 && normalized.All(c => char.IsAsciiLetterOrDigit(c) || c == ' ')
+            ? normalized
+            : throw new DomainException(SalesErrors.FleetCodeInvalid, "The vehicle's ficha has 2 to 12 letters, digits and spaces, such as BR 09 (E-FLT-1).");
+    }
+
+    public static string? Date(DateOnly? date) => date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
     public static decimal Capacity(decimal kg) => SalesSql.Positive(kg, 6, "The capacity in kg");
 
     public static string Name(string? name)
@@ -84,29 +95,35 @@ public sealed class RegisterVehicleHandler : ICommandHandler<RegisterVehicle>
         ArgumentNullException.ThrowIfNull(context);
         var plate = FleetRows.Plate(command.Plate);
         var capacity = FleetRows.Capacity(command.CapacityKg);
+        var fleetCode = FleetRows.FleetCode(command.FleetCode);
+        var policy = SalesSql.Optional(command.InsurancePolicyNo, 40, "The insurance policy number");
         var eventId = await context.AppendEventAsync(
             new EventDraft("VehicleRegistered", 1, FleetRows.Vehicles.Aggregate, context.ResultRef, 1,
-                JsonSerializer.Serialize(new { vehicleId = context.ResultRef, plate, capacityKg = capacity.ToString(CultureInfo.InvariantCulture) }), Publish: true),
+                JsonSerializer.Serialize(new { vehicleId = context.ResultRef, plate, capacityKg = capacity.ToString(CultureInfo.InvariantCulture), fleetCode, insurancePolicyNo = policy }), Publish: true),
             cancellationToken).ConfigureAwait(false);
         try
         {
             await Sql.ExecuteAsync(
                 context.Connection,
                 context.Transaction,
-                "INSERT INTO log.vehicle (vehicle_id, company_id, plate, capacity_kg, status, version) VALUES (@id, @c, @plate, @kg, 'ACTIVE', 1)",
+                "INSERT INTO log.vehicle (vehicle_id, company_id, plate, capacity_kg, status, version, fleet_code, insurance_policy_no) VALUES (@id, @c, @plate, @kg, 'ACTIVE', 1, @code, @policy)",
                 cancellationToken,
                 ("id", context.ResultRef),
                 ("c", context.CompanyId),
                 ("plate", plate),
-                ("kg", capacity)).ConfigureAwait(false);
+                ("kg", capacity),
+                ("code", fleetCode),
+                ("policy", policy)).ConfigureAwait(false);
         }
         catch (DbException ex) when (ex.SqlState == SqlStates.UniqueViolation)
         {
-            throw new DomainException(SalesErrors.PlateDuplicate, $"Plate {plate} is already registered.");
+            throw ex.Message.Contains("vehicle_fleet_code_uq", StringComparison.Ordinal)
+                ? new DomainException(SalesErrors.FleetCodeDuplicate, $"Another vehicle already has the ficha {fleetCode}.")
+                : new DomainException(SalesErrors.PlateDuplicate, $"Plate {plate} is already registered.");
         }
 
         await context.AppendStateAsync(FleetRows.Vehicles.Aggregate, context.ResultRef, "DOCUMENT", null, "ACTIVE", CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { vehicleId = context.ResultRef, plate, status = "ACTIVE", version = 1 });
+        return JsonSerializer.Serialize(new { vehicleId = context.ResultRef, plate, fleetCode, status = "ACTIVE", version = 1 });
     }
 }
 
@@ -120,13 +137,25 @@ public sealed class UpdateVehicleHandler : ICommandHandler<UpdateVehicle>
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var capacity = FleetRows.Capacity(command.CapacityKg);
+        var fleetCode = FleetRows.FleetCode(command.FleetCode);
+        var policy = SalesSql.Optional(command.InsurancePolicyNo, 40, "The insurance policy number");
         var (_, version) = await FleetRows.LockAsync(context, FleetRows.Vehicles, command.VehicleId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         var next = version + 1;
         await context.AppendEventAsync(
             new EventDraft("VehicleUpdated", 1, FleetRows.Vehicles.Aggregate, command.VehicleId, next,
-                JsonSerializer.Serialize(new { vehicleId = command.VehicleId, capacityKg = capacity.ToString(CultureInfo.InvariantCulture) }), Publish: true),
+                JsonSerializer.Serialize(new { vehicleId = command.VehicleId, capacityKg = capacity.ToString(CultureInfo.InvariantCulture), fleetCode, insurancePolicyNo = policy }), Publish: true),
             cancellationToken).ConfigureAwait(false);
-        await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE log.vehicle SET capacity_kg = @kg, version = @v WHERE vehicle_id = @id", cancellationToken, ("kg", capacity), ("v", next), ("id", command.VehicleId)).ConfigureAwait(false);
+        try
+        {
+            await Sql.ExecuteAsync(
+                context.Connection, context.Transaction, "UPDATE log.vehicle SET capacity_kg = @kg, fleet_code = @code, insurance_policy_no = @policy, version = @v WHERE vehicle_id = @id",
+                cancellationToken, ("kg", capacity), ("code", fleetCode), ("policy", policy), ("v", next), ("id", command.VehicleId)).ConfigureAwait(false);
+        }
+        catch (DbException ex) when (ex.SqlState == SqlStates.UniqueViolation)
+        {
+            throw new DomainException(SalesErrors.FleetCodeDuplicate, $"Another vehicle already has the ficha {fleetCode}.");
+        }
+
         return JsonSerializer.Serialize(new { vehicleId = command.VehicleId, version = next });
     }
 }
@@ -167,19 +196,21 @@ public sealed class RegisterDriverHandler : ICommandHandler<RegisterDriver>
         var name = FleetRows.Name(command.FullName);
         var nationalId = FleetRows.NationalId(command.NationalId);
         var eventId = await context.AppendEventAsync(
-            new EventDraft("DriverRegistered", 1, FleetRows.Drivers.Aggregate, context.ResultRef, 1, JsonSerializer.Serialize(new { driverId = context.ResultRef, fullName = name, nationalId }), Publish: true),
+            new EventDraft("DriverRegistered", 1, FleetRows.Drivers.Aggregate, context.ResultRef, 1,
+                JsonSerializer.Serialize(new { driverId = context.ResultRef, fullName = name, nationalId, licenseExpiresOn = FleetRows.Date(command.LicenseExpiresOn) }), Publish: true),
             cancellationToken).ConfigureAwait(false);
         try
         {
             await Sql.ExecuteAsync(
                 context.Connection,
                 context.Transaction,
-                "INSERT INTO log.driver (driver_id, company_id, full_name, national_id, status, version) VALUES (@id, @c, @name, @nid, 'ACTIVE', 1)",
+                "INSERT INTO log.driver (driver_id, company_id, full_name, national_id, status, version, license_expires_on) VALUES (@id, @c, @name, @nid, 'ACTIVE', 1, @lic)",
                 cancellationToken,
                 ("id", context.ResultRef),
                 ("c", context.CompanyId),
                 ("name", name),
-                ("nid", nationalId)).ConfigureAwait(false);
+                ("nid", nationalId),
+                ("lic", command.LicenseExpiresOn)).ConfigureAwait(false);
         }
         catch (DbException ex) when (ex.SqlState == SqlStates.UniqueViolation)
         {
@@ -204,9 +235,10 @@ public sealed class UpdateDriverHandler : ICommandHandler<UpdateDriver>
         var (_, version) = await FleetRows.LockAsync(context, FleetRows.Drivers, command.DriverId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         var next = version + 1;
         await context.AppendEventAsync(
-            new EventDraft("DriverUpdated", 1, FleetRows.Drivers.Aggregate, command.DriverId, next, JsonSerializer.Serialize(new { driverId = command.DriverId, fullName = name }), Publish: true),
+            new EventDraft("DriverUpdated", 1, FleetRows.Drivers.Aggregate, command.DriverId, next,
+                JsonSerializer.Serialize(new { driverId = command.DriverId, fullName = name, licenseExpiresOn = FleetRows.Date(command.LicenseExpiresOn) }), Publish: true),
             cancellationToken).ConfigureAwait(false);
-        await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE log.driver SET full_name = @name, version = @v WHERE driver_id = @id", cancellationToken, ("name", name), ("v", next), ("id", command.DriverId)).ConfigureAwait(false);
+        await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE log.driver SET full_name = @name, license_expires_on = @lic, version = @v WHERE driver_id = @id", cancellationToken, ("name", name), ("lic", command.LicenseExpiresOn), ("v", next), ("id", command.DriverId)).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { driverId = command.DriverId, version = next });
     }
 }

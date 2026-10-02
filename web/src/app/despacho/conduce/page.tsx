@@ -9,6 +9,7 @@ import { SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
+import { licenseWarning, vehicleName } from "@/lib/fleet";
 import { DELIVERY_TERMS, formatDateTime, statusLabel } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
 import { cancellable, nextDeliveryStep } from "@/lib/sales";
@@ -118,7 +119,7 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
               <option value="">Seleccione…</option>
               {data.vehicles.map((v) => (
                 <option key={v.vehicleId} value={v.vehicleId}>
-                  {v.plate} ({formatQuantity(v.capacityKg)} kg)
+                  {vehicleName(v)} ({formatQuantity(v.capacityKg)} kg)
                 </option>
               ))}
             </select>
@@ -133,6 +134,12 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
               ))}
             </select>
           </Field>
+          {licenseWarning(data.drivers.find((d) => d.driverId === form.driverId)?.daysToLicenseExpiry) ? (
+            <p className="notice" data-testid="license-warning">
+              {licenseWarning(data.drivers.find((d) => d.driverId === form.driverId)?.daysToLicenseExpiry)}. Puede despachar; actualice la fecha en Maestros › Vehículos y choferes cuando el
+              chofer renueve la licencia.
+            </p>
+          ) : null}
         </>
       ) : (
         <>
@@ -429,7 +436,7 @@ function DeliveryDetail() {
         </Link>
       </p>
       <p className="muted">
-        {data.vehiclePlate ? `Camión ${data.vehiclePlate} · chofer ${data.driverName ?? "—"}` : null}
+        {data.vehiclePlate ? `Camión ${vehicleName({ fleetCode: h.fleetCode, plate: data.vehiclePlate })} · chofer ${data.driverName ?? "—"}` : null}
         {data.customerVehiclePlate ? `Placa del cliente ${data.customerVehiclePlate} · chofer ${data.customerDriverName ?? "—"}` : null}
         {data.grossKg ? ` · bruto ${formatQuantity(data.grossKg)} kg, tara ${formatQuantity(data.tareKg)} kg · Evidencia: ${data.weighTicketRef} (huella verificada)` : null}
         {h.gateOutAt ? ` · salió ${formatDateTime(h.gateOutAt)}` : null}

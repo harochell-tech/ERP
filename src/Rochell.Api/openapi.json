@@ -29077,6 +29077,22 @@
               "type": "string",
               "format": "date"
             }
+          },
+          {
+            "name": "vehicleId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "driverId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -38614,7 +38630,8 @@
           "weighTicketRef",
           "lines",
           "receivedByName",
-          "receivedAt"
+          "receivedAt",
+          "vehicleFleetCode"
         ],
         "type": "object",
         "properties": {
@@ -38747,6 +38764,12 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "vehicleFleetCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -38835,7 +38858,9 @@
           "controlTransfersAt",
           "status",
           "gateOutAt",
-          "version"
+          "version",
+          "fleetCode",
+          "driverName"
         ],
         "type": "object",
         "properties": {
@@ -38878,6 +38903,18 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "fleetCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "driverName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -39209,7 +39246,9 @@
           "fullName",
           "nationalId",
           "status",
-          "version"
+          "version",
+          "licenseExpiresOn",
+          "daysToLicenseExpiry"
         ],
         "type": "object",
         "properties": {
@@ -39229,6 +39268,20 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "licenseExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "daysToLicenseExpiry": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -48076,6 +48129,13 @@
           },
           "nationalId": {
             "type": "string"
+          },
+          "licenseExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         },
         "additionalProperties": false
@@ -48269,6 +48329,18 @@
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
             "format": "decimal"
+          },
+          "fleetCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "insurancePolicyNo": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -52810,6 +52882,13 @@
           },
           "fullName": {
             "type": "string"
+          },
+          "licenseExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         },
         "additionalProperties": false
@@ -53103,6 +53182,18 @@
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
             "format": "decimal"
+          },
+          "fleetCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "insurancePolicyNo": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -53225,7 +53316,9 @@
           "plate",
           "capacityKg",
           "status",
-          "version"
+          "version",
+          "fleetCode",
+          "insurancePolicyNo"
         ],
         "type": "object",
         "properties": {
@@ -53247,6 +53340,18 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          },
+          "fleetCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "insurancePolicyNo": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false

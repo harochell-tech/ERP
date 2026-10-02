@@ -6572,6 +6572,7 @@ export interface components {
             receivedByName: null | string;
             /** Format: date-time */
             receivedAt: null | string;
+            vehicleFleetCode: null | string;
         };
         DeliveryPrintLine: {
             /** Format: int32 */
@@ -6609,6 +6610,8 @@ export interface components {
             gateOutAt: null | string;
             /** Format: int64 */
             version: number;
+            fleetCode: null | string;
+            driverName: null | string;
         };
         DepositDetail: {
             header: components["schemas"]["DepositSummary"];
@@ -6700,6 +6703,10 @@ export interface components {
             status: string;
             /** Format: int64 */
             version: number;
+            /** Format: date */
+            licenseExpiresOn: null | string;
+            /** Format: int32 */
+            daysToLicenseExpiry: null | number;
         };
         EnvironmentInfo: {
             badge: null | string;
@@ -9116,6 +9123,8 @@ export interface components {
         RegisterDriver: {
             fullName: string;
             nationalId: string;
+            /** Format: date */
+            licenseExpiresOn?: null | string;
         };
         RegisterFiscalAuthorization: {
             /** Format: uuid */
@@ -9167,6 +9176,8 @@ export interface components {
             plate: string;
             /** Format: decimal */
             capacityKg: string;
+            fleetCode?: null | string;
+            insurancePolicyNo?: null | string;
         };
         RejectAuthorization: {
             /** Format: uuid */
@@ -10408,6 +10419,8 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             fullName: string;
+            /** Format: date */
+            licenseExpiresOn?: null | string;
         };
         UpdateManualJournal: {
             /** Format: uuid */
@@ -10495,6 +10508,8 @@ export interface components {
             expectedVersion: number;
             /** Format: decimal */
             capacityKg: string;
+            fleetCode?: null | string;
+            insurancePolicyNo?: null | string;
         };
         UserList: {
             items: components["schemas"]["UserView"][];
@@ -10531,6 +10546,8 @@ export interface components {
             status: string;
             /** Format: int64 */
             version: number;
+            fleetCode: null | string;
+            insurancePolicyNo: null | string;
         };
         VerifiedChain: {
             ledger: string;
@@ -29178,6 +29195,8 @@ export interface operations {
                 partyId?: string;
                 from?: string;
                 to?: string;
+                vehicleId?: string;
+                driverId?: string;
             };
             header?: never;
             path: {
