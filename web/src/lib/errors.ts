@@ -97,6 +97,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   CONSUMER_ID_RULE_MISSING: "Falta la regla fiscal del monto desde el cual se identifica al comprador; el Analista fiscal la configura y el Especialista fiscal la activa.",
   BUYER_ID_REQUIRED: "Por el monto de la venta, la identificación del comprador es obligatoria.",
   ALLOCATION_EXCEEDS_DUE: "El monto supera lo que falta por pagar del pedido.",
+  CASH_INVOICE_ONE_ORDER: "Una factura de consumidor final sale de un solo pedido: cada pedido tiene su comprador.",
   CASH_SALE_NOT_PAID: "La venta de contado no está cobrada completa con dinero que cuente: un cheque cuenta cuando su depósito está conciliado con el banco.",
   MAIL_DOCUMENT_NOT_SENDABLE: "Ese documento todavía no se puede enviar: solo se envía lo que se imprime sin marca de agua.",
   MAIL_DISABLED: "El envío de correos no está activado en este ambiente.",

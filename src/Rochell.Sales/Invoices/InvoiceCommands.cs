@@ -30,7 +30,7 @@ public sealed record IssueInvoice(Guid CompanyId, Guid SessionId, string Idempot
 /// </summary>
 public sealed record RecordExternalFiscalDocument(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid InvoiceId, long ExpectedVersion, string Encf, DateTime IssuedAt, string SecurityCode, string EvidenceRef,
-    string EvidenceSha256, string ReceiverRnc, decimal NetTotal, decimal TaxTotal, decimal Total) : ICommand;
+    string EvidenceSha256, string? ReceiverRnc, decimal NetTotal, decimal TaxTotal, decimal Total, string? ReceiverPassport = null) : ICommand;
 
 /// <summary>E-VS3-05-11: an issued invoice never fiscalized and without receipts is voided (P-18 reversed), with a reason and step-up.</summary>
 public sealed record VoidUnfiscalizedInvoice(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid InvoiceId, long ExpectedVersion, string Reason) : ICommand;

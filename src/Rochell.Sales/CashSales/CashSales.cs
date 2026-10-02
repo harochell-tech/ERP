@@ -65,6 +65,13 @@ public sealed record ReleaseOrderAllocation(Guid CompanyId, Guid SessionId, stri
 /// </summary>
 public sealed record ConfirmCashSale(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SalesOrderId) : ICommand;
 
+/// <summary>
+/// E-CF1-01-8, E-CF1-03-2: cancels a cash sale without deliveries, paid or not. The receipts assigned to it are released — the
+/// money stays on them, to be returned to the customer with a refund (Cobros prepares, the Controller releases; never in cash,
+/// E-CF1-03-3) or assigned to another sale.
+/// </summary>
+public sealed record CancelCashSale(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SalesOrderId, long ExpectedVersion, string Reason) : ICommand;
+
 /// <summary>Shared reads and writes of cash sales. Lock order: sales order → receipt.</summary>
 internal static partial class CashSaleStore
 {
@@ -180,6 +187,80 @@ internal static partial class CashSaleStore
         """;
 
     private static Live Map(System.Data.Common.DbDataReader r) => new(r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetString(3), r.GetDecimal(4), r.GetGuid(5));
+
+    /// <summary>The live assignments to an order, oldest first: the order in which its invoices take them.</summary>
+    public static Task<List<Live>> LiveOfOrderAsync(CommandContext context, Guid orderId, CancellationToken cancellationToken)
+        => Reading.ListAsync(
+            context.Connection, context.Transaction, LiveSelect + " AND x.sales_order_id = @o ORDER BY x.allocation_id", Map, cancellationToken,
+            ("c", context.CompanyId), ("o", orderId));
+
+    /// <summary>
+    /// E-CF1-5, E-CF1-13: the invoice of a cash order takes, from the receipts assigned to the order (oldest first), what covers its
+    /// total — each is released and applied to the new AR document (P-25) — and what an assignment has left stays assigned to the
+    /// order for its next deliveries. Returns what was applied. The caller holds the order's and the invoice's locks.
+    /// </summary>
+    public static async Task<decimal> InheritAsync(
+        CommandContext context, Finance.Posting.PostingEngine engine, Guid orderId, Guid invoiceId, string invoiceNo, Guid arDocId, decimal total, Guid invoiceEvent, string commandType,
+        CancellationToken cancellationToken)
+    {
+        var live = await LiveOfOrderAsync(context, orderId, cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(context.Connection, context.Transaction, "SELECT 1 FROM fin.ar_document WHERE ar_doc_id = @a FOR UPDATE", cancellationToken, ("a", arDocId)).ConfigureAwait(false);
+        var open = total;
+        foreach (var allocation in live)
+        {
+            if (open <= 0m)
+            {
+                break;
+            }
+
+            var receipt = await Receipting.LockAsync(context, allocation.ReceiptId, null, cancellationToken).ConfigureAwait(false);
+            var version = receipt.Version + 1;
+            await ReleaseAsync(context, allocation.ReceiptId, receipt.No, [allocation], version, $"Invoice {invoiceNo} issued", commandType, cancellationToken).ConfigureAwait(false);
+            var amount = Math.Min(allocation.Amount, open);
+            await Receipting.ApplyAsync(context, engine, allocation.ReceiptId, receipt, ++version, [new Receipting.Target(invoiceId, invoiceNo, arDocId, amount)], invoiceEvent, cancellationToken)
+                .ConfigureAwait(false);
+            open -= amount;
+            var left = allocation.Amount - amount;
+            if (left > 0m)
+            {
+                await AssignAsync(context, allocation.ReceiptId, receipt.No, orderId, allocation.OrderNo, left, ++version, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return total - open;
+    }
+
+    /// <summary>Writes one assignment of a receipt to an order: its event, its row and both assigned amounts. Returns the event.</summary>
+    public static async Task<Guid> AssignAsync(CommandContext context, Guid receiptId, string receiptNo, Guid orderId, string orderNo, decimal amount, long version, CancellationToken cancellationToken)
+    {
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(
+                "ReceiptAllocatedToOrder",
+                1,
+                Receipting.Aggregate,
+                receiptId,
+                version,
+                JsonSerializer.Serialize(new { receiptId, receiptNo, salesOrderId = orderId, orderNo, amount = Receipting.Money(amount) }),
+                Publish: true,
+                BusinessDate: SalesSql.Today(context)),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "INSERT INTO fin.order_allocation (allocation_id, company_id, receipt_id, sales_order_id, amount, event_id) VALUES (@id, @c, @r, @o, @a, @e)",
+            cancellationToken,
+            ("id", context.Ids.NewId()),
+            ("c", context.CompanyId),
+            ("r", receiptId),
+            ("o", orderId),
+            ("a", amount),
+            ("e", eventId)).ConfigureAwait(false);
+        await MoveAllocatedAsync(context, orderId, amount, cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection, context.Transaction, "UPDATE fin.receipt SET allocated_amount = allocated_amount + @a, version = @v WHERE receipt_id = @r", cancellationToken,
+            ("a", amount), ("v", version), ("r", receiptId)).ConfigureAwait(false);
+        return eventId;
+    }
 
     public static Task<List<Live>> LiveOfReceiptAsync(CommandContext context, Guid receiptId, CancellationToken cancellationToken)
         => Reading.ListAsync(
@@ -486,32 +567,7 @@ public sealed class AllocateReceiptToOrderHandler : ICommandHandler<AllocateRece
         }
 
         var version = receipt.Version + 1;
-        var eventId = await context.AppendEventAsync(
-            new EventDraft(
-                "ReceiptAllocatedToOrder",
-                1,
-                Receipting.Aggregate,
-                command.ReceiptId,
-                version,
-                JsonSerializer.Serialize(new { receiptId = command.ReceiptId, receiptNo = receipt.No, salesOrderId = command.SalesOrderId, orderNo = order.OrderNo, amount = Receipting.Money(amount) }),
-                Publish: true,
-                BusinessDate: SalesSql.Today(context)),
-            cancellationToken).ConfigureAwait(false);
-        await Sql.ExecuteAsync(
-            context.Connection,
-            context.Transaction,
-            "INSERT INTO fin.order_allocation (allocation_id, company_id, receipt_id, sales_order_id, amount, event_id) VALUES (@id, @c, @r, @o, @a, @e)",
-            cancellationToken,
-            ("id", context.Ids.NewId()),
-            ("c", context.CompanyId),
-            ("r", command.ReceiptId),
-            ("o", command.SalesOrderId),
-            ("a", amount),
-            ("e", eventId)).ConfigureAwait(false);
-        await CashSaleStore.MoveAllocatedAsync(context, command.SalesOrderId, amount, cancellationToken).ConfigureAwait(false);
-        await Sql.ExecuteAsync(
-            context.Connection, context.Transaction, "UPDATE fin.receipt SET allocated_amount = allocated_amount + @a, version = @v WHERE receipt_id = @r", cancellationToken,
-            ("a", amount), ("v", version), ("r", command.ReceiptId)).ConfigureAwait(false);
+        var eventId = await CashSaleStore.AssignAsync(context, command.ReceiptId, receipt.No, command.SalesOrderId, order.OrderNo, amount, version, cancellationToken).ConfigureAwait(false);
         var confirmed = await CashSaleStore.ConfirmIfPaidAsync(context, command.SalesOrderId, CommandType, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new
         {
@@ -581,5 +637,51 @@ public sealed class ConfirmCashSaleHandler : ICommandHandler<ConfirmCashSale>
         }
 
         return JsonSerializer.Serialize(new { salesOrderId = command.SalesOrderId, status = "CONFIRMED", version = order.Version + 1 });
+    }
+}
+
+[RequiresPermission("cash_sale:create")]
+public sealed class CancelCashSaleHandler : ICommandHandler<CancelCashSale>
+{
+    public string CommandType => "Sales.CancelCashSale";
+
+    public async Task<string> HandleAsync(CancelCashSale command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var reason = Receipting.Reason(command.Reason);
+        var order = CashSaleStore.RequireCash(await Orders.Orders.LockAsync(context, command.SalesOrderId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false));
+        if (order.Status is not ("DRAFT" or "PENDING_PAYMENT" or "CONFIRMED"))
+        {
+            throw new DomainException(SalesErrors.InvalidState, $"The sale is {order.Status}; only a sale without deliveries is cancelled.");
+        }
+
+        if (await SalesSql.ScalarAsync<bool?>(
+                context,
+                """
+                SELECT EXISTS (SELECT 1 FROM sal.sales_order_line WHERE sales_order_id = @o AND qty_delivered > 0)
+                    OR EXISTS (SELECT 1 FROM log.delivery WHERE sales_order_id = @o AND status NOT IN ('CANCELLED'))
+                """,
+                cancellationToken,
+                ("o", command.SalesOrderId)).ConfigureAwait(false) == true)
+        {
+            throw new DomainException(SalesErrors.InvalidState, $"{order.OrderNo} has deliveries planned or made: cancel the planned ones first; what was delivered is credited with a credit note.");
+        }
+
+        // Every receipt assigned to the order gives its money back to itself, one event per receipt.
+        var released = SalesSql.Zero;
+        foreach (var group in (await CashSaleStore.LiveOfOrderAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false)).GroupBy(a => a.ReceiptId).OrderBy(g => g.Key))
+        {
+            var receipt = await Receipting.LockAsync(context, group.Key, null, cancellationToken).ConfigureAwait(false);
+            await CashSaleStore.ReleaseAsync(context, group.Key, receipt.No, [.. group], receipt.Version + 1, reason, CommandType, cancellationToken).ConfigureAwait(false);
+            released += group.Sum(a => a.Amount);
+        }
+
+        var current = await Orders.Orders.LockCurrentAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
+        await Orders.Orders.TransitionAsync(
+            context, command.SalesOrderId, current, "CANCELLED", "SalesOrderCancelled",
+            new { salesOrderId = command.SalesOrderId, orderNo = order.OrderNo, reason, released = Receipting.Money(released) }, CommandType, cancellationToken, reason, cancelReason: reason)
+            .ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { salesOrderId = command.SalesOrderId, status = "CANCELLED", released = Receipting.Money(released), version = current.Version + 1 });
     }
 }

@@ -43,3 +43,24 @@ Tests: `Rochell.Sales.Tests.CashSaleSchemaTests`.
   classification. The rule screen's guided form for it comes with CF1-05; until then it is loaded with the configuration load.
 - 194 commands. Tests: `Rochell.Sales.Tests.CashSaleTests` (CF-01…07).
 
+## CF1-03 — invoice, e-CF record, credit note and paid cancellation (migration 0074; E-CF1-03-1…3)
+
+- **Invoice.** `CreateInvoiceFromDeliveries` for the final consumer takes the delivery lines of one order (`CASH_INVOICE_ONE_ORDER`),
+  copies its buyer to `sal.invoice` and refuses a fiscal authorization (E-CF1-9); the e-CF type is 32. `IssueInvoice` locks the cash
+  order first (sales order → proformas → invoice → AR document → receipts), makes the invoice due the day it is issued (no terms)
+  and, after P-18, calls `CashSaleStore.InheritAsync`: the receipts assigned to the order, oldest first, are released and applied to
+  the new AR document (P-25) up to the invoice's total; what an assignment has left is assigned again to the order for its next
+  deliveries (E-CF1-13). The result carries `collectedOnOrder`; the invoice is born PAID.
+- **e-CF record.** `FiscalReceiver` gives who the e-CF names: the customer's RNC or cédula; for the consumer the buyer's cédula or
+  RNC, the passport (`ReceiverPassport`, new optional member of `RecordExternalFiscalDocument` and
+  `RecordExternalCreditNoteDocument`), or nobody (`ReceiverRnc` empty or null). Anything else is `FISCAL_DOCUMENT_MISMATCH`.
+  Migration 0074: the receiver check of 0071 also covers a credit note's record, through the invoice it credits.
+- **Credit note and refund (E-CF1-8, E-CF1-03-3).** No new command: Cobros undoes the paid invoice's application (`UnapplyReceipt`),
+  Facturación creates the note and another person issues it (e-CF 34, P-22), Cobros applies the receipt again to what the invoice
+  still owes, and what is left on the receipt is refunded with `PrepareCustomerRefund` (TRANSFER or CHEQUE only) and
+  `ReleaseCustomerRefund` by the Controller (P-36).
+- **`CancelCashSale`** (`cash_sale:create`: Vendedor, Caja; E-CF1-03-2): DRAFT, PENDING_PAYMENT or CONFIRMED without deliveries
+  made or planned; releases every receipt assigned (`ReceiptOrderAllocationReleased`) and cancels with the reason. The money stays
+  on the receipts, to be refunded or assigned to another sale. 195 commands.
+- Tests: `Rochell.Sales.Tests.CashSaleInvoiceTests` (CF-08…11).
+
