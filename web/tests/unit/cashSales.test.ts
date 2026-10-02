@@ -57,3 +57,29 @@ describe("consumer identification rule form (E-CF1-05-7)", () => {
     expect(ruleKindRunsTests("CONSUMER_ID_THRESHOLD")).toBe(false);
   });
 });
+
+describe("purchase tax types and withholding scope in words (E-GAS-02-1, E-GAS-01-7)", () => {
+  it("describes a tax type by its components and keeps a withholding's scope through the form", async () => {
+    const { buildFiscalDefinition, describeFiscalDefinition, parseFiscalDefinition } = await import("@/lib/fiscalRuleForm");
+    const telecom = JSON.stringify({
+      label: "Telecomunicaciones",
+      components: [
+        { tax_code: "ITBIS", rate: "0.18", effect: "RECOVERABLE_INPUT" },
+        { tax_code: "ISC", rate: "0.10", effect: "SELECTIVE_TAX" },
+        { tax_code: "CDT", rate: "0.02", effect: "OTHER_TAX" },
+      ],
+    });
+    expect(describeFiscalDefinition("PURCHASE_TAX_TYPE", telecom)).toEqual([
+      "Telecomunicaciones",
+      "ITBIS al 18 % — Adelantado (se descuenta del ITBIS por pagar)",
+      "ISC al 10 % — Selectivo al consumo (va a gasto, no se acredita)",
+      "CDT al 2 % — Otros impuestos y tasas (va a gasto, no se acredita)",
+    ]);
+    expect(describeFiscalDefinition("PURCHASE_TAX_TYPE", '{"label":"Exento","components":[]}')).toEqual(["Exento", "Sin impuestos (exento)"]);
+    const isr = JSON.stringify({ tax_code: "RET_ISR", rate: "0.10", base: "NET", party_types: ["INDIVIDUAL"], isr_withholding_type: "2", applies_to: ["EXPENSE_SERVICE"] }, null, 2);
+    const parsed = parseFiscalDefinition("PURCHASE_WITHHOLDING", isr);
+    expect(parsed.form?.appliesTo).toEqual(["EXPENSE_SERVICE"]);
+    expect(buildFiscalDefinition("PURCHASE_WITHHOLDING", parsed.form!)).toBe(isr);
+    expect(describeFiscalDefinition("PURCHASE_WITHHOLDING", isr)).toContain("Aplica solo a: Gastos que son servicios");
+  });
+});

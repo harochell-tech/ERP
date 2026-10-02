@@ -971,6 +971,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-GAS-01-9 | GAS-1 | New PURCHASING parameter `expense_invoice_approval_threshold`; the invoice over it is approved by who approves match exceptions today, the Controller. |
 | E-GAS-01-10 | GAS-1 | An expense order goes to CLOSED when billed in full or when Compras closes it with a reason; it never shows in «Por recibir». |
 | E-GAS-01-11 | GAS-1 | Two new permissions, to prepare and to approve categories. Registering and posting expense invoices uses the current permissions of Cuentas por pagar. |
+| E-GAS-02-1 | GAS-1 | A tax type is a fiscal rule of kind PURCHASE_TAX_TYPE: a label for the list («ITBIS 18 %») and its components, each with a tax code, a rate and where it goes — creditable ITBIS, selective tax, other taxes or legal tip. «Exento» has no components. |
+| E-GAS-02-2 | GAS-1 | Every tax type may be active at once; each is a rule with its own code (ITBIS_18, ITBIS_16, EXENTO, TELECOM, SEGUROS, CONSUMO_PROPINA). |
+| E-GAS-02-3 | GAS-1 | Each type has its regression cases (a net and the expected taxes), like today's ITBIS rules. |
+| E-GAS-02-4 | GAS-1 | An expense line gets only the components of its own type; the automatic purchase ITBIS rule applies only to inventory lines. A document whose line names a type that is not active on its date is not determined (FISCAL_GATE_CLOSED); a type nobody names, or one still pending, stops nothing. |
+| E-GAS-02-5 | GAS-1 | A withholding rule states what it applies to — inventory, expense services, expense goods — with "applies_to"; without it, every line. A withholding on ITBIS is on that line's ITBIS only. |
+| E-GAS-02-6 | GAS-1 | The six types are loaded by the configuration-load identity from `deploy/fiscal/tax-types-2026-10.json`, READY with their sources and tests; a person activates them. The official documents (Código Tributario Título IV, Ley 153-98, Ley 16-92) are downloaded by the owner. |
+| E-GAS-02-7 | GAS-1 | The list of tax types shows those active on the document's date, with their label (`GET /tax/purchase-tax-types`). |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |

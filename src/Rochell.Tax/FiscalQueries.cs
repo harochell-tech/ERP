@@ -138,3 +138,43 @@ public sealed class ListFiscalRulesHandler : IQueryHandler<ListFiscalRules>
         return ApiJson.Serialize(new FiscalRuleList(rules.Select(r => new FiscalRuleView(r.Id, r.Code, r.Kind, versions[r.Id].ToList())).ToList()));
     }
 }
+
+/// <summary>E-GAS-02-7: the tax types an expense line may name on <paramref name="Date"/> (today's business date when absent).</summary>
+public sealed record ListPurchaseTaxTypes(Guid CompanyId, Guid SessionId, DateOnly? Date = null) : IQuery;
+
+public sealed record PurchaseTaxComponentView(string TaxCode, decimal Rate, string Effect);
+
+/// <summary><see cref="TaxTypeId"/> is the fiscal rule a line names; <see cref="Label"/> what the list shows («ITBIS 18 %»).</summary>
+public sealed record PurchaseTaxTypeView(Guid TaxTypeId, string Code, string Label, IReadOnlyList<PurchaseTaxComponentView> Components);
+
+public sealed record PurchaseTaxTypeList(DateOnly Date, IReadOnlyList<PurchaseTaxTypeView> Items);
+
+[RequiresPermission("master_data:read")]
+public sealed class ListPurchaseTaxTypesHandler : IQueryHandler<ListPurchaseTaxTypes>
+{
+    public string QueryType => "Tax.ListPurchaseTaxTypes";
+
+    public async Task<string> HandleAsync(ListPurchaseTaxTypes query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var date = query.Date ?? Platform.Time.BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow);
+        var rows = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT r.rule_id, r.code, v.definition::text
+            FROM tax.fiscal_rule r JOIN tax.fiscal_rule_version v ON v.rule_id = r.rule_id
+            WHERE r.company_id = @c AND r.rule_kind = @kind AND v.status = 'ACTIVE' AND v.effective_from <= @d AND (v.effective_to IS NULL OR v.effective_to > @d)
+            ORDER BY r.code
+            """,
+            r => (Id: r.GetGuid(0), Code: r.GetString(1), Definition: FiscalRuleDefinition.Parse(FiscalRuleKinds.PurchaseTaxType, r.GetString(2))),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("kind", FiscalRuleKinds.PurchaseTaxType),
+            ("d", date)).ConfigureAwait(false);
+        return ApiJson.Serialize(new PurchaseTaxTypeList(
+            date,
+            [.. rows.Select(r => new PurchaseTaxTypeView(r.Id, r.Code, r.Definition.Label ?? r.Code, [.. (r.Definition.Components ?? []).Select(c => new PurchaseTaxComponentView(c.TaxCode, c.Rate, c.Effect))]))]));
+    }
+}

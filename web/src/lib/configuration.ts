@@ -16,6 +16,7 @@ export const FISCAL_KIND_LABELS: Readonly<Record<string, string>> = {
   SALES_ITBIS: "ITBIS de ventas",
   REPORT_606_CLASSIFICATION: "Clasificación del 606", // FIS2-03 (E-FIS2-03-5)
   CONSUMER_ID_THRESHOLD: "Identificación del consumidor final", // CF1-05 (E-CF1-05-7)
+  PURCHASE_TAX_TYPE: "Tipo de impuesto de compras de gastos", // GAS1-02 (E-GAS-02-1): loaded from the pack; its guided form comes with the expense screens
 };
 
 /**

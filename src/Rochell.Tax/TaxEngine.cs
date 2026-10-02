@@ -6,8 +6,12 @@ using Rochell.Platform.Hashing;
 
 namespace Rochell.Tax;
 
-/// <summary>One purchase line to determine: its id in the subject document, the item and its net amount (quantity × price).</summary>
-public sealed record TaxLineInput(Guid SubjectLineId, Guid ItemId, decimal NetAmount);
+/// <summary>
+/// One line to determine: its id in the subject document, the item and its net amount (quantity × price). An expense line
+/// (E-GAS-02-4) has no item: it names its tax type (a PURCHASE_TAX_TYPE rule) and whether its category is a service or a good
+/// (<see cref="TaxLineScopes"/>).
+/// </summary>
+public sealed record TaxLineInput(Guid SubjectLineId, Guid? ItemId, decimal NetAmount, Guid? TaxTypeRuleId = null, string? ExpenseScope = null);
 
 /// <summary>
 /// What to determine taxes for: the subject document, its supplier or customer and the determination date. A SALE applies only
@@ -57,12 +61,22 @@ public sealed class TaxEngine
             throw new DomainException(TaxErrors.SubjectInvalid, "A determination needs a subject and at least one line.");
         }
 
-        var rules = await ApplicableRulesAsync(context, request.Date, request.Direction == TaxDirections.Sale, cancellationToken).ConfigureAwait(false);
+        var sale = request.Direction == TaxDirections.Sale;
+        if (request.Lines.Any(l => (l.ItemId is null) == (l.TaxTypeRuleId is null) || (l.TaxTypeRuleId is not null && (sale || l.ExpenseScope is not (TaxLineScopes.ExpenseService or TaxLineScopes.ExpenseGoods)))))
+        {
+            throw new DomainException(TaxErrors.SubjectInvalid, "A line has an item, or — on a purchase — a tax type with the scope of its expense category; never both.");
+        }
+
+        var rules = await ApplicableRulesAsync(
+            context.Connection, context.Transaction, context.CompanyId, request.Date, sale, request.Lines.Select(l => l.TaxTypeRuleId).OfType<Guid>().ToHashSet(),
+            request.Lines.Any(l => l.ItemId is not null), cancellationToken).ConfigureAwait(false);
         var partyType = await PartyTypeAsync(context, request.PartyId, cancellationToken).ConfigureAwait(false);
         var lines = new List<TaxableLine>();
         foreach (var line in request.Lines)
         {
-            lines.Add(new TaxableLine(line.SubjectLineId, await ItemCategoryAsync(context, line.ItemId, cancellationToken).ConfigureAwait(false), line.NetAmount));
+            lines.Add(line.ItemId is { } item
+                ? new TaxableLine(line.SubjectLineId, await ItemCategoryAsync(context, item, cancellationToken).ConfigureAwait(false), line.NetAmount)
+                : new TaxableLine(line.SubjectLineId, string.Empty, line.NetAmount, line.TaxTypeRuleId, line.ExpenseScope!));
         }
 
         // E-FIS1-03-3: an exempt sale keeps the gate (the rules in force are still required and recorded) and determines no ITBIS.
@@ -73,7 +87,9 @@ public sealed class TaxEngine
             ["date"] = request.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             ["partyId"] = request.PartyId,
             ["partyTaxType"] = partyType,
-            ["lines"] = lines.Select(l => new { lineId = l.LineId, itemCategory = l.ItemCategory, netAmount = l.NetAmount.ToString(CultureInfo.InvariantCulture) }).ToList(),
+            ["lines"] = lines.Select(l => l.TaxTypeRuleId is { } taxType
+                ? (object)new { lineId = l.LineId, taxType = rules.First(r => r.RuleId == taxType).RuleCode, scope = l.Scope, netAmount = l.NetAmount.ToString(CultureInfo.InvariantCulture) }
+                : new { lineId = l.LineId, itemCategory = l.ItemCategory, netAmount = l.NetAmount.ToString(CultureInfo.InvariantCulture) }).ToList(),
         };
         if (request.Exemption is { } exemption)
         {
@@ -124,9 +140,6 @@ public sealed class TaxEngine
         return new TaxDetermination(determinationId, taxes);
     }
 
-    private static Task<IReadOnlyList<ApplicableRule>> ApplicableRulesAsync(CommandContext context, DateOnly date, bool sale, CancellationToken cancellationToken)
-        => ApplicableRulesAsync(context.Connection, context.Transaction, context.CompanyId, date, sale, cancellationToken);
-
     /// <summary>
     /// E-FIS1-02-8: the sales ITBIS a set of lines would carry on <paramref name="date"/>, computed with the rules in force and never
     /// written (the proforma a customer takes to the DGII). Closed gate → FISCAL_GATE_CLOSED, as at invoicing.
@@ -134,7 +147,7 @@ public sealed class TaxEngine
     public static async Task<IReadOnlyList<DeterminedTax>> PreviewSalesItbisAsync(
         System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly date, IReadOnlyList<TaxableLine> lines, CancellationToken cancellationToken)
     {
-        var rules = await ApplicableRulesAsync(connection, transaction, companyId, date, sale: true, cancellationToken).ConfigureAwait(false);
+        var rules = await ApplicableRulesAsync(connection, transaction, companyId, date, sale: true, NoTaxTypes, needsItbis: true, cancellationToken).ConfigureAwait(false);
         return TaxCalculator.Determine(PartyTaxTypes.Company, lines, rules);
     }
 
@@ -151,7 +164,9 @@ public sealed class TaxEngine
         IReadOnlyList<ApplicableRule> rules;
         try
         {
-            rules = await ApplicableRulesAsync(connection, transaction, companyId, date, sale, cancellationToken).ConfigureAwait(false);
+            rules = await ApplicableRulesAsync(
+                connection, transaction, companyId, date, sale, lines.Select(l => l.TaxTypeRuleId).OfType<Guid>().ToHashSet(), lines.Any(l => l.ItemId is not null), cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (DomainException ex) when (ex.Code == TaxErrors.FiscalGateClosed)
         {
@@ -160,7 +175,7 @@ public sealed class TaxEngine
 
         var categories = new Dictionary<Guid, string>();
         await using (var command = Sql.Command(
-            connection, transaction, "SELECT item_id, item_category FROM md.item WHERE company_id = @c AND item_id = ANY(@ids)", ("c", companyId), ("ids", lines.Select(l => l.ItemId).Distinct().ToArray())))
+            connection, transaction, "SELECT item_id, item_category FROM md.item WHERE company_id = @c AND item_id = ANY(@ids)", ("c", companyId), ("ids", lines.Select(l => l.ItemId).OfType<Guid>().Distinct().ToArray())))
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -169,24 +184,35 @@ public sealed class TaxEngine
             }
         }
 
-        var taxable = lines.Select(l => new TaxableLine(
-            l.SubjectLineId,
-            categories.TryGetValue(l.ItemId, out var category) ? category : throw new DomainException(TaxErrors.SubjectInvalid, "An item of the estimate does not exist."),
-            l.NetAmount)).ToList();
+        // E-GAS-02-4: an expense line of a draft is estimated with its own tax type — every component, not only the ITBIS.
+        var taxable = lines.Select(l => l.ItemId is { } item
+            ? new TaxableLine(
+                l.SubjectLineId,
+                categories.TryGetValue(item, out var category) ? category : throw new DomainException(TaxErrors.SubjectInvalid, "An item of the estimate does not exist."),
+                l.NetAmount)
+            : new TaxableLine(l.SubjectLineId, string.Empty, l.NetAmount, l.TaxTypeRuleId, l.ExpenseScope ?? TaxLineScopes.ExpenseService)).ToList();
         var itbis = TaxCalculator.Determine(PartyTaxTypes.Company, taxable, rules).Where(t => t.Effect != TaxEffects.Withholding).ToList();
         var zero = new decimal(0, 0, 0, false, 2);
         var byLine = lines.ToDictionary(l => l.SubjectLineId, l => zero + itbis.Where(t => t.LineId == l.SubjectLineId).Sum(t => t.Amount));
         return new ItbisEstimate(byLine, zero + byLine.Values.Sum(), null, null);
     }
 
+    private static readonly IReadOnlySet<Guid> NoTaxTypes = new HashSet<Guid>();
+
+    /// <summary>
+    /// The rules in force for a determination. <paramref name="taxTypes"/> (E-GAS-02-4): the tax types its expense lines name — each
+    /// must be ACTIVE on the date, and only those apply or close the gate (a type nobody uses, or one still pending, stops nothing).
+    /// <paramref name="needsItbis"/>: there are lines with an item, so the ITBIS rule of the direction must be in force.
+    /// </summary>
     private static async Task<IReadOnlyList<ApplicableRule>> ApplicableRulesAsync(
-        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly date, bool sale, CancellationToken cancellationToken)
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly date, bool sale, IReadOnlySet<Guid> taxTypes, bool needsItbis,
+        CancellationToken cancellationToken)
     {
         await using var command = Sql.Command(
             connection,
             transaction,
             """
-            SELECT r.code, r.rule_kind,
+            SELECT r.code, r.rule_kind, r.rule_id,
                    (SELECT v.rule_version_id FROM tax.fiscal_rule_version v
                     WHERE v.rule_id = r.rule_id AND v.status = 'ACTIVE' AND v.effective_from <= @d AND (v.effective_to IS NULL OR v.effective_to > @d)) AS active_version,
                    (SELECT v.definition::text FROM tax.fiscal_rule_version v
@@ -202,22 +228,39 @@ public sealed class TaxEngine
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var rules = new List<ApplicableRule>();
         var closed = new List<string>();
+        var found = new HashSet<Guid>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var code = reader.GetString(0);
-            if (FiscalRuleKinds.IsReport(reader.GetString(1)))
+            var kind = reader.GetString(1);
+            var ruleId = reader.GetGuid(2);
+            if (FiscalRuleKinds.IsReport(kind))
             {
                 continue; // E-FIS2-01-3: read by the reports only; it neither applies nor closes the gate
             }
 
-            if (FiscalRuleKinds.IsSales(reader.GetString(1)) != sale)
+            if (kind == FiscalRuleKinds.PurchaseTaxType)
+            {
+                if (sale || !taxTypes.Contains(ruleId))
+                {
+                    continue; // E-GAS-02-4: only the tax types the lines name
+                }
+
+                found.Add(ruleId);
+                if (reader.IsDBNull(3))
+                {
+                    closed.Add(code);
+                    continue;
+                }
+            }
+            else if (FiscalRuleKinds.IsSales(kind) != sale)
             {
                 continue; // the other direction's rules neither apply nor close this gate
             }
 
-            if (reader.IsDBNull(2))
+            if (reader.IsDBNull(3))
             {
-                if (reader.GetBoolean(4))
+                if (reader.GetBoolean(5))
                 {
                     closed.Add(code);
                 }
@@ -225,16 +268,21 @@ public sealed class TaxEngine
                 continue;
             }
 
-            rules.Add(new ApplicableRule(reader.GetGuid(2), code, FiscalRuleDefinition.Parse(reader.GetString(1), reader.GetString(3))));
+            rules.Add(new ApplicableRule(reader.GetGuid(3), code, FiscalRuleDefinition.Parse(kind, reader.GetString(4)), ruleId));
+        }
+
+        if (taxTypes.Count != found.Count)
+        {
+            throw new DomainException(TaxErrors.SubjectInvalid, "A line names a tax type that does not exist.");
         }
 
         if (closed.Count > 0)
         {
-            throw new DomainException(TaxErrors.FiscalGateClosed, $"Fiscal rules pending activation on {date:yyyy-MM-dd}: {string.Join(", ", closed)}.");
+            throw new DomainException(TaxErrors.FiscalGateClosed, $"Fiscal rules not in force on {date:yyyy-MM-dd}, or pending activation: {string.Join(", ", closed)}.");
         }
 
         var itbisKind = sale ? FiscalRuleKinds.SalesItbis : FiscalRuleKinds.PurchaseItbis;
-        if (!rules.Any(r => r.Definition.Kind == itbisKind))
+        if (needsItbis && !rules.Any(r => r.Definition.Kind == itbisKind))
         {
             throw new DomainException(TaxErrors.FiscalGateClosed, $"No {(sale ? "sales" : "purchase")} ITBIS rule is active on {date:yyyy-MM-dd}.");
         }

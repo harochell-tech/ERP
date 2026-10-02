@@ -1,0 +1,132 @@
+{
+  "pack": "tax-types-2026-10",
+  "sources": [
+    {
+      "key": "CT-TITULO-III",
+      "file": "titulo3.pdf",
+      "officialSource": "DGII",
+      "documentTitle": "Código Tributario (Ley 11-92), Título III — ITBIS",
+      "documentVersion": "Texto con la Ley 253-12 (2012-11-09)",
+      "publicationDate": "2012-11-09",
+      "effectiveFrom": "2013-01-01",
+      "url": "https://dgii.gov.do/legislacion/codigotributario/cdigo%20tributario/titulo3.pdf"
+    },
+    {
+      "key": "CT-TITULO-IV",
+      "file": "titulo4.pdf",
+      "officialSource": "DGII",
+      "documentTitle": "Código Tributario (Ley 11-92), Título IV — Impuesto Selectivo al Consumo",
+      "documentVersion": "Texto con la Ley 253-12 (2012-11-09)",
+      "publicationDate": "2012-11-09",
+      "effectiveFrom": "2013-01-01",
+      "url": "https://dgii.gov.do/legislacion/codigotributario/cdigo%20tributario/titulo4.pdf"
+    },
+    {
+      "key": "LEY-153-98",
+      "file": "ley153-98.pdf",
+      "officialSource": "INDOTEL",
+      "documentTitle": "Ley General de Telecomunicaciones No. 153-98 — Contribución al Desarrollo de las Telecomunicaciones (CDT)",
+      "documentVersion": "1998-05-27",
+      "publicationDate": "1998-05-27",
+      "effectiveFrom": "1998-05-27",
+      "url": "https://indotel.gob.do/media/5126/ley-153-98.pdf"
+    },
+    {
+      "key": "LEY-16-92",
+      "file": "ley16-92.pdf",
+      "officialSource": "Ministerio de Trabajo",
+      "documentTitle": "Código de Trabajo (Ley 16-92), art. 228 — propina legal",
+      "documentVersion": "1992-05-29",
+      "publicationDate": "1992-05-29",
+      "effectiveFrom": "1992-06-17",
+      "url": "https://mt.gob.do/images/docs/biblioteca/codigo_de_trabajo.pdf"
+    }
+  ],
+  "rules": [
+    {
+      "code": "ITBIS_18",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "label": "ITBIS 18 %", "components": [ { "tax_code": "ITBIS", "rate": "0.18", "effect": "RECOVERABLE_INPUT" } ] },
+      "sources": [ "CT-TITULO-III" ],
+      "cases": [
+        { "caseId": "reparacion-10000", "partyType": "COMPANY", "itemCategory": "", "netAmount": "10000.00", "itbisAmount": "0.00",
+          "expected": [ { "taxCode": "ITBIS", "amount": "1800.00", "effect": "RECOVERABLE_INPUT" } ] }
+      ]
+    },
+    {
+      "code": "ITBIS_16",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "label": "ITBIS 16 %", "components": [ { "tax_code": "ITBIS", "rate": "0.16", "effect": "RECOVERABLE_INPUT" } ] },
+      "sources": [ "CT-TITULO-III" ],
+      "cases": [
+        { "caseId": "cafe-1000", "partyType": "COMPANY", "itemCategory": "", "netAmount": "1000.00", "itbisAmount": "0.00",
+          "expected": [ { "taxCode": "ITBIS", "amount": "160.00", "effect": "RECOVERABLE_INPUT" } ] }
+      ]
+    },
+    {
+      "code": "EXENTO",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "label": "Exento", "components": [] },
+      "sources": [ "CT-TITULO-III" ],
+      "cases": [
+        { "caseId": "combustible-5000", "partyType": "COMPANY", "itemCategory": "", "netAmount": "5000.00", "itbisAmount": "0.00", "expected": [] }
+      ]
+    },
+    {
+      "code": "TELECOM",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2026-10-01",
+      "definition": {
+        "label": "Telecomunicaciones (ITBIS 18 % + ISC 10 % + CDT 2 %)",
+        "components": [
+          { "tax_code": "ITBIS", "rate": "0.18", "effect": "RECOVERABLE_INPUT" },
+          { "tax_code": "ISC", "rate": "0.10", "effect": "SELECTIVE_TAX" },
+          { "tax_code": "CDT", "rate": "0.02", "effect": "OTHER_TAX" }
+        ]
+      },
+      "sources": [ "CT-TITULO-III", "CT-TITULO-IV", "LEY-153-98" ],
+      "cases": [
+        { "caseId": "telefono-5000", "partyType": "COMPANY", "itemCategory": "", "netAmount": "5000.00", "itbisAmount": "0.00",
+          "expected": [
+            { "taxCode": "ITBIS", "amount": "900.00", "effect": "RECOVERABLE_INPUT" },
+            { "taxCode": "ISC", "amount": "500.00", "effect": "SELECTIVE_TAX" },
+            { "taxCode": "CDT", "amount": "100.00", "effect": "OTHER_TAX" }
+          ] }
+      ]
+    },
+    {
+      "code": "SEGUROS",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "label": "Seguros (ISC 16 %, sin ITBIS)", "components": [ { "tax_code": "ISC", "rate": "0.16", "effect": "SELECTIVE_TAX" } ] },
+      "sources": [ "CT-TITULO-IV" ],
+      "cases": [
+        { "caseId": "poliza-20000", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00",
+          "expected": [ { "taxCode": "ISC", "amount": "3200.00", "effect": "SELECTIVE_TAX" } ] }
+      ]
+    },
+    {
+      "code": "CONSUMO_PROPINA",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2026-10-01",
+      "definition": {
+        "label": "Consumo con propina (ITBIS 18 % + propina 10 %)",
+        "components": [
+          { "tax_code": "ITBIS", "rate": "0.18", "effect": "RECOVERABLE_INPUT" },
+          { "tax_code": "PROPINA", "rate": "0.10", "effect": "LEGAL_TIP" }
+        ]
+      },
+      "sources": [ "CT-TITULO-III", "LEY-16-92" ],
+      "cases": [
+        { "caseId": "consumo-2000", "partyType": "COMPANY", "itemCategory": "", "netAmount": "2000.00", "itbisAmount": "0.00",
+          "expected": [
+            { "taxCode": "ITBIS", "amount": "360.00", "effect": "RECOVERABLE_INPUT" },
+            { "taxCode": "PROPINA", "amount": "200.00", "effect": "LEGAL_TIP" }
+          ] }
+      ]
+    }
+  ]
+}

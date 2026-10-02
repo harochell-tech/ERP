@@ -25,6 +25,32 @@ Schema only: no command writes these columns yet, and every existing row is of c
 Tests: `Rochell.Procurement.Tests.ExpensePurchaseSchemaTests` (each case sets its rows up inside one block and rolls back with a
 sentinel, since no command exists yet).
 
+## GAS1-02 — tax types (no migration; E-GAS-02-1…7)
+
+- **Definition** (`FiscalRuleDefinition`): `PURCHASE_TAX_TYPE` is `{"label", "components": [{"tax_code", "rate", "effect"}]}` with
+  effects RECOVERABLE_INPUT, SELECTIVE_TAX, OTHER_TAX or LEGAL_TIP; tax codes unique within a type; no components = exempt.
+  `PURCHASE_WITHHOLDING` takes an optional `"applies_to"` (INVENTORY, EXPENSE_SERVICE, EXPENSE_GOODS — `TaxLineScopes`).
+- **Calculation** (`TaxCalculator`): a line with a tax type (`TaxableLine.TaxTypeRuleId`) gets that rule's components, each on the
+  line's net (`Components`); a line with an item gets the PURCHASE_ITBIS rule as before. Withholdings apply by party type and by
+  the line's scope; the ITBIS base of a withholding is the line's ITBIS, never its selective tax, other taxes or tip.
+- **Engine** (`TaxEngine`): `TaxLineInput(SubjectLineId, ItemId?, NetAmount, TaxTypeRuleId?, ExpenseScope?)` — an item, or a tax
+  type with its scope. Only the tax types the lines name are loaded: each must be ACTIVE on the date (otherwise
+  `FISCAL_GATE_CLOSED`, naming it) and must exist (`TAX_SUBJECT_INVALID`). The purchase ITBIS rule is required only when there are
+  lines with an item. The determination's inputs record `taxType` (the rule code) and `scope` for expense lines.
+  `EstimateItbisAsync` estimates expense lines with their type.
+- **Test runs**: a tax type's case gives the net and expects every component (`FiscalTestCase.Scope` serves withholding rules
+  limited by scope).
+- **Query** `ListPurchaseTaxTypes` (`GET /tax/purchase-tax-types?date=`, `master_data:read`): the types ACTIVE on the date with
+  label and components.
+- **Pack** `deploy/fiscal/tax-types-2026-10.json`: ITBIS_18, ITBIS_16, EXENTO, TELECOM (18 + 10 + 2), SEGUROS (ISC 16 %),
+  CONSUMO_PROPINA (18 + 10), with their cases and four sources (`titulo3.pdf`, `titulo4.pdf`, `ley153-98.pdf`, `ley16-92.pdf` in
+  `docs/fiscal/fuentes/`; the last three are the owner's to download). Loaded with `rochell-migrate load-fiscal-rules`
+  (`configuration-load.md`); a person activates each type. Rates and bases are the accountant's to confirm (X-1).
+- **Web**: Fiscal › Reglas fiscales names the kind and reads a tax type and a withholding's scope in words
+  (`describeFiscalDefinition`); the guided form of a tax type comes with the expense screens (GAS1-07).
+
+Tests: `Rochell.Tax.Tests.PurchaseTaxTypeTests`, `web/tests/unit/cashSales.test.ts`.
+
 ## Block Rochell's chart (A-01)
 
 From the ADM Cloud export of 2026-10-02 (E-GAS-11, E-GAS-12). The Controller approves the categories and their accounts; the

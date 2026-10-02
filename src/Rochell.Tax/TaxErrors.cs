@@ -55,6 +55,12 @@ public static class FiscalRuleKinds
     /// </summary>
     public const string ConsumerIdThreshold = "CONSUMER_ID_THRESHOLD";
 
+    /// <summary>
+    /// E-GAS-3, E-GAS-02-1/2: the tax type of an expense line — its label and its components (ITBIS, selective tax, other taxes,
+    /// legal tip). Several are in force at once, one per rule code; a line gets only the components of its own type.
+    /// </summary>
+    public const string PurchaseTaxType = "PURCHASE_TAX_TYPE";
+
     public static bool IsSales(string kind) => kind == SalesItbis;
 
     /// <summary>
@@ -72,6 +78,24 @@ public static class TaxEffects
 
     /// <summary>E-VS3-05-1: ITBIS charged on a sale (payable).</summary>
     public const string Output = "OUTPUT";
+
+    /// <summary>E-GAS-10: taxes of an expense purchase that are not credited — each goes to its own expense account and 606 column.</summary>
+    public const string SelectiveTax = "SELECTIVE_TAX";
+    public const string OtherTax = "OTHER_TAX";
+    public const string LegalTip = "LEGAL_TIP";
+}
+
+/// <summary>
+/// E-GAS-01-7, E-GAS-02-5: what a purchase line is, for the rules that depend on it — a registered raw material, or an expense line
+/// whose category is a service or a good.
+/// </summary>
+public static class TaxLineScopes
+{
+    public const string Inventory = "INVENTORY";
+    public const string ExpenseService = "EXPENSE_SERVICE";
+    public const string ExpenseGoods = "EXPENSE_GOODS";
+
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Inventory, ExpenseService, ExpenseGoods };
 }
 
 public static class FiscalRuleStatus
