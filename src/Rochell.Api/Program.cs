@@ -68,6 +68,7 @@ services.AddHostedService(sp => sp.GetRequiredService<FiscalExpiryService>());
 
 // E-MAIL-01-4: outgoing mail is Off unless configured; Redirect and Live need the sender, the relay and the PDF renderer.
 services.AddSingleton(settings.Mail);
+services.AddSingleton(new MailSwitch(settings.Mail.Mode != MailMode.Off));
 if (settings.Mail.Mode != MailMode.Off)
 {
     Required(settings.Mail.FromAddress, "Mail:FromAddress");
@@ -148,10 +149,10 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment(RochellEnvi
 }
 
 app.MapAuthEndpoints();
-app.MapGet("/api/v1/environment", () => Results.Json(new EnvironmentInfo(string.IsNullOrWhiteSpace(settings.EnvironmentBadge) ? null : settings.EnvironmentBadge.Trim())))
+app.MapGet("/api/v1/environment", () => Results.Json(new EnvironmentInfo(string.IsNullOrWhiteSpace(settings.EnvironmentBadge) ? null : settings.EnvironmentBadge.Trim(), settings.Mail.Mode.ToString().ToUpperInvariant())))
     .WithTags("Auth")
     .WithName("GetEnvironment")
-    .WithSummary("E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name). No sign-in needed.")
+    .WithSummary("E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name) and, E-MAIL-01-4, whether it sends mail (OFF, REDIRECT, LIVE). No sign-in needed.")
     .Produces<EnvironmentInfo>();
 var company = app.MapGroup("/api/v1/companies/{companyId:guid}");
 company.MapCommandEndpoints();
@@ -176,4 +177,4 @@ static string? FromFile(string? path, string key)
 public partial class Program;
 
 /// <summary>E-PAR-3: what the web shows in its top bar for this deployment.</summary>
-public sealed record EnvironmentInfo(string? Badge);
+public sealed record EnvironmentInfo(string? Badge, string MailMode);

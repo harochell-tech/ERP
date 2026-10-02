@@ -91,6 +91,9 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   RECEIPT_NOT_REFUNDABLE: "Solo se devuelve dinero de un recibo vigente cuyo dinero ya está en el banco.",
   REFUND_NOT_MATCHABLE: "Solo una devolución liberada se empareja con el extracto.",
   MAIL_RECIPIENT_INVALID: "Revise los destinatarios: de 1 a 10 direcciones de correo válidas.",
+  MAIL_DOCUMENT_NOT_SENDABLE: "Ese documento todavía no se puede enviar: solo se envía lo que se imprime sin marca de agua.",
+  MAIL_DISABLED: "El envío de correos no está activado en este ambiente.",
+  MAIL_NOT_RETRYABLE: "Solo se reintenta un correo que falló.",
   MAIL_FIELD_INVALID: "Revise el asunto (una línea, hasta 200 caracteres) y el mensaje (hasta 5,000 caracteres).",
   // IMP-01: bulk load of suppliers and customers.
   IMPORT_FILE_INVALID: "El archivo no se puede leer como la exportación de ADM Cloud (.xlsx o .csv con «Razón Social» e «ID Fiscal»).",

@@ -214,3 +214,31 @@ and TRANSITO, the 2026 periods, the registry of 2026-09-19 and the owner as SUPE
    E-ADM-2-2), `create-plant 131925332 MATILLA <AREA> "<name>"` and its locations (RECEPCION, CURADO, TRANSITO), `open-periods`,
    `import-rnc-registry`.
 7. Sign in; Configuración › Centro de configuración shows the 19 setup steps pending.
+
+## Outgoing mail (MAIL-03, E-MAIL-01-3 / E-MAIL-01-4)
+
+The compose file runs `pdf` (Gotenberg with Chromium, internal network only) and passes the mail settings to the API. Mail stays
+**Off** until `MAIL_MODE` is set in `/opt/rochell-staging/.env`:
+
+```
+MAIL_MODE=Redirect
+MAIL_FROM=industrias@rochell.com.do
+MAIL_REDIRECT_TO=industrias@rochell.com.do
+MAIL_ARCHIVE_BCC=industrias@rochell.com.do
+```
+
+`MAIL_SMTP_HOST` (default `smtp-relay.gmail.com`) and `MAIL_EHLO_NAME` (default `staging.industriasrochell.com.do`) rarely change.
+Then `docker compose up -d api`. With **Redirect** every message goes only to `MAIL_REDIRECT_TO`, the intended recipients named in
+the subject and the body; **Live** (customers receive mail) is set only on the owner's explicit decision (E-MAIL-8).
+
+One-time, by the Workspace administrator (no password is stored on the server):
+
+1. admin.google.com → Apps → Google Workspace → Gmail → Routing → **SMTP relay service** → Configure.
+2. Allowed senders: *Only addresses in my domains*. Authentication: *Only accept mail from the specified IP addresses* →
+   `2.25.237.35`. Leave *Require SMTP Authentication* unticked; tick *Require TLS encryption*. Save (it can take up to an hour).
+3. `industrias@rochell.com.do` must exist as a mailbox or a group that receives mail.
+
+Check: send a quote from the UI (Ventas › Cotización › Enviar por correo); its history shows «Enviado — Redirigido a …» and the
+message arrives at the internal mailbox with the PDF. A failure shows the relay's answer in the history and in
+`docker compose logs api`; `core.mail_attempt` keeps every attempt.
+

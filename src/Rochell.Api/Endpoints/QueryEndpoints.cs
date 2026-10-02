@@ -16,6 +16,7 @@ using Rochell.Platform.Queries;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Customers;
+using Rochell.Sales.Mail;
 using Rochell.Sales.Proformas;
 using Rochell.Sales.Queries;
 using Rochell.Sales.Refunds;
@@ -62,7 +63,7 @@ public static class QueryEndpoints
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
-        typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler),
+        typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
@@ -242,6 +243,13 @@ public static class QueryEndpoints
         sales.MapGet("/proformas/{proformaId:guid}", (HttpContext http, Guid companyId, Guid proformaId, GetProformaHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetProforma(companyId, s, proformaId), handler, ct))
             .Describe<ProformaDetail>(nameof(GetProforma), notFound: true);
+        // MAIL-02 (E-MAIL-7, E-MAIL-01-6): the sendings of a document and the exact PDF sent.
+        sales.MapGet("/mail", (HttpContext http, Guid companyId, string documentType, Guid documentId, ListDocumentMailHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListDocumentMail(companyId, s, documentType, documentId), handler, ct))
+            .Describe<DocumentMailList>(nameof(ListDocumentMail));
+        sales.MapGet("/mail/{mailId:guid}/pdf", (HttpContext http, Guid companyId, Guid mailId, GetDocumentMailPdfHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetDocumentMailPdf(companyId, s, mailId), handler, ct))
+            .Describe<DocumentMailPdf>(nameof(GetDocumentMailPdf), notFound: true);
         // E-FIS1b-8: refunds of customers' credit balances.
         sales.MapGet("/customer-refunds", (HttpContext http, Guid companyId, Guid? partyId, string? status, int? limit, int? offset, ListCustomerRefundsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListCustomerRefunds(companyId, s, partyId, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
+import { DeliveryMail } from "@/components/DocumentMail";
 import { SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
@@ -508,6 +509,7 @@ function DeliveryDetail() {
           </ul>
         </>
       ) : null}
+      <DeliveryMail deliveryId={h.deliveryId} deliveryNo={h.deliveryNo} blocked={h.gateOutAt ? null : "El conduce se envía por correo después de la salida por portería."} />
       <SalesHistory history={data.history} />
     </>
   );

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Rochell.Api.Auth;
+using Rochell.Platform.Mail;
 using Rochell.TestInfrastructure;
 using Rochell.Testing.Oidc;
 
@@ -106,10 +107,20 @@ internal sealed class DevApiHost(TestHarness harness, SimulatedIdp idp, string? 
             builder.UseSetting("Rochell:WebRoot", webRoot);
         }
 
+        // MAIL-03: mail in Redirect mode with a transport that only records and a renderer that fakes the PDF — nothing leaves.
+        builder.UseSetting("Rochell:Mail:Mode", "Redirect");
+        builder.UseSetting("Rochell:Mail:FromAddress", "industrias@dev.rochell.test");
+        builder.UseSetting("Rochell:Mail:RedirectTo", "industrias@dev.rochell.test");
+        builder.UseSetting("Rochell:Mail:Interval", "00:00:01");
+        builder.UseSetting("Rochell:Mail:RendererUrl", "http://localhost:9");
+        builder.UseSetting("Rochell:Mail:Smtp:Host", "localhost");
+
         builder.ConfigureTestServices(services =>
         {
             services.Configure<OpenIdConnectOptions>(OidcAuthentication.Scheme, o => o.BackchannelHttpHandler = idp.Backchannel);
             services.AddSingleton<IStartupFilter>(new IdpPage(idp));
+            services.AddSingleton<IMailTransport>(new RecordingMailTransport());
+            services.AddSingleton<IPdfRenderer>(new FakePdfRenderer());
         });
     }
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
+import { AgingMail, StatementMail } from "@/components/DocumentMail";
 import { StatementProformas, StatementTable } from "@/components/SalesStatement";
 import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
 import { Field, NoPermission } from "@/components/ui";
@@ -77,6 +78,9 @@ function Statement() {
           </p>
           <StatementTable statement={s} />
           <StatementProformas statement={s} />
+          {/* MAIL-03 (E-MAIL-3, E-MAIL-01-8): Cobros sends the statement of this period, or today's open invoices by age. */}
+          <StatementMail key={`ec:${customer}`} partyId={customer} from={from} to={to} />
+          <AgingMail key={`cxc:${customer}`} partyId={customer} />
         </>
       )}
     </>

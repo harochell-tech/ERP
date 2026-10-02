@@ -4,6 +4,12 @@ using Rochell.Platform.Data;
 
 namespace Rochell.Platform.Mail;
 
+/// <summary>
+/// Whether this deployment sends mail (E-MAIL-01-4). When it does not, the commands that send documents refuse instead of queueing
+/// messages that would leave, stale, the day the mode changes.
+/// </summary>
+public sealed record MailSwitch(bool Enabled);
+
 public static class MailErrors
 {
     public const string RecipientInvalid = "MAIL_RECIPIENT_INVALID";
@@ -49,8 +55,11 @@ public static partial class MailOutbox
         return addresses;
     }
 
-    /// <summary>Queues the message for the dispatcher; returns its id. <paramref name="requestEventId"/> is the event of the command that asked for it.</summary>
-    public static async Task<Guid> EnqueueAsync(CommandContext context, MailDraft draft, Guid requestEventId, Guid requestedBy, CancellationToken cancellationToken)
+    /// <summary>
+    /// Queues the message <paramref name="mailId"/> for the dispatcher. <paramref name="requestEventId"/> is the event of the command
+    /// that asked for it.
+    /// </summary>
+    public static async Task EnqueueAsync(CommandContext context, Guid mailId, MailDraft draft, Guid requestEventId, Guid requestedBy, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(draft);
@@ -72,7 +81,6 @@ public static partial class MailOutbox
             throw new DomainException(MailErrors.FieldInvalid, "The document needs its HTML and a .pdf file name of letters, digits, dots, dashes and underscores.");
         }
 
-        var id = context.Ids.NewId();
         var now = context.Clock.UtcNow;
         await Sql.ExecuteAsync(
             context.Connection,
@@ -83,7 +91,7 @@ public static partial class MailOutbox
             VALUES (@id, @c, @type, @doc, @no, @party, @to, @subject, @body, @file, @html, 'QUEUED', @now, @event, @by, @now)
             """,
             cancellationToken,
-            ("id", id),
+            ("id", mailId),
             ("c", context.CompanyId),
             ("type", draft.DocumentType),
             ("doc", draft.DocumentId),
@@ -97,7 +105,6 @@ public static partial class MailOutbox
             ("now", now),
             ("event", requestEventId),
             ("by", requestedBy)).ConfigureAwait(false);
-        return id;
     }
 
     [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
