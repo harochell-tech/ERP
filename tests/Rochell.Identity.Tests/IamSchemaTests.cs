@@ -36,7 +36,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_authorization:suspend,fiscal_authorization:verify,fiscal_report:read,fiscal_rule:activate,sales:read", // + E-FIS1-01-9
         ["PROBADOR"] = "identity:act_as", // E-B03-14, TEST databases only
         ["PROCESO_DIARIO"] = "fiscal_authorization:suspend", // E-FIS1-04-7, the API's daily process only
-        ["CARGA_CONFIGURACION"] = "fiscal_rule:configure,fiscal_rule_source:register", // E-CFG-1, the deployment CLI's configuration load only
+        ["CARGA_CONFIGURACION"] = "account:manage,expense_category:prepare,fiscal_rule:configure,fiscal_rule_source:register", // E-CFG-1, E-GAS-03-4/7: the deployment CLI's configuration load only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
         ["VENDEDOR"] = "cash_sale:create,customer:create,customer:import,customer:update,mail:retry,quote:email,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11

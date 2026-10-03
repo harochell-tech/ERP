@@ -51,6 +51,27 @@ sentinel, since no command exists yet).
 
 Tests: `Rochell.Tax.Tests.PurchaseTaxTypeTests`, `web/tests/unit/cashSales.test.ts`.
 
+## GAS1-03 — expense categories and the configuration load (migration 0078; E-GAS-03-1…10)
+
+- **Commands** (`Rochell.Procurement/Expenses`): `PrepareExpenseCategory` and `UpdateExpenseCategoryDraft` (`expense_category:prepare`),
+  `ApproveExpenseCategories` (one or up to 500, `expense_category:approve`, step-up; approver ≠ preparer unless waived; every check
+  before any write, so a refused category is reported SKIPPED and the others go on), `DeactivateExpenseCategory`
+  (`expense_category:prepare`; also discards a draft), `ReactivateExpenseCategory` (`expense_category:approve`; only an approved
+  category whose code is free). Errors `EXPENSE_CATEGORY_NOT_FOUND`, `EXPENSE_CATEGORY_INVALID`, `EXPENSE_CATEGORY_CODE_USED`,
+  `EXPENSE_ACCOUNT_INVALID`. 200 commands.
+- **Query** `ListExpenseCategories` (`GET /procurement/expense-categories?status=`, `master_data:read`) with the account's code and
+  name and who prepared and approved.
+- **Load** (migration 0078 gives «Carga de configuración» `account:manage` and `expense_category:prepare`):
+  `rochell-migrate load-chart <rnc> deploy/chart/block-rochell-2026-10.json` (`ChartPackLoader`: CreateAccount per account; an
+  existing code is EXISTS or DIFFERENT, never changed) and `rochell-migrate load-expense-categories <rnc>
+  deploy/expenses/categories-block-rochell-2026-10.json` (`ExpenseCategoryPackLoader`: DRAFT categories; a missing account is
+  ACCOUNT_MISSING). Exit code 3 when something was DIFFERENT, missing or refused.
+- **Packs** generated from the owner's ADM Cloud export of 2026-10-02: 139 accounts (10 control; 35 rows left out, E-GAS-03-8) and
+  37 categories.
+
+Tests: `ExpenseCategoryTests` (prepare / correct / approve / take out of use / replace; the batch; both loads twice;
+the missing account).
+
 ## Block Rochell's chart (A-01)
 
 From the ADM Cloud export of 2026-10-02 (E-GAS-11, E-GAS-12). The Controller approves the categories and their accounts; the

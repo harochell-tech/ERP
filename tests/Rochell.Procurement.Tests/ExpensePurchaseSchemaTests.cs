@@ -198,7 +198,7 @@ public sealed class ExpensePurchaseSchemaTests(PostgresFixture postgres)
                 "SELECT string_agg(role_code || ':' || is_control, ',' ORDER BY role_code) FROM fin.account_role WHERE role_code IN ('SELECTIVE_TAX_EXPENSE', 'OTHER_TAX_EXPENSE', 'LEGAL_TIP_EXPENSE', 'PURCHASE_EXPENSE') AND name IS NOT NULL"));
         Assert.Equal("PURCHASING:AMOUNT", await h.ScalarAsync<string>("SELECT policy_code || ':' || value_type FROM acc.policy_parameter_definition WHERE param_code = 'expense_invoice_approval_threshold'"));
         Assert.Equal(
-            "CONTADOR:expense_category:prepare,CONTROLLER:expense_category:approve,CONTROLLER:expense_category:prepare",
+            "CARGA_CONFIGURACION:expense_category:prepare,CONTADOR:expense_category:prepare,CONTROLLER:expense_category:approve,CONTROLLER:expense_category:prepare", // + the load, E-GAS-03-4
             await h.ScalarAsync<string>(
                 """
                 SELECT string_agg(r.code || ':' || rp.permission_code, ',' ORDER BY r.code, rp.permission_code)

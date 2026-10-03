@@ -978,6 +978,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-GAS-02-5 | GAS-1 | A withholding rule states what it applies to — inventory, expense services, expense goods — with "applies_to"; without it, every line. A withholding on ITBIS is on that line's ITBIS only. |
 | E-GAS-02-6 | GAS-1 | The six types are loaded by the configuration-load identity from `deploy/fiscal/tax-types-2026-10.json`, READY with their sources and tests; a person activates them. The official documents (Código Tributario Título IV, Ley 153-98, Ley 16-92) are downloaded by the owner. |
 | E-GAS-02-7 | GAS-1 | The list of tax types shows those active on the document's date, with their label (`GET /tax/purchase-tax-types`). |
+| E-GAS-03-1 | GAS-1 | Category commands: prepare, correct while DRAFT, approve (step-up), deactivate (also discards a draft) and reactivate an approved one. |
+| E-GAS-03-2 | GAS-1 | Categories are read with `master_data:read` (Compras, Cuentas por pagar, Controller, Contador). |
+| E-GAS-03-3 | GAS-1 | Approval in batch: the Controller approves several categories in one operation; what cannot be approved is reported and the rest goes on. |
+| E-GAS-03-4 | GAS-1 | Block Rochell's categories are loaded from a file in the repository by «Carga de configuración», which receives only `expense_category:prepare` for them: they stay DRAFT until the Controller approves them. |
+| E-GAS-03-5 | GAS-1 | A category's code is derived from its name in capitals (ELECTRICIDAD, COMBUSTIBLE, MANT_MAQUINARIA); internal, the screens show the name. |
+| E-GAS-03-6 | GAS-1 | The category load creates no account: a category whose account is not in the chart is skipped and reported. |
+| E-GAS-03-7 | GAS-1 | The chart of accounts is loaded to staging from a file generated from the owner's ADM Cloud export, by «Carga de configuración» (which receives `account:manage`) through CreateAccount. Accounts are created ACTIVE (the system has no draft account; the Controller renames or deactivates); an existing code is left as it is. |
+| E-GAS-03-8 | GAS-1 | Left out of the load: the 13 rows without code, the two USD accounts (10301, 30901) and the group headers ending in 000 — 20 of them, not the 15 first stated (10000, 11000, 12000, 13000, 14000, 16000, 18000, 19000, 20000, 24000, 25000, 30000, 40000, 50000, 60000, 62000, 63000, 65000, 70000, 80000); 17000, 21000, 22000, 61000, 64000 and 90000 are accounts, not headers. |
+| E-GAS-03-9 | GAS-1 | Control accounts (fixed at creation): 10100, 10300, 10302, 10400, 12100, 13300, 13400, 13500, 20100, 20300; every other account is normal. |
+| E-GAS-03-10 | GAS-1 | Added in the same load: 14400 ITBIS adelantado en compras, 63550 Peajes, 63960 Otros impuestos y tasas, and the plant and fleet accounts 66100…66550. |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |

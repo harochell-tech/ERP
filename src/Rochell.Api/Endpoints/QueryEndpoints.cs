@@ -13,6 +13,7 @@ using Rochell.MasterData.Import;
 using Rochell.MasterData.Suppliers;
 using Rochell.MasterData.Queries;
 using Rochell.Platform.Queries;
+using Rochell.Procurement.Expenses;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Customers;
@@ -51,7 +52,7 @@ public static class QueryEndpoints
         typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewCashSaleHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
         typeof(ListLatestReconciliationRunsHandler), typeof(SearchJournalsHandler), typeof(GetIntegrityStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
-        typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(GetSupplierInvoiceHandler),
+        typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(ListExpenseCategoriesHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
@@ -130,6 +131,10 @@ public static class QueryEndpoints
         procurement.MapGet("/receipt-corrections", (HttpContext http, Guid companyId, Guid? plantId, string? documentStatus, int? limit, int? offset, ListReceiptCorrectionsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListReceiptCorrections(companyId, s, plantId, documentStatus, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<ReceiptCorrectionList>(nameof(ListReceiptCorrections));
+        // E-GAS-03-2: expense categories (master data).
+        procurement.MapGet("/expense-categories", (HttpContext http, Guid companyId, string? status, ListExpenseCategoriesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListExpenseCategories(companyId, s, status), handler, ct))
+            .Describe<ExpenseCategoryList>(nameof(ListExpenseCategories));
         procurement.MapGet("/supplier-invoices", (HttpContext http, Guid companyId, string? documentStatus, string? accountingStatus, Guid? supplierId, int? limit, int? offset, ListSupplierInvoicesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListSupplierInvoices(companyId, s, documentStatus, accountingStatus, supplierId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<SupplierInvoiceList>(nameof(ListSupplierInvoices));

@@ -1,0 +1,839 @@
+{
+  "pack": "block-rochell-2026-10",
+  "accounts": [
+    {
+      "code": "10100",
+      "name": "Caja General - Fondos por Depositar",
+      "accountClass": "ASSET",
+      "isControl": true
+    },
+    {
+      "code": "10200",
+      "name": "Caja Chica",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "10300",
+      "name": "Banco Popular 818175580",
+      "accountClass": "ASSET",
+      "isControl": true
+    },
+    {
+      "code": "10302",
+      "name": "Banco Popular 826945750",
+      "accountClass": "ASSET",
+      "isControl": true
+    },
+    {
+      "code": "10400",
+      "name": "Banco BHD 27771380012",
+      "accountClass": "ASSET",
+      "isControl": true
+    },
+    {
+      "code": "11100",
+      "name": "Inversiones a Corto Plazo",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "12100",
+      "name": "Cuentas por Cobrar Clientes",
+      "accountClass": "ASSET",
+      "isControl": true
+    },
+    {
+      "code": "12200",
+      "name": "Cuentas por Cobrar Empleados",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "12300",
+      "name": "Cuentas por Cobrar Accionistas",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "12900",
+      "name": "Cuentas por Cobrar Otros",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "13100",
+      "name": "Mercancía para la Venta",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "13200",
+      "name": "Compras en Tránsito",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "13300",
+      "name": "Inventario de Materia Prima",
+      "accountClass": "ASSET",
+      "isControl": true
+    },
+    {
+      "code": "13400",
+      "name": "Producción en Proceso",
+      "accountClass": "ASSET",
+      "isControl": true
+    },
+    {
+      "code": "13500",
+      "name": "Inventario de Producto Terminado",
+      "accountClass": "ASSET",
+      "isControl": true
+    },
+    {
+      "code": "14100",
+      "name": "Seguros Pagados por Adelantado",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "14200",
+      "name": "Publicidad Pagada por Adelantado",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "14300",
+      "name": "Adelantos a Proveedores",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "14400",
+      "name": "ITBIS adelantado en compras",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "16100",
+      "name": "Terrenos",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "16200",
+      "name": "Edificios",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "16300",
+      "name": "Equipos",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "16400",
+      "name": "Vehículos y Equipos de Transporte Liviano",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "16450",
+      "name": "Vehículos y Equipos de Transporte Pesado",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "16500",
+      "name": "Muebles de Oficina",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "16600",
+      "name": "Mejoras de Propiedad Arrendada",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "16900",
+      "name": "Otros Activos Fijos",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "17000",
+      "name": "Depreciación Acumulada - Edificios",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "17100",
+      "name": "Depreciación Acumulada - Equipos",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "17200",
+      "name": "Depreciación Acumulada - Vehículos y Equipos de Transporte Liviano",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "17250",
+      "name": "Depreciación Acumulada - Vehículos y Equipos de Transporte Pesado",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "17300",
+      "name": "Depreciación Acumulada - Muebles de Oficina",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "17400",
+      "name": "Depreciación Acumulada - Mejoras Propiedad Arrendada",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "17500",
+      "name": "Depreciación Acumulada - Otros",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "18100",
+      "name": "Instrumentos Bancarios",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "19100",
+      "name": "Anticipos a Impuestos sobre la Renta",
+      "accountClass": "ASSET",
+      "isControl": false
+    },
+    {
+      "code": "20100",
+      "name": "Cuentas por Pagar Proveedores",
+      "accountClass": "LIABILITY",
+      "isControl": true
+    },
+    {
+      "code": "20200",
+      "name": "Reembolsos por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "20300",
+      "name": "Adelantos de Clientes",
+      "accountClass": "LIABILITY",
+      "isControl": true
+    },
+    {
+      "code": "20400",
+      "name": "Tarjeta de Crédito",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "20500",
+      "name": "Otras cuentas por pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "21000",
+      "name": "Nómina por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "21100",
+      "name": "Bonificaciones por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "21200",
+      "name": "Incentivos por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "21300",
+      "name": "Seguros Retenidos",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "21350",
+      "name": "Preavisos y Cesantías por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "21400",
+      "name": "Retención TSS Empleados",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "21450",
+      "name": "Retención TSS Empleador",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "21500",
+      "name": "Retención Aportes Infotep",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "22000",
+      "name": "Rentas por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "22100",
+      "name": "Electricidad por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "22200",
+      "name": "Servicios Comunicaciones por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "22300",
+      "name": "Seguros Médicos por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "22400",
+      "name": "Seguridad Social por Pagar",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "24100",
+      "name": "Impuestos por Pagar - ITBIS 100%",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "24200",
+      "name": "Impuestos por Pagar - ITBIS 30%",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "24300",
+      "name": "Retención Impuesto a la Renta 27% Exterior",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "24400",
+      "name": "Retención Impuesto a la Renta 10% Proveedores",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "24500",
+      "name": "Retención Impuesto a la Renta 2% Proveedores",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "25100",
+      "name": "Préstamos Bancarios",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "25200",
+      "name": "Préstamos de Accionistas",
+      "accountClass": "LIABILITY",
+      "isControl": false
+    },
+    {
+      "code": "30100",
+      "name": "Capital de los Accionistas",
+      "accountClass": "EQUITY",
+      "isControl": false
+    },
+    {
+      "code": "30200",
+      "name": "Utilidades Retenidas",
+      "accountClass": "EQUITY",
+      "isControl": false
+    },
+    {
+      "code": "30300",
+      "name": "Resultados del Período",
+      "accountClass": "EQUITY",
+      "isControl": false
+    },
+    {
+      "code": "30400",
+      "name": "Reserva Legal",
+      "accountClass": "EQUITY",
+      "isControl": false
+    },
+    {
+      "code": "30900",
+      "name": "Carga Inicial DOP",
+      "accountClass": "EQUITY",
+      "isControl": false
+    },
+    {
+      "code": "40100",
+      "name": "Ventas",
+      "accountClass": "REVENUE",
+      "isControl": false
+    },
+    {
+      "code": "40200",
+      "name": "Descuentos en Ventas",
+      "accountClass": "REVENUE",
+      "isControl": false
+    },
+    {
+      "code": "40300",
+      "name": "Devoluciones",
+      "accountClass": "REVENUE",
+      "isControl": false
+    },
+    {
+      "code": "40400",
+      "name": "Descuentos en Cobros",
+      "accountClass": "REVENUE",
+      "isControl": false
+    },
+    {
+      "code": "50100",
+      "name": "Costo de Ventas",
+      "accountClass": "COST",
+      "isControl": false
+    },
+    {
+      "code": "50210",
+      "name": "Merma / Desperdicio de Producción",
+      "accountClass": "COST",
+      "isControl": false
+    },
+    {
+      "code": "60100",
+      "name": "Salarios",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60150",
+      "name": "Comisiones",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60200",
+      "name": "Horas Extras",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60300",
+      "name": "Incentivos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60400",
+      "name": "Vacaciones",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60500",
+      "name": "Bonificaciones",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60550",
+      "name": "Regalías",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60600",
+      "name": "Aportes a la Seguridad Social SFS",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60650",
+      "name": "Aportes a la Seguridad Social AFP",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60660",
+      "name": "Aportes Infotep",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60700",
+      "name": "Seguros Médicos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60800",
+      "name": "Transporte",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "60900",
+      "name": "Entrenamientos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "61000",
+      "name": "Viáticos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "61100",
+      "name": "Integración y Atención a Empleados",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "61200",
+      "name": "Unfiformes",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "61300",
+      "name": "Preavisos y Cesantías",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "61900",
+      "name": "Otros gastos de personal",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "62100",
+      "name": "Promociones",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "62200",
+      "name": "Publicidad Digital",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "62250",
+      "name": "Publicidad Tradicional",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "62300",
+      "name": "Gastos de Viaje",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "62400",
+      "name": "Gastos de Representación",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "62500",
+      "name": "Redes Sociales",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63100",
+      "name": "Rentas de Inmuebles",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63150",
+      "name": "Rentas de Equipos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63200",
+      "name": "Electricidad",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63300",
+      "name": "Teléfono",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63400",
+      "name": "Suministros de Oficina",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63500",
+      "name": "Combustible",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63550",
+      "name": "Peajes",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63600",
+      "name": "Mantenimiento de Oficina",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63700",
+      "name": "Reparaciones",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63800",
+      "name": "Servicios de Limpieza",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63900",
+      "name": "Propinas",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63950",
+      "name": "Impuesto Selectivo al consumo",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "63960",
+      "name": "Otros impuestos y tasas",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "64000",
+      "name": "Seguros",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "64100",
+      "name": "Servicios Contabilidad",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "64200",
+      "name": "Servicios Legales",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "64300",
+      "name": "Servicios Técnicos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "64400",
+      "name": "Cargos Tarjetas Crédito",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "64900",
+      "name": "Otros Servicios",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "65100",
+      "name": "Depreciaciones - Edificios",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "65200",
+      "name": "Depreciaciones - Equipos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "65300",
+      "name": "Depreciaciones - Vehículos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "65400",
+      "name": "Depreciaciones - Muebles de Oficina",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66100",
+      "name": "Mantenimiento de maquinaria y planta",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66150",
+      "name": "Repuestos de maquinaria",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66200",
+      "name": "Lubricantes y grasas",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66250",
+      "name": "Neumáticos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66300",
+      "name": "Mantenimiento de vehículos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66350",
+      "name": "Fletes y acarreos contratados",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66400",
+      "name": "Seguridad y vigilancia",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66450",
+      "name": "Agua",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66500",
+      "name": "Herramientas menores",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "66550",
+      "name": "Equipos de protección personal",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "70100",
+      "name": "Intereses Bancarios",
+      "accountClass": "REVENUE",
+      "isControl": false
+    },
+    {
+      "code": "70200",
+      "name": "Ganancia en Venta de Activos",
+      "accountClass": "REVENUE",
+      "isControl": false
+    },
+    {
+      "code": "70300",
+      "name": "Ingreso por Diferencia Cambiara",
+      "accountClass": "REVENUE",
+      "isControl": false
+    },
+    {
+      "code": "80100",
+      "name": "Cargos Bancarios",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "80200",
+      "name": "Intereses de Préstamos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "80300",
+      "name": "Intereses de Tarjetas de Crédito",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "80400",
+      "name": "Pérdida en Venta de Activos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "80500",
+      "name": "Gasto por Diferencia Cambiara",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "80600",
+      "name": "Redondeos",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    },
+    {
+      "code": "90000",
+      "name": "Impuesto sobre la Renta",
+      "accountClass": "EXPENSE",
+      "isControl": false
+    }
+  ]
+}

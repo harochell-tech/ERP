@@ -1,0 +1,264 @@
+{
+  "pack": "block-rochell-2026-10",
+  "categories": [
+    {
+      "code": "ELECTRICIDAD",
+      "name": "Electricidad",
+      "account": "63200",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "TELEFONO",
+      "name": "Teléfono e internet",
+      "account": "63300",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "SUMINISTROS_OFICINA",
+      "name": "Suministros de oficina",
+      "account": "63400",
+      "goodsType606": "02",
+      "lineClass": "GOODS"
+    },
+    {
+      "code": "COMBUSTIBLE",
+      "name": "Combustible",
+      "account": "63500",
+      "goodsType606": "02",
+      "lineClass": "GOODS"
+    },
+    {
+      "code": "PEAJES",
+      "name": "Peajes",
+      "account": "63550",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "MANT_OFICINA",
+      "name": "Mantenimiento de oficina",
+      "account": "63600",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "REPARACIONES",
+      "name": "Reparaciones",
+      "account": "63700",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "LIMPIEZA",
+      "name": "Servicios de limpieza",
+      "account": "63800",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "SEGUROS",
+      "name": "Seguros",
+      "account": "64000",
+      "goodsType606": "11",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "CONTABILIDAD",
+      "name": "Servicios de contabilidad",
+      "account": "64100",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "LEGALES",
+      "name": "Servicios legales",
+      "account": "64200",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "TECNICOS",
+      "name": "Servicios técnicos",
+      "account": "64300",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "OTROS_SERVICIOS",
+      "name": "Otros servicios",
+      "account": "64900",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "RENTA_INMUEBLES",
+      "name": "Renta de inmuebles",
+      "account": "63100",
+      "goodsType606": "03",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "RENTA_EQUIPOS",
+      "name": "Renta de equipos",
+      "account": "63150",
+      "goodsType606": "03",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "PROMOCIONES",
+      "name": "Promociones",
+      "account": "62100",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "PUBLICIDAD_DIGITAL",
+      "name": "Publicidad digital",
+      "account": "62200",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "PUBLICIDAD_TRADICIONAL",
+      "name": "Publicidad tradicional",
+      "account": "62250",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "REDES_SOCIALES",
+      "name": "Redes sociales",
+      "account": "62500",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "VIAJES",
+      "name": "Gastos de viaje",
+      "account": "62300",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "REPRESENTACION",
+      "name": "Gastos de representación",
+      "account": "62400",
+      "goodsType606": "05",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "UNIFORMES",
+      "name": "Uniformes",
+      "account": "61200",
+      "goodsType606": "01",
+      "lineClass": "GOODS"
+    },
+    {
+      "code": "ENTRENAMIENTOS",
+      "name": "Entrenamientos",
+      "account": "60900",
+      "goodsType606": "01",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "ATENCION_EMPLEADOS",
+      "name": "Integración y atención a empleados",
+      "account": "61100",
+      "goodsType606": "01",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "TRANSPORTE_PERSONAL",
+      "name": "Transporte del personal",
+      "account": "60800",
+      "goodsType606": "01",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "VIATICOS",
+      "name": "Viáticos",
+      "account": "61000",
+      "goodsType606": "01",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "SEGUROS_MEDICOS",
+      "name": "Seguros médicos",
+      "account": "60700",
+      "goodsType606": "01",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "MANT_MAQUINARIA",
+      "name": "Mantenimiento de maquinaria y planta",
+      "account": "66100",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "REPUESTOS",
+      "name": "Repuestos de maquinaria",
+      "account": "66150",
+      "goodsType606": "02",
+      "lineClass": "GOODS"
+    },
+    {
+      "code": "LUBRICANTES",
+      "name": "Lubricantes y grasas",
+      "account": "66200",
+      "goodsType606": "02",
+      "lineClass": "GOODS"
+    },
+    {
+      "code": "NEUMATICOS",
+      "name": "Neumáticos",
+      "account": "66250",
+      "goodsType606": "02",
+      "lineClass": "GOODS"
+    },
+    {
+      "code": "MANT_VEHICULOS",
+      "name": "Mantenimiento de vehículos",
+      "account": "66300",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "FLETES",
+      "name": "Fletes y acarreos contratados",
+      "account": "66350",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "VIGILANCIA",
+      "name": "Seguridad y vigilancia",
+      "account": "66400",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "AGUA",
+      "name": "Agua",
+      "account": "66450",
+      "goodsType606": "02",
+      "lineClass": "SERVICE"
+    },
+    {
+      "code": "HERRAMIENTAS",
+      "name": "Herramientas menores",
+      "account": "66500",
+      "goodsType606": "02",
+      "lineClass": "GOODS"
+    },
+    {
+      "code": "EPP",
+      "name": "Equipos de protección personal",
+      "account": "66550",
+      "goodsType606": "02",
+      "lineClass": "GOODS"
+    }
+  ]
+}

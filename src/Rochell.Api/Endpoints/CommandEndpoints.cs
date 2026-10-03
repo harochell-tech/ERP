@@ -17,6 +17,7 @@ using Rochell.Manufacturing.Runs;
 using Rochell.Manufacturing.Shifts;
 using Rochell.MasterData.Suppliers;
 using Rochell.Platform.Commands;
+using Rochell.Procurement.Expenses;
 using Rochell.Procurement.GoodsReceipts;
 using Rochell.Procurement.Ledger;
 using Rochell.Procurement.PurchaseOrders;
@@ -112,6 +113,12 @@ public static class CommandEndpoints
         procurement.MapCommand<ApproveReceiptCorrection, ApproveReceiptCorrectionHandler>();
         procurement.MapCommand<RejectReceiptCorrection, RejectReceiptCorrectionHandler>();
         procurement.MapCommand<RegisterSupplierInvoice, RegisterSupplierInvoiceHandler>();
+        // GAS1-03 (E-GAS-03-1…3): expense categories.
+        procurement.MapCommand<PrepareExpenseCategory, PrepareExpenseCategoryHandler>();
+        procurement.MapCommand<UpdateExpenseCategoryDraft, UpdateExpenseCategoryDraftHandler>();
+        procurement.MapCommand<ApproveExpenseCategories, ApproveExpenseCategoriesHandler>();
+        procurement.MapCommand<DeactivateExpenseCategory, DeactivateExpenseCategoryHandler>();
+        procurement.MapCommand<ReactivateExpenseCategory, ReactivateExpenseCategoryHandler>();
         procurement.MapCommand<MatchSupplierInvoice, MatchSupplierInvoiceHandler>();
         procurement.MapCommand<ApproveMatchException, ApproveMatchExceptionHandler>();
         procurement.MapCommand<VoidSupplierInvoice, VoidSupplierInvoiceHandler>();
@@ -303,7 +310,8 @@ public static class CommandEndpoints
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
-        typeof(RegisterSupplierInvoiceHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
+        typeof(RegisterSupplierInvoiceHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
+        typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),
         typeof(ApproveAccountingPolicyVersionHandler),
