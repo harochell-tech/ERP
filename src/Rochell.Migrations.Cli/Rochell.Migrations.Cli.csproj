@@ -10,6 +10,8 @@
     <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
     <ProjectReference Include="..\Rochell.Identity\Rochell.Identity.csproj" />
     <ProjectReference Include="..\Rochell.Tax\Rochell.Tax.csproj" />
+    <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
+    <ProjectReference Include="..\Rochell.Procurement\Rochell.Procurement.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" />

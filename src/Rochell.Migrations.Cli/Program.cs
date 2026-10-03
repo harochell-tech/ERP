@@ -551,6 +551,60 @@ try
                 }
             }
 
+        case "load-chart":
+        case "load-expense-categories":
+            {
+                // E-GAS-03-4/7: the chart of accounts (created) and the expense categories (prepared as DRAFT, approved by the
+                // Controller) of a reviewed pack, through the commands of the application as the configuration-load identity.
+                if (args.Length != 3 || !File.Exists(args[2]))
+                {
+                    await Console.Error.WriteLineAsync($"Usage: rochell-migrate {args[0]} <company-rnc> <pack.json>");
+                    return 1;
+                }
+
+                await using var dataSource = NpgsqlDataSource.Create(connectionString);
+                Guid? company;
+                await using (var connection = await dataSource.OpenConnectionAsync())
+                {
+                    await using var find = new NpgsqlCommand("SELECT company_id FROM md.company WHERE rnc = @rnc", connection);
+                    find.Parameters.AddWithValue("rnc", args[1]);
+                    company = (Guid?)await find.ExecuteScalarAsync();
+                }
+
+                if (company is null)
+                {
+                    await Console.Error.WriteLineAsync($"Company {args[1]} does not exist.");
+                    return 2;
+                }
+
+                var clock = Rochell.Platform.Time.SystemClock.Instance;
+                var options = new Rochell.Identity.IdentityOptions { HostedDomain = "service.invalid" };
+                var sessions = new Rochell.Identity.Sessions.SessionService(dataSource, options, clock);
+                var log = new Rochell.Platform.Observability.RequestLogWriter(dataSource, ex => Console.Error.WriteLine($"request_log: {ex.Message}"));
+                var pipeline = new Rochell.Platform.Commands.CommandPipeline(dataSource, new Rochell.Identity.Authorization.SqlCommandAuthorizer(options, clock), log, clock);
+                var session = await sessions.StartServiceSessionAsync(Rochell.Identity.IdentityConstants.ConfigurationLoadUserId);
+                try
+                {
+                    var json = await File.ReadAllTextAsync(args[2]);
+                    var steps = args[0] == "load-chart"
+                        ? await new Rochell.Finance.Ledger.ChartPackLoader(pipeline, dataSource).LoadAsync(company.Value, session, Rochell.Finance.Ledger.ChartPack.Parse(json))
+                        : await new Rochell.Procurement.Expenses.ExpenseCategoryPackLoader(pipeline, dataSource).LoadAsync(
+                            company.Value, session, Rochell.Procurement.Expenses.ExpenseCategoryPack.Parse(json));
+                    foreach (var step in steps)
+                    {
+                        Console.WriteLine($"{step.Subject}: {step.Outcome} — {step.Detail}");
+                    }
+
+                    Console.WriteLine(string.Join(", ", steps.GroupBy(s => s.Outcome).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key} {g.Count()}")));
+                    return steps.Any(s => s.Outcome is "DIFFERENT" or "ACCOUNT_MISSING" or "REFUSED") ? 3 : 0;
+                }
+                finally
+                {
+                    await log.FlushAsync();
+                    await sessions.EndSessionAsync(session);
+                }
+            }
+
         case "import-rnc-registry":
             {
                 // E-RNC-1/2: the DGII's weekly "Listado de todos los RNC", replacing the whole registry in one transaction.
@@ -575,7 +629,7 @@ try
             }
 
         default:
-            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|create-synthetic-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods|import-rnc-registry>");
+            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|create-synthetic-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods|load-fiscal-rules|load-chart|load-expense-categories|import-rnc-registry>");
             return 1;
     }
 }

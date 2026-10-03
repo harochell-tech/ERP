@@ -128,7 +128,7 @@ public sealed class FiscalRulePackTests(PostgresFixture postgres)
         await h.GrantAsync(h.CompanyId, Loader, "CARGA_CONFIGURACION");
 
         Assert.All(new[] { toPerson, otherRole, crossed }, e => Assert.Equal("P0001", (e as PostgresException)?.SqlState));
-        Assert.Equal("fiscal_rule:configure,fiscal_rule_source:register", await h.ScalarAsync<string>(
+        Assert.Equal("account:manage,expense_category:prepare,fiscal_rule:configure,fiscal_rule_source:register", await h.ScalarAsync<string>( // + E-GAS-03-4/7
             "SELECT string_agg(permission_code, ',' ORDER BY permission_code) FROM iam.role r JOIN iam.role_permission USING (role_id) WHERE r.code = 'CARGA_CONFIGURACION'"));
     }
 }

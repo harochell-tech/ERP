@@ -175,6 +175,11 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PLATE_DUPLICATE: "Ya existe un vehículo con esa placa.",
   FLEET_CODE_INVALID: "Indique la ficha del vehículo: de 2 a 12 letras, números y espacios, como BR 09.",
   FLEET_CODE_DUPLICATE: "Otro vehículo ya tiene esa ficha.",
+  // GAS1-03 (E-GAS-03-1…6): expense categories.
+  EXPENSE_CATEGORY_NOT_FOUND: "La categoría de gasto no existe.",
+  EXPENSE_CATEGORY_INVALID: "Revise la categoría: nombre de 1 a 100 caracteres, tipo del 606 de 01 a 11 y clase servicio o bien.",
+  EXPENSE_CATEGORY_CODE_USED: "Ya hay una categoría en uso con ese código.",
+  EXPENSE_ACCOUNT_INVALID: "La cuenta de una categoría debe ser una cuenta de gasto activa que no sea de control.",
   NATIONAL_ID_INVALID: "La cédula debe tener 11 dígitos.",
   NATIONAL_ID_DUPLICATE: "Ya existe un chofer con esa cédula.",
   OPENING_FILE_INVALID: "El archivo de apertura tiene errores; revise el detalle.",
