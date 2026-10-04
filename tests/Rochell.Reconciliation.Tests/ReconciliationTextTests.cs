@@ -21,6 +21,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
         "AP_CONTROL", "AR_CONTROL", "CASH_IN_TRANSIT", "CONTRACT_ASSET", "FINISHED_GOODS", "FINISHED_GOODS_IN_TRANSIT", "ITBIS_RECOVERABLE", "MANUAL_ADJUSTMENT",
         "MIGRATION_CLEARING", "RAW_MATERIAL", "UNAPPLIED_RECEIPTS", "UNBILLED_RECEIVABLE", "BALANCE_SHEET", "INCOME_STATEMENT", "CHARGE_RECOGNIZED", "IN_PROGRESS",
         "IN_TRANSIT", "NOT_POSTED", "PENDING_EXTERNAL", "POSTING_BLOCKED", "SALES_ITBIS",
+        "SELECTIVE_TAX_EXPENSE", "OTHER_TAX_EXPENSE", "LEGAL_TIP_EXPENSE", // account roles TAX-606 reads (E-GAS-06-5)
     };
 
     private static DateOnly Today(TestHarness h) => BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
@@ -83,7 +84,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
 
         Assert.Contains("CLASSIFICATION_MISSING", produced);   // from tax.report_606
         Assert.Contains("BANK_GL_DIFFERENCE", produced);       // from BankGl.cs
-        Assert.Equal(63, produced.Count); // + the three of CASH-SALE (E-CF1-10, 11); // + the three of PROFORMA-ASIG (E-FIS1b-01-12)
+        Assert.Equal(66, produced.Count); // + the three of TAX-606 for expense taxes (E-GAS-06-5); + the three of CASH-SALE (E-CF1-10, 11); // + the three of PROFORMA-ASIG (E-FIS1b-01-12)
         Assert.Equal(produced, catalogued);                     // none missing, none stale
         Assert.Equal(Reconciliations.All.Order(StringComparer.Ordinal), definitions.Select(d => d.GetProperty("reconCode").GetString()));
         Assert.All(definitions, d => Assert.False(string.IsNullOrWhiteSpace(d.GetProperty("name").GetString())));

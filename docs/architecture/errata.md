@@ -1001,6 +1001,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-GAS-05-4 | GAS-1 | The order closes by itself when the invoice that completes it is posted; Compras may close it before with a reason; reversing an invoice reopens it. |
 | E-GAS-05-5 | GAS-1 | An expense order never shows in «Por recibir» and cannot be received. |
 | E-GAS-05-6 | GAS-1 | While an expense order is typed, the net and the estimated taxes of each type are shown, as for an inventory order. |
+| E-GAS-06-1 | GAS-1 | The 606 has one goods-and-services type per NCF: for an expense invoice, the 606 type of the category of its largest line, as the item's classification is used for inventory invoices. |
+| E-GAS-06-2 | GAS-1 | Services amount: the net of lines whose category is a service; goods amount: categories that are goods plus inventory lines. |
+| E-GAS-06-3 | GAS-1 | ITBIS billed is only ITBIS; selective tax, CDT and tip are never added to it. |
+| E-GAS-06-4 | GAS-1 | Fields 20, 21 and 22 carry the selective tax, other taxes (CDT) and legal tip, each from its own tax. |
+| E-GAS-06-5 | GAS-1 | TAX-606 also compares the month's selective tax, other taxes and tip of the 606 with their accounts (warnings TAX606_SELECTIVE_DIFFERENCE, TAX606_OTHER_DIFFERENCE, TAX606_TIP_DIFFERENCE). |
+| E-GAS-06-6 | GAS-1 | An expense invoice always has its type (its category requires it); CLASSIFICATION_MISSING remains for raw materials without a classification rule. |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |
