@@ -617,6 +617,17 @@ public static class Reconciliations
                    gl.amount AS value_b, 'TAX606_ITBIS_DIFFERENCE' AS classification, 'WARNING' AS severity, NULL::text AS component
             FROM gl WHERE (SELECT coalesce(sum(itbis_to_advance), 0) FROM r WHERE record_kind = 'NCF') <> gl.amount
             UNION ALL
+            -- E-GAS-06-5: the selective tax, other taxes and legal tip of the month's NCF records against their expense roles.
+            SELECT x.tax || ':' || to_char(@cutoff, 'YYYYMM'), x.reported, x.posted, x.classification, 'WARNING', NULL::text
+            FROM (SELECT v.tax, v.classification,
+                         (SELECT coalesce(sum(CASE v.tax WHEN 'selective' THEN selective_tax WHEN 'other' THEN other_taxes ELSE legal_tip END), 0) FROM r WHERE record_kind = 'NCF') AS reported,
+                         (SELECT coalesce(sum(e.debit - e.credit), 0) FROM fin.gl_entry e
+                          WHERE e.company_id = @c AND e.account_role = v.role
+                            AND e.posting_date >= date_trunc('month', @cutoff)::date AND e.posting_date < (date_trunc('month', @cutoff) + interval '1 month')::date) AS posted
+                  FROM (VALUES ('selective', 'SELECTIVE_TAX_EXPENSE', 'TAX606_SELECTIVE_DIFFERENCE'), ('other', 'OTHER_TAX_EXPENSE', 'TAX606_OTHER_DIFFERENCE'),
+                               ('tip', 'LEGAL_TIP_EXPENSE', 'TAX606_TIP_DIFFERENCE')) AS v (tax, role, classification)) x
+            WHERE x.reported <> x.posted
+            UNION ALL
             SELECT 'ncf:' || r.ncf, r.total_amount, NULL::numeric, w, 'WARNING', NULL::text FROM r CROSS JOIN unnest(r.warnings) AS w) f
             """,
             null),

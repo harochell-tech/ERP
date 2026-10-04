@@ -115,6 +115,17 @@ Tests: `ExpenseInvoiceTests` (GAS-03…09, GAS-13 and the refusals), with hand-d
 
 Tests: `ExpensePurchaseOrderTests` (GAS-10, GAS-11, price exception, the order's rules for an invoice, the preview).
 
+## GAS1-06 — the 606 and TAX-606 (migration 0080; E-GAS-06-1…6)
+
+- `tax.report_606` (same signature, replaced): the type of the largest line is its expense category's `goods_type_606`, or the
+  classification rule applied to its item's category; `services_amount` = net of SERVICE-class expense lines, `goods_amount` = the
+  rest, `total_amount` = both; `itbis_billed` keeps only ITBIS effects; `selective_tax`, `other_taxes`, `legal_tip` (fields 20–22)
+  sum the SELECTIVE_TAX, OTHER_TAX and LEGAL_TIP effects of NCF records (0 on PAYMENT records). The CSV, IT-1 and IR-17 read it as before.
+- TAX-606 adds three warnings when the month's 606 amounts differ from what was posted to `SELECTIVE_TAX_EXPENSE`,
+  `OTHER_TAX_EXPENSE` and `LEGAL_TIP_EXPENSE` in the month. 66 classifications.
+
+Tests: `ExpenseReport606Tests` (GAS-14 with hand-derived amounts, and the warning on a tampered determination).
+
 ## Block Rochell's chart (A-01)
 
 From the ADM Cloud export of 2026-10-02 (E-GAS-11, E-GAS-12). The Controller approves the categories and their accounts; the
