@@ -114,6 +114,9 @@ public static class CommandEndpoints
         procurement.MapCommand<RejectReceiptCorrection, RejectReceiptCorrectionHandler>();
         procurement.MapCommand<RegisterSupplierInvoice, RegisterSupplierInvoiceHandler>();
         procurement.MapCommand<RegisterExpenseInvoice, RegisterExpenseInvoiceHandler>(); // GAS1-04 (E-GAS-04-1)
+        procurement.MapCommand<CreateExpensePurchaseOrder, CreateExpensePurchaseOrderHandler>(); // GAS1-05 (E-GAS-05-1)
+        procurement.MapCommand<UpdateExpensePurchaseOrderDraft, UpdateExpensePurchaseOrderDraftHandler>();
+        procurement.MapCommand<CloseExpensePurchaseOrder, CloseExpensePurchaseOrderHandler>();
         // GAS1-03 (E-GAS-03-1…3): expense categories.
         procurement.MapCommand<PrepareExpenseCategory, PrepareExpenseCategoryHandler>();
         procurement.MapCommand<UpdateExpenseCategoryDraft, UpdateExpenseCategoryDraftHandler>();
@@ -311,7 +314,7 @@ public static class CommandEndpoints
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
-        typeof(RegisterSupplierInvoiceHandler), typeof(RegisterExpenseInvoiceHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
+        typeof(RegisterSupplierInvoiceHandler), typeof(RegisterExpenseInvoiceHandler), typeof(CreateExpensePurchaseOrderHandler), typeof(UpdateExpensePurchaseOrderDraftHandler), typeof(CloseExpensePurchaseOrderHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
         typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),

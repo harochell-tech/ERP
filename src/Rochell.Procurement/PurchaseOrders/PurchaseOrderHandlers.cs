@@ -73,6 +73,11 @@ public sealed class UpdatePurchaseOrderDraftHandler : ICommandHandler<UpdatePurc
         ArgumentNullException.ThrowIfNull(context);
         var header = await PurchaseOrderStore.LockAsync(context, command.PurchaseOrderId, command.PlantId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         PurchaseOrderStore.RequireStatus(header, PurchaseOrderStatus.Draft);
+        if (header.DocClass != "INVENTORY")
+        {
+            throw new DomainException(ProcurementErrors.InvalidState, "An expense order is corrected with UpdateExpensePurchaseOrderDraft (E-GAS-01-1).");
+        }
+
         await PurchaseOrderStore.ValidateAsync(context, header.PartyId, header.OrderDate, command.Lines, cancellationToken).ConfigureAwait(false);
 
         var newVersion = header.Version + 1;
@@ -228,6 +233,23 @@ public sealed class CancelPurchaseOrderHandler : ICommandHandler<CancelPurchaseO
             if ((decimal)(await received.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))! != 0)
             {
                 throw new DomainException(ProcurementErrors.AlreadyReceived, "Orders with receipts cannot be cancelled.");
+            }
+        }
+
+        // GAS1-05 (E-GAS-05-2): nor an order that an invoice (not voided) bills.
+        await using (var billed = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT EXISTS (SELECT 1 FROM pur.supplier_invoice_line il JOIN pur.supplier_invoice si ON si.si_id = il.si_id
+                           JOIN pur.purchase_order_line l ON l.po_line_id = il.po_line_id
+                           WHERE l.po_id = @p AND si.document_status NOT IN ('VOIDED', 'REVERSED'))
+            """,
+            ("p", header.Id)))
+        {
+            if (await billed.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
+            {
+                throw new DomainException(ProcurementErrors.AlreadyInvoiced, "Orders that an invoice bills cannot be cancelled.");
             }
         }
 

@@ -195,8 +195,9 @@ function OrderDetail() {
             {order.lines.map((l) => (
               <tr key={l.poLineId}>
                 <td>{l.lineNo}</td>
-                <td className="wrap">{itemLabel(l.itemCode, l.itemDescription)}</td>
-                <td>{uomLabel(l.uom)}</td>
+                {/* GAS1-05: an expense line has no item nor unit — it shows what is bought and its category. */}
+                <td className="wrap">{l.itemCode ? itemLabel(l.itemCode, l.itemDescription) : `${l.description ?? "—"} (${l.expenseCategoryName ?? "—"})`}</td>
+                <td>{l.uom ? uomLabel(l.uom) : "—"}</td>
                 <td className="num">{formatQuantity(l.qtyOrdered)}</td>
                 <td className="num">{formatDecimal(l.unitPrice)}</td>
                 <td className="num">{formatDecimal(l.netAmount)}</td>

@@ -52,7 +52,7 @@ public static class QueryEndpoints
         typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewCashSaleHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
         typeof(ListLatestReconciliationRunsHandler), typeof(SearchJournalsHandler), typeof(GetIntegrityStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
-        typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(ListExpenseCategoriesHandler), typeof(GetSupplierInvoiceHandler),
+        typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(ListExpenseCategoriesHandler), typeof(PreviewExpensePurchaseOrderHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
@@ -131,6 +131,11 @@ public static class QueryEndpoints
         procurement.MapGet("/receipt-corrections", (HttpContext http, Guid companyId, Guid? plantId, string? documentStatus, int? limit, int? offset, ListReceiptCorrectionsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListReceiptCorrections(companyId, s, plantId, documentStatus, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<ReceiptCorrectionList>(nameof(ListReceiptCorrections));
+        // E-GAS-05-6: a draft expense order priced with the taxes of its lines' types (POST: the lines travel in the body; read-only).
+        procurement.MapPost("/expense-purchase-orders/preview", (HttpContext http, Guid companyId, PreviewExpensePurchaseOrderHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<ExpenseOrderPreviewRequest, PreviewExpensePurchaseOrder>(http, (s, b) => new PreviewExpensePurchaseOrder(companyId, s, b.OrderDate, b.Lines), handler, ct))
+            .Describe<ExpenseOrderPreview>(nameof(PreviewExpensePurchaseOrder))
+            .Accepts<ExpenseOrderPreviewRequest>("application/json");
         // E-GAS-03-2: expense categories (master data).
         procurement.MapGet("/expense-categories", (HttpContext http, Guid companyId, string? status, ListExpenseCategoriesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListExpenseCategories(companyId, s, status), handler, ct))

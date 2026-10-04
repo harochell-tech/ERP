@@ -5,7 +5,7 @@ using Rochell.Platform.Data;
 
 namespace Rochell.Procurement.PurchaseOrders;
 
-internal sealed record PurchaseOrderHeader(Guid Id, string PoNo, Guid PartyId, Guid PlantId, DateOnly OrderDate, string Status, Guid CreatedBy, long Version);
+internal sealed record PurchaseOrderHeader(Guid Id, string PoNo, Guid PartyId, Guid PlantId, DateOnly OrderDate, string Status, Guid CreatedBy, long Version, string DocClass = "INVENTORY");
 
 /// <summary>Shared rules of the purchase order handlers (§11.1): locking, checks and state transitions with history (ADR-027).</summary>
 internal static class PurchaseOrderStore
@@ -27,7 +27,7 @@ internal static class PurchaseOrderStore
         await using (var command = Sql.Command(
             context.Connection,
             context.Transaction,
-            "SELECT po_id, po_no, party_id, plant_id, order_date, status::text, created_by, version FROM pur.purchase_order WHERE company_id = @c AND po_id = @p FOR UPDATE",
+            "SELECT po_id, po_no, party_id, plant_id, order_date, status::text, created_by, version, doc_class FROM pur.purchase_order WHERE company_id = @c AND po_id = @p FOR UPDATE",
             ("c", context.CompanyId),
             ("p", poId)))
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
@@ -37,7 +37,7 @@ internal static class PurchaseOrderStore
                 throw new DomainException(ProcurementErrors.NotFound, "The purchase order does not exist.");
             }
 
-            header = new PurchaseOrderHeader(reader.GetGuid(0), reader.GetString(1), reader.GetGuid(2), reader.GetGuid(3), reader.GetFieldValue<DateOnly>(4), reader.GetString(5), reader.GetGuid(6), reader.GetInt64(7));
+            header = new PurchaseOrderHeader(reader.GetGuid(0), reader.GetString(1), reader.GetGuid(2), reader.GetGuid(3), reader.GetFieldValue<DateOnly>(4), reader.GetString(5), reader.GetGuid(6), reader.GetInt64(7), reader.GetString(8));
         }
 
         if (header.PlantId != plantId)

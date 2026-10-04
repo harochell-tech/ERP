@@ -51,7 +51,7 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
 
         // N3: the order.
         var header = await PurchaseOrderStore.LockAsync(context, command.PurchaseOrderId, command.PlantId, null, cancellationToken).ConfigureAwait(false);
-        if (header.Status is not (PurchaseOrderStatus.Approved or PurchaseOrderStatus.PartiallyReceived))
+        if (header.Status is not (PurchaseOrderStatus.Approved or PurchaseOrderStatus.PartiallyReceived) || header.DocClass != "INVENTORY") // E-GAS-05-5: an expense order is never received
         {
             throw new DomainException(ProcurementErrors.NotReceivable, $"The purchase order is {header.Status}; only APPROVED or PARTIALLY_RECEIVED orders can be received.");
         }
