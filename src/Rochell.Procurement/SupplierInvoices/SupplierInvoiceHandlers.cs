@@ -10,7 +10,9 @@ using Rochell.Procurement.PurchaseOrders;
 
 namespace Rochell.Procurement.SupplierInvoices;
 
-internal sealed record InvoiceHeader(Guid Id, Guid PartyId, string FiscalNumber, DateOnly DocDate, string Status, string AccountingStatus, Guid CreatedBy, long Version);
+internal sealed record InvoiceHeader(
+    Guid Id, Guid PartyId, string FiscalNumber, DateOnly DocDate, string Status, string AccountingStatus, Guid CreatedBy, long Version, string DocClass = SupplierInvoiceClasses.Inventory,
+    Guid? PlantId = null);
 
 internal static partial class SupplierInvoiceStore
 {
@@ -25,7 +27,7 @@ internal static partial class SupplierInvoiceStore
             context.Connection,
             context.Transaction,
             """
-            SELECT si_id, party_id, supplier_fiscal_number, doc_date, document_status::text, accounting_status::text, created_by, version
+            SELECT si_id, party_id, supplier_fiscal_number, doc_date, document_status::text, accounting_status::text, created_by, version, doc_class, plant_id
             FROM pur.supplier_invoice WHERE company_id = @c AND si_id = @s FOR UPDATE
             """,
             ("c", context.CompanyId),
@@ -36,7 +38,9 @@ internal static partial class SupplierInvoiceStore
             throw new DomainException(ProcurementErrors.InvoiceNotFound, "The supplier invoice does not exist.");
         }
 
-        var header = new InvoiceHeader(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetFieldValue<DateOnly>(3), reader.GetString(4), reader.GetString(5), reader.GetGuid(6), reader.GetInt64(7));
+        var header = new InvoiceHeader(
+            reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetFieldValue<DateOnly>(3), reader.GetString(4), reader.GetString(5), reader.GetGuid(6), reader.GetInt64(7),
+            reader.GetString(8), reader.IsDBNull(9) ? null : reader.GetGuid(9));
         return header.Version == expectedVersion
             ? header
             : throw new DomainException(ProcurementErrors.VersionConflict, $"The invoice is at version {header.Version}, not {expectedVersion}.");
@@ -146,7 +150,7 @@ public sealed class RegisterSupplierInvoiceHandler : ICommandHandler<RegisterSup
         await using (var used = Sql.Command(
             context.Connection,
             context.Transaction,
-            "SELECT EXISTS (SELECT 1 FROM pur.supplier_invoice WHERE company_id = @c AND party_id = @p AND supplier_fiscal_number = @n AND document_status <> 'VOIDED')",
+            "SELECT EXISTS (SELECT 1 FROM pur.supplier_invoice WHERE company_id = @c AND party_id = @p AND supplier_fiscal_number = @n AND document_status NOT IN ('VOIDED', 'REVERSED'))",
             ("c", context.CompanyId),
             ("p", command.PartyId),
             ("n", fiscalNumber)))
@@ -255,6 +259,11 @@ public sealed class MatchSupplierInvoiceHandler : ICommandHandler<MatchSupplierI
         }
 
         var policy = await PolicyResolver.ResolveAsync(context, PolicyCodes.Purchasing, header.DocDate, cancellationToken).ConfigureAwait(false);
+        if (header.DocClass == SupplierInvoiceClasses.Expense)
+        {
+            return await Expenses.ExpenseInvoices.MatchAsync(context, header, policy, CommandType, cancellationToken).ConfigureAwait(false);
+        }
+
         var results = new List<LineMatch>();
         foreach (var line in await SupplierInvoiceStore.LinesAsync(context, header.Id, cancellationToken).ConfigureAwait(false))
         {

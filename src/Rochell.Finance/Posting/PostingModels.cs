@@ -3,6 +3,8 @@ namespace Rochell.Finance.Posting;
 /// <summary>
 /// One instance of a rule line. <paramref name="AmountSource"/> must equal the rule line's "amount" name (guards mapper bugs).
 /// Dimensions must match exactly the rule line's declared dimensions; <paramref name="SubledgerRef"/> is required iff the line has a subledger.
+/// <paramref name="AccountId"/> (E-GAS-2, GAS1-04): the account of a line whose role takes it from the document
+/// (<see cref="PostingEngine.DocumentAccountRole"/>, an expense category's account) — required there and refused anywhere else.
 /// </summary>
 public sealed record PostingLineInput(
     string LineCode,
@@ -13,7 +15,8 @@ public sealed record PostingLineInput(
     Guid? PartyId = null,
     Guid? SubledgerRef = null,
     Guid? InvValueEntryId = null,
-    IReadOnlyDictionary<string, string>? Inputs = null);
+    IReadOnlyDictionary<string, string>? Inputs = null,
+    Guid? AccountId = null);
 
 /// <summary>A posting to prepare (validate) before any write, and to write afterwards with the source event id (Patch 1 §5.2 steps 7 and 11).</summary>
 public sealed record PostingRequest(string RuleCode, DateOnly BusinessDate, DateTime OccurredAt, IReadOnlyList<PostingLineInput> Lines, int Generation = 1, string JournalType = "AUTO");

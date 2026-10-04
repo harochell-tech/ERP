@@ -190,8 +190,9 @@ function InvoiceDetail() {
           {invoice.lines.map((l) => (
             <tr key={l.siLineId}>
               <td>{l.lineNo}</td>
-              <td>{l.poNo}</td>
-              <td>{l.itemCode}</td>
+              {/* GAS1-04: an expense line has no order nor item — it shows what was bought and its category. */}
+              <td>{l.poNo ?? "Sin orden"}</td>
+              <td>{l.itemCode ?? (l.description ? `${l.description} (${l.expenseCategoryName ?? "—"})` : "—")}</td>
               <td className="num">{formatQuantity(l.qty)}</td>
               <td className="num">{formatDecimal(l.unitPrice)}</td>
               <td className="num">{formatDecimal(l.netAmount)}</td>

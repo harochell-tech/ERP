@@ -113,6 +113,7 @@ public static class CommandEndpoints
         procurement.MapCommand<ApproveReceiptCorrection, ApproveReceiptCorrectionHandler>();
         procurement.MapCommand<RejectReceiptCorrection, RejectReceiptCorrectionHandler>();
         procurement.MapCommand<RegisterSupplierInvoice, RegisterSupplierInvoiceHandler>();
+        procurement.MapCommand<RegisterExpenseInvoice, RegisterExpenseInvoiceHandler>(); // GAS1-04 (E-GAS-04-1)
         // GAS1-03 (E-GAS-03-1…3): expense categories.
         procurement.MapCommand<PrepareExpenseCategory, PrepareExpenseCategoryHandler>();
         procurement.MapCommand<UpdateExpenseCategoryDraft, UpdateExpenseCategoryDraftHandler>();
@@ -310,7 +311,7 @@ public static class CommandEndpoints
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
-        typeof(RegisterSupplierInvoiceHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
+        typeof(RegisterSupplierInvoiceHandler), typeof(RegisterExpenseInvoiceHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
         typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),

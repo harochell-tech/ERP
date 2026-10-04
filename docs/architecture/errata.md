@@ -988,6 +988,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-GAS-03-8 | GAS-1 | Left out of the load: the 13 rows without code, the two USD accounts (10301, 30901) and the group headers ending in 000 — 20 of them, not the 15 first stated (10000, 11000, 12000, 13000, 14000, 16000, 18000, 19000, 20000, 24000, 25000, 30000, 40000, 50000, 60000, 62000, 63000, 65000, 70000, 80000); 17000, 21000, 22000, 61000, 64000 and 90000 are accounts, not headers. |
 | E-GAS-03-9 | GAS-1 | Control accounts (fixed at creation): 10100, 10300, 10302, 10400, 12100, 13300, 13400, 13500, 20100, 20300; every other account is normal. |
 | E-GAS-03-10 | GAS-1 | Added in the same load: 14400 ITBIS adelantado en compras, 63550 Peajes, 63960 Otros impuestos y tasas, and the plant and fleet accounts 66100…66550. |
+| E-GAS-04-1 | GAS-1 | An expense invoice without a purchase order is registered with its own command (`RegisterExpenseInvoice`): supplier, NCF, dates, plant and lines (description, category, tax type, quantity, price), and the printed total optional. |
+| E-GAS-04-2 | GAS-1 | The existing steps are reused: «Cotejar» without an order compares the total with taxes against the policy amount — below it the invoice is MATCHED; from it, a MATCH_EXCEPTION the Controller approves, never who registered it. |
+| E-GAS-04-3 | GAS-1 | The total compared is the net plus every tax of its lines' types, with the rules in force on the invoice's date. |
+| E-GAS-04-4 | GAS-1 | Posting is P-37: each line to its category's account, ITBIS to ITBIS adelantado, selective tax, CDT and tip to their accounts, against accounts payable less withholdings; the Controller approves P-37 and the three tax maps first. |
+| E-GAS-04-5 | GAS-1 | The invoice has its AP document and is paid and matched with the bank like any supplier invoice. |
+| E-GAS-04-6 | GAS-1 | Reversal by the Controller, with step-up, only without payments; the NCF is free again — for every supplier invoice, also inventory ones (migration 0079 excludes REVERSED from the NCF uniqueness, as VOIDED was). |
+| E-GAS-04-7 | GAS-1 | Voiding before posting is as today: who registers voids it with a reason while it is not posted. |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |

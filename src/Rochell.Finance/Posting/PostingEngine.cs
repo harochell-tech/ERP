@@ -21,6 +21,9 @@ public sealed class PostingEngine
     public const string RoundingLineCode = "R-08";
     public const string RoundingRole = "ROUNDING_DIFFERENCE";
 
+    /// <summary>E-GAS-2: the technical role whose account is the document's (an expense category's), never a role map.</summary>
+    public const string DocumentAccountRole = "PURCHASE_EXPENSE";
+
     public async Task<PostingPlan> PrepareAsync(CommandContext context, PostingRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -47,7 +50,9 @@ public sealed class PostingEngine
             var category = input.ItemId is null ? null : await ItemCategoryAsync(context, input.ItemId.Value, cancellationToken).ConfigureAwait(false);
             var (accountId, mapId) = ruleLine.Subledger == BankSubledger
                 ? (await BankGlAccountAsync(context, input.SubledgerRef!.Value, cancellationToken).ConfigureAwait(false), (Guid?)null)
-                : await ResolveAccountAsync(context, ruleLine.AccountRole, category, postingDate, cancellationToken).ConfigureAwait(false);
+                : ruleLine.AccountRole == DocumentAccountRole
+                    ? (await DocumentAccountAsync(context, input.AccountId!.Value, cancellationToken).ConfigureAwait(false), (Guid?)null)
+                    : await ResolveAccountAsync(context, ruleLine.AccountRole, category, postingDate, cancellationToken).ConfigureAwait(false);
             lines.Add(new PlannedLine(input, ruleLine, accountId, mapId, category, ruleLine.IsDebit ? amount : 0, ruleLine.IsDebit ? 0 : amount));
         }
 
@@ -122,6 +127,12 @@ public sealed class PostingEngine
             if (line.Rule.Code == RoundingLineCode)
             {
                 inputs["policy_version_id"] = plan.RoundingPolicyVersionId;
+            }
+
+            if (line.Rule.AccountRole == DocumentAccountRole)
+            {
+                // E-GAS-2: the account comes from the document (its expense category), not from the role map.
+                inputs["gl_account_id"] = line.AccountId;
             }
 
             if (line.Rule.Subledger == BankSubledger)
@@ -319,6 +330,11 @@ public sealed class PostingEngine
         {
             throw new InvalidOperationException($"Line {rule.Code}: subledger reference must be present exactly when the rule line has a subledger.");
         }
+
+        if ((rule.AccountRole == DocumentAccountRole) != (input.AccountId is not null))
+        {
+            throw new InvalidOperationException($"Line {rule.Code}: an account is given exactly when the rule line's role is {DocumentAccountRole}.");
+        }
     }
 
     private static async Task<ActiveRule> ActiveRuleAsync(CommandContext context, string ruleCode, DateOnly date, CancellationToken cancellationToken)
@@ -447,6 +463,16 @@ public sealed class PostingEngine
                ("c", context.CompanyId),
                ("b", bankAccountId))
            ?? throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"Bank account {bankAccountId} does not exist or is not ACTIVE.");
+
+    /// <summary>E-GAS-2: the document's account must be the company's, ACTIVE and not a control account.</summary>
+    private static async Task<Guid> DocumentAccountAsync(CommandContext context, Guid accountId, CancellationToken cancellationToken)
+        => await ScalarAsync<Guid?>(
+               context,
+               "SELECT account_id FROM fin.account WHERE company_id = @c AND account_id = @a AND status = 'ACTIVE' AND NOT is_control",
+               cancellationToken,
+               ("c", context.CompanyId),
+               ("a", accountId))
+           ?? throw new DomainException(FinanceErrors.PostingPrerequisiteMissing, $"Account {accountId} is not an ACTIVE account of the company that is not a control account.");
 
     private static async Task<(Guid AccountId, Guid MapId)> ResolveAccountAsync(CommandContext context, string role, string? category, DateOnly postingDate, CancellationToken cancellationToken)
     {

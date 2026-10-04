@@ -39,7 +39,8 @@ public sealed record SupplierInvoiceSummary(
     decimal? OpenAmount,
     string PaymentStatus,
     decimal? PrintedTotal,
-    decimal? PrintedTotalDifference);
+    decimal? PrintedTotalDifference,
+    string DocClass = "INVENTORY");
 
 public sealed record SupplierInvoiceList(IReadOnlyList<SupplierInvoiceSummary> Items, int Limit, int Offset);
 
@@ -72,7 +73,7 @@ public sealed class ListSupplierInvoicesHandler : IQueryHandler<ListSupplierInvo
             """,
             r => new SupplierInvoiceSummary(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.Date(4), r.Date(5), r.GetString(6), r.GetString(7), r.GetDecimal(8), r.GetInt64(9),
-                r.NullableDecimal(10), r.NullableDecimal(11), r.NullableDecimal(12), r.GetString(13), r.NullableDecimal(14), r.NullableDecimal(15)),
+                r.NullableDecimal(10), r.NullableDecimal(11), r.NullableDecimal(12), r.GetString(13), r.NullableDecimal(14), r.NullableDecimal(15), r.GetString(16)),
             cancellationToken,
             ("c", context.CompanyId),
             ("doc", query.DocumentStatus),
@@ -97,19 +98,28 @@ public sealed record MatchResultView(
     Guid PolicyVersionId,
     DateTime EvaluatedAt);
 
+/// <summary>
+/// An inventory line names its order line and item; an expense line (GAS1-04, E-GAS-1) its description, category and tax type —
+/// the order fields are then null.
+/// </summary>
 public sealed record SupplierInvoiceLineView(
     Guid SiLineId,
     int LineNo,
     string LineKind,
-    Guid PoLineId,
-    Guid PurchaseOrderId,
-    string PoNo,
-    Guid ItemId,
-    string ItemCode,
+    Guid? PoLineId,
+    Guid? PurchaseOrderId,
+    string? PoNo,
+    Guid? ItemId,
+    string? ItemCode,
     decimal Qty,
     decimal UnitPrice,
     decimal NetAmount,
-    MatchResultView? Match);
+    MatchResultView? Match,
+    string? Description = null,
+    Guid? ExpenseCategoryId = null,
+    string? ExpenseCategoryName = null,
+    Guid? TaxTypeId = null,
+    string? TaxTypeCode = null);
 
 public sealed record DeterminedTaxView(Guid SiLineId, string TaxCode, decimal Base, decimal Rate, decimal Amount, string Effect, Guid RuleVersionId);
 
@@ -123,7 +133,7 @@ internal static class ApAmounts
 {
     public const string Columns = """
                    CASE WHEN si.tax_determination_id IS NOT NULL THEN coalesce(t.itbis, 0) END,
-                   CASE WHEN si.tax_determination_id IS NOT NULL THEN si.total_amount + coalesce(t.itbis, 0) END,
+                   CASE WHEN si.tax_determination_id IS NOT NULL THEN si.total_amount + coalesce(t.itbis, 0) + coalesce(t.other, 0) END,
                    ap.open_amount,
                    CASE WHEN si.document_status::text = 'VOIDED' THEN 'VOIDED'
                         WHEN si.accounting_status::text = 'REVERSED' THEN 'REVERSED'
@@ -132,13 +142,15 @@ internal static class ApAmounts
                         WHEN ap.open_amount < ap.original_amount THEN 'PARTIAL'
                         ELSE 'OPEN' END,
                    si.printed_total,
-                   CASE WHEN si.tax_determination_id IS NOT NULL AND si.printed_total IS NOT NULL THEN (si.printed_total - (si.total_amount + coalesce(t.itbis, 0)))::numeric(19,2) END
+                   CASE WHEN si.tax_determination_id IS NOT NULL AND si.printed_total IS NOT NULL THEN (si.printed_total - (si.total_amount + coalesce(t.itbis, 0) + coalesce(t.other, 0)))::numeric(19,2) END,
+                   si.doc_class
 
         """;
 
     public const string Joins = """
-            LEFT JOIN LATERAL (SELECT sum(d.amount) AS itbis FROM tax.tax_determination_line d
-                               WHERE d.determination_id = si.tax_determination_id AND d.effect IN ('RECOVERABLE_INPUT', 'NON_RECOVERABLE_INPUT')) t ON true
+            LEFT JOIN LATERAL (SELECT sum(d.amount) FILTER (WHERE d.effect IN ('RECOVERABLE_INPUT', 'NON_RECOVERABLE_INPUT')) AS itbis,
+                                      sum(d.amount) FILTER (WHERE d.effect IN ('SELECTIVE_TAX', 'OTHER_TAX', 'LEGAL_TIP')) AS other
+                               FROM tax.tax_determination_line d WHERE d.determination_id = si.tax_determination_id) t ON true
             LEFT JOIN fin.ap_document ap ON ap.company_id = si.company_id AND ap.doc_type = 'SUPPLIER_INVOICE' AND ap.source_doc_id = si.si_id
 
         """;
@@ -169,7 +181,9 @@ public sealed record SupplierInvoiceDetail(
     string PaymentStatus,
     IReadOnlyList<SupplierInvoicePaymentView> Payments,
     decimal? PrintedTotal,
-    decimal? PrintedTotalDifference);
+    decimal? PrintedTotalDifference,
+    string DocClass = "INVENTORY",
+    Guid? PlantId = null);
 
 [RequiresPermission("supplier_invoice:read")]
 public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice>
@@ -187,6 +201,7 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
             SELECT si.si_id, si.party_id, p.legal_name, si.supplier_fiscal_number, si.doc_date, si.due_date, si.document_status::text,
                    si.accounting_status::text, si.total_amount, coalesce(cu.display_name, cu.email), coalesce(eu.display_name, eu.email), si.tax_determination_id, si.posting_event_id, si.version,
             """ + ApAmounts.Columns + """
+            , si.plant_id
             FROM pur.supplier_invoice si
             JOIN md.party p ON p.party_id = si.party_id
             """ + ApAmounts.Joins + """
@@ -197,7 +212,7 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
             r => new SupplierInvoiceDetail(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.Date(4), r.Date(5), r.GetString(6), r.GetString(7), r.GetDecimal(8),
                 r.NullableString(9), r.NullableString(10), r.NullableGuid(11), r.NullableGuid(12), r.GetInt64(13), [], [], null, [],
-                r.NullableDecimal(14), r.NullableDecimal(15), r.NullableDecimal(16), r.GetString(17), [], r.NullableDecimal(18), r.NullableDecimal(19)),
+                r.NullableDecimal(14), r.NullableDecimal(15), r.NullableDecimal(16), r.GetString(17), [], r.NullableDecimal(18), r.NullableDecimal(19), r.GetString(20), r.NullableGuid(21)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.SupplierInvoiceId)).ConfigureAwait(false)
@@ -209,21 +224,24 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
             """
             SELECT l.si_line_id, l.line_no, l.line_kind, l.po_line_id, po.po_id, po.po_no, pl.item_id, i.code, l.qty, l.unit_price, l.net_amount,
                    m.si_line_id IS NOT NULL, m.qty_available_to_invoice, m.qty_diff, m.price_diff, m.amount_diff, m.qty_exceeds, m.within_tolerance,
-                   m.policy_version_id, m.evaluated_at
+                   m.policy_version_id, m.evaluated_at, l.description, l.expense_category_id, c.name, l.tax_rule_id, r.code
             FROM pur.supplier_invoice_line l
-            JOIN pur.purchase_order_line pl ON pl.po_line_id = l.po_line_id
-            JOIN pur.purchase_order po ON po.po_id = pl.po_id
-            JOIN md.item i ON i.item_id = pl.item_id
+            LEFT JOIN pur.purchase_order_line pl ON pl.po_line_id = l.po_line_id
+            LEFT JOIN pur.purchase_order po ON po.po_id = pl.po_id
+            LEFT JOIN md.item i ON i.item_id = pl.item_id
+            LEFT JOIN pur.expense_category c ON c.expense_category_id = l.expense_category_id
+            LEFT JOIN tax.fiscal_rule r ON r.rule_id = l.tax_rule_id
             LEFT JOIN pur.match_result m ON m.si_line_id = l.si_line_id
             WHERE l.company_id = @c AND l.si_id = @id
             ORDER BY l.line_no
             """,
             r => new SupplierInvoiceLineView(
-                r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetGuid(3), r.GetGuid(4), r.GetString(5), r.GetGuid(6), r.GetString(7), r.GetDecimal(8),
+                r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.NullableGuid(3), r.NullableGuid(4), r.NullableString(5), r.NullableGuid(6), r.NullableString(7), r.GetDecimal(8),
                 r.GetDecimal(9), r.GetDecimal(10),
                 r.GetBoolean(11)
                     ? new MatchResultView(r.GetDecimal(12), r.GetDecimal(13), r.GetDecimal(14), r.GetDecimal(15), r.GetBoolean(16), r.GetBoolean(17), r.GetGuid(18), r.Utc(19))
-                    : null),
+                    : null,
+                r.NullableString(20), r.NullableGuid(21), r.NullableString(22), r.NullableGuid(23), r.NullableString(24)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.SupplierInvoiceId)).ConfigureAwait(false);
