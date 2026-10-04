@@ -72,6 +72,28 @@ Tests: `Rochell.Tax.Tests.PurchaseTaxTypeTests`, `web/tests/unit/cashSales.test.
 Tests: `ExpenseCategoryTests` (prepare / correct / approve / take out of use / replace; the batch; both loads twice;
 the missing account).
 
+## GAS1-04 — the expense invoice without a purchase order (migration 0079; E-GAS-04-1…7)
+
+- **Register** `RegisterExpenseInvoice` (`supplier_invoice:register`): an ACTIVE supplier, a free NCF, dates, the plant and 1–200 lines
+  (description 1–200 characters, an ACTIVE category, a tax type in force on the invoice's date, quantity and price with up to 6
+  decimals; net = round(qty × price, 2)). `total_amount` is the net, as for inventory invoices. 201 commands.
+- **Match** (`MatchSupplierInvoice`): for an expense invoice the total with taxes (`TaxEngine.EstimateItbisAsync`, every component of
+  the lines' types) against PURCHASING `expense_invoice_approval_threshold`: below → MATCHED, from it → MATCH_EXCEPTION, approved by
+  `ApproveMatchException` (Controller ≠ registrar). No `pur.match_result` rows: there is no order to compare with.
+- **Post** (`PostSupplierInvoice`): the determination (`TaxRequest` lines with tax type and the scope of the category's class), then
+  P-37 — `P37-DR-EXP` per line with the category's account (`PostingLineInput.AccountId`; the engine takes the account of the role
+  `PURCHASE_EXPENSE` from the document, never from a map, and requires an ACTIVE account that is not a control account), ITBIS,
+  selective tax, other taxes, tip, AP (subledger the AP document) and withholdings. Event `ExpenseInvoicePosted`; the AP document's
+  amount is net + taxes − withholdings.
+- **Reverse** (`ReverseSupplierInvoice`, Controller, step-up): the exact reversal of the P-37 journal while the AP document is fully
+  open. Migration 0079: a REVERSED invoice no longer holds its NCF (any supplier invoice).
+- **Queries**: invoice lines of an expense invoice carry description, category and tax type (order and item null); the detail and the
+  list carry `docClass`; the gross includes selective tax, other taxes and tip.
+- **Staging**: before posting, the Controller approves P-37 and maps ITBIS_RECOVERABLE (14400), SELECTIVE_TAX_EXPENSE (63950),
+  OTHER_TAX_EXPENSE (63960) and LEGAL_TIP_EXPENSE (63900); the PURCHASING policy needs a version with the approval amount.
+
+Tests: `ExpenseInvoiceTests` (GAS-03…09, GAS-13 and the refusals), with hand-derived amounts.
+
 ## Block Rochell's chart (A-01)
 
 From the ADM Cloud export of 2026-10-02 (E-GAS-11, E-GAS-12). The Controller approves the categories and their accounts; the

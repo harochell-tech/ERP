@@ -828,6 +828,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/procurement/register-expense-invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RegisterExpenseInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/prepare-expense-category": {
         parameters: {
             query?: never;
@@ -6955,6 +6971,17 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        ExpenseLineInput: {
+            description: string;
+            /** Format: uuid */
+            expenseCategoryId: string;
+            /** Format: uuid */
+            taxTypeId: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            unitPrice: string;
+        };
         ExpireFiscalAuthorizations: Record<string, never>;
         ExternalFiscalRecordView: {
             encf: string;
@@ -9392,6 +9419,20 @@ export interface components {
             /** Format: date */
             licenseExpiresOn?: null | string;
         };
+        RegisterExpenseInvoice: {
+            /** Format: uuid */
+            partyId: string;
+            supplierFiscalNumber: string;
+            /** Format: date */
+            docDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: uuid */
+            plantId: string;
+            lines: components["schemas"]["ExpenseLineInput"][];
+            /** Format: decimal */
+            printedTotal?: null | string;
+        };
         RegisterFiscalAuthorization: {
             /** Format: uuid */
             partyId: string;
@@ -10414,6 +10455,10 @@ export interface components {
             printedTotal: null | string;
             /** Format: decimal */
             printedTotalDifference: null | string;
+            /** @default INVENTORY */
+            docClass?: string;
+            /** Format: uuid */
+            plantId?: null | string;
         };
         SupplierInvoiceLineInput: {
             /** Format: uuid */
@@ -10432,13 +10477,13 @@ export interface components {
             lineNo: number;
             lineKind: string;
             /** Format: uuid */
-            poLineId: string;
+            poLineId: null | string;
             /** Format: uuid */
-            purchaseOrderId: string;
-            poNo: string;
+            purchaseOrderId: null | string;
+            poNo: null | string;
             /** Format: uuid */
-            itemId: string;
-            itemCode: string;
+            itemId: null | string;
+            itemCode: null | string;
             /** Format: decimal */
             qty: string;
             /** Format: decimal */
@@ -10446,6 +10491,13 @@ export interface components {
             /** Format: decimal */
             netAmount: string;
             match: null | components["schemas"]["MatchResultView"];
+            description?: null | string;
+            /** Format: uuid */
+            expenseCategoryId?: null | string;
+            expenseCategoryName?: null | string;
+            /** Format: uuid */
+            taxTypeId?: null | string;
+            taxTypeCode?: null | string;
         };
         SupplierInvoiceList: {
             items: components["schemas"]["SupplierInvoiceSummary"][];
@@ -10492,6 +10544,8 @@ export interface components {
             printedTotal: null | string;
             /** Format: decimal */
             printedTotalDifference: null | string;
+            /** @default INVENTORY */
+            docClass?: string;
         };
         SupplierList: {
             items: components["schemas"]["SupplierView"][];
@@ -14347,6 +14401,82 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RegisterSupplierInvoice"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RegisterExpenseInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterExpenseInvoice"];
             };
         };
         responses: {

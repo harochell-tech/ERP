@@ -156,6 +156,11 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
             throw new DomainException(ProcurementErrors.InvalidState, $"The invoice is {header.Status}/{header.AccountingStatus}; only unposted MATCHED invoices can be posted.");
         }
 
+        if (header.DocClass == SupplierInvoiceClasses.Expense)
+        {
+            return await Expenses.ExpenseInvoices.PostAsync(context, header, _engine, _tax, cancellationToken).ConfigureAwait(false); // GAS1-04: P-37
+        }
+
         var lines = await SupplierInvoiceStore.LinesAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
         var po = await InvoicePostingStore.LockPoLinesAsync(context, lines.Select(l => l.PurchaseOrderLineId), cancellationToken).ConfigureAwait(false);
 
@@ -417,6 +422,11 @@ public sealed class ReverseSupplierInvoiceHandler : ICommandHandler<ReverseSuppl
         if (header.Status != SupplierInvoiceStatus.Matched || header.AccountingStatus != "POSTED")
         {
             throw new DomainException(ProcurementErrors.InvalidState, $"The invoice is {header.Status}/{header.AccountingStatus}; only posted invoices can be reversed.");
+        }
+
+        if (header.DocClass == SupplierInvoiceClasses.Expense)
+        {
+            return await Expenses.ExpenseInvoices.ReverseAsync(context, header, reason, _engine, CommandType, cancellationToken).ConfigureAwait(false); // GAS1-04 (E-GAS-04-6)
         }
 
         Guid apDocId;

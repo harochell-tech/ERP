@@ -24,6 +24,35 @@ public sealed record RegisterSupplierInvoice(
     IReadOnlyList<SupplierInvoiceLineInput> Lines,
     decimal? PrintedTotal = null) : ICommand;
 
+/// <summary>
+/// E-GAS-04-1: one line of an expense invoice — what was bought (free text), its expense category (the account and the 606 type),
+/// its tax type (a PURCHASE_TAX_TYPE rule), the quantity and the unit price.
+/// </summary>
+public sealed record ExpenseLineInput(string Description, Guid ExpenseCategoryId, Guid TaxTypeId, decimal Quantity, decimal UnitPrice);
+
+/// <summary>
+/// E-GAS-04-1, E-GAS-6: registers a DRAFT expense invoice without a purchase order — electricity, telephone, tolls, repairs. It
+/// goes through the same match (against the approval amount, E-GAS-04-2), exception approval, posting (P-37), void and reversal as
+/// any supplier invoice. <paramref name="PlantId"/> is mandatory (E-GAS-01-8).
+/// </summary>
+public sealed record RegisterExpenseInvoice(
+    Guid CompanyId,
+    Guid SessionId,
+    string IdempotencyKey,
+    Guid PartyId,
+    string SupplierFiscalNumber,
+    DateOnly DocDate,
+    DateOnly DueDate,
+    Guid PlantId,
+    IReadOnlyList<ExpenseLineInput> Lines,
+    decimal? PrintedTotal = null) : ICommand;
+
+public static class SupplierInvoiceClasses
+{
+    public const string Inventory = "INVENTORY";
+    public const string Expense = "EXPENSE";
+}
+
 /// <summary>T-07: three-way match of every line against received-not-invoiced quantity and PO price (E-PR13-1/2). Also re-match.</summary>
 public sealed record MatchSupplierInvoice(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SupplierInvoiceId, long ExpectedVersion) : ICommand;
 
@@ -36,6 +65,9 @@ public sealed record VoidSupplierInvoice(Guid CompanyId, Guid SessionId, string 
 public static class SupplierInvoiceLineKinds
 {
     public const string InventoryPo = "INVENTORY_PO";
+
+    /// <summary>E-GAS-1: a line of an expense invoice (description, category, tax type).</summary>
+    public const string Expense = "EXPENSE";
 }
 
 public static class SupplierInvoiceStatus
