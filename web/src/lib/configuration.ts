@@ -7,7 +7,7 @@ export async function sha256Hex(data: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export const FISCAL_RULE_KINDS = ["PURCHASE_ITBIS", "PURCHASE_WITHHOLDING", "SALES_ITBIS", "REPORT_606_CLASSIFICATION", "CONSUMER_ID_THRESHOLD"] as const;
+export const FISCAL_RULE_KINDS = ["PURCHASE_ITBIS", "PURCHASE_WITHHOLDING", "SALES_ITBIS", "REPORT_606_CLASSIFICATION", "CONSUMER_ID_THRESHOLD", "PURCHASE_TAX_TYPE"] as const;
 export type FiscalRuleKind = (typeof FISCAL_RULE_KINDS)[number];
 
 export const FISCAL_KIND_LABELS: Readonly<Record<string, string>> = {
@@ -16,7 +16,7 @@ export const FISCAL_KIND_LABELS: Readonly<Record<string, string>> = {
   SALES_ITBIS: "ITBIS de ventas",
   REPORT_606_CLASSIFICATION: "Clasificación del 606", // FIS2-03 (E-FIS2-03-5)
   CONSUMER_ID_THRESHOLD: "Identificación del consumidor final", // CF1-05 (E-CF1-05-7)
-  PURCHASE_TAX_TYPE: "Tipo de impuesto de compras de gastos", // GAS1-02 (E-GAS-02-1): loaded from the pack; its guided form comes with the expense screens
+  PURCHASE_TAX_TYPE: "Tipo de impuesto de compras de gastos", // GAS1-02 (E-GAS-02-1); guided form GAS1-07 (E-GAS-07-5)
 };
 
 /**
@@ -37,6 +37,10 @@ export const DEFINITION_HELP: Readonly<Partial<Record<FiscalRuleKind, readonly s
     "01 Gastos de personal · 02 Gastos por trabajos, suministros y servicios · 03 Arrendamientos · 04 Gastos de activos fijos · 05 Gastos de representación · 06 Otras deducciones admitidas · 07 Gastos financieros · 08 Gastos extraordinarios · 09 Compras y gastos que formarán parte del costo de venta · 10 Adquisiciones de activos · 11 Gastos de seguros.",
     "No lleva pruebas de regresión: queda lista para activar al vincular su fuente oficial (el instructivo del 606).",
   ],
+  PURCHASE_TAX_TYPE: [
+    "Un tipo de impuesto es lo que se elige en cada línea de una compra de gastos: su nombre y los impuestos que cobra sobre el neto (ninguno si es exento).",
+    "El ITBIS adelantable va al crédito fiscal; el selectivo, los otros impuestos (CDT) y la propina legal van a gasto. Confirme cada tasa con su contador contra la norma y vincúlela como fuente.",
+  ],
   CONSUMER_ID_THRESHOLD: [
     "El monto, con ITBIS, desde el cual una venta a consumidor final debe llevar la identificación del comprador (cédula, RNC o pasaporte). Sin esta regla activa no se envía a pago ninguna venta de contado.",
     "Confirme el monto con su contador contra la norma de la DGII y vincule esa norma como fuente oficial. No lleva pruebas de regresión.",
@@ -54,6 +58,7 @@ export const DEFINITION_TEMPLATES: Readonly<Record<FiscalRuleKind, string>> = {
   REPORT_606_CLASSIFICATION: JSON.stringify({ classes: { CEMENTO: "09", AGREGADO: "09", ADITIVO: "09", OTRA_MATERIA_PRIMA: "09" } }, null, 2),
   // No amount to start from: it is the accountant's, read from the DGII norm (E-CF1-05-7).
   CONSUMER_ID_THRESHOLD: JSON.stringify({ amount: "" }, null, 2),
+  PURCHASE_TAX_TYPE: JSON.stringify({ label: "ITBIS 18 %", components: [{ tax_code: "ITBIS", rate: "0.18", effect: "RECOVERABLE_INPUT" }] }, null, 2),
 };
 
 /** One regression case to start from; the analyst writes the expected taxes the source dictates. */

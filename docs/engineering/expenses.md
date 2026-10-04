@@ -126,6 +126,17 @@ Tests: `ExpensePurchaseOrderTests` (GAS-10, GAS-11, price exception, the order's
 
 Tests: `ExpenseReport606Tests` (GAS-14 with hand-derived amounts, and the warning on a tampered determination).
 
+## GAS1-07 — screens, E2E-G1 and the acceptance matrix (migration 0081; E-GAS-07-1…9)
+
+- `PreviewExpenseInvoice` (POST `/procurement/expense-invoices/preview`, `supplier_invoice:register`) reuses the order preview's
+  computation (net and taxes of each line's type on the invoice's date).
+- Migration 0081 grants `master_data:read` to CONTADOR (E-GAS-07-9).
+- Screens and their tests: `web.md` (GAS1-07). The dev seed (`tests/Rochell.DevStack/ExpenseSeed.cs`) adds the types ITBIS 18 %,
+  Exento and Telecomunicaciones, the three tax expense maps, P-37 approved, REPARACIONES and TELEFONO approved and COMBUSTIBLE
+  waiting for the Controller.
+- E2E-G1 over the API: `ExpenseAcceptanceTests` (also GAS-15: payment, bank match, AP-GL and TAX-606 MATCHED). Acceptance matrix
+  `docs/acceptance/gas1.md`, checked by `AcceptanceGas1TraceabilityTests`.
+
 ## Block Rochell's chart (A-01)
 
 From the ADM Cloud export of 2026-10-02 (E-GAS-11, E-GAS-12). The Controller approves the categories and their accounts; the

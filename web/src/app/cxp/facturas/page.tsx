@@ -71,7 +71,7 @@ export default function Invoices() {
                     {paymentStatusLabel(si.paymentStatus)}
                   </span>
                 </td>
-                <td>{invoiceStatusLabel(si.documentStatus)}</td>
+                <td>{invoiceStatusLabel(si.documentStatus, si.docClass)}</td>
                 <td>{accountingStatusWorthShowing(si.documentStatus, si.accountingStatus) ? <AccountingStatus status={si.accountingStatus} /> : null}</td>
               </tr>
             ))}

@@ -53,7 +53,11 @@ function Actions({ invoice, onDone }: { invoice: Invoice; onDone: () => void }) 
         {document === "MATCH_EXCEPTION" && can("match_exception:approve") ? (
           <ReasonAction
             label="Aprobar excepción"
-            consequence="La diferencia de precio queda aceptada y la factura queda cotejada, lista para contabilizar."
+            consequence={
+              invoice.docClass === "EXPENSE" && !invoice.lines.some((l) => l.poNo)
+                ? "La factura de gastos supera el monto de aprobación de la política: queda aprobada y cotejada, lista para contabilizar."
+                : "La diferencia de precio queda aceptada y la factura queda cotejada, lista para contabilizar."
+            }
             stepUp
             busy={busy}
             onConfirm={async (reason) => after(await exception.run({ ...target, reason }))}
@@ -145,7 +149,7 @@ function InvoiceDetail() {
           </>
         ) : null}
         <dt>Estado</dt>
-        <dd data-testid="si-status">{invoiceStatusLabel(invoice.documentStatus)}</dd>
+        <dd data-testid="si-status">{invoiceStatusLabel(invoice.documentStatus, invoice.docClass)}</dd>
         {accountingStatusWorthShowing(invoice.documentStatus, invoice.accountingStatus) ? (
           <>
             <dt>Contabilidad</dt>
@@ -192,7 +196,7 @@ function InvoiceDetail() {
               <td>{l.lineNo}</td>
               {/* GAS1-04: an expense line has no order nor item — it shows what was bought and its category. */}
               <td>{l.poNo ?? "Sin orden"}</td>
-              <td>{l.itemCode ?? (l.description ? `${l.description} (${l.expenseCategoryName ?? "—"})` : "—")}</td>
+              <td>{l.itemCode ?? (l.description ? `${l.description} (${l.expenseCategoryName ?? "—"} · ${l.taxTypeCode ?? "—"})` : "—")}</td>
               <td className="num">{formatQuantity(l.qty)}</td>
               <td className="num">{formatDecimal(l.unitPrice)}</td>
               <td className="num">{formatDecimal(l.netAmount)}</td>

@@ -18,12 +18,15 @@ import {
   RAW_MATERIAL_CATEGORIES,
   rowsToCases,
   TAX_EFFECT_LABELS,
+  TAX_TYPE_EFFECTS,
   validateCases,
   validateFiscalForm,
   WITHHOLDING_BASE_LABELS,
   WITHHOLDING_PARTY_TYPES,
+  WITHHOLDING_SCOPE_LABELS,
   type CaseRow,
   type FiscalRuleForm,
+  type TaxComponentRow,
 } from "@/lib/fiscalRuleForm";
 import { GOODS_TYPES } from "@/lib/fiscalReports";
 import { formatDate, formatDateTime } from "@/lib/labels";
@@ -87,6 +90,9 @@ function GuidedFields({ kind, form, onChange, errors }: { kind: FiscalRuleKind; 
         <input aria-label="Monto de identificación del consumidor" inputMode="decimal" value={form.amount} onChange={(e) => set({ amount: e.target.value })} />
       </Field>
     );
+  }
+  if (kind === "PURCHASE_TAX_TYPE") {
+    return <TaxTypeFields form={form} onChange={onChange} errors={errors} />;
   }
   if (kind === "REPORT_606_CLASSIFICATION") {
     return (
@@ -152,6 +158,13 @@ function GuidedFields({ kind, form, onChange, errors }: { kind: FiscalRuleKind; 
               ))}
             </select>
           </Field>
+          <CheckGroup
+            id="applies-to-message"
+            legend="Aplica a (ninguna marcada = a todas las líneas)"
+            options={Object.entries(WITHHOLDING_SCOPE_LABELS).map(([code, label]) => ({ code, label }))}
+            selected={form.appliesTo ?? []}
+            onChange={(appliesTo) => set({ appliesTo })}
+          />
         </>
       ) : (
         <>
@@ -174,6 +187,77 @@ function GuidedFields({ kind, form, onChange, errors }: { kind: FiscalRuleKind; 
           />
         </>
       )}
+    </>
+  );
+}
+
+/** GAS1-07 (E-GAS-07-5): a purchase tax type — its name in the lines' list and the taxes it charges on the net. */
+function TaxTypeFields({ form, onChange, errors }: { form: FiscalRuleForm; onChange: (form: FiscalRuleForm) => void; errors: Partial<Record<string, string>> }) {
+  const components = form.components ?? [];
+  const setComponents = (next: TaxComponentRow[]) => onChange({ ...form, components: next });
+  const setRow = (i: number, patch: Partial<TaxComponentRow>) => setComponents(components.map((c, k) => (k === i ? { ...c, ...patch } : c)));
+  return (
+    <>
+      <Field label="Nombre del tipo" required error={errors.label} hint="Como se verá en la lista de cada línea: «ITBIS 18 %», «Telecomunicaciones», «Exento».">
+        <input aria-label="Nombre del tipo" maxLength={60} value={form.label ?? ""} onChange={(e) => onChange({ ...form, label: e.target.value })} />
+      </Field>
+      <LineTable testId="tax-type-components">
+        <thead>
+          <tr>
+            <th>Impuesto</th>
+            <th>Tasa (%)</th>
+            <th>Va a</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {components.length === 0 ? (
+            <tr>
+              <td colSpan={4} className="muted">
+                Sin impuestos: el tipo es exento.
+              </td>
+            </tr>
+          ) : null}
+          {components.map((c, i) => (
+            <tr key={i}>
+              <td>
+                <input
+                  aria-label={`Impuesto ${i + 1}`}
+                  value={c.taxCode}
+                  onChange={(e) => setRow(i, { taxCode: e.target.value.toUpperCase() })}
+                  {...fieldAria(errors[`component-${i}-taxCode`], `component-${i}-taxCode-message`, true)}
+                />
+                <FieldMessage id={`component-${i}-taxCode-message`} error={errors[`component-${i}-taxCode`]} />
+              </td>
+              <td>
+                <SuffixInput suffix="%" value={c.ratePercent} placeholder="18" onChange={(v) => setRow(i, { ratePercent: v })} />
+                <FieldMessage id={`component-${i}-ratePercent-message`} error={errors[`component-${i}-ratePercent`]} />
+              </td>
+              <td>
+                <select aria-label={`Va a ${i + 1}`} value={c.effect} onChange={(e) => setRow(i, { effect: e.target.value })}>
+                  <option value="">Elegir…</option>
+                  {TAX_TYPE_EFFECTS.map((code) => (
+                    <option key={code} value={code}>
+                      {TAX_EFFECT_LABELS[code] ?? code}
+                    </option>
+                  ))}
+                </select>
+                <FieldMessage id={`component-${i}-effect-message`} error={errors[`component-${i}-effect`]} />
+              </td>
+              <td>
+                <button type="button" onClick={() => setComponents(components.filter((_, k) => k !== i))}>
+                  Quitar
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </LineTable>
+      <div className="actions">
+        <button type="button" onClick={() => setComponents([...components, { taxCode: "", ratePercent: "", effect: "" }])}>
+          Agregar impuesto
+        </button>
+      </div>
     </>
   );
 }
@@ -448,7 +532,7 @@ function VersionActions({ ruleCode, ruleKind, version, sources, onDone }: { rule
               type="button"
               disabled={test.busy || rows.length === 0}
               onClick={async () => {
-                const errors = validateCases(rows);
+                const errors = validateCases(rows, ruleKind);
                 setCaseErrors(errors);
                 if (Object.keys(errors).length === 0) {
                   done(await test.run({ ruleVersionId: id, cases: rowsToCases(rows) }));

@@ -34,6 +34,7 @@ const draftSummaries: Counter = async (companyId, plantId) =>
 // E-UI01-7: each task's counter comes from an existing list query, only when the user may read it; no API of its own.
 const TASKS: readonly Task[] = [
   { href: "/compras/ordenes/nueva/", label: "Crear una orden de compra", permission: "purchase_order:create" },
+  { href: "/compras/ordenes/gasto/", label: "Crear una orden de gastos", permission: "purchase_order:create" },
   {
     href: "/compras/ordenes/?estado=PENDING_APPROVAL",
     label: "Aprobar órdenes de compra",
@@ -61,6 +62,16 @@ const TASKS: readonly Task[] = [
         .items.length,
   },
   { href: "/cxp/facturas/nueva/", label: "Registrar una factura de proveedor", permission: "supplier_invoice:register" },
+  { href: "/cxp/facturas/gasto/", label: "Registrar una factura de gastos", permission: "supplier_invoice:register" },
+  // GAS1-07 (E-GAS-07-7): expense categories waiting for the Controller.
+  {
+    href: "/maestros/categorias-gasto/",
+    label: "Categorías de gasto por aprobar",
+    permission: "expense_category:approve",
+    countPermission: "master_data:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/procurement/expense-categories", { path: { companyId }, query: { status: "DRAFT" } })).items.length,
+  },
   { href: "/tesoreria/propuesta/", label: "Preparar pagos a proveedores", permission: "payment:prepare" },
   {
     href: "/tesoreria/pagos/?estado=PREPARED",

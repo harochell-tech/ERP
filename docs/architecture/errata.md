@@ -1007,6 +1007,15 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-GAS-06-4 | GAS-1 | Fields 20, 21 and 22 carry the selective tax, other taxes (CDT) and legal tip, each from its own tax. |
 | E-GAS-06-5 | GAS-1 | TAX-606 also compares the month's selective tax, other taxes and tip of the 606 with their accounts (warnings TAX606_SELECTIVE_DIFFERENCE, TAX606_OTHER_DIFFERENCE, TAX606_TIP_DIFFERENCE). |
 | E-GAS-06-6 | GAS-1 | An expense invoice always has its type (its category requires it); CLASSIFICATION_MISSING remains for raw materials without a classification rule. |
+| E-GAS-07-1 | GAS-1 | Maestros › Categorías de gasto: list with account, 606 type, class and status; the Contador or Controller prepares and corrects; the Controller approves several at once (step-up, never their own), takes out of use and reactivates. |
+| E-GAS-07-2 | GAS-1 | CxP › Factura de gastos (switch from the inventory form): supplier, optional approved expense order, plant, NCF, dates, printed total; lines with description, category and tax type lists, quantity, price; the server's preview while typing; «Registrar y cotejar». |
+| E-GAS-07-3 | GAS-1 | Compras › Orden de gastos (switch from the inventory form): the same lines and preview; «Guardar borrador» or «Guardar y enviar». |
+| E-GAS-07-4 | GAS-1 | Invoice and order details show category and tax type per line; the expense taxes read in Spanish; an expense invoice's status never mentions the receipt («Cotejada, lista para contabilizar», «Pendiente de aprobación»). |
+| E-GAS-07-5 | GAS-1 | Fiscal › Reglas: a guided form for PURCHASE_TAX_TYPE (name, components with rate in % and where each goes; none = exempt; cases on the net alone) and the «Aplica a» boxes of a withholding. |
+| E-GAS-07-6 | GAS-1 | `PreviewExpenseInvoice` (POST `/procurement/expense-invoices/preview`, `supplier_invoice:register`): the order preview's computation for Cuentas por pagar. |
+| E-GAS-07-7 | GAS-1 | Inicio: «Categorías de gasto por aprobar» for whoever holds `expense_category:approve`. |
+| E-GAS-07-8 | GAS-1 | E2E-G1 over the API (category → telephone bill over the approval amount → approval → P-37 → payment and bank match → 606 and TAX-606) and Playwright (the same up to the 606, plus an expense order billed in part); acceptance matrix `docs/acceptance/gas1.md` and `AcceptanceGas1TraceabilityTests`. |
+| E-GAS-07-9 | GAS-1 | The Contador reads master data (`master_data:read`, migration 0081): the category list they prepare from is a master data list. Read only. |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |

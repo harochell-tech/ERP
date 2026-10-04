@@ -30,7 +30,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             + "standard_cost:prepare,supplier:activate,supplier_invoice:read,supplier_invoice:reverse,valuation_residual:approve",
         ["DIRECTOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,fiscal_report:read,goods_receipt:read,hash:verify,iam:read,ledger:read,"
             + "master_data:read,payment:read,period:read,production:read,purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission
-        ["CONTADOR"] = "account_role_map:prepare,configuration:read,expense_category:prepare,fiscal_report:read,ledger:read,manual_journal:prepare,period:read,reconciliation:read", // E-FIN1-01-5, E-FIN1-04-2, E-UX4-13
+        ["CONTADOR"] = "account_role_map:prepare,configuration:read,expense_category:prepare,fiscal_report:read,ledger:read,manual_journal:prepare,master_data:read,period:read,reconciliation:read", // E-FIN1-01-5, E-FIN1-04-2, E-UX4-13
         ["CUENTAS_POR_PAGAR"] = "bank:read,goods_receipt:read,master_data:read,payment:read,purchase_order:read,rnc:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_authorization:suspend,fiscal_authorization:verify,fiscal_report:read,fiscal_rule:activate,sales:read", // + E-FIS1-01-9

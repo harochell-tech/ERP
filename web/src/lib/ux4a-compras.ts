@@ -38,7 +38,16 @@ const INVOICE_STATUS: Readonly<Record<string, string>> = {
   VOIDED: "Anulada",
 };
 
-export function invoiceStatusLabel(status: string | null | undefined): string {
+/** GAS1-07 (E-GAS-07-4): an expense invoice is not compared with a receipt; over the approval amount it waits for the Controller. */
+const EXPENSE_INVOICE_STATUS: Readonly<Record<string, string>> = {
+  MATCHED: "Cotejada, lista para contabilizar",
+  MATCH_EXCEPTION: "Pendiente de aprobación",
+};
+
+export function invoiceStatusLabel(status: string | null | undefined, docClass?: string | null): string {
+  if (status && docClass === "EXPENSE" && EXPENSE_INVOICE_STATUS[status]) {
+    return EXPENSE_INVOICE_STATUS[status];
+  }
   return status ? (INVOICE_STATUS[status] ?? statusLabel(status)) : "—";
 }
 
@@ -63,6 +72,9 @@ const TAX_EFFECTS: Readonly<Record<string, string>> = {
   NON_RECOVERABLE_INPUT: "No deducible (va al costo)",
   OUTPUT: "ITBIS facturado (por pagar)",
   WITHHOLDING: "Retención",
+  SELECTIVE_TAX: "Selectivo al consumo (gasto)", // GAS1-07 (E-GAS-07-4)
+  OTHER_TAX: "Otros impuestos y tasas (gasto)",
+  LEGAL_TIP: "Propina legal (gasto)",
 };
 
 export function taxEffectLabel(effect: string | null | undefined): string {
