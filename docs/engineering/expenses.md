@@ -94,6 +94,27 @@ the missing account).
 
 Tests: `ExpenseInvoiceTests` (GAS-03…09, GAS-13 and the refusals), with hand-derived amounts.
 
+## GAS1-05 — the expense purchase order (no migration; E-GAS-05-1…6)
+
+- **Order**: `CreateExpensePurchaseOrder` / `UpdateExpensePurchaseOrderDraft` (`purchase_order:create`; ACTIVE supplier, 1–200 lines
+  with an ACTIVE category and a tax type in force on the order date); `SubmitPurchaseOrder`, `ApprovePurchaseOrder`,
+  `RejectPurchaseOrder` and `CancelPurchaseOrder` as for any order (cancel refuses an order an invoice bills);
+  `CloseExpensePurchaseOrder` (`purchase_order:cancel`, APPROVED → CLOSED with a reason). `UpdatePurchaseOrderDraft` refuses an
+  expense order. 204 commands.
+- **Never received**: `PostGoodsReceipt` refuses it (`PURCHASE_ORDER_NOT_RECEIVABLE`) and `ListPurchaseOrdersToReceive` leaves it out.
+- **Invoice against it**: `RegisterExpenseInvoice` with `PurchaseOrderId` — an APPROVED expense order of the supplier and the invoice's
+  plant; every line names a different order line (`ExpenseLineInput.PurchaseOrderLineId`) with its category and tax type.
+  `MatchSupplierInvoice` writes `pur.match_result` per line: quantity against `qty_ordered − qty_invoiced` (exceeding is never
+  approvable), price within `match_price_tolerance_pct` or `match_amount_tolerance_abs`; no approval amount. Posting locks the order
+  and its lines, re-checks the quantity, adds `qty_invoiced`, writes BILLS links and closes the order once complete; the reversal
+  subtracts and reopens a CLOSED order with something left to bill (`PurchaseOrderReopened`).
+- **Preview** `POST /procurement/expense-purchase-orders/preview` (`PreviewExpensePurchaseOrder`, `purchase_order:create`): net per
+  line, the taxes of each line's type and the totals; null taxes with the reason when a type is not in force.
+- **Queries**: order lines carry description, category and tax type (item and unit null); `openQuantity` of an expense line is what is
+  still to bill; detail and list carry `docClass`.
+
+Tests: `ExpensePurchaseOrderTests` (GAS-10, GAS-11, price exception, the order's rules for an invoice, the preview).
+
 ## Block Rochell's chart (A-01)
 
 From the ADM Cloud export of 2026-10-02 (E-GAS-11, E-GAS-12). The Controller approves the categories and their accounts; the

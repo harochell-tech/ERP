@@ -28,7 +28,8 @@ public sealed record RegisterSupplierInvoice(
 /// E-GAS-04-1: one line of an expense invoice — what was bought (free text), its expense category (the account and the 606 type),
 /// its tax type (a PURCHASE_TAX_TYPE rule), the quantity and the unit price.
 /// </summary>
-public sealed record ExpenseLineInput(string Description, Guid ExpenseCategoryId, Guid TaxTypeId, decimal Quantity, decimal UnitPrice);
+/// <remarks>E-GAS-05-2: <paramref name="PurchaseOrderLineId"/> names the expense order line it bills; its category and tax type are the order line's.</remarks>
+public sealed record ExpenseLineInput(string Description, Guid ExpenseCategoryId, Guid TaxTypeId, decimal Quantity, decimal UnitPrice, Guid? PurchaseOrderLineId = null);
 
 /// <summary>
 /// E-GAS-04-1, E-GAS-6: registers a DRAFT expense invoice without a purchase order — electricity, telephone, tolls, repairs. It
@@ -45,7 +46,8 @@ public sealed record RegisterExpenseInvoice(
     DateOnly DueDate,
     Guid PlantId,
     IReadOnlyList<ExpenseLineInput> Lines,
-    decimal? PrintedTotal = null) : ICommand;
+    decimal? PrintedTotal = null,
+    Guid? PurchaseOrderId = null) : ICommand;
 
 public static class SupplierInvoiceClasses
 {

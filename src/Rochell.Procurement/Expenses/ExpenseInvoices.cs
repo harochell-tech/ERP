@@ -25,7 +25,8 @@ internal static class ExpenseInvoices
     private const decimal MaxQuantity = 999_999_999_999.999999m; // type-limit: numeric(18,6)
     private const decimal MaxUnitPrice = 9_999_999_999_999.999999m; // type-limit: numeric(19,6)
 
-    public sealed record Line(Guid Id, int LineNo, string Description, decimal Quantity, decimal UnitPrice, decimal Net, Guid TaxTypeId, Guid CategoryId, Guid AccountId, string Category, string Scope);
+    public sealed record Line(
+        Guid Id, int LineNo, string Description, decimal Quantity, decimal UnitPrice, decimal Net, Guid TaxTypeId, Guid CategoryId, Guid AccountId, string Category, string Scope, Guid? PoLineId);
 
     public static async Task<IReadOnlyList<Line>> LinesAsync(CommandContext context, Guid siId, CancellationToken cancellationToken)
         => await Reading.ListAsync(
@@ -33,11 +34,11 @@ internal static class ExpenseInvoices
             context.Transaction,
             """
             SELECT l.si_line_id, l.line_no, l.description, l.qty, l.unit_price, l.net_amount, l.tax_rule_id, c.expense_category_id, c.account_id, c.code,
-                   CASE c.line_class WHEN 'SERVICE' THEN 'EXPENSE_SERVICE' ELSE 'EXPENSE_GOODS' END
+                   CASE c.line_class WHEN 'SERVICE' THEN 'EXPENSE_SERVICE' ELSE 'EXPENSE_GOODS' END, l.po_line_id
             FROM pur.supplier_invoice_line l JOIN pur.expense_category c ON c.expense_category_id = l.expense_category_id
             WHERE l.si_id = @s ORDER BY l.line_no
             """,
-            r => new Line(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), r.GetGuid(6), r.GetGuid(7), r.GetGuid(8), r.GetString(9), r.GetString(10)),
+            r => new Line(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), r.GetGuid(6), r.GetGuid(7), r.GetGuid(8), r.GetString(9), r.GetString(10), r.IsDBNull(11) ? null : r.GetGuid(11)),
             cancellationToken,
             ("s", siId)).ConfigureAwait(false);
 
@@ -49,8 +50,13 @@ internal static class ExpenseInvoices
     /// </summary>
     public static async Task<string> MatchAsync(CommandContext context, InvoiceHeader header, ResolvedPolicy policy, string commandType, CancellationToken cancellationToken)
     {
-        var threshold = policy.Decimal(ApprovalThreshold);
         var lines = await LinesAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
+        if (lines.Any(l => l.PoLineId is not null))
+        {
+            return await MatchToOrderAsync(context, header, policy, lines, commandType, cancellationToken).ConfigureAwait(false);
+        }
+
+        var threshold = policy.Decimal(ApprovalThreshold);
         var estimate = await TaxEngine.EstimateItbisAsync(context.Connection, context.Transaction, context.CompanyId, header.DocDate, false, TaxLines(lines), cancellationToken).ConfigureAwait(false);
         if (estimate.Total is not { } taxes)
         {
@@ -84,6 +90,16 @@ internal static class ExpenseInvoices
     public static async Task<string> PostAsync(CommandContext context, InvoiceHeader header, PostingEngine engine, TaxEngine tax, CancellationToken cancellationToken)
     {
         var lines = await LinesAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
+
+        // E-GAS-05-2/3: re-checked under the order lines' locks — another invoice may have billed them since the match.
+        foreach (var (line, open) in await OrderLinesAsync(context, lines, cancellationToken).ConfigureAwait(false))
+        {
+            if (line.Quantity > open)
+            {
+                throw new DomainException(ProcurementErrors.QtyExceedsAvailable, $"Line {line.LineNo} bills more than the order has still to bill ({open}); match the invoice again.");
+            }
+        }
+
         var determination = await tax.DetermineAsync(
             context, new TaxRequest("SupplierInvoice", header.Id, header.DocDate, header.PartyId, TaxLines(lines)), cancellationToken).ConfigureAwait(false);
         decimal Sum(string effect) => determination.Taxes.Where(t => t.Effect == effect).Sum(t => t.Amount);
@@ -155,6 +171,7 @@ internal static class ExpenseInvoices
             ("id", apDocId),
             ("amount", payable),
             ("s", header.Id)).ConfigureAwait(false);
+        await BillOrderAsync(context, header, lines, eventId, +1, "Procurement.PostSupplierInvoice", cancellationToken).ConfigureAwait(false);
         var journal = await engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new
         {
@@ -213,8 +230,271 @@ internal static class ExpenseInvoices
             cancellationToken, ("v", version), ("s", header.Id)).ConfigureAwait(false);
         await Sql.ExecuteAsync(
             context.Connection, context.Transaction, "UPDATE fin.ap_document SET open_amount = 0, version = version + 1 WHERE ap_doc_id = @a", cancellationToken, ("a", apDocId)).ConfigureAwait(false);
+        var lines = await LinesAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
+        await OrderLinesAsync(context, lines, cancellationToken).ConfigureAwait(false);
+        await BillOrderAsync(context, header, lines, eventId, -1, commandType, cancellationToken).ConfigureAwait(false);
         var reversal = await engine.WriteReversalAsync(context, plan, eventId, occurredAt, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { supplierInvoiceId = header.Id, status = SupplierInvoiceStatus.Reversed, journals = new[] { reversal.JournalId }, version });
+    }
+
+    /// <summary>
+    /// E-GAS-05-3: each line against its order line — the quantity still to bill (never exceeded, never approvable) and the order's
+    /// price within the PURCHASING tolerances; a price outside them is a MATCH_EXCEPTION the Controller approves.
+    /// </summary>
+    private static async Task<string> MatchToOrderAsync(
+        CommandContext context, InvoiceHeader header, ResolvedPolicy policy, IReadOnlyList<Line> lines, string commandType, CancellationToken cancellationToken)
+    {
+        var pricePct = policy.Decimal(PolicyParameters.MatchPriceTolerancePct);
+        var amountAbs = policy.Decimal(PolicyParameters.MatchAmountToleranceAbs);
+        var order = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT po_line_id, qty_ordered - qty_invoiced, unit_price FROM pur.purchase_order_line WHERE po_line_id = ANY(@ids)",
+            r => (Id: r.GetGuid(0), Open: r.GetDecimal(1), Price: r.GetDecimal(2)),
+            cancellationToken,
+            ("ids", lines.Select(l => l.PoLineId!.Value).ToArray())).ConfigureAwait(false)).ToDictionary(o => o.Id);
+        var results = new List<(Guid Line, decimal Available, decimal QtyDiff, decimal PriceDiff, decimal AmountDiff, bool Exceeds, bool Within)>();
+        foreach (var line in lines)
+        {
+            var po = order[line.PoLineId!.Value];
+            var qtyDiff = line.Quantity - po.Open;
+            var priceDiff = line.UnitPrice - po.Price;
+            var amountDiff = decimal.Round(line.Quantity * priceDiff, 2, MidpointRounding.AwayFromZero);
+            var exceeds = qtyDiff > 0m;
+            var priceOk = Math.Abs(priceDiff) <= po.Price * pricePct || Math.Abs(amountDiff) <= amountAbs;
+            results.Add((line.Id, po.Open, qtyDiff, priceDiff, amountDiff, exceeds, !exceeds && priceOk));
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                INSERT INTO pur.match_result (si_line_id, company_id, qty_available_to_invoice, qty_diff, price_diff, amount_diff, qty_exceeds, within_tolerance, policy_version_id, evaluated_at)
+                VALUES (@line, @c, @available, @qtyDiff, @priceDiff, @amountDiff, @exceeds, @within, @policy, @at)
+                ON CONFLICT (si_line_id) DO UPDATE SET
+                  qty_available_to_invoice = EXCLUDED.qty_available_to_invoice, qty_diff = EXCLUDED.qty_diff, price_diff = EXCLUDED.price_diff,
+                  amount_diff = EXCLUDED.amount_diff, qty_exceeds = EXCLUDED.qty_exceeds, within_tolerance = EXCLUDED.within_tolerance,
+                  policy_version_id = EXCLUDED.policy_version_id, evaluated_at = EXCLUDED.evaluated_at
+                """,
+                cancellationToken,
+                ("line", line.Id),
+                ("c", context.CompanyId),
+                ("available", po.Open),
+                ("qtyDiff", qtyDiff),
+                ("priceDiff", priceDiff),
+                ("amountDiff", amountDiff),
+                ("exceeds", exceeds),
+                ("within", !exceeds && priceOk),
+                ("policy", policy.PolicyVersionId),
+                ("at", context.Clock.UtcNow)).ConfigureAwait(false);
+        }
+
+        var matched = results.All(r => r.Within);
+        var status = matched ? SupplierInvoiceStatus.Matched : SupplierInvoiceStatus.MatchException;
+        var version = await SupplierInvoiceStore.TransitionAsync(
+            context,
+            header,
+            status,
+            commandType,
+            matched ? "SupplierInvoiceMatched" : "MatchExceptionRaised",
+            new
+            {
+                siId = header.Id,
+                status,
+                docClass = SupplierInvoiceClasses.Expense,
+                policyVersionId = policy.PolicyVersionId,
+                lines = results.Select(r => new
+                {
+                    siLineId = r.Line,
+                    qtyAvailable = r.Available.ToString(CultureInfo.InvariantCulture),
+                    qtyDiff = r.QtyDiff.ToString(CultureInfo.InvariantCulture),
+                    priceDiff = r.PriceDiff.ToString(CultureInfo.InvariantCulture),
+                    amountDiff = Text(r.AmountDiff),
+                    qtyExceeds = r.Exceeds,
+                    withinTolerance = r.Within,
+                }),
+            },
+            publish: !matched,
+            cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { supplierInvoiceId = header.Id, status, qtyExceeds = results.Any(r => r.Exceeds), version });
+    }
+
+    /// <summary>Locks the order lines an invoice bills (by id) and returns, for each invoice line with one, what the order has still to bill.</summary>
+    private static async Task<List<(Line Line, decimal Open)>> OrderLinesAsync(CommandContext context, IReadOnlyList<Line> lines, CancellationToken cancellationToken)
+    {
+        var ids = lines.Where(l => l.PoLineId is not null).Select(l => l.PoLineId!.Value).Distinct().Order().ToArray();
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        // Lock order: the order (N3) before its lines (N4), as every purchase order command takes them.
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT 1 FROM pur.purchase_order WHERE po_id IN (SELECT po_id FROM pur.purchase_order_line WHERE po_line_id = ANY(@ids)) ORDER BY po_id FOR UPDATE",
+            cancellationToken,
+            ("ids", ids)).ConfigureAwait(false);
+        var open = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT po_line_id, qty_ordered - qty_invoiced FROM pur.purchase_order_line WHERE po_line_id = ANY(@ids) ORDER BY po_line_id FOR UPDATE",
+            r => (Id: r.GetGuid(0), Open: r.GetDecimal(1)),
+            cancellationToken,
+            ("ids", ids)).ConfigureAwait(false)).ToDictionary(o => o.Id, o => o.Open);
+        return [.. lines.Where(l => l.PoLineId is not null).Select(l => (l, open[l.PoLineId!.Value]))];
+    }
+
+    /// <summary>
+    /// E-GAS-05-4: what an invoice bills of its order (<paramref name="sign"/> +1 when posted, −1 when reversed), its BILLS links, and
+    /// the order's status — CLOSED once billed in full, APPROVED again when a reversal leaves something to bill.
+    /// </summary>
+    private static async Task BillOrderAsync(CommandContext context, InvoiceHeader header, IReadOnlyList<Line> lines, Guid eventId, int sign, string commandType, CancellationToken cancellationToken)
+    {
+        var billed = lines.Where(l => l.PoLineId is not null).ToList();
+        if (billed.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var line in billed)
+        {
+            await Sql.ExecuteAsync(
+                context.Connection, context.Transaction, "UPDATE pur.purchase_order_line SET qty_invoiced = qty_invoiced + @q, version = version + 1 WHERE po_line_id = @l",
+                cancellationToken, ("q", sign * line.Quantity), ("l", line.PoLineId)).ConfigureAwait(false);
+            if (sign > 0)
+            {
+                await Sql.ExecuteAsync(
+                    context.Connection,
+                    context.Transaction,
+                    """
+                    INSERT INTO core.document_link (link_id, company_id, from_type, from_id, from_line_id, to_type, to_id, to_line_id, link_type, qty, amount, event_id)
+                    SELECT @id, @c, 'SupplierInvoice', @si, @sil, 'PurchaseOrder', po_id, po_line_id, 'BILLS', @qty, @amount, @event FROM pur.purchase_order_line WHERE po_line_id = @pol
+                    """,
+                    cancellationToken,
+                    ("id", context.Ids.NewId()),
+                    ("c", context.CompanyId),
+                    ("si", header.Id),
+                    ("sil", line.Id),
+                    ("pol", line.PoLineId),
+                    ("qty", line.Quantity),
+                    ("amount", line.Net),
+                    ("event", eventId)).ConfigureAwait(false);
+            }
+        }
+
+        var poId = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT po_id FROM pur.purchase_order_line WHERE po_line_id = @l", r => r.GetGuid(0), cancellationToken, ("l", billed[0].PoLineId))
+            .ConfigureAwait(false)).Single();
+        var po = await PurchaseOrderStore.LockAsync(context, poId, header.PlantId!.Value, null, cancellationToken).ConfigureAwait(false);
+        var complete = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT bool_and(qty_invoiced >= qty_ordered) FROM pur.purchase_order_line WHERE po_id = @p", r => r.GetBoolean(0), cancellationToken, ("p", poId))
+            .ConfigureAwait(false)).Single();
+        if (sign > 0 && complete && po.Status == PurchaseOrderStatus.Approved)
+        {
+            await PurchaseOrderStore.TransitionAsync(
+                context, po, PurchaseOrderStatus.Closed, commandType, "PurchaseOrderClosed", new { poId, billedBy = header.Id }, publish: true, cancellationToken).ConfigureAwait(false);
+        }
+        else if (sign < 0 && !complete && po.Status == PurchaseOrderStatus.Closed)
+        {
+            await PurchaseOrderStore.TransitionAsync(
+                context, po, PurchaseOrderStatus.Approved, commandType, "PurchaseOrderReopened", new { poId, reversedInvoice = header.Id }, publish: true, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>An ACTIVE supplier; every category ACTIVE and every tax type in force on <paramref name="date"/> (E-GAS-02-4, E-GAS-02-7).</summary>
+    public static async Task RequireSupplierAndTypesAsync(
+        CommandContext context, Guid partyId, DateOnly date, IEnumerable<Guid> categoryIds, IEnumerable<Guid> taxTypeIds, CancellationToken cancellationToken)
+    {
+        var categories = categoryIds.Distinct().ToArray();
+        var types = taxTypeIds.Distinct().ToArray();
+        var found = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT coalesce((SELECT status = 'ACTIVE' AND is_supplier FROM md.party WHERE company_id = @c AND party_id = @p), false),
+                   (SELECT count(*) FROM pur.expense_category WHERE company_id = @c AND expense_category_id = ANY(@cats) AND status = 'ACTIVE'),
+                   (SELECT count(*) FROM tax.fiscal_rule r WHERE r.company_id = @c AND r.rule_id = ANY(@types) AND r.rule_kind = 'PURCHASE_TAX_TYPE'
+                      AND EXISTS (SELECT 1 FROM tax.fiscal_rule_version v WHERE v.rule_id = r.rule_id AND v.status = 'ACTIVE' AND v.effective_from <= @d
+                                    AND (v.effective_to IS NULL OR v.effective_to > @d)))
+            """,
+            r => (Supplier: r.GetBoolean(0), Categories: r.GetInt64(1), Types: r.GetInt64(2)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("p", partyId),
+            ("cats", categories),
+            ("types", types),
+            ("d", date)).ConfigureAwait(false)).Single();
+        if (!found.Supplier)
+        {
+            throw new DomainException(ProcurementErrors.SupplierNotActive, "The supplier does not exist or is not ACTIVE.");
+        }
+
+        if (found.Categories != categories.Length)
+        {
+            throw new DomainException(ExpenseErrors.CategoryNotFound, "Every line needs an ACTIVE expense category.");
+        }
+
+        if (found.Types != types.Length)
+        {
+            throw new DomainException(TaxErrors.FiscalGateClosed, $"Every line needs a tax type in force on {date:yyyy-MM-dd} (E-GAS-02-7).");
+        }
+    }
+
+    /// <summary>
+    /// E-GAS-05-2: an invoice cites one APPROVED expense order of its supplier and plant, or none. With an order every line names a
+    /// different line of it and carries that line's category and tax type; without one, no line names an order line.
+    /// </summary>
+    public static async Task RequireOrderAsync(CommandContext context, RegisterExpenseInvoice command, CancellationToken cancellationToken)
+    {
+        if (command.PurchaseOrderId is not { } poId)
+        {
+            if (command.Lines.Any(l => l.PurchaseOrderLineId is not null))
+            {
+                throw new DomainException(ProcurementErrors.LineNotFound, "A line names an order line, but the invoice cites no order.");
+            }
+
+            return;
+        }
+
+        var order = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT party_id, plant_id, status::text, doc_class FROM pur.purchase_order WHERE company_id = @c AND po_id = @p",
+            r => (Party: r.GetGuid(0), Plant: r.GetGuid(1), Status: r.GetString(2), Class: r.GetString(3)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("p", poId)).ConfigureAwait(false)).SingleOrDefault();
+        if (order.Class != SupplierInvoiceClasses.Expense || order.Party != command.PartyId)
+        {
+            throw new DomainException(ProcurementErrors.NotFound, "The order does not exist, is not an expense order or is another supplier's.");
+        }
+
+        if (order.Status != PurchaseOrderStatus.Approved)
+        {
+            throw new DomainException(ProcurementErrors.InvalidState, $"The order is {order.Status}: an invoice bills an APPROVED expense order.");
+        }
+
+        if (order.Plant != command.PlantId)
+        {
+            throw new DomainException(ProcurementErrors.PlantMismatch, "The invoice's plant is the order's (E-GAS-01-8).");
+        }
+
+        var lines = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT po_line_id, expense_category_id, tax_rule_id FROM pur.purchase_order_line WHERE po_id = @p",
+            r => (Id: r.GetGuid(0), Category: r.GetGuid(1), Tax: r.GetGuid(2)),
+            cancellationToken,
+            ("p", poId)).ConfigureAwait(false)).ToDictionary(l => l.Id);
+        if (command.Lines.Any(l => l.PurchaseOrderLineId is not { } id || !lines.ContainsKey(id))
+            || command.Lines.Select(l => l.PurchaseOrderLineId).Distinct().Count() != command.Lines.Count)
+        {
+            throw new DomainException(ProcurementErrors.DuplicateLine, "With an order, every line names a different line of that order.");
+        }
+
+        if (command.Lines.Any(l => lines[l.PurchaseOrderLineId!.Value] is var o && (o.Category != l.ExpenseCategoryId || o.Tax != l.TaxTypeId)))
+        {
+            throw new DomainException(ExpenseErrors.CategoryInvalid, "A line billing an order line carries that line's category and tax type (E-GAS-05-2).");
+        }
     }
 
     public static (string Description, decimal Quantity, decimal UnitPrice, decimal Net) ValidLine(ExpenseLineInput line)
@@ -278,21 +558,17 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
             context.Connection,
             context.Transaction,
             """
-            SELECT (SELECT status = 'ACTIVE' AND is_supplier FROM md.party WHERE company_id = @c AND party_id = @p),
-                   EXISTS (SELECT 1 FROM md.plant WHERE company_id = @c AND plant_id = @plant),
+            SELECT EXISTS (SELECT 1 FROM md.plant WHERE company_id = @c AND plant_id = @plant),
                    EXISTS (SELECT 1 FROM pur.supplier_invoice WHERE company_id = @c AND party_id = @p AND supplier_fiscal_number = @n AND document_status NOT IN ('VOIDED', 'REVERSED'))
             """,
-            r => (Supplier: !r.IsDBNull(0) && r.GetBoolean(0), Plant: r.GetBoolean(1), Used: r.GetBoolean(2)),
+            r => (Plant: r.GetBoolean(0), Used: r.GetBoolean(1)),
             cancellationToken,
             ("c", context.CompanyId),
             ("p", command.PartyId),
             ("plant", command.PlantId),
             ("n", fiscalNumber)).ConfigureAwait(false)).Single();
-        if (!checks.Supplier)
-        {
-            throw new DomainException(ProcurementErrors.SupplierNotActive, "The supplier does not exist or is not ACTIVE.");
-        }
-
+        await ExpenseInvoices.RequireSupplierAndTypesAsync(
+            context, command.PartyId, command.DocDate, command.Lines.Select(l => l.ExpenseCategoryId), command.Lines.Select(l => l.TaxTypeId), cancellationToken).ConfigureAwait(false);
         if (!checks.Plant)
         {
             throw new DomainException(ProcurementErrors.PlantMismatch, "The plant does not exist (E-GAS-01-8).");
@@ -303,33 +579,7 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
             throw new DomainException(ProcurementErrors.FiscalNumberUsed, $"Fiscal number {fiscalNumber} is already registered for this supplier.");
         }
 
-        // An ACTIVE category and a tax type in force on the invoice's date for every line (E-GAS-02-4, E-GAS-02-7).
-        var categories = command.Lines.Select(l => l.ExpenseCategoryId).Distinct().ToArray();
-        var types = command.Lines.Select(l => l.TaxTypeId).Distinct().ToArray();
-        var found = (await Reading.ListAsync(
-            context.Connection,
-            context.Transaction,
-            """
-            SELECT (SELECT count(*) FROM pur.expense_category WHERE company_id = @c AND expense_category_id = ANY(@cats) AND status = 'ACTIVE'),
-                   (SELECT count(*) FROM tax.fiscal_rule r WHERE r.company_id = @c AND r.rule_id = ANY(@types) AND r.rule_kind = 'PURCHASE_TAX_TYPE'
-                      AND EXISTS (SELECT 1 FROM tax.fiscal_rule_version v WHERE v.rule_id = r.rule_id AND v.status = 'ACTIVE' AND v.effective_from <= @d
-                                    AND (v.effective_to IS NULL OR v.effective_to > @d)))
-            """,
-            r => (Categories: r.GetInt64(0), Types: r.GetInt64(1)),
-            cancellationToken,
-            ("c", context.CompanyId),
-            ("cats", categories),
-            ("types", types),
-            ("d", command.DocDate)).ConfigureAwait(false)).Single();
-        if (found.Categories != categories.Length)
-        {
-            throw new DomainException(ExpenseErrors.CategoryNotFound, "Every line needs an ACTIVE expense category.");
-        }
-
-        if (found.Types != types.Length)
-        {
-            throw new DomainException(TaxErrors.FiscalGateClosed, $"Every line needs a tax type in force on {command.DocDate:yyyy-MM-dd} (E-GAS-02-7).");
-        }
+        await ExpenseInvoices.RequireOrderAsync(context, command, cancellationToken).ConfigureAwait(false);
 
         var total = lines.Sum(l => l.Net);
         var creator = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
@@ -390,7 +640,7 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
                 context.Transaction,
                 """
                 INSERT INTO pur.supplier_invoice_line (si_line_id, company_id, si_id, line_no, line_kind, po_line_id, qty, unit_price, net_amount, description, expense_category_id, tax_rule_id)
-                VALUES (@id, @c, @si, @no, 'EXPENSE', NULL, @qty, @price, @net, @description, @category, @tax)
+                VALUES (@id, @c, @si, @no, 'EXPENSE', @pol, @qty, @price, @net, @description, @category, @tax)
                 """,
                 cancellationToken,
                 ("id", context.Ids.NewId()),
@@ -402,7 +652,8 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
                 ("net", lines[i].Net),
                 ("description", lines[i].Description),
                 ("category", command.Lines[i].ExpenseCategoryId),
-                ("tax", command.Lines[i].TaxTypeId)).ConfigureAwait(false);
+                ("tax", command.Lines[i].TaxTypeId),
+                ("pol", command.Lines[i].PurchaseOrderLineId)).ConfigureAwait(false);
         }
 
         return JsonSerializer.Serialize(new { supplierInvoiceId = siId, status = SupplierInvoiceStatus.Draft, totalAmount = ExpenseInvoices.Text(total), version = 1 });

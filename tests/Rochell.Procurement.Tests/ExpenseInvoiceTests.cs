@@ -21,11 +21,11 @@ public sealed class ExpenseInvoiceTests(PostgresFixture postgres)
 {
     private const string P37 = "0192f001-0000-7000-8000-000000000029";
 
-    private sealed record World(TestInvoicing S, Guid Clerk, Guid Controller, Guid Plant, IReadOnlyDictionary<string, Guid> Types, IReadOnlyDictionary<string, Guid> Categories);
+    internal sealed record World(TestInvoicing S, Guid Clerk, Guid Controller, Guid Plant, IReadOnlyDictionary<string, Guid> Types, IReadOnlyDictionary<string, Guid> Categories);
 
-    private static DateOnly Today(TestHarness h) => BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
+    internal static DateOnly Today(TestHarness h) => BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
 
-    private static async Task<World> WorldAsync(TestHarness h, string? withholding = null)
+    internal static async Task<World> WorldAsync(TestHarness h, string? withholding = null)
     {
         var s = await h.CreateInvoicingSetupAsync();
         await h.EnableInvoicePostingAsync(withholdingDefinition: withholding);
@@ -68,7 +68,7 @@ public sealed class ExpenseInvoiceTests(PostgresFixture postgres)
         return new World(s, s.Clerk, controller, s.Purchasing.PlantId, types, categories);
     }
 
-    private static ExpenseLineInput Line(World w, string description, string category, string type, decimal qty, decimal price) => new(description, w.Categories[category], w.Types[type], qty, price);
+    internal static ExpenseLineInput Line(World w, string description, string category, string type, decimal qty, decimal price) => new(description, w.Categories[category], w.Types[type], qty, price);
 
     private static async Task<Guid> RegisterAsync(TestHarness h, World w, string key, Guid supplier, string ncf, params ExpenseLineInput[] lines)
         => (await h.RunAsync(new RegisterExpenseInvoice(h.CompanyId, w.Clerk, key, supplier, ncf, Today(h), Today(h).AddDays(30), w.Plant, lines), new RegisterExpenseInvoiceHandler())).ResultRef;
@@ -80,7 +80,7 @@ public sealed class ExpenseInvoiceTests(PostgresFixture postgres)
     private static string Role(string role) => $"(SELECT coalesce(sum(debit - credit), 0)::numeric(19,2) FROM fin.gl_entry WHERE account_role = '{role}')";
 
     /// <summary>ITBIS | selective | other | tip | withholding | AP control | each expense account (code:amount) | AP document original/open.</summary>
-    private static Task<string?> BooksAsync(TestHarness h)
+    internal static Task<string?> BooksAsync(TestHarness h)
         => h.ScalarAsync<string>(
             $"""
             SELECT {Role("ITBIS_RECOVERABLE")} || '|' || {Role("SELECTIVE_TAX_EXPENSE")} || '|' || {Role("OTHER_TAX_EXPENSE")} || '|' || {Role("LEGAL_TIP_EXPENSE")} || '|' ||
@@ -88,7 +88,7 @@ public sealed class ExpenseInvoiceTests(PostgresFixture postgres)
                    coalesce((SELECT string_agg(a.code || ':' || x.amount, ',' ORDER BY a.code)
                              FROM (SELECT account_id, sum(debit - credit)::numeric(19,2) AS amount FROM fin.gl_entry WHERE account_role = 'PURCHASE_EXPENSE' GROUP BY account_id) x
                              JOIN fin.account a ON a.account_id = x.account_id), '-') || '|' ||
-                   coalesce((SELECT string_agg(original_amount::numeric(19,2) || '/' || open_amount::numeric(19,2), ',') FROM fin.ap_document), '-')
+                   coalesce((SELECT string_agg(original_amount::numeric(19,2) || '/' || open_amount::numeric(19,2), ',' ORDER BY original_amount DESC) FROM fin.ap_document), '-')
             """);
 
     [Trait("AcceptanceGas1", "GAS-03")]

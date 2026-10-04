@@ -995,6 +995,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-GAS-04-5 | GAS-1 | The invoice has its AP document and is paid and matched with the bank like any supplier invoice. |
 | E-GAS-04-6 | GAS-1 | Reversal by the Controller, with step-up, only without payments; the NCF is free again — for every supplier invoice, also inventory ones (migration 0079 excludes REVERSED from the NCF uniqueness, as VOIDED was). |
 | E-GAS-04-7 | GAS-1 | Voiding before posting is as today: who registers voids it with a reason while it is not posted. |
+| E-GAS-05-1 | GAS-1 | An expense order has its own creation (`CreateExpensePurchaseOrder`): supplier, plant, date and lines (description, category, tax type, quantity, price); it is submitted and approved as any order (the purchasing approver's limit, the Controller without limit, step-up from the policy amount). |
+| E-GAS-05-2 | GAS-1 | An expense invoice may cite one expense order: each line names a line of it and carries its category and tax type. An invoice cites one order or none. |
+| E-GAS-05-3 | GAS-1 | Matched as inventory invoices: the quantity cannot exceed what is still to bill (never approvable); a price within the PURCHASING tolerance passes, outside it the Controller approves. The approval amount of invoices without an order does not apply. |
+| E-GAS-05-4 | GAS-1 | The order closes by itself when the invoice that completes it is posted; Compras may close it before with a reason; reversing an invoice reopens it. |
+| E-GAS-05-5 | GAS-1 | An expense order never shows in «Por recibir» and cannot be received. |
+| E-GAS-05-6 | GAS-1 | While an expense order is typed, the net and the estimated taxes of each type are shown, as for an inventory order. |
 | E-PRC1-1 | PRC-1 | Named price lists («General», «CONFOTUR», …), each with its versions, prepared and approved as today. |
 | E-PRC1-2 | PRC-1 | Each customer has one list; changing it is prepared by Crédito and approved by the Controller, like the terms. Default «General»; the final consumer uses «General». |
 | E-PRC1-3 | PRC-1 | Orders and quotes are priced from the customer's list in force that day; a product missing from it takes the «General» price. Special-price approval compares against that price. |

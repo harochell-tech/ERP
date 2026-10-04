@@ -844,6 +844,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/procurement/create-expense-purchase-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateExpensePurchaseOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/update-expense-purchase-order-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UpdateExpensePurchaseOrderDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/close-expense-purchase-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CloseExpensePurchaseOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/prepare-expense-category": {
         parameters: {
             query?: never;
@@ -3596,6 +3644,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/procurement/expense-purchase-orders/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PreviewExpensePurchaseOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/expense-categories": {
         parameters: {
             query?: never;
@@ -6082,6 +6146,15 @@ export interface components {
             periodId: string;
             component: string;
         };
+        CloseExpensePurchaseOrder: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            purchaseOrderId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            reason: string;
+        };
         CloseReadiness: {
             /** Format: uuid */
             periodId: string;
@@ -6276,6 +6349,15 @@ export interface components {
             email?: null | string;
             address?: null | string;
             emails?: null | string[];
+        };
+        CreateExpensePurchaseOrder: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            partyId: string;
+            /** Format: date */
+            orderDate: string;
+            lines: components["schemas"]["ExpenseOrderLineInput"][];
         };
         CreateFinishedGood: {
             code: string;
@@ -6981,6 +7063,43 @@ export interface components {
             quantity: string;
             /** Format: decimal */
             unitPrice: string;
+            /** Format: uuid */
+            purchaseOrderLineId?: null | string;
+        };
+        ExpenseOrderLineInput: {
+            description: string;
+            /** Format: uuid */
+            expenseCategoryId: string;
+            /** Format: uuid */
+            taxTypeId: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            unitPrice: string;
+        };
+        ExpenseOrderPreview: {
+            lines: components["schemas"]["ExpenseOrderPreviewLine"][];
+            /** Format: decimal */
+            netTotal: string;
+            /** Format: decimal */
+            taxTotal: null | string;
+            /** Format: decimal */
+            total: null | string;
+            taxesUnavailableCode: null | string;
+            taxesUnavailableReason: null | string;
+        };
+        ExpenseOrderPreviewLine: {
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: decimal */
+            netAmount: string;
+            /** Format: decimal */
+            taxes: null | string;
+        };
+        ExpenseOrderPreviewRequest: {
+            /** Format: date */
+            orderDate: string;
+            lines: components["schemas"]["ExpenseOrderLineInput"][];
         };
         ExpireFiscalAuthorizations: Record<string, never>;
         ExternalFiscalRecordView: {
@@ -8673,6 +8792,8 @@ export interface components {
             history: components["schemas"]["StateChange"][];
             /** Format: decimal */
             total: string;
+            /** @default INVENTORY */
+            docClass?: string;
         };
         PurchaseOrderLineInput: {
             /** Format: uuid */
@@ -8710,10 +8831,10 @@ export interface components {
             /** Format: int32 */
             lineNo: number;
             /** Format: uuid */
-            itemId: string;
-            itemCode: string;
-            itemDescription: string;
-            uom: string;
+            itemId: null | string;
+            itemCode: null | string;
+            itemDescription: null | string;
+            uom: null | string;
             /** Format: decimal */
             qtyOrdered: string;
             /** Format: decimal */
@@ -8732,6 +8853,13 @@ export interface components {
             openQuantity: string;
             /** Format: decimal */
             netAmount: string;
+            description?: null | string;
+            /** Format: uuid */
+            expenseCategoryId?: null | string;
+            expenseCategoryName?: null | string;
+            /** Format: uuid */
+            taxTypeId?: null | string;
+            taxTypeCode?: null | string;
         };
         PurchaseOrderList: {
             items: components["schemas"]["PurchaseOrderSummary"][];
@@ -8801,6 +8929,8 @@ export interface components {
             version: number;
             /** Format: decimal */
             total: string;
+            /** @default INVENTORY */
+            docClass?: string;
         };
         PurchaseOrderToReceive: {
             /** Format: uuid */
@@ -9432,6 +9562,8 @@ export interface components {
             lines: components["schemas"]["ExpenseLineInput"][];
             /** Format: decimal */
             printedTotal?: null | string;
+            /** Format: uuid */
+            purchaseOrderId?: null | string;
         };
         RegisterFiscalAuthorization: {
             /** Format: uuid */
@@ -10755,6 +10887,15 @@ export interface components {
             name: string;
             goodsType606: string;
             lineClass: string;
+        };
+        UpdateExpensePurchaseOrderDraft: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            purchaseOrderId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            lines: components["schemas"]["ExpenseOrderLineInput"][];
         };
         UpdateManualJournal: {
             /** Format: uuid */
@@ -14477,6 +14618,234 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RegisterExpenseInvoice"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateExpensePurchaseOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateExpensePurchaseOrder"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateExpensePurchaseOrderDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateExpensePurchaseOrderDraft"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CloseExpensePurchaseOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseExpensePurchaseOrder"];
             };
         };
         responses: {
@@ -27256,6 +27625,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReceiptCorrectionList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PreviewExpensePurchaseOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseOrderPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseOrderPreview"];
                 };
             };
             /** @description Bad Request */
