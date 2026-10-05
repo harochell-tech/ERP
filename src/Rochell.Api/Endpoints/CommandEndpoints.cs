@@ -19,6 +19,7 @@ using Rochell.Manufacturing.Shifts;
 using Rochell.MasterData.Suppliers;
 using Rochell.Platform.Commands;
 using Rochell.Procurement.Expenses;
+using Rochell.Procurement.Imports;
 using Rochell.Procurement.GoodsReceipts;
 using Rochell.Procurement.Ledger;
 using Rochell.Procurement.PurchaseOrders;
@@ -133,6 +134,13 @@ public static class CommandEndpoints
         procurement.MapCommand<VoidSupplierInvoice, VoidSupplierInvoiceHandler>();
         procurement.MapCommand<PostSupplierInvoice, PostSupplierInvoiceHandler>();
         procurement.MapCommand<ReverseSupplierInvoice, ReverseSupplierInvoiceHandler>();
+        procurement.MapCommand<RegisterCustomsDeclaration, RegisterCustomsDeclarationHandler>(); // USD1-04 (E-USD1-04-1…7)
+        procurement.MapCommand<ReverseCustomsDeclaration, ReverseCustomsDeclarationHandler>();
+        procurement.MapCommand<PrepareImportSettlement, PrepareImportSettlementHandler>();
+        procurement.MapCommand<UpdateImportSettlementDraft, UpdateImportSettlementDraftHandler>();
+        procurement.MapCommand<CancelImportSettlement, CancelImportSettlementHandler>();
+        procurement.MapCommand<ApproveImportSettlement, ApproveImportSettlementHandler>();
+        procurement.MapCommand<ReverseImportSettlement, ReverseImportSettlementHandler>();
         procurement.MapCommand<RepostEvent, RepostEventHandler>();
         procurement.MapCommand<ApproveValuationResidualAdjustment, ApproveValuationResidualAdjustmentHandler>();
 
@@ -331,7 +339,9 @@ public static class CommandEndpoints
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
         typeof(RegisterSupplierInvoiceHandler), typeof(RegisterExpenseInvoiceHandler), typeof(CreateExpensePurchaseOrderHandler), typeof(UpdateExpensePurchaseOrderDraftHandler), typeof(CloseExpensePurchaseOrderHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
         typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
-        typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
+        typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RegisterCustomsDeclarationHandler),
+        typeof(ReverseCustomsDeclarationHandler), typeof(PrepareImportSettlementHandler), typeof(UpdateImportSettlementDraftHandler), typeof(CancelImportSettlementHandler),
+        typeof(ApproveImportSettlementHandler), typeof(ReverseImportSettlementHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),
         typeof(ApproveAccountingPolicyVersionHandler),
         typeof(CreateAccountHandler), typeof(PrepareExchangeRateHandler), typeof(ApproveExchangeRateHandler), typeof(DiscardExchangeRateHandler), typeof(UpdateAccountHandler), typeof(DeactivateAccountHandler), typeof(ActivateAccountHandler),

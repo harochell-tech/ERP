@@ -13,6 +13,7 @@ internal static class DocumentNumbers
 {
     public const string PurchaseOrder = "OC";
     public const string GoodsReceipt = "RM";
+    public const string ImportSettlement = "LI";
 
     public static async Task<string> NextAsync(CommandContext context, string prefix, int year, CancellationToken cancellationToken)
     {
@@ -20,6 +21,7 @@ internal static class DocumentNumbers
         {
             PurchaseOrder => ("pur.purchase_order", "po_no"),
             GoodsReceipt => ("pur.goods_receipt", "gr_no"),
+            ImportSettlement => ("pur.import_settlement", "settlement_no"), // E-USD1-04-6
             _ => throw new ArgumentOutOfRangeException(nameof(prefix), prefix, "Unknown document prefix."),
         };
         var stem = string.Create(CultureInfo.InvariantCulture, $"{prefix}-{year:D4}-");

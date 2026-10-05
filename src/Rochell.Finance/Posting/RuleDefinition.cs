@@ -19,7 +19,7 @@ public sealed record RuleDefinition(IReadOnlyList<RuleLine> Lines)
     public const string Credit = "CREDIT";
     public static readonly IReadOnlySet<string> AllowedDimensions = new HashSet<string>(StringComparer.Ordinal) { "plant", "item", "party" };
     /// <summary>AR since VS#3 (E-VS3-01-16): receivables, contract assets and unapplied receipts.</summary>
-    public static readonly IReadOnlySet<string> AllowedSubledgers = new HashSet<string>(StringComparer.Ordinal) { "INV", "AP", "BANK", "AR", "WIP" };
+    public static readonly IReadOnlySet<string> AllowedSubledgers = new HashSet<string>(StringComparer.Ordinal) { "INV", "AP", "BANK", "AR", "WIP", "IMPORT" };
 
     /// <summary>Parses and validates the structure. Role existence and control consistency are checked against the database on approval.</summary>
     public static RuleDefinition Parse(string json)

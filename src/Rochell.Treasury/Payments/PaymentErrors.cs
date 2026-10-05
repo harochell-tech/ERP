@@ -2,6 +2,9 @@ namespace Rochell.Treasury.Payments;
 
 public static class PaymentErrors
 {
+    /// <summary>E-USD-7: a USD payable is paid in its currency (USD1-05), never by a peso payment.</summary>
+    public const string ApDocumentCurrency = "AP_DOCUMENT_CURRENCY";
+
     public const string NotFound = "NOT_FOUND";
     public const string VersionConflict = "VERSION_CONFLICT";
     public const string NotPrepared = "PAYMENT_NOT_PREPARED";

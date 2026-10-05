@@ -15,6 +15,7 @@ using Rochell.MasterData.Suppliers;
 using Rochell.MasterData.Queries;
 using Rochell.Platform.Queries;
 using Rochell.Procurement.Expenses;
+using Rochell.Procurement.Imports;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Customers;
@@ -54,7 +55,7 @@ public static class QueryEndpoints
         typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewCashSaleHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
         typeof(ListLatestReconciliationRunsHandler), typeof(SearchJournalsHandler), typeof(GetIntegrityStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
-        typeof(ListReceiptCorrectionsHandler), typeof(ListSupplierInvoicesHandler), typeof(ListExpenseCategoriesHandler), typeof(PreviewExpensePurchaseOrderHandler), typeof(PreviewExpenseInvoiceHandler), typeof(GetSupplierInvoiceHandler),
+        typeof(ListReceiptCorrectionsHandler), typeof(ListCustomsDeclarationsHandler), typeof(ListImportSettlementsHandler), typeof(GetImportSettlementHandler), typeof(ListSupplierInvoicesHandler), typeof(ListExpenseCategoriesHandler), typeof(PreviewExpensePurchaseOrderHandler), typeof(PreviewExpenseInvoiceHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
@@ -152,6 +153,17 @@ public static class QueryEndpoints
         procurement.MapGet("/supplier-invoices/{supplierInvoiceId:guid}", (HttpContext http, Guid companyId, Guid supplierInvoiceId, GetSupplierInvoiceHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetSupplierInvoice(companyId, s, supplierInvoiceId), handler, ct))
             .Describe<SupplierInvoiceDetail>(nameof(GetSupplierInvoice), notFound: true);
+
+        // USD1-04 (E-USD1-04-1…7): DUAs and import settlements.
+        procurement.MapGet("/customs-declarations", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListCustomsDeclarationsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListCustomsDeclarations(companyId, s, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<CustomsDeclarationList>(nameof(ListCustomsDeclarations));
+        procurement.MapGet("/import-settlements", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListImportSettlementsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListImportSettlements(companyId, s, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<ImportSettlementList>(nameof(ListImportSettlements));
+        procurement.MapGet("/import-settlements/{settlementId:guid}", (HttpContext http, Guid companyId, Guid settlementId, GetImportSettlementHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetImportSettlement(companyId, s, settlementId), handler, ct))
+            .Describe<ImportSettlementDetail>(nameof(GetImportSettlement), notFound: true);
 
         var reconciliation = company.MapGroup("/reconciliation").WithTags("Reconciliation");
         reconciliation.MapGet("/setup-status", (HttpContext http, Guid companyId, GetSetupStatusHandler handler, QueryRunner runner, CancellationToken ct)

@@ -114,8 +114,8 @@ public sealed class UsdImportSchemaTests(PostgresFixture postgres)
         var dua = Guid.CreateVersion7();
         await Run(
             h, payables, "dua",
-            "INSERT INTO pur.customs_declaration (dua_id, company_id, dua_no, dua_date, party_id, cif_amount, duties_amount, itbis_amount, other_amount, due_date, status, accounting_status, created_by, version) " +
-            $"VALUES ('{dua}', '{h.CompanyId}', '10-2026-IC01-000123', current_date, '{dga}', 660000.00, 30000.00, 124200.00, 0, current_date, 'DRAFT', 'NOT_POSTED', @user, 1)",
+            "INSERT INTO pur.customs_declaration (dua_id, company_id, dua_no, dua_date, party_id, cif_amount, duties_amount, itbis_amount, other_amount, due_date, status, accounting_status, created_by, version, plant_id) " +
+            $"VALUES ('{dua}', '{h.CompanyId}', '10-2026-IC01-000123', current_date, '{dga}', 660000.00, 30000.00, 124200.00, 0, current_date, 'DRAFT', 'NOT_POSTED', @user, 1, '{p.PlantId}')",
             new TestState("CustomsDeclaration", dua, null, "DRAFT"));
         var usdPayable = await Fails(
             h, payables, "ap",
@@ -131,11 +131,11 @@ public sealed class UsdImportSchemaTests(PostgresFixture postgres)
             new TestState("ImportSettlement", settlement, null, "DRAFT"));
         var ownApproval = await Fails(
             h, payables, "own",
-            $"UPDATE pur.import_settlement SET status = 'POSTED', approved_by = @user, approved_at = now(), version = 2 WHERE settlement_id = '{settlement}'",
+            $"UPDATE pur.import_settlement SET status = 'POSTED', accounting_status = 'POSTED', posting_event_id = (SELECT max(event_id::text)::uuid FROM core.domain_event WHERE company_id = '{h.CompanyId}'), approved_by = @user, approved_at = now(), version = 2 WHERE settlement_id = '{settlement}'",
             new TestState("ImportSettlement", settlement, "DRAFT", "POSTED"));
         await Run(
             h, controller, "post",
-            $"UPDATE pur.import_settlement SET status = 'POSTED', approved_by = @user, approved_at = now(), version = 2 WHERE settlement_id = '{settlement}'",
+            $"UPDATE pur.import_settlement SET status = 'POSTED', accounting_status = 'POSTED', posting_event_id = (SELECT max(event_id::text)::uuid FROM core.domain_event WHERE company_id = '{h.CompanyId}'), approved_by = @user, approved_at = now(), version = 2 WHERE settlement_id = '{settlement}'",
             new TestState("ImportSettlement", settlement, "DRAFT", "POSTED"));
         var late = await Fails(h, controller, "late", $"DELETE FROM pur.import_settlement_document WHERE settlement_id = '{settlement}'");
 

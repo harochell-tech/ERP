@@ -23,10 +23,10 @@ public sealed class ForeignInvoiceTests(PostgresFixture postgres)
 {
     private const string P38 = "0192f001-0000-7000-8000-000000000030";
 
-    private sealed record Foreign(World W, Guid Supplier, Guid Forklift, Guid Parts);
+    internal sealed record Foreign(World W, Guid Supplier, Guid Forklift, Guid Parts);
 
     /// <summary>The expense world, a foreign supplier, today's rate, AP_FOREIGN mapped, P-38 approved and a fixed-asset category.</summary>
-    private static async Task<Foreign> ForeignAsync(TestHarness h, decimal rate = 60m)
+    internal static async Task<Foreign> ForeignAsync(TestHarness h, decimal rate = 60m)
     {
         var w = await WorldAsync(h);
         var supplier = (await h.RunAsync(
@@ -50,7 +50,7 @@ public sealed class ForeignInvoiceTests(PostgresFixture postgres)
         return new Foreign(w, supplier, forklift, w.Categories["REPUESTOS"]);
     }
 
-    private static ExpenseLineInput Usd(Guid category, string description, decimal qty, decimal price, Guid? poLine = null) => new(description, category, null, qty, price, poLine);
+    internal static ExpenseLineInput Usd(Guid category, string description, decimal qty, decimal price, Guid? poLine = null) => new(description, category, null, qty, price, poLine);
 
     private static Task<CommandResult> RegisterAsync(TestHarness h, Foreign f, string key, string number, Guid? po, params ExpenseLineInput[] lines)
         => h.RunAsync(

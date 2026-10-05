@@ -75,3 +75,30 @@ Tests: `ExchangeRateTests` (Finance).
   amounts; purchase order list / detail add `currency` (totals in the order's currency).
 
 Tests: `ForeignInvoiceTests` (USD-02, USD-03, rounding, refusals, fixed-asset categories).
+
+## USD1-04 — DUA and import settlement (migration 0088; E-USD1-04-1…9)
+
+| Command / query | Permission | What it does |
+| --- | --- | --- |
+| `RegisterCustomsDeclaration` | `supplier_invoice:post` | Registers and posts the DUA (P-39) and the DGA's payable (`fin.ap_document` doc_type CUSTOMS_DECLARATION) |
+| `ReverseCustomsDeclaration` | `supplier_invoice:reverse` (step-up) | Exact reversal while unpaid and in no live settlement |
+| `PrepareImportSettlement` / `UpdateImportSettlementDraft` / `CancelImportSettlement` | `import_settlement:prepare` | DRAFT LI-YYYY-NNNNNN with its documents and computed allocation |
+| `ApproveImportSettlement` | `import_settlement:approve` (step-up, four eyes) | Posts P-40 on the settlement date |
+| `ReverseImportSettlement` | `import_settlement:approve` (step-up) | Exact reversal; documents are free again |
+| `ListCustomsDeclarations` (GET `/procurement/customs-declarations`), `ListImportSettlements`, `GetImportSettlement` | `supplier_invoice:read` | |
+
+- **Documents** (`ImportSettlements.GatherAsync`): `SUPPLIER_INVOICE` = a POSTED foreign expense invoice in USD of the plant (its lines
+  receive cost); `EXPENSE_INVOICE` = a POSTED expense invoice of the plant (its peso net is cost); `CUSTOMS_DECLARATION` = a POSTED DUA of the
+  plant (duties + other charges). A document is in one DRAFT/POSTED settlement at a time (`pur.import_settlement_document_live_once`
+  trigger, the rows locked while gathering); the date is not future nor before its latest document.
+- **Allocation**: total cost × line net ÷ Σ goods nets, rounded; the cent left to the largest line. Stored in
+  `pur.import_settlement_allocation` (EXPENSE_LINE only, E-USD1-04-8) and recomputed identically at approval.
+- **Posting**: P-39 `P39-DR-CLR` (IMPORT_CLEARING, subledger IMPORT = the DUA), `P39-DR-ITBIS`, `P39-CR-AP`; P-40 `P40-DR-COST` per goods
+  line to its category account, `P40-CR-CLR` per DUA, `P40-CR-EXP` per expense invoice line to its category account. `IMPORT` is a new
+  subledger type; IMPORT_CLEARING ⇔ IMPORT.
+- **Treasury**: payment screens read payables through the view `fin.ap_source` (supplier invoice or «DUA <number>»), so the DGA's payable is
+  proposed and paid like any other; the proposal leaves out USD payables and a peso payment refuses them (`AP_DOCUMENT_CURRENCY`) until
+  USD1-05. PAY-APPL counts DUA payables.
+- **Reversal guards**: an expense invoice or DUA in a live settlement is not reversed (`IMPORT_DOCUMENT_IN_SETTLEMENT`).
+
+Tests: `ImportSettlementTests` (USD-05 with the baseline's figures, the settlement rules, the DUA). 224 commands.
