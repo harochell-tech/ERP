@@ -25,11 +25,16 @@ public sealed record ApproveStandardCost(Guid CompanyId, Guid SessionId, string 
 
 public sealed record PriceListLine(Guid ItemId, string Uom, decimal UnitPrice);
 
+/// <summary>E-SRV1-10, E-PRS-03-5: the freight of a product to a zone, per unit of the product (its base unit or one convertible to it).</summary>
+public sealed record FreightPriceLine(Guid ItemId, string Uom, Guid ZoneId, decimal UnitPrice);
+
 /// <summary>
 /// E-VS3-01-14, E-VS3-02-8: the Controller prepares a new DRAFT version of a price list with all its lines (DOP without ITBIS).
 /// E-PRS-02-2: of the list <paramref name="PriceListId"/>, or of GENERAL when none is given; its versions are numbered per list.
+/// E-PRS-03-3/4: with its freight table in <paramref name="Freight"/>; a version may hold only freight.
 /// </summary>
-public sealed record PreparePriceList(Guid CompanyId, Guid SessionId, string IdempotencyKey, IReadOnlyList<PriceListLine> Lines, Guid? PriceListId = null) : ICommand;
+public sealed record PreparePriceList(
+    Guid CompanyId, Guid SessionId, string IdempotencyKey, IReadOnlyList<PriceListLine> Lines, Guid? PriceListId = null, IReadOnlyList<FreightPriceLine>? Freight = null) : ICommand;
 
 /// <summary>E-PRC1-5: the Controller creates a named list (code A–Z, 0–9, _; name); it is priced by preparing its first version.</summary>
 public sealed record CreatePriceList(Guid CompanyId, Guid SessionId, string IdempotencyKey, string Code, string Name) : ICommand;

@@ -263,7 +263,10 @@ public sealed record GetPriceList(Guid CompanyId, Guid SessionId, Guid PriceList
 
 public sealed record PriceListLineView(Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal UnitPrice);
 
-public sealed record PriceListDetail(PriceListSummary Header, IReadOnlyList<PriceListLineView> Lines);
+/// <summary>E-PRS-03-6: a freight price of the version — product, unit, zone, price per unit of the product.</summary>
+public sealed record PriceListFreightView(Guid ItemId, string ItemCode, string ItemDescription, string Uom, Guid ZoneId, string ZoneName, decimal UnitPrice);
+
+public sealed record PriceListDetail(PriceListSummary Header, IReadOnlyList<PriceListLineView> Lines, IReadOnlyList<PriceListFreightView> Freight);
 
 [RequiresPermission("sales:read")]
 public sealed class GetPriceListHandler : IQueryHandler<GetPriceList>
@@ -289,7 +292,18 @@ public sealed class GetPriceListHandler : IQueryHandler<GetPriceList>
             r => new PriceListLineView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetDecimal(4)),
             cancellationToken,
             ("id", query.PriceListVersionId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new PriceListDetail(header, lines));
+        var freight = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT f.item_id, i.code, i.description, f.uom, f.zone_id, z.name, f.unit_price
+            FROM sal.price_list_freight f JOIN md.item i ON i.item_id = f.item_id JOIN sal.delivery_zone z ON z.zone_id = f.zone_id
+            WHERE f.price_list_version_id = @id ORDER BY i.code, f.uom, lower(z.name)
+            """,
+            r => new PriceListFreightView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.GetDecimal(6)),
+            cancellationToken,
+            ("id", query.PriceListVersionId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new PriceListDetail(header, lines, freight));
     }
 }
 

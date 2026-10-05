@@ -1060,6 +1060,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PRS-02-4 | PRS-1 | A customer whose list has no version in force prices everything from GENERAL. |
 | E-PRS-02-5 | PRS-1 | Changing a DRAFT order or quote re-prices every line with the lists in force that day; prices that came from a quote are kept. |
 | E-PRS-02-6 | PRS-1 | Each order and quote line shows whether its price came from the customer's list, GENERAL or the quote; the customer shows its list. |
+| E-PRS-03-1 | PRS-1 | `CreateFreightItem` creates «Transporte de blocks» (code TRANSPORTE, type SERVICE) with the item-creation permission; someone with `item:activate` activates it, like a finished good. |
+| E-PRS-03-2 | PRS-1 | Zones are created, renamed, deactivated and reactivated; documents keep the zone, so a rename shows everywhere. |
+| E-PRS-03-3 | PRS-1 | Freight prices are prepared in the same price list version as the product prices. |
+| E-PRS-03-4 | PRS-1 | A version may hold only freight prices (a customer takes its blocks from GENERAL and has its own freight). |
+| E-PRS-03-5 | PRS-1 | A freight price is per unit of the product: its base unit or one with a conversion in force, like product prices. |
+| E-PRS-03-6 | PRS-1 | Queries: the zones with their status; a list version shows its freight table by product and zone. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

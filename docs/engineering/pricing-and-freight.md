@@ -42,3 +42,15 @@ order line `quotedPrice`; customer terms read `priceListId` / `priceListCode` / 
 207 commands.
 
 Tests: `CustomerPriceListTests` (PRC-02…08 and deactivation), `PriceListFreightSchemaTests` (PRC-01).
+
+## PRS-03 — zones, the freight item and freight prices (no migration; E-PRS-03-1…6)
+
+| Command / query | Permission | What it does |
+| --- | --- | --- |
+| `CreateFreightItem` (description) | `item:create` | The company's one freight item, DRAFT: code TRANSPORTE, type SERVICE, category TRANSPORTE, unit «un»; activated with `ActivateItem` (`item:activate`) |
+| `CreateDeliveryZone`, `RenameDeliveryZone`, `DeactivateDeliveryZone`, `ReactivateDeliveryZone` | `delivery_zone:manage` | Zones by name (unique without case; `ZONE_NAME_USED`); a rename shows everywhere |
+| `ListDeliveryZones` (GET `/sales/delivery-zones?status=`) | `sales:read` | Zones by name |
+| `PreparePriceList` + `Freight` | `price_list:prepare` | The version's freight table: product, unit (its base unit or a convertible one), ACTIVE zone (`ZONE_INACTIVE`), price; once per product, unit and zone; a version may hold only freight |
+| `GetPriceList` | `sales:read` | Adds `freight` (product, unit, zone, price) |
+
+212 commands. Tests: `FreightPriceTests` (SRV-01, SRV-02, the freight table).
