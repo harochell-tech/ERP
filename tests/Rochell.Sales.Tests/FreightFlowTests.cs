@@ -231,4 +231,19 @@ public sealed class FreightFlowTests(PostgresFixture postgres)
         Assert.Equal("BLOQUE-6:42000.00:3000.00", await LinesAsync(h, w, order));
         Assert.Equal("BLOQUE-6:42000.00:4000.00", await LinesAsync(h, w, fresh));
     }
+
+    [Fact]
+    public async Task A_CONFOTUR_authorization_cannot_cite_an_order_that_carries_freight()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        var (order, _) = await OrderAsync(h, w, "o", DeliveryTerms.DeliveredOwnTransport, w.Bavaro, false, new SalesOrderLineInput(w.S.Block, "un", 1000m));
+        var refused = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
+            new Rochell.Tax.Authorizations.RegisterFiscalAuthorization(
+                h.CompanyId, w.Billing, "auth", w.S.Customer, "CERT-2026-0001", new DateOnly(2026, 9, 1), new DateOnly(2027, 3, 1), "Hotel Playa Bávaro", "CONFOTUR-0456-2025", null, order,
+                [new Rochell.Tax.Authorizations.AuthorizationLineInput(w.S.Block, "un", 1000m, 42000.00m)]),
+            new Rochell.Tax.Authorizations.RegisterFiscalAuthorizationHandler()));
+
+        Assert.Equal(TaxErrors.AuthorizationOrderHasFreight, refused.Code);
+    }
 }

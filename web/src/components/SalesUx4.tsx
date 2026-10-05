@@ -79,11 +79,13 @@ export function useSalesPreview(
   plantId: string,
   lines: readonly { itemId: string; uom: string; quantity: string; unitPrice?: string }[],
   partyId = "",
+  zoneId = "",
+  exemptionPending = false,
 ): { preview: Preview | null; pending: boolean; problem: string | null } {
   const { companyId } = useSession();
   const [state, setState] = useState<{ preview: Preview | null; pending: boolean; problem: string | null }>({ preview: null, pending: false, problem: null });
   const ready = plantId ? previewableLines(lines.map((l) => ({ ...l }))) : null;
-  const key = ready ? JSON.stringify([kind, plantId, ready.map((l) => [l.itemId, l.uom, l.quantity, (l as { unitPrice?: string }).unitPrice?.trim() ?? ""]), partyId]) : "";
+  const key = ready ? JSON.stringify([kind, plantId, ready.map((l) => [l.itemId, l.uom, l.quantity, (l as { unitPrice?: string }).unitPrice?.trim() ?? ""]), partyId, zoneId, exemptionPending]) : "";
   useEffect(() => {
     if (!key) {
       return;
@@ -101,11 +103,15 @@ export function useSalesPreview(
                 lines: body.map(([itemId, uom, quantity]) => ({ itemId, uom, quantity })),
                 // PRS-02 (E-PRC1-3): the customer's list prices the preview; a cash sale is always GENERAL (E-PRC1-10).
                 partyId: kind === "order" && partyId ? partyId : null,
+                // PRS-05 (E-PRS-05-5): the zone prices the freight of an own-truck draft.
+                deliveryZoneId: zoneId || null,
+                ...(kind === "order" ? { exemptionPending } : {}),
               })
             : await previewQuery("/api/v1/companies/{companyId}/sales/quotes/preview", companyId, {
                 plantId,
                 lines: body.map(([itemId, uom, quantity, unitPrice]) => ({ itemId, uom, quantity, unitPrice: unitPrice === "" || !/^\d{1,13}(\.\d{1,4})?$/.test(unitPrice) ? null : unitPrice })),
                 partyId: partyId || null,
+                deliveryZoneId: zoneId || null,
               });
         if (!cancelled) {
           setState({ preview: result, pending: false, problem: null });
@@ -120,8 +126,22 @@ export function useSalesPreview(
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [companyId, key, kind, plantId]);
+  }, [companyId, key, kind, plantId, partyId, zoneId, exemptionPending]);
   return key ? state : { preview: null, pending: false, problem: null };
+}
+
+/** PRS-05 (E-PRS-05-5, E-PRS-04-1/2/3): why a document with a zone goes without freight. */
+export function freightWithheldText(code: string): string {
+  switch (code) {
+    case "FREIGHT_ITEM_MISSING":
+      return "Sin flete: el artículo «Transporte de blocks» no existe o no está activo (Maestros › Productos terminados).";
+    case "FREIGHT_NOT_EXEMPT":
+      return "Sin flete: la regla de ITBIS de ventas vigente todavía no exime «Transporte»; el contador debe confirmarla.";
+    case "FREIGHT_POSTING_MISSING":
+      return "Sin flete: falta aprobar la regla contable P-16 versión 2 o la cuenta de «Ingresos por transporte».";
+    default:
+      return `Sin flete (${code}).`;
+  }
 }
 
 /** V-11: the preview's totals: net, estimated ITBIS (or why not) and total. */
@@ -144,6 +164,14 @@ export function PreviewTotals({ preview, pending, problem, note }: { preview: Pr
         <dd>
           <MoneyText value={preview.netTotal} testId="preview-net" />
         </dd>
+        {/^0(\.0+)?$/.test(preview.freightTotal ?? "0") ? null : (
+          <>
+            <dt>Flete (exento de ITBIS)</dt>
+            <dd>
+              <MoneyText value={preview.freightTotal ?? "0"} testId="preview-freight" />
+            </dd>
+          </>
+        )}
         <dt>ITBIS estimado</dt>
         <dd>
           {preview.itbisTotal !== null ? (
@@ -155,6 +183,11 @@ export function PreviewTotals({ preview, pending, problem, note }: { preview: Pr
         <dt>Total</dt>
         <dd>{preview.total !== null ? <MoneyText value={preview.total} testId="preview-total" /> : "—"}</dd>
       </dl>
+      {preview.freightWithheld ? (
+        <p className="warning" role="status" data-testid="preview-freight-withheld">
+          {freightWithheldText(preview.freightWithheld)}
+        </p>
+      ) : null}
       <p className="muted">{note ?? "El ITBIS definitivo se calcula al facturar (una exención CONFOTUR se decide ahí)."}</p>
     </div>
   );

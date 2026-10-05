@@ -38,6 +38,7 @@ internal static class DevSeed
         await h.SessionWithRolesAsync("SEGUNDO_APROBADOR_SEGURIDAD"); // UI-01: decides them
         await h.SessionWithRolesAsync("CONTADOR"); // FIN1-04: prepares adjustments
         await SalesSeed.RunAsync(h, receiving.Purchasing.PlantId, payments.Controller, approver); // VS3-10b, before the accounts are classed
+        await PriceSeed.RunAsync(h, payments.Controller); // PRS-05
         await MfgSeed.RunAsync(h, receiving.Purchasing.PlantId); // MFG1-07
         await SeedLedgerAsync(h);
         await ExpenseSeed.RunAsync(h, payments.Controller); // GAS1-07, after the accounts are classed

@@ -42,6 +42,8 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await seller.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
   await seller.getByLabel("Término de entrega").selectOption("DELIVERED_OWN_TRANSPORT");
   await seller.getByLabel("Dirección de la obra").fill("Obra Punta Cana");
+  // PRS-05: the company has zones, so an own-truck order chooses one; GENERAL has no freight to Higüey, the total stays.
+  await seller.getByLabel("Zona de entrega").selectOption({ label: "Higüey" });
   await seller.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
   await seller.getByLabel("Cantidad 1").fill("100");
   // UX4-03 (V-11, E-UX4-3/4): the server prices the draft while it is typed — net per line, total, ITBIS 18 % — and the customer's

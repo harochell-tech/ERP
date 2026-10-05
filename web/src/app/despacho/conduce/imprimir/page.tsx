@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, Fragment } from "react";
 import { query } from "@/api/client";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { NoPermission } from "@/components/ui";
@@ -107,19 +107,33 @@ function DeliveryPrint() {
           </thead>
           <tbody>
             {data.lines.map((l) => (
-              <tr key={l.lineNo}>
-                <td className="num">{l.lineNo}</td>
-                <td className="wrap">
-                  {l.itemCode} — {l.itemDescription}
-                </td>
-                <td>{l.uom}</td>
-                <td className="num">{formatQuantity(l.qtyPlanned)}</td>
-                <td className="num">{formatQuantity(l.qtyIssued)}</td>
-                <td className="num">{formatQuantity(l.qtyDelivered)}</td>
-                <td className="wrap">
-                  {l.lots.length === 0 ? "—" : l.lots.map((lot) => `${lot.lotCode} (${lot.sourceLocationCode}): ${formatQuantity(lot.baseQuantity)}`).join(" · ")}
-                </td>
-              </tr>
+              <Fragment key={l.lineNo}>
+                <tr>
+                  <td className="num">{l.lineNo}</td>
+                  <td className="wrap">
+                    {l.itemCode} — {l.itemDescription}
+                  </td>
+                  <td>{l.uom}</td>
+                  <td className="num">{formatQuantity(l.qtyPlanned)}</td>
+                  <td className="num">{formatQuantity(l.qtyIssued)}</td>
+                  <td className="num">{formatQuantity(l.qtyDelivered)}</td>
+                  <td className="wrap">
+                    {l.lots.length === 0 ? "—" : l.lots.map((lot) => `${lot.lotCode} (${lot.sourceLocationCode}): ${formatQuantity(lot.baseQuantity)}`).join(" · ")}
+                  </td>
+                </tr>
+                {l.freight ? (
+                  // PRS-05 (E-PRS-04-7): the line's freight, same quantities, no price.
+                  <tr data-testid={`conduce-freight:${l.lineNo}`}>
+                    <td />
+                    <td className="wrap">{l.freight}</td>
+                    <td>{l.uom}</td>
+                    <td className="num">{formatQuantity(l.qtyPlanned)}</td>
+                    <td className="num">{formatQuantity(l.qtyIssued)}</td>
+                    <td className="num">{formatQuantity(l.qtyDelivered)}</td>
+                    <td>—</td>
+                  </tr>
+                ) : null}
+              </Fragment>
             ))}
           </tbody>
         </table>

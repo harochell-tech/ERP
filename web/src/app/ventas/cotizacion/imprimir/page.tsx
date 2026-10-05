@@ -92,6 +92,7 @@ function QuotePrint() {
               <td className="num">{l.lineNo}</td>
               <td>
                 {l.itemCode} — {l.itemName}
+                {l.exempt ? " (exento)" : ""}
               </td>
               <td>{l.uom}</td>
               <td className="num">{formatQuantity(l.quantity)}</td>

@@ -125,7 +125,7 @@ public static class DocumentHtml
         }
 
         html.Fact("Entrega", Term(q.DeliveryTermCode, q.SiteAddress)).Append("</dl>");
-        html.PricedLines(q.Lines.Select(l => (l.LineNo, l.ItemCode, l.ItemName, l.Uom, l.Quantity, l.UnitPrice, l.Net, l.Itbis, l.Total)), q.NetTotal, q.ItbisTotal, q.Total);
+        html.PricedLines(q.Lines.Select(l => (l.LineNo, l.ItemCode, l.Exempt ? l.ItemName + " (exento)" : l.ItemName, l.Uom, l.Quantity, l.UnitPrice, l.Net, l.Itbis, l.Total)), q.NetTotal, q.ItbisTotal, q.Total);
         if (!string.IsNullOrWhiteSpace(q.Notes))
         {
             html.Append("<p><strong>Notas:</strong> ").Append(E(q.Notes)).Append("</p>");

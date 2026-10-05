@@ -10,6 +10,7 @@ import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermissio
 import { BUYER_ID_KINDS, buyerIdError, normalizeBuyerId } from "@/lib/cashSales";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { DELIVERY_TERMS } from "@/lib/labels";
+import { useZones, ZoneField } from "@/components/ZoneField";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -33,6 +34,7 @@ interface Values {
   buyerPhone: string;
   buyerIdKind: string;
   buyerId: string;
+  deliveryZoneId?: string;
 }
 
 const EMPTY_LINE: Line = { itemId: "", uom: "", quantity: "" };
@@ -50,6 +52,7 @@ function CashSaleForm() {
   const fe = useFieldErrors<string>();
   const allowed = can("cash_sale:create");
   const permission = scope("cash_sale:create");
+  const { zones } = useZones();
 
   const { data, error } = useLoad(
     allowed
@@ -60,7 +63,8 @@ function CashSaleForm() {
             query("/api/v1/companies/{companyId}/sales/cash-sale-setup", { path: { companyId } }),
             editId ? query("/api/v1/companies/{companyId}/sales/orders/{salesOrderId}", { path: { companyId, salesOrderId: editId } }) : Promise.resolve(null),
           ]);
-          const active = lists.items.find((l) => l.status === "ACTIVE");
+          // PRS-05: the products offered are GENERAL's (every product is there); the price of each line is the server's preview.
+          const active = lists.items.find((l) => l.status === "ACTIVE" && l.priceListCode === "GENERAL") ?? lists.items.find((l) => l.status === "ACTIVE");
           const prices = active
             ? (await query("/api/v1/companies/{companyId}/sales/price-lists/{priceListVersionId}", { path: { companyId, priceListVersionId: active.priceListVersionId } })).lines
             : [];
@@ -70,7 +74,9 @@ function CashSaleForm() {
     [companyId, allowed, editId],
   );
   const previewSource = values ?? (data?.order ? { plantId: data.order.plantId, lines: data.order.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.qtyOrdered })) } : null);
-  const preview = useSalesPreview("cash", previewSource?.plantId ?? "", previewSource?.lines ?? []);
+  // E-PRS-04-9: a cash sale's freight comes from GENERAL.
+  const ownTruck = (values?.deliveryTermCode ?? data?.order?.header.deliveryTermCode) === "DELIVERED_OWN_TRANSPORT";
+  const preview = useSalesPreview("cash", previewSource?.plantId ?? "", previewSource?.lines ?? [], "", ownTruck ? (values?.deliveryZoneId ?? data?.order?.deliveryZoneId ?? "") : "");
 
   if (!allowed) {
     return <NoPermission />;
@@ -87,6 +93,7 @@ function CashSaleForm() {
           deliveryTermCode: order.header.deliveryTermCode,
           siteAddress: order.siteAddress ?? "",
           requestedDate: order.requestedDate ?? "",
+          deliveryZoneId: order.deliveryZoneId ?? "",
           lines: order.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.qtyOrdered })),
           buyerName: order.cashSale?.buyerName ?? "",
           buyerPhone: order.cashSale?.buyerPhone ?? "",
@@ -124,6 +131,7 @@ function CashSaleForm() {
     const found: Record<string, string | false> = {
       plantId: !current.plantId && "Elija la planta.",
       siteAddress: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.siteAddress.trim() === "" && "Una entrega en obra necesita la dirección de la obra.",
+      deliveryZoneId: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && zones.length > 0 && !current.deliveryZoneId && "Elija la zona de entrega.",
       buyerId: buyerIdError(current.buyerIdKind, current.buyerId) ?? false,
     };
     lines.forEach((l, i) => {
@@ -140,6 +148,7 @@ function CashSaleForm() {
       siteAddress: optional(current.siteAddress),
       requestedDate: current.requestedDate === "" ? null : current.requestedDate,
       lines,
+      deliveryZoneId: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.deliveryZoneId ? current.deliveryZoneId : null,
       buyerName: optional(current.buyerName),
       buyerPhone: optional(current.buyerPhone),
       buyerIdKind: current.buyerIdKind === "" ? null : current.buyerIdKind,
@@ -192,6 +201,9 @@ function CashSaleForm() {
             <input aria-label="Dirección de la obra" value={current.siteAddress} onChange={(e) => set({ siteAddress: e.target.value })} />
           </Field>
         ) : null}
+        {current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" ? (
+          <ZoneField value={current.deliveryZoneId ?? ""} onChange={(deliveryZoneId) => set({ deliveryZoneId })} error={fe.errors.deliveryZoneId} zones={zones} />
+        ) : null}
         <Field label="Fecha solicitada (opcional)">
           <input type="date" value={current.requestedDate} onChange={(e) => set({ requestedDate: e.target.value })} />
         </Field>
@@ -234,7 +246,7 @@ function CashSaleForm() {
                 </td>
                 <td>{line.uom}</td>
                 <td className="num">
-                  <Money value={price?.unitPrice} />
+                  <Money value={priced && priced.itemId === line.itemId ? priced.listPrice : price?.unitPrice} />
                 </td>
                 <td className="num">
                   <input
@@ -248,6 +260,11 @@ function CashSaleForm() {
                 </td>
                 <td className="num">
                   {priced && priced.itemId === line.itemId ? <Money value={priced.netAmount} testId={`preview-line-net:${index + 1}`} /> : <span className="muted">—</span>}
+                  {priced && priced.itemId === line.itemId && priced.freightAmount ? (
+                    <div className="muted" data-testid={`preview-line-freight:${index + 1}`}>
+                      + flete <Money value={priced.freightAmount} />
+                    </div>
+                  ) : null}
                 </td>
                 <td>
                   {current.lines.length > 1 ? (
