@@ -236,16 +236,17 @@ public static class Reconciliations
             null),
         ["PAY-APPL"] = (
             Findings + """
-            -- E-VS2-06-5, global. Each released / cleared payment: Σ live applications = amount (REVERSED: 0).
+            -- E-VS2-06-5, global. Each released / cleared payment: Σ live applications = amount (REVERSED: 0); a payment of USD payables
+            -- compares its USD (E-USD1-05-4: its pesos also carry the exchange difference).
             SELECT 'payment:' || p.payment_no AS match_key,
-                   coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0) AS value_a,
-                   CASE WHEN p.status::text = 'REVERSED' THEN 0 ELSE p.amount END AS value_b,
+                   coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN coalesce(a.amount_fc, a.amount) ELSE -coalesce(a.amount_fc, a.amount) END), 0) AS value_a,
+                   CASE WHEN p.status::text = 'REVERSED' THEN 0 ELSE coalesce(p.amount_fc, p.amount) END AS value_b,
                    'PAYMENT_APPLICATION_DIFFERENCE' AS classification, 'ERROR' AS severity, NULL::text AS component
             FROM fin.payment p LEFT JOIN fin.ap_application a ON a.payment_id = p.payment_id
             WHERE p.company_id = @c AND p.status::text IN ('RELEASED', 'CLEARED', 'REVERSED')
-            GROUP BY p.payment_id, p.payment_no, p.status, p.amount
-            HAVING coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0)
-                   <> CASE WHEN p.status::text = 'REVERSED' THEN 0 ELSE p.amount END
+            GROUP BY p.payment_id, p.payment_no, p.status, p.amount, p.amount_fc
+            HAVING coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN coalesce(a.amount_fc, a.amount) ELSE -coalesce(a.amount_fc, a.amount) END), 0)
+                   <> CASE WHEN p.status::text = 'REVERSED' THEN 0 ELSE coalesce(p.amount_fc, p.amount) END
             UNION ALL
             -- Each AP document of a POSTED invoice or DUA: original − open = Σ live applications.
             SELECT 'ap_doc:' || d.ap_doc_id::text, d.original_amount - d.open_amount,
@@ -262,7 +263,7 @@ public static class Reconciliations
             SELECT 'application:' || a.application_id::text, a.amount, count(e.gl_entry_id)::numeric,
                    'APPLICATION_WITHOUT_R09_LINE', 'ERROR', NULL
             FROM fin.ap_application a
-            LEFT JOIN fin.gl_entry e ON e.company_id = @c AND e.source_event_id = a.event_id AND e.rule_line_code = 'R09-DR-AP'
+            LEFT JOIN fin.gl_entry e ON e.company_id = @c AND e.source_event_id = a.event_id AND e.rule_line_code IN ('R09-DR-AP', 'P41-DR-AP')
               AND e.subledger_ref = a.ap_doc_id
               AND (CASE WHEN a.reverses_application_id IS NULL THEN e.debit ELSE e.credit END) = a.amount
             WHERE a.company_id = @c

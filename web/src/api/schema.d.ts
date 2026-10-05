@@ -8854,6 +8854,12 @@ export interface components {
             statementLines: components["schemas"]["PaymentLineView"][];
             history: components["schemas"]["StateChange"][];
             bankAccountAlias: null | string;
+            /** @default DOP */
+            currency?: string;
+            /** Format: decimal */
+            amountUsd?: null | string;
+            /** Format: decimal */
+            exchangeRate?: null | string;
         };
         PaymentLineView: {
             /** Format: uuid */
@@ -9176,6 +9182,8 @@ export interface components {
             valueDate: string;
             bankReference: null | string;
             applications: components["schemas"]["PaymentApplication"][];
+            /** Format: decimal */
+            exchangeRate?: null | string;
         };
         PriceListDetail: {
             header: components["schemas"]["PriceListSummary"];
@@ -9477,6 +9485,10 @@ export interface components {
             originalAmount: string;
             /** Format: decimal */
             openAmount: string;
+            /** @default DOP */
+            currency?: string;
+            /** Format: decimal */
+            openAmountUsd?: null | string;
         };
         ProposalSupplier: {
             /** Format: uuid */
@@ -10303,6 +10315,8 @@ export interface components {
             bankCode: string;
             accountNumber: string;
             glAccountCode: string;
+            /** @default DOP */
+            currency?: string;
         };
         RegisterCustomsDeclaration: {
             /** Format: uuid */
@@ -11802,6 +11816,8 @@ export interface components {
             valueDate: string;
             bankReference: null | string;
             applications: components["schemas"]["PaymentApplication"][];
+            /** Format: decimal */
+            exchangeRate?: null | string;
         };
         UpdatePurchaseOrderDraft: {
             /** Format: uuid */

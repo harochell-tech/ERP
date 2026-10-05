@@ -2,8 +2,11 @@ namespace Rochell.Treasury.Payments;
 
 public static class PaymentErrors
 {
-    /// <summary>E-USD-7: a USD payable is paid in its currency (USD1-05), never by a peso payment.</summary>
+    /// <summary>E-USD1-05-2: a payment pays invoices of one currency, and peso invoices only from a peso account.</summary>
     public const string ApDocumentCurrency = "AP_DOCUMENT_CURRENCY";
+
+    /// <summary>E-USD1-05-3: the rate of a USD payment — typed only when it leaves a peso account.</summary>
+    public const string ExchangeRateInvalid = "PAYMENT_EXCHANGE_RATE_INVALID";
 
     public const string NotFound = "NOT_FOUND";
     public const string VersionConflict = "VERSION_CONFLICT";

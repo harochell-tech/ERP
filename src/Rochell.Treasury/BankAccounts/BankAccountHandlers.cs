@@ -28,6 +28,12 @@ public sealed class RegisterBankAccountHandler : ICommandHandler<RegisterBankAcc
         ArgumentNullException.ThrowIfNull(context);
         var bankCode = BankIdentifiers.BankCode(command.BankCode);
         var accountNumber = BankIdentifiers.AccountNumber(command.AccountNumber);
+        var currency = (command.Currency ?? string.Empty).Trim().ToUpperInvariant();
+        if (currency is not ("DOP" or "USD"))
+        {
+            throw new DomainException(BankIdentifiers.Invalid, "A bank account is in DOP or USD (E-USD1-05-1).");
+        }
+
         var glCode = (command.GlAccountCode ?? string.Empty).Trim();
         var gl = await Reading.SingleOrDefaultAsync(
             context.Connection,
@@ -57,7 +63,7 @@ public sealed class RegisterBankAccountHandler : ICommandHandler<RegisterBankAcc
                 BankAccountRules.Aggregate,
                 context.ResultRef,
                 1,
-                JsonSerializer.Serialize(new { bankAccountId = context.ResultRef, bankCode, accountNumber, currency = "DOP", glAccountId = gl.AccountId, glAccountCode = glCode }),
+                JsonSerializer.Serialize(new { bankAccountId = context.ResultRef, bankCode, accountNumber, currency, glAccountId = gl.AccountId, glAccountCode = glCode }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
         try
@@ -67,13 +73,14 @@ public sealed class RegisterBankAccountHandler : ICommandHandler<RegisterBankAcc
                 context.Transaction,
                 """
                 INSERT INTO fin.bank_account (bank_account_id, company_id, bank_code, account_number, currency, gl_account_id, status, version)
-                VALUES (@id, @c, @bank, @number, 'DOP', @gl, 'ACTIVE', 1)
+                VALUES (@id, @c, @bank, @number, @currency, @gl, 'ACTIVE', 1)
                 """,
                 cancellationToken,
                 ("id", context.ResultRef),
                 ("c", context.CompanyId),
                 ("bank", bankCode),
                 ("number", accountNumber),
+                ("currency", currency),
                 ("gl", gl.AccountId)).ConfigureAwait(false);
         }
         catch (DbException ex) when (ex.SqlState == SqlStates.UniqueViolation)

@@ -102,3 +102,25 @@ Tests: `ForeignInvoiceTests` (USD-02, USD-03, rounding, refusals, fixed-asset ca
 - **Reversal guards**: an expense invoice or DUA in a live settlement is not reversed (`IMPORT_DOCUMENT_IN_SETTLEMENT`).
 
 Tests: `ImportSettlementTests` (USD-05 with the baseline's figures, the settlement rules, the DUA). 224 commands.
+
+## USD1-05a — USD bank accounts and payments of USD payables (migration 0089; E-USD1-05-1…6)
+
+- **Bank accounts**: `RegisterBankAccount` takes `Currency` (DOP default, or USD).
+- **Foreign supplier accounts**: `RequestPartyBankAccount` accepts, for a FOREIGN supplier, an account number or IBAN of 5–34 letters and
+  digits (stored upper case); the bank code holds the SWIFT/BIC or bank name. The CHECK allows `^[A-Z0-9]{5,34}$`; the trigger
+  `md.party_bank_account_number_kind` keeps digits only for local suppliers.
+- **Plan** (`PaymentRules.ValidatePlanAsync` → `Plan`): one invoice currency per payment; peso invoices only from a peso account. USD
+  invoices: applications in USD (≤ `open_amount_fc`), `amount_fc` = Σ USD; from a USD account the approved rate of the value date
+  (`ExchangeRate` must be empty), from a peso account the bank's rate typed in `PrepareSupplierPayment.ExchangeRate` /
+  `UpdatePreparedPayment.ExchangeRate` (`PAYMENT_EXCHANGE_RATE_INVALID`); `amount` = USD × rate rounded. `fin.payment.currency` is the bank
+  account's; a prepared payment keeps it.
+- **Release** (P-41, event `ForeignPaymentReleased`): each application relieves `round(open_amount × USD ÷ open_amount_fc)` pesos (the whole
+  `open_amount` when it pays the whole USD balance); `P41-DR-AP` with its USD, `P41-CR-BANK` (with the USD when the account is in USD),
+  `P41-DR-FXL` / `P41-CR-FXG` for bank pesos − relieved pesos. `fin.ap_application` keeps pesos and `amount_fc`; the AP document's
+  `open_amount` and `open_amount_fc` go down together. Reversal restores both.
+- **Checks**: `fin.payment_amount_allocated` and PAY-APPL compare USD for payments with `amount_fc`; PAY-APPL's journal check accepts
+  `P41-DR-AP`.
+- **Queries**: the payment proposal lists USD payables again with `currency` and `openAmountUsd`; `GetPayment` adds `currency`,
+  `amountUsd`, `exchangeRate`.
+
+Tests: `ForeignPaymentTests` (USD-07, partial payments from a USD account with a gain, currency and IBAN rules).

@@ -9,6 +9,8 @@ public sealed record PaymentApplication(Guid ApDocId, decimal Amount);
 /// A transfer to one supplier (E-VS2-2, E-VS2-9), PREPARED by the treasurer: no journal and no reservation of invoice balances
 /// (E-VS2-6). Its amount is the sum of the applications; the supplier account must be VERIFIED (payable or not yet, E-VS2-03-8);
 /// the value date is not before the latest invoice applied (E-VS2-03-4). Amounts have at most 2 decimals (E-VS2-03-5).
+/// USD invoices (E-USD1-05-2/3) are paid alone with amounts in USD: from a USD account at the approved rate of the value date, from a
+/// peso account at <paramref name="ExchangeRate"/>, the rate the bank charged.
 /// </summary>
 public sealed record PrepareSupplierPayment(
     Guid CompanyId,
@@ -19,7 +21,8 @@ public sealed record PrepareSupplierPayment(
     Guid PartyBankAccountId,
     DateOnly ValueDate,
     string? BankReference,
-    IReadOnlyList<PaymentApplication> Applications) : ICommand;
+    IReadOnlyList<PaymentApplication> Applications,
+    decimal? ExchangeRate = null) : ICommand;
 
 /// <summary>Replaces a PREPARED payment's bank accounts, value date, reference and whole set of applications (E-VS2-03-6).</summary>
 public sealed record UpdatePreparedPayment(
@@ -32,7 +35,8 @@ public sealed record UpdatePreparedPayment(
     Guid PartyBankAccountId,
     DateOnly ValueDate,
     string? BankReference,
-    IReadOnlyList<PaymentApplication> Applications) : ICommand;
+    IReadOnlyList<PaymentApplication> Applications,
+    decimal? ExchangeRate = null) : ICommand;
 
 /// <summary>PREPARED → VOIDED with a reason (E-VS2-03-6).</summary>
 public sealed record VoidPayment(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PaymentId, long ExpectedVersion, string Reason) : ICommand;

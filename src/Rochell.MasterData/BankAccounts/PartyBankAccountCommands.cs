@@ -2,7 +2,10 @@ using Rochell.Platform.Commands;
 
 namespace Rochell.MasterData.BankAccounts;
 
-/// <summary>A new version of a supplier's bank account, in REVIEW (VS#2 §4, E-VS2-02-4: ACTIVE suppliers, one REVIEW at a time).</summary>
+/// <summary>
+/// A new version of a supplier's bank account, in REVIEW (VS#2 §4, E-VS2-02-4: ACTIVE suppliers, one REVIEW at a time). A foreign supplier's
+/// <paramref name="BankCode"/> is its SWIFT/BIC or bank name and <paramref name="AccountNumber"/> may be an IBAN (E-USD1-05-6).
+/// </summary>
 public sealed record RequestPartyBankAccount(
     Guid CompanyId,
     Guid SessionId,

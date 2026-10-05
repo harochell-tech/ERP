@@ -19,9 +19,20 @@ public static partial class BankIdentifiers
             : throw new DomainException(Invalid, "The bank code must have 2 to 20 characters.");
     }
 
-    public static string AccountNumber(string? value)
+    /// <summary>
+    /// Digits only (5–30); a foreign supplier's account (E-USD1-05-6) may be an IBAN or a number with letters, 5–34 characters, stored upper case.
+    /// </summary>
+    public static string AccountNumber(string? value, bool foreign = false)
     {
         var number = (value ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal).Replace("-", string.Empty, StringComparison.Ordinal);
+        if (foreign)
+        {
+            number = number.ToUpperInvariant();
+            return Alphanumeric().IsMatch(number)
+                ? number
+                : throw new DomainException(Invalid, "The account number or IBAN has 5 to 34 letters and digits (spaces and hyphens are ignored).");
+        }
+
         return Digits().IsMatch(number)
             ? number
             : throw new DomainException(Invalid, "The account number must have 5 to 30 digits (spaces and hyphens are ignored).");
@@ -29,4 +40,7 @@ public static partial class BankIdentifiers
 
     [GeneratedRegex("^[0-9]{5,30}$")]
     private static partial Regex Digits();
+
+    [GeneratedRegex("^[A-Z0-9]{5,34}$")]
+    private static partial Regex Alphanumeric();
 }
