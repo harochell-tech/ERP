@@ -1083,6 +1083,15 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PRS-05-5 | PRS-1 | Order, quote and cash sale: the zone with our own truck; each line's price source and freight; a notice when freight is withheld. |
 | E-PRS-05-6 | PRS-1 | The freight prints as its own line: on the conduce without price, on the invoice and the quote with price and «Exento». |
 | E-PRS-05-7 | PRS-1 | E2E-PR1 over the API and Playwright; the authorization-with-freight refusal test; `docs/acceptance/prs1.md` and its traceability test. |
+| E-USD-1 | USD-1 | Currencies DOP and USD only; the books stay in pesos; each USD document keeps its USD amount, the rate and the peso equivalent. |
+| E-USD-2 | USD-1 | The Banco Central selling rate per day, entered by Tesorería or the Contador and approved by the Controller; without the day's rate no USD document is registered. |
+| E-USD-3 | USD-1 | Foreign supplier orders and invoices in USD, without NCF, ITBIS or withholding; the payable in USD with its peso equivalent at the invoice's rate. |
+| E-USD-4 | USD-1 | Imported goods are received as today; their cost is completed by the import settlement. |
+| E-USD-5 | USD-1 | An import settlement per shipment gathers the supplier's invoice, international freight, insurance, duties, customs and agent fees and local transport, spreads them over the items by value and adds them to the inventory cost. |
+| E-USD-6 | USD-1 | The ITBIS paid at the DGA is recorded with its DUA as recoverable ITBIS and reported in the 606 as the instructions say (accountant, X-1). |
+| E-USD-7 | USD-1 | Payments from a USD account, or from a peso account at the bank's rate that day; the difference against the invoice's rate is realized exchange gain or loss. |
+| E-USD-8 | USD-1 | Open USD balances are revalued at the month's last rate and reversed the next day (unrealized exchange difference). |
+| E-USD-9 | USD-1 | USD bank accounts with their own GL account and USD statements. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
