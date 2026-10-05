@@ -1027,6 +1027,25 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-SRV1-5 | SRV-1 | Freight of cargo carries no ITBIS, as a fiscal rule with its official source (the accountant confirms), not a constant in code; the invoice shows the exempt line apart. |
 | E-SRV1-6 | SRV-1 | CONFOTUR never invoices freight: orders with an exemption never carry the line; those customers use their own price list. |
 | E-SRV1-7 | SRV-1 | Account «Ingresos por transporte», recognised at delivery, without cost of sales. |
+| E-PRC1-5 | PRC-1 | A new named list is created from Maestros › Listas de precios (code and name); prepared by the Controller (`price_list:prepare`), approved by the Aprobador de políticas; one version in force per list. |
+| E-PRC1-6 | PRC-1 | The customer's list is part of the customer terms version (prepared by Crédito, approved by the Controller with days and credit limit). |
+| E-PRC1-7 | PRC-1 | A list may hold only some products; a missing one takes «General»; missing in both, the order is refused. |
+| E-PRC1-8 | PRC-1 | The price is taken when the order or quote is created or changed and stays fixed; a converted quote keeps its prices. |
+| E-PRC1-9 | PRC-1 | Special-price approval (quotes only) compares against the customer's list price, or «General» when the list lacks the product. |
+| E-PRC1-10 | PRC-1 | Cash sales always use «General». |
+| E-PRC1-11 | PRC-1 | Screens: Maestros › Listas de precios (lists, versions, lines); the customer shows its list; orders and quotes show the list used. |
+| E-SRV1-8 | SRV-1 | Item type SERVICE, category TRANSPORTE: no stock, no standard cost, no recipe; one freight item per company. |
+| E-SRV1-9 | SRV-1 | Maestros › Zonas de entrega: name and active / inactive, maintained by Controller or Crédito without approval. |
+| E-SRV1-10 | SRV-1 | Each price list version has a freight table: product, unit, zone → price per unit of the product; approved with the list. |
+| E-SRV1-11 | SRV-1 | The zone is mandatory on an order delivered with our own truck; a pickup order has neither zone nor freight. |
+| E-SRV1-12 | SRV-1 | The system adds one freight line per product priced for that zone in the customer's own list: quantity = units ordered, price = the zone's; never typed; recomputed when zone or quantity change. |
+| E-SRV1-13 | SRV-1 | The delivery note prints the freight beside each product with the units delivered; freight never moves stock. |
+| E-SRV1-14 | SRV-1 | Freight revenue is recognised at control transfer (units delivered × price) to `FREIGHT_REVENUE` against the same contract asset / unbilled receivable; no cost of sales. |
+| E-SRV1-15 | SRV-1 | Each invoiced delivery carries its freight line apart, ITBIS-exempt; proformas and cash sales include it; credit notes may reduce it. |
+| E-SRV1-16 | SRV-1 | The exemption is the SALES_ITBIS rule with TRANSPORTE among the exempt categories and its official source (accountant, X-1). |
+| E-SRV1-17 | SRV-1 | An order with a pending exemption or a fiscal authorization never carries freight. |
+| E-SRV1-18 | SRV-1 | New account 40500 «Ingresos por transporte» mapped to `FREIGHT_REVENUE`; the Controller approves it (A-01). |
+| E-SRV1-19 | SRV-1 | A quote also chooses the zone and shows the freight; the converted order keeps it. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
