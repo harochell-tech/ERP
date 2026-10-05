@@ -78,7 +78,7 @@ public sealed record GetSalesOrder(Guid CompanyId, Guid SessionId, Guid SalesOrd
 /// <summary><paramref name="SalesOrderLineId"/> (VS3-09): what a delivery plan names.</summary>
 public sealed record SalesOrderLineView(
     int LineNo, Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal QtyOrdered, decimal UnitPrice, decimal NetAmount, decimal QtyDelivered, decimal QtyInvoiced,
-    Guid SalesOrderLineId, string? PriceListCode = null, string? PriceListName = null, bool QuotedPrice = false);
+    Guid SalesOrderLineId, string? PriceListCode = null, string? PriceListName = null, bool QuotedPrice = false, decimal? FreightUnitPrice = null, decimal? FreightAmount = null);
 
 public sealed record CreditCheckView(
     Guid CreditCheckId, DateTime CheckedAt, decimal OrderAmount, decimal ExposureAr, decimal ExposureOrders, decimal ExposureUninvoiced, decimal CreditLimit, bool CreditHold,
@@ -107,12 +107,14 @@ public sealed record CashSaleView(
 public sealed record SalesOrderDetail(
     SalesOrderSummary Header, Guid PlantId, string? SiteAddress, DateOnly? RequestedDate, string? CustomerPoRef, Guid PriceListVersionId, string? CancelReason,
     IReadOnlyList<SalesOrderLineView> Lines, IReadOnlyList<CreditCheckView> CreditChecks, IReadOnlyList<StateChange> History, bool ExemptionPending, bool? ProformaCollectsItbis,
-    CashSaleView? CashSale);
+    CashSaleView? CashSale, Guid? DeliveryZoneId = null, string? DeliveryZoneName = null);
 
 [RequiresPermission("sales:read")]
 public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
 {
     public string QueryType => "Sales.GetSalesOrder";
+
+    private sealed record ZoneRef(Guid Id, string Name);
 
     private sealed record Extra(Guid PlantId, string? Site, DateOnly? Requested, string? PoRef, Guid ListId, string? CancelReason, bool ExemptionPending, bool? CollectsItbis);
 
@@ -136,7 +138,7 @@ public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
             context.Transaction,
             """
             SELECT l.line_no, l.item_id, i.code, i.description, l.uom, l.qty_ordered, l.unit_price, l.net_amount::numeric(19,2), l.qty_delivered, l.qty_invoiced, l.line_id,
-                   pl.code, pl.name, l.price_list_version_id IS NULL AND o.quote_id IS NOT NULL
+                   pl.code, pl.name, l.price_list_version_id IS NULL AND o.quote_id IS NOT NULL, l.freight_unit_price, l.freight_amount::numeric(19,2)
             FROM sal.sales_order o
             JOIN sal.sales_order_line l ON l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version
             JOIN md.item i ON i.item_id = l.item_id
@@ -145,7 +147,7 @@ public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
             WHERE o.sales_order_id = @o ORDER BY l.line_no
             """,
             r => new SalesOrderLineView(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9), r.GetGuid(10),
-                r.NullableString(11), r.NullableString(12), r.GetBoolean(13)),
+                r.NullableString(11), r.NullableString(12), r.GetBoolean(13), r.NullableDecimal(14), r.NullableDecimal(15)),
             cancellationToken,
             ("o", query.SalesOrderId)).ConfigureAwait(false);
         var checks = await Reading.ListAsync(
@@ -164,8 +166,16 @@ public sealed class GetSalesOrderHandler : IQueryHandler<GetSalesOrder>
             ("o", query.SalesOrderId)).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "SalesOrder", query.SalesOrderId, cancellationToken).ConfigureAwait(false);
         var cash = header.CashSale ? await CashSaleAsync(query.SalesOrderId, header, context, cancellationToken).ConfigureAwait(false) : null;
+        var zone = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT z.zone_id, z.name FROM sal.sales_order o JOIN sal.delivery_zone z ON z.zone_id = o.delivery_zone_id WHERE o.sales_order_id = @o",
+            r => new ZoneRef(r.GetGuid(0), r.GetString(1)),
+            cancellationToken,
+            ("o", query.SalesOrderId)).ConfigureAwait(false)).SingleOrDefault();
         return ApiJson.Serialize(new SalesOrderDetail(
-            header, extra.PlantId, extra.Site, extra.Requested, extra.PoRef, extra.ListId, extra.CancelReason, lines, checks, history, extra.ExemptionPending, extra.CollectsItbis, cash));
+            header, extra.PlantId, extra.Site, extra.Requested, extra.PoRef, extra.ListId, extra.CancelReason, lines, checks, history, extra.ExemptionPending, extra.CollectsItbis, cash,
+            zone?.Id, zone?.Name));
     }
 
     private static async Task<CashSaleView> CashSaleAsync(Guid orderId, SalesOrderSummary header, QueryContext context, CancellationToken cancellationToken)

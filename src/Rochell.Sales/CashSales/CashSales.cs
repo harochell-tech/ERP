@@ -33,12 +33,13 @@ public static class CashSaleErrors
 /// </summary>
 public sealed record CreateCashSale(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PlantId, string DeliveryTermCode, string? SiteAddress, DateOnly? RequestedDate, IReadOnlyList<SalesOrderLineInput> Lines,
-    string? BuyerName = null, string? BuyerPhone = null, string? BuyerIdKind = null, string? BuyerId = null) : ICommand;
+    string? BuyerName = null, string? BuyerPhone = null, string? BuyerIdKind = null, string? BuyerId = null, Guid? DeliveryZoneId = null) : ICommand;
 
 /// <summary>Replaces a DRAFT cash sale's header, lines and buyer.</summary>
 public sealed record UpdateCashSaleDraft(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SalesOrderId, long ExpectedVersion, Guid PlantId, string DeliveryTermCode, string? SiteAddress, DateOnly? RequestedDate,
-    IReadOnlyList<SalesOrderLineInput> Lines, string? BuyerName = null, string? BuyerPhone = null, string? BuyerIdKind = null, string? BuyerId = null) : ICommand;
+    IReadOnlyList<SalesOrderLineInput> Lines, string? BuyerName = null, string? BuyerPhone = null, string? BuyerIdKind = null, string? BuyerId = null,
+    Guid? DeliveryZoneId = null) : ICommand;
 
 /// <summary>
 /// E-CF1-01-3/4/6: DRAFT → PENDING_PAYMENT. What must be paid is fixed here: the net plus the ITBIS of the rules in force today.
@@ -363,10 +364,14 @@ public sealed class CreateCashSaleHandler : ICommandHandler<CreateCashSale>
         ArgumentNullException.ThrowIfNull(context);
         var header = Orders.Orders.ValidateHeader(command.DeliveryTermCode, command.SiteAddress, command.RequestedDate, null, command.PlantId);
         var buyer = CashSaleStore.Buyer(command.BuyerName, command.BuyerPhone, command.BuyerIdKind, command.BuyerId);
-        var (list, lines, total) = await Orders.Orders.PriceAsync(context, header.PlantId, null, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, priced, _) = await Orders.Orders.PriceAsync(context, header.PlantId, null, command.Lines, cancellationToken).ConfigureAwait(false);
+        header = await Orders.Orders.WithZoneAsync(context.Connection, context.Transaction, context.CompanyId, header, command.DeliveryZoneId, cancellationToken).ConfigureAwait(false);
+        // E-PRS-04-9: a cash sale's freight comes from GENERAL, the list of the final consumer.
+        var (lines, total, withheld) = await Orders.Orders.WithFreightAsync(
+            context.Connection, context.Transaction, context.CompanyId, null, header, false, SalesSql.Today(context), priced, cancellationToken).ConfigureAwait(false);
         var consumer = await CashSaleStore.ConsumerAsync(context, CommandType, cancellationToken).ConfigureAwait(false);
         var orderNo = await Orders.Orders.InsertAsync(context, context.ResultRef, consumer, header, list, lines, total, null, CommandType, cancellationToken, buyer: buyer).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.Orders.M(total), version = 1 });
+        return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.Orders.M(total), freightWithheld = withheld, version = 1 });
     }
 }
 
@@ -388,7 +393,11 @@ public sealed class UpdateCashSaleDraftHandler : ICommandHandler<UpdateCashSaleD
         }
 
         var quoted = await Orders.Orders.QuotedPricesAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
-        var (list, lines, total) = await Orders.Orders.PriceAsync(context, header.PlantId, null, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
+        var (list, priced, _) = await Orders.Orders.PriceAsync(context, header.PlantId, null, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
+        header = await Orders.Orders.WithZoneAsync(context.Connection, context.Transaction, context.CompanyId, header, command.DeliveryZoneId, cancellationToken).ConfigureAwait(false);
+        var (lines, total, withheld) = await Orders.Orders.WithFreightAsync(
+            context.Connection, context.Transaction, context.CompanyId, null, header, false, SalesSql.Today(context), priced, cancellationToken,
+            await Orders.Orders.QuotedFreightAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
         var version = row.Version + 1;
         var linesVersion = row.LinesVersion + 1;
         await context.AppendEventAsync(
@@ -413,7 +422,7 @@ public sealed class UpdateCashSaleDraftHandler : ICommandHandler<UpdateCashSaleD
             context.Transaction,
             """
             UPDATE sal.sales_order SET plant_id = @plant, delivery_term_code = @term, site_address = @site, requested_date = @req, price_list_version_id = @list, total_net = @total,
-              lines_version = @lv, buyer_name = @bname, buyer_phone = @bphone, buyer_id_kind = @bkind, buyer_id = @bid, version = @v
+              lines_version = @lv, buyer_name = @bname, buyer_phone = @bphone, buyer_id_kind = @bkind, buyer_id = @bid, version = @v, delivery_zone_id = @zone
             WHERE sales_order_id = @o
             """,
             cancellationToken,
@@ -429,9 +438,10 @@ public sealed class UpdateCashSaleDraftHandler : ICommandHandler<UpdateCashSaleD
             ("bkind", buyer.IdKind),
             ("bid", buyer.Id),
             ("v", version),
+            ("zone", header.ZoneId),
             ("o", command.SalesOrderId)).ConfigureAwait(false);
         await Orders.Orders.WriteLinesAsync(context, command.SalesOrderId, linesVersion, lines, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { salesOrderId = command.SalesOrderId, status = "DRAFT", totalNet = Orders.Orders.M(total), version });
+        return JsonSerializer.Serialize(new { salesOrderId = command.SalesOrderId, status = "DRAFT", totalNet = Orders.Orders.M(total), freightWithheld = withheld, version });
     }
 }
 

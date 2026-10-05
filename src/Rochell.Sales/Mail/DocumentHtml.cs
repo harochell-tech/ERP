@@ -176,6 +176,12 @@ public static class DocumentHtml
             html.Append("<tr>").Cell(l.LineNo.ToString(CultureInfo.InvariantCulture), numeric: true).Cell(E(l.ItemCode) + " — " + E(l.ItemDescription)).Cell(E(l.Uom))
                 .Cell(Quantity(l.QtyPlanned), numeric: true).Cell(Quantity(l.QtyIssued), numeric: true).Cell(Quantity(l.QtyDelivered), numeric: true)
                 .Cell(l.Lots.Count == 0 ? "—" : string.Join(" · ", l.Lots.Select(lot => $"{E(lot.LotCode)} ({E(lot.SourceLocationCode)}): {Quantity(lot.BaseQuantity)}"))).Append("</tr>");
+            if (l.Freight is { } freight)
+            {
+                // E-PRS-04-7: the freight of the line, with its quantities and no price.
+                html.Append("<tr>").Cell(string.Empty).Cell(E(freight)).Cell(E(l.Uom))
+                    .Cell(Quantity(l.QtyPlanned), numeric: true).Cell(Quantity(l.QtyIssued), numeric: true).Cell(Quantity(l.QtyDelivered), numeric: true).Cell("—").Append("</tr>");
+            }
         }
 
         html.Append("</tbody></table>");

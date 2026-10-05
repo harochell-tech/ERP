@@ -54,3 +54,25 @@ Tests: `CustomerPriceListTests` (PRC-02…08 and deactivation), `PriceListFreigh
 | `GetPriceList` | `sales:read` | Adds `freight` (product, unit, zone, price) |
 
 212 commands. Tests: `FreightPriceTests` (SRV-01, SRV-02, the freight table).
+
+## PRS-04 — freight on orders, deliveries and invoices (migration 0084; E-PRS-04-1…10)
+
+- **Migration 0084**: P-16 version 2 (DRAFT, from 2026-10-01) = version 1 + `P16-DR-CA-FRT` / `P16-DR-UR-FRT` (the delivery line's contract asset
+  or unbilled receivable) and `P16-CR-FRT` (FREIGHT_REVENUE), amount `freight`. The Controller approves it (A-01); its approval closes version 1.
+- **Orders, quotes, cash sales** take `DeliveryZoneId` (own truck only; required when the company has ACTIVE zones, `ZONE_REQUIRED`; ACTIVE,
+  `ZONE_INACTIVE`). `Pricing/Freight.cs`: each product line takes the freight of (item, unit, zone) from the customer's own list in force
+  (GENERAL for a customer on GENERAL, without terms, or a cash sale); never on a pending exemption. Freight rides only when the freight item
+  is ACTIVE, the SALES_ITBIS rule in force charges no ITBIS on TRANSPORTE and P-16 in force has `P16-CR-FRT` with FREIGHT_REVENUE mapped;
+  otherwise the lines go without it and the result's `freightWithheld` says why (`FREIGHT_ITEM_MISSING`, `FREIGHT_NOT_EXEMPT`,
+  `FREIGHT_POSTING_MISSING`). The order keeps freight on the product's line; `total_net` includes it (credit exposure too). An order from a
+  quote keeps the quoted zone and freight. Previews take `deliveryZoneId` and return `freightTotal` / `freightWithheld`.
+- **Deliveries**: at control transfer the line's freight (units delivered × freight price) posts with P-16 v2 without cost. The delivery note
+  prints «Transporte de blocks — zona» under the product with the same quantities, no price.
+- **Invoices**: each delivery line with freight gives a FREIGHT line of the freight item (ITBIS by the rule: exempt); P-18 empties the delivery
+  line's balance with both lines; quantities move only with the PRODUCT line; a delivery with freight is never invoiced under a fiscal
+  authorization (`FREIGHT_UNDER_AUTHORIZATION`), and an authorization cannot cite an order with freight (`AUTHORIZATION_ORDER_HAS_FREIGHT`).
+  Credit notes may take the freight line (P-22).
+- **Reconciliations**: CONTRACT-ASSET adds (delivered − invoiced) × freight; CASH-SALE gives the ITBIS share to the products only.
+- Fixtures that activate rules by code now activate version 1 only.
+
+Tests: `FreightFlowTests` (SRV-03…13 and the withheld reasons).

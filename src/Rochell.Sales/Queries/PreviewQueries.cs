@@ -20,39 +20,66 @@ namespace Rochell.Sales.Queries;
 /// the ITBIS the sales rules in force today would add. Needs <c>sales_order:create</c>, like the form it serves.
 /// </summary>
 /// <summary>PRS-02: <paramref name="PartyId"/> prices from that customer's list (E-PRC1-3); without it, from GENERAL.</summary>
-public sealed record PreviewSalesOrder(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines, Guid? PartyId = null) : IQuery;
+public sealed record PreviewSalesOrder(
+    Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines, Guid? PartyId = null, Guid? DeliveryZoneId = null, bool ExemptionPending = false) : IQuery;
 
 /// <summary>The HTTP body of the order preview.</summary>
-public sealed record SalesOrderPreviewRequest(Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines, Guid? PartyId = null);
+/// <summary>PRS-04: <paramref name="DeliveryZoneId"/> prices the freight of an own-truck draft (E-SRV1-12).</summary>
+public sealed record SalesOrderPreviewRequest(
+    Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines, Guid? PartyId = null, Guid? DeliveryZoneId = null, bool ExemptionPending = false);
 
 /// <summary>E-UX4-3: a draft quote's lines priced as CreateQuote prices them (a price below the list's is a special price). Needs <c>quote:manage</c>.</summary>
-public sealed record PreviewQuote(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<QuoteLineInput> Lines, Guid? PartyId = null) : IQuery;
+public sealed record PreviewQuote(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<QuoteLineInput> Lines, Guid? PartyId = null, Guid? DeliveryZoneId = null) : IQuery;
 
 /// <summary>The HTTP body of the quote preview.</summary>
-public sealed record QuotePreviewRequest(Guid PlantId, IReadOnlyList<QuoteLineInput> Lines, Guid? PartyId = null);
+public sealed record QuotePreviewRequest(Guid PlantId, IReadOnlyList<QuoteLineInput> Lines, Guid? PartyId = null, Guid? DeliveryZoneId = null);
 
 /// <summary><see cref="SpecialPrice"/>: the unit price is below the list price (the quote needs price approval, E-QUO1-3).</summary>
 public sealed record SalesPreviewLine(
-    int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, bool SpecialPrice, decimal NetAmount, decimal? Itbis);
+    int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, bool SpecialPrice, decimal NetAmount, decimal? Itbis,
+    decimal? FreightUnitPrice = null, decimal? FreightAmount = null);
 
 /// <summary>
 /// <see cref="ItbisTotal"/> and <see cref="Total"/> are null when no sales ITBIS rule is in force today; <see cref="ItbisUnavailableCode"/>
 /// (FISCAL_GATE_CLOSED) and <see cref="ItbisUnavailableReason"/> then say why. An exemption (e-CF 44, E-FIS1) is decided at invoicing.
 /// </summary>
+/// <remarks>
+/// PRS-04: <see cref="NetTotal"/> is the products' net; <see cref="FreightTotal"/> the freight (exempt of ITBIS, E-SRV1-15), part of
+/// <see cref="Total"/>; <see cref="FreightWithheld"/> says why a zone with freight prices gave none (E-PRS-04-1/2/3).
+/// </remarks>
 public sealed record SalesPreview(
-    Guid PriceListVersionId, IReadOnlyList<SalesPreviewLine> Lines, decimal NetTotal, decimal? ItbisTotal, decimal? Total, string? ItbisUnavailableCode, string? ItbisUnavailableReason);
+    Guid PriceListVersionId, IReadOnlyList<SalesPreviewLine> Lines, decimal NetTotal, decimal? ItbisTotal, decimal? Total, string? ItbisUnavailableCode, string? ItbisUnavailableReason,
+    decimal FreightTotal = 0m, string? FreightWithheld = null);
 
 internal static class SalesPreviews
 {
-    public static async Task<string> BuildAsync(QueryContext context, Guid priceList, IReadOnlyList<SalesPreviewLine> lines, CancellationToken cancellationToken)
+    public static async Task<string> BuildAsync(QueryContext context, Guid priceList, IReadOnlyList<SalesPreviewLine> lines, CancellationToken cancellationToken, string? freightWithheld = null)
     {
         var ids = lines.Select(l => new Guid(l.LineNo, 0, 0, new byte[8])).ToList();
         var itbis = await TaxEngine.EstimateItbisAsync(
             context.Connection, context.Transaction, context.CompanyId, BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow), sale: true,
             [.. lines.Select((l, i) => new TaxLineInput(ids[i], l.ItemId, l.NetAmount))], cancellationToken).ConfigureAwait(false);
         var net = SalesSql.Zero + lines.Sum(l => l.NetAmount);
+        var freight = SalesSql.Zero + lines.Sum(l => l.FreightAmount ?? 0m);
         return ApiJson.Serialize(new SalesPreview(
-            priceList, [.. lines.Select((l, i) => l with { Itbis = itbis.ByLine?[ids[i]] })], net, itbis.Total, net + itbis.Total, itbis.UnavailableCode, itbis.UnavailableReason));
+            priceList, [.. lines.Select((l, i) => l with { Itbis = itbis.ByLine?[ids[i]] })], net, itbis.Total, net + freight + itbis.Total, itbis.UnavailableCode,
+            itbis.UnavailableReason, freight, freightWithheld));
+    }
+
+    /// <summary>The freight of a draft's lines for a zone (an own-truck draft), as the command would add it.</summary>
+    public static async Task<(List<Orders.Orders.PricedLine> Lines, string? Withheld)> FreightAsync(
+        QueryContext context, Guid? partyId, Guid plantId, Guid? zoneId, bool exemptionPending, List<Orders.Orders.PricedLine> lines, CancellationToken cancellationToken)
+    {
+        if (zoneId is null)
+        {
+            return (lines, null);
+        }
+
+        var header = new Orders.Orders.Header(plantId, Orders.DeliveryTerms.DeliveredOwnTransport, null, null, null, zoneId);
+        var (withFreight, _, withheld) = await Orders.Orders.WithFreightAsync(
+            context.Connection, context.Transaction, context.CompanyId, partyId, header, exemptionPending, BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow), lines, cancellationToken)
+            .ConfigureAwait(false);
+        return (withFreight, withheld);
     }
 }
 
@@ -65,14 +92,16 @@ public sealed class PreviewSalesOrderHandler : IQueryHandler<PreviewSalesOrder>
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(context);
-        var (list, lines, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.PartyId, query.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, priced, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.PartyId, query.Lines, cancellationToken).ConfigureAwait(false);
+        var (lines, withheld) = await SalesPreviews.FreightAsync(context, query.PartyId, query.PlantId, query.DeliveryZoneId, query.ExemptionPending, priced, cancellationToken).ConfigureAwait(false);
         return await SalesPreviews.BuildAsync(
-            context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.UnitPrice, l.UnitPrice, false, l.Net, null))], cancellationToken).ConfigureAwait(false);
+            context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.UnitPrice, l.UnitPrice, false, l.Net, null, l.FreightUnitPrice, l.FreightAmount))],
+            cancellationToken, withheld).ConfigureAwait(false);
     }
 }
 
 /// <summary>E-CF1-05-2: a cash sale's lines priced as CreateCashSale prices them, with the ITBIS of today's rules. Needs <c>cash_sale:create</c>.</summary>
-public sealed record PreviewCashSale(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines) : IQuery;
+public sealed record PreviewCashSale(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines, Guid? DeliveryZoneId = null) : IQuery;
 
 [RequiresPermission("cash_sale:create")]
 public sealed class PreviewCashSaleHandler : IQueryHandler<PreviewCashSale>
@@ -83,9 +112,11 @@ public sealed class PreviewCashSaleHandler : IQueryHandler<PreviewCashSale>
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(context);
-        var (list, lines, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, null, query.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, priced, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, null, query.Lines, cancellationToken).ConfigureAwait(false);
+        var (lines, withheld) = await SalesPreviews.FreightAsync(context, null, query.PlantId, query.DeliveryZoneId, false, priced, cancellationToken).ConfigureAwait(false);
         return await SalesPreviews.BuildAsync(
-            context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.UnitPrice, l.UnitPrice, false, l.Net, null))], cancellationToken).ConfigureAwait(false);
+            context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.UnitPrice, l.UnitPrice, false, l.Net, null, l.FreightUnitPrice, l.FreightAmount))],
+            cancellationToken, withheld).ConfigureAwait(false);
     }
 }
 
@@ -99,8 +130,12 @@ public sealed class PreviewQuoteHandler : IQueryHandler<PreviewQuote>
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(context);
         var (list, lines, _) = await Quotes.Quotes.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.PartyId, query.Lines, cancellationToken).ConfigureAwait(false);
+        var (freight, withheld) = await SalesPreviews.FreightAsync(
+            context, query.PartyId, query.PlantId, query.DeliveryZoneId, false, [.. lines.Select(l => new Orders.Orders.PricedLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.UnitPrice, l.Net))],
+            cancellationToken).ConfigureAwait(false);
         return await SalesPreviews.BuildAsync(
-            context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.ListPrice, l.UnitPrice, l.Special, l.Net, null))], cancellationToken).ConfigureAwait(false);
+            context, list, [.. lines.Select((l, i) => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.ListPrice, l.UnitPrice, l.Special, l.Net, null, freight[i].FreightUnitPrice, freight[i].FreightAmount))],
+            cancellationToken, withheld).ConfigureAwait(false);
     }
 }
 

@@ -307,8 +307,11 @@ public static class Reconciliations
             Findings + """
             -- E-VS3-08-2: per delivery line with control transferred, (delivered − invoiced) × order price equals the line's CONTRACT_ASSET
             -- + UNBILLED_RECEIVABLE balance (subledger = the delivery line). E-VS3-08-3: aged when older than unbilled_aging_alert_days.
+            -- E-PRS-01-3: with freight, (delivered − invoiced) × the freight price adds to the same balance.
             WITH ex AS (SELECT dl.delivery_line_id AS id,
-                               CASE WHEN dl.qty_invoiced >= dl.qty_delivered THEN 0 ELSE round((dl.qty_delivered - dl.qty_invoiced) * ol.unit_price, 2) END AS a
+                               CASE WHEN dl.qty_invoiced >= dl.qty_delivered THEN 0
+                                    ELSE round((dl.qty_delivered - dl.qty_invoiced) * ol.unit_price, 2)
+                                         + coalesce(round((dl.qty_delivered - dl.qty_invoiced) * ol.freight_unit_price, 2), 0) END AS a
                         FROM log.delivery_line dl JOIN sal.sales_order_line ol ON ol.line_id = dl.sales_order_line_id
                         WHERE dl.company_id = @c AND dl.qty_delivered > 0),
                  gl AS (SELECT subledger_ref AS id, sum(debit - credit) AS b, min(posting_date) AS since FROM fin.gl_entry
@@ -322,7 +325,9 @@ public static class Reconciliations
             WHERE CAST(@udays AS integer) IS NOT NULL AND ex.a > 0 AND gl.since < @cutoff - CAST(@udays AS integer)) f
             """,
             """
-            SELECT (SELECT coalesce(sum(CASE WHEN dl.qty_invoiced >= dl.qty_delivered THEN 0 ELSE round((dl.qty_delivered - dl.qty_invoiced) * ol.unit_price, 2) END), 0)
+            SELECT (SELECT coalesce(sum(CASE WHEN dl.qty_invoiced >= dl.qty_delivered THEN 0
+                                             ELSE round((dl.qty_delivered - dl.qty_invoiced) * ol.unit_price, 2)
+                                                  + coalesce(round((dl.qty_delivered - dl.qty_invoiced) * ol.freight_unit_price, 2), 0) END), 0)
                     FROM log.delivery_line dl JOIN sal.sales_order_line ol ON ol.line_id = dl.sales_order_line_id WHERE dl.company_id = @c),
                    (SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role IN ('CONTRACT_ASSET', 'UNBILLED_RECEIVABLE'))
             """),
@@ -550,8 +555,12 @@ public static class Reconciliations
                           WHERE x.company_id = @c AND x.reverses_allocation_id IS NULL
                             AND NOT EXISTS (SELECT 1 FROM fin.order_allocation u WHERE u.reverses_allocation_id = x.allocation_id)),
                  sale AS (SELECT o.sales_order_id, o.order_no, o.allocated_amount,
+                                 -- PRS-04: the products carry their share of the ITBIS paid; the freight carries none (E-SRV1-15).
                                  round((SELECT coalesce(sum(l.qty_delivered * l.unit_price), 0) FROM sal.sales_order_line l
-                                        WHERE l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version) * o.payment_total / o.total_net, 2) AS delivered,
+                                        WHERE l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version)
+                                       * (o.payment_total - f.freight) / nullif(o.total_net - f.freight, 0)
+                                       + (SELECT coalesce(sum(l.qty_delivered * l.freight_unit_price), 0) FROM sal.sales_order_line l
+                                          WHERE l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version), 2) AS delivered,
                                  coalesce((SELECT sum(l.amount) FROM live l JOIN fin.receipt r ON r.receipt_id = l.receipt_id
                                            WHERE l.sales_order_id = o.sales_order_id AND r.status = 'RECORDED' AND (r.method <> 'CHEQUE' OR r.bank_status = 'MATCHED')), 0)
                                  + coalesce((SELECT sum(a.amount) FROM fin.ar_application a JOIN sal.invoice i ON i.ar_doc_id = a.ar_doc_id
@@ -562,6 +571,8 @@ public static class Reconciliations
                                                            WHERE il.invoice_id = i.invoice_id AND d.sales_order_id = o.sales_order_id)), 0) AS paid,
                                  coalesce((SELECT sum(l.amount) FROM live l WHERE l.sales_order_id = o.sales_order_id), 0) AS assigned
                           FROM sal.sales_order o
+                          CROSS JOIN LATERAL (SELECT coalesce(sum(l.freight_amount), 0) AS freight FROM sal.sales_order_line l
+                                              WHERE l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version) f
                           WHERE o.company_id = @c AND o.cash_sale AND o.payment_total IS NOT NULL)
             SELECT 'PV:' || s.order_no AS match_key, s.delivered AS value_a, s.paid AS value_b, 'CASH_SALE_UNPAID' AS classification, 'ERROR' AS severity, 'AR-REC' AS component
             FROM sale s WHERE s.delivered > s.paid

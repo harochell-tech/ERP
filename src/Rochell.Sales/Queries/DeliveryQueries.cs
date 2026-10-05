@@ -170,8 +170,10 @@ public sealed record GetDeliveryPrint(Guid CompanyId, Guid SessionId, Guid Deliv
 
 public sealed record DeliveryPrintLot(string LotCode, string SourceLocationCode, decimal BaseQuantity);
 
+/// <summary>E-PRS-04-7: <paramref name="Freight"/> names the line's freight («Transporte de blocks — Bávaro»), same quantities, no price.</summary>
 public sealed record DeliveryPrintLine(
-    int LineNo, string ItemCode, string ItemDescription, string Uom, decimal QtyPlanned, decimal QtyIssued, decimal QtyDelivered, IReadOnlyList<DeliveryPrintLot> Lots);
+    int LineNo, string ItemCode, string ItemDescription, string Uom, decimal QtyPlanned, decimal QtyIssued, decimal QtyDelivered, IReadOnlyList<DeliveryPrintLot> Lots,
+    string? Freight = null);
 
 /// <summary>
 /// What the driver carries and the customer signs, mirroring GetQuotePrint: issuer and customer (legal name and RNC), the order's site
@@ -238,11 +240,17 @@ public sealed class GetDeliveryPrintHandler : IQueryHandler<GetDeliveryPrint>
             context.Connection,
             context.Transaction,
             """
-            SELECT dl.delivery_line_id, dl.line_no, i.code, i.description, dl.uom, dl.qty_planned, dl.qty_issued, dl.qty_delivered
+            SELECT dl.delivery_line_id, dl.line_no, i.code, i.description, dl.uom, dl.qty_planned, dl.qty_issued, dl.qty_delivered,
+                   CASE WHEN ol.freight_unit_price IS NOT NULL
+                        THEN coalesce((SELECT f.description FROM md.item f WHERE f.company_id = dl.company_id AND f.item_category = 'TRANSPORTE'), 'Transporte') || ' — ' || z.name END
             FROM log.delivery_line dl JOIN md.item i ON i.item_id = dl.item_id
+            JOIN sal.sales_order_line ol ON ol.line_id = dl.sales_order_line_id
+            JOIN sal.sales_order o ON o.sales_order_id = ol.sales_order_id
+            LEFT JOIN sal.delivery_zone z ON z.zone_id = o.delivery_zone_id
             WHERE dl.delivery_id = @d ORDER BY dl.line_no
             """,
-            r => new DeliveryPrintLine(r.GetInt32(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), lots[r.GetGuid(0)].ToList()),
+            r => new DeliveryPrintLine(
+                r.GetInt32(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), lots[r.GetGuid(0)].ToList(), r.NullableString(8)),
             cancellationToken,
             ("d", query.DeliveryId)).ConfigureAwait(false);
         return ApiJson.Serialize(print with { Lines = lines });

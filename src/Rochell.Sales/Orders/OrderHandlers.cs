@@ -11,6 +11,7 @@ public static class OrderErrors
 {
     public const string PriceListMissing = "PRICE_LIST_MISSING";
     public const string PriceMissing = "PRICE_MISSING";
+    public const string ZoneRequired = "ZONE_REQUIRED";
     public const string CustomerNotActive = "CUSTOMER_NOT_ACTIVE";
     public const string TermsMissing = "CUSTOMER_TERMS_REQUIRED";
     public const string SiteRequired = "SITE_ADDRESS_REQUIRED";
@@ -26,10 +27,71 @@ internal static class Orders
     public const string CreditPolicy = "CREDIT";
     public const string OverdueDaysBlock = "overdue_days_block";
 
-    public sealed record Header(Guid PlantId, string Term, string? Site, DateOnly? Requested, string? PoRef);
+    public sealed record Header(Guid PlantId, string Term, string? Site, DateOnly? Requested, string? PoRef, Guid? ZoneId = null);
 
     /// <summary>A priced line; <paramref name="PriceListVersionId"/> is the list version its price came from (null for a quoted price, E-PRS-02-6).</summary>
-    public sealed record PricedLine(int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal UnitPrice, decimal Net, Guid? PriceListVersionId = null);
+    public sealed record PricedLine(
+        int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal UnitPrice, decimal Net, Guid? PriceListVersionId = null, decimal? FreightUnitPrice = null,
+        decimal? FreightAmount = null)
+    {
+        /// <summary>What the line adds to the order's total: the product's net and its freight (E-PRS-01-1).</summary>
+        public decimal Total => Net + (FreightAmount ?? 0m);
+    }
+
+    /// <summary>
+    /// E-SRV1-11, E-PRS-04-10: a zone is given only for delivery with our own truck, and must be when the company has zones; it must be
+    /// ACTIVE.
+    /// </summary>
+    public static async Task<Header> WithZoneAsync(System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid companyId, Header header, Guid? zoneId, CancellationToken cancellationToken)
+    {
+        if (zoneId is { } zone)
+        {
+            if (header.Term != DeliveryTerms.DeliveredOwnTransport)
+            {
+                throw new DomainException(SalesErrors.FieldInvalid, "A zone is given only for delivery with our own truck (E-SRV1-11).");
+            }
+
+            var status = await SalesSql.ScalarAsync<string>(connection, transaction, "SELECT status FROM sal.delivery_zone WHERE company_id = @c AND zone_id = @z", cancellationToken,
+                ("c", companyId), ("z", zone)).ConfigureAwait(false) ?? throw new DomainException(SalesErrors.NotFound, "The zone does not exist.");
+            if (status != "ACTIVE")
+            {
+                throw new DomainException(Zones.ZoneErrors.Inactive, "The zone is inactive.");
+            }
+        }
+        else if (header.Term == DeliveryTerms.DeliveredOwnTransport && await SalesSql.ScalarAsync<bool>(
+                     connection, transaction, "SELECT EXISTS (SELECT 1 FROM sal.delivery_zone WHERE company_id = @c AND status = 'ACTIVE')", cancellationToken, ("c", companyId))
+                     .ConfigureAwait(false))
+        {
+            throw new DomainException(OrderErrors.ZoneRequired, "Choose the delivery zone of an order delivered with our own truck (E-SRV1-11).");
+        }
+
+        return header with { ZoneId = zoneId };
+    }
+
+    /// <summary>
+    /// SRV-1: the freight of each product line (<see cref="Pricing.Freight"/>), or the quoted freight of an order that came from a quote
+    /// (E-PRS-04-8); the total with freight; and why freight was withheld, if it was.
+    /// </summary>
+    public static async Task<(List<PricedLine> Lines, decimal Total, string? FreightWithheld)> WithFreightAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid companyId, Guid? partyId, Header header, bool exemptionPending, DateOnly date,
+        List<PricedLine> lines, CancellationToken cancellationToken, IReadOnlyDictionary<(Guid ItemId, string Uom), decimal>? quotedFreight = null)
+    {
+        Pricing.Freight.Result freight;
+        if (quotedFreight is not null && header.ZoneId is not null && !exemptionPending)
+        {
+            freight = new Pricing.Freight.Result(quotedFreight, null);
+        }
+        else
+        {
+            freight = await Pricing.Freight.PriceAsync(
+                connection, transaction, companyId, partyId, header.ZoneId, exemptionPending, date, lines.Select(l => (l.ItemId, l.Uom)), cancellationToken).ConfigureAwait(false);
+        }
+
+        var result = lines.Select(l => freight.Prices.TryGetValue((l.ItemId, l.Uom), out var price)
+            ? l with { FreightUnitPrice = price, FreightAmount = Pricing.Freight.Amount(l.Quantity, price) }
+            : l with { FreightUnitPrice = null, FreightAmount = null }).ToList();
+        return (result, result.Sum(l => l.Total), freight.Withheld);
+    }
 
     public static Header ValidateHeader(string? term, string? site, DateOnly? requested, string? poRef, Guid plantId)
     {
@@ -113,6 +175,28 @@ internal static class Orders
         return (sources.Header, priced, priced.Sum(l => l.Net));
     }
 
+    /// <summary>E-PRS-04-8: the quoted freight of each (item, unit) of the quote the order came from (empty without one or without freight).</summary>
+    public static async Task<Dictionary<(Guid ItemId, string Uom), decimal>?> QuotedFreightAsync(CommandContext context, Guid orderId, CancellationToken cancellationToken)
+    {
+        if (await SalesSql.ScalarAsync<Guid?>(context, "SELECT quote_id FROM sal.sales_order WHERE sales_order_id = @o", cancellationToken, ("o", orderId)).ConfigureAwait(false) is null)
+        {
+            return null;
+        }
+
+        var rows = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT l.item_id, l.uom, l.freight_unit_price
+            FROM sal.sales_order o JOIN sal.quote q ON q.quote_id = o.quote_id JOIN sal.quote_line l ON l.quote_id = q.quote_id AND l.lines_version = q.lines_version
+            WHERE o.sales_order_id = @o AND l.freight_unit_price IS NOT NULL
+            """,
+            r => (Key: (r.GetGuid(0), r.GetString(1)), Price: r.GetDecimal(2)),
+            cancellationToken,
+            ("o", orderId)).ConfigureAwait(false);
+        return rows.ToDictionary(r => r.Key, r => r.Price);
+    }
+
     /// <summary>E-QUO1-03-4: the quoted price of each (item, unit) of the quote the order came from (empty for an order without one).</summary>
     public static async Task<Dictionary<(Guid ItemId, string Uom), decimal>> QuotedPricesAsync(CommandContext context, Guid orderId, CancellationToken cancellationToken)
     {
@@ -165,7 +249,17 @@ internal static class Orders
                     cashSale = cash,
                     buyer = buyer is null ? null : new { name = buyer.Name, phone = buyer.Phone, idKind = buyer.IdKind, id = buyer.Id },
                     totalNet = M(total),
-                    lines = lines.Select(l => new { itemId = l.ItemId, uom = l.Uom, quantity = M(l.Quantity), unitPrice = M(l.UnitPrice), net = M(l.Net) }),
+                    deliveryZoneId = header.ZoneId,
+                    lines = lines.Select(l => new
+                    {
+                        itemId = l.ItemId,
+                        uom = l.Uom,
+                        quantity = M(l.Quantity),
+                        unitPrice = M(l.UnitPrice),
+                        net = M(l.Net),
+                        freightUnitPrice = l.FreightUnitPrice is { } fp ? M(fp) : null,
+                        freight = l.FreightAmount is { } fa ? M(fa) : null,
+                    }),
                 }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
@@ -175,9 +269,9 @@ internal static class Orders
             """
             INSERT INTO sal.sales_order (sales_order_id, company_id, order_no, party_id, plant_id, order_date, delivery_term_code, site_address, requested_date, customer_po_ref,
               price_list_version_id, status, total_net, lines_version, created_by, version, quote_id, exemption_pending, proforma_collects_itbis,
-              cash_sale, buyer_name, buyer_phone, buyer_id_kind, buyer_id)
+              cash_sale, buyer_name, buyer_phone, buyer_id_kind, buyer_id, delivery_zone_id)
             VALUES (@id, @c, @no, @p, @plant, @date, @term, @site, @req, @po, @list, 'DRAFT', @total, 1, @by, 1, @quote, @pending, @collects,
-              @cash, @bname, @bphone, @bkind, @bid)
+              @cash, @bname, @bphone, @bkind, @bid, @zone)
             """,
             cancellationToken,
             ("id", orderId),
@@ -200,7 +294,8 @@ internal static class Orders
             ("bname", buyer?.Name),
             ("bphone", buyer?.Phone),
             ("bkind", buyer?.IdKind),
-            ("bid", buyer?.Id)).ConfigureAwait(false);
+            ("bid", buyer?.Id),
+            ("zone", header.ZoneId)).ConfigureAwait(false);
         await WriteLinesAsync(context, orderId, 1, lines, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(Aggregate, orderId, "DOCUMENT", null, "DRAFT", commandType, eventId, cancellationToken).ConfigureAwait(false);
         return orderNo;
@@ -214,8 +309,9 @@ internal static class Orders
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO sal.sales_order_line (line_id, company_id, sales_order_id, lines_version, line_no, item_id, uom, qty_ordered, unit_price, net_amount, price_list_version_id)
-                VALUES (@id, @c, @o, @v, @no, @i, @u, @q, @p, @n, @src)
+                INSERT INTO sal.sales_order_line (line_id, company_id, sales_order_id, lines_version, line_no, item_id, uom, qty_ordered, unit_price, net_amount, price_list_version_id,
+                  freight_unit_price, freight_amount)
+                VALUES (@id, @c, @o, @v, @no, @i, @u, @q, @p, @n, @src, @fp, @fa)
                 """,
                 cancellationToken,
                 ("id", context.Ids.NewId()),
@@ -228,7 +324,9 @@ internal static class Orders
                 ("q", l.Quantity),
                 ("p", l.UnitPrice),
                 ("n", l.Net),
-                ("src", l.PriceListVersionId)).ConfigureAwait(false);
+                ("src", l.PriceListVersionId),
+                ("fp", l.FreightUnitPrice),
+                ("fa", l.FreightAmount)).ConfigureAwait(false);
         }
     }
 
@@ -348,9 +446,12 @@ public sealed class CreateSalesOrderHandler : ICommandHandler<CreateSalesOrder>
             throw new DomainException(OrderErrors.UseCashSale, "A sale to the final consumer is a cash sale: use CreateCashSale (E-CF1-4).");
         }
 
-        var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, priced, _) = await Orders.PriceAsync(context, header.PlantId, command.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
+        header = await Orders.WithZoneAsync(context.Connection, context.Transaction, context.CompanyId, header, command.DeliveryZoneId, cancellationToken).ConfigureAwait(false);
+        var (lines, total, withheld) = await Orders.WithFreightAsync(
+            context.Connection, context.Transaction, context.CompanyId, command.PartyId, header, exemption.Pending, SalesSql.Today(context), priced, cancellationToken).ConfigureAwait(false);
         var orderNo = await Orders.InsertAsync(context, context.ResultRef, command.PartyId, header, list, lines, total, null, CommandType, cancellationToken, exemption).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.M(total), version = 1 });
+        return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.M(total), freightWithheld = withheld, version = 1 });
     }
 }
 
@@ -377,7 +478,11 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
         }
 
         var quoted = await Orders.QuotedPricesAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
-        var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, row.PartyId, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
+        var (list, priced, _) = await Orders.PriceAsync(context, header.PlantId, row.PartyId, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
+        header = await Orders.WithZoneAsync(context.Connection, context.Transaction, context.CompanyId, header, command.DeliveryZoneId, cancellationToken).ConfigureAwait(false);
+        var (lines, total, withheld) = await Orders.WithFreightAsync(
+            context.Connection, context.Transaction, context.CompanyId, row.PartyId, header, exemption.Pending, SalesSql.Today(context), priced, cancellationToken,
+            await Orders.QuotedFreightAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false)).ConfigureAwait(false);
         var version = row.Version + 1;
         var linesVersion = row.LinesVersion + 1;
         await context.AppendEventAsync(
@@ -395,7 +500,8 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
             context.Transaction,
             """
             UPDATE sal.sales_order SET plant_id = @plant, delivery_term_code = @term, site_address = @site, requested_date = @req, customer_po_ref = @po,
-              price_list_version_id = @list, total_net = @total, lines_version = @lv, exemption_pending = @pending, proforma_collects_itbis = @collects, version = @v
+              price_list_version_id = @list, total_net = @total, lines_version = @lv, exemption_pending = @pending, proforma_collects_itbis = @collects, version = @v,
+              delivery_zone_id = @zone
             WHERE sales_order_id = @o
             """,
             cancellationToken,
@@ -410,9 +516,10 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
             ("pending", exemption.Pending),
             ("collects", exemption.CollectsItbis),
             ("v", version),
+            ("zone", header.ZoneId),
             ("o", command.SalesOrderId)).ConfigureAwait(false);
         await Orders.WriteLinesAsync(context, command.SalesOrderId, linesVersion, lines, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { salesOrderId = command.SalesOrderId, status = "DRAFT", totalNet = Orders.M(total), version });
+        return JsonSerializer.Serialize(new { salesOrderId = command.SalesOrderId, status = "DRAFT", totalNet = Orders.M(total), freightWithheld = withheld, version });
     }
 }
 

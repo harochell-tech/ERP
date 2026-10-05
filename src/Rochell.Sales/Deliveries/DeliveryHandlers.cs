@@ -37,7 +37,7 @@ internal static class Deliveries
 
     public sealed record Line(
         Guid Id, int LineNo, Guid OrderLineId, Guid ItemId, string Uom, decimal Planned, decimal? Factor, Guid? Source, decimal Issued, decimal Delivered, decimal Returned, decimal Lost,
-        decimal UnitPrice);
+        decimal UnitPrice, decimal? FreightUnitPrice = null);
 
     public sealed record Portion(Guid LineId, Guid LotId, Guid FromLocation, decimal BaseQuantity);
 
@@ -79,12 +79,12 @@ internal static class Deliveries
             context.Transaction,
             """
             SELECT d.delivery_line_id, d.line_no, d.sales_order_line_id, d.item_id, d.uom, d.qty_planned, d.base_factor, d.source_location_id, d.qty_issued, d.qty_delivered,
-                   d.qty_returned, d.qty_lost, o.unit_price
+                   d.qty_returned, d.qty_lost, o.unit_price, o.freight_unit_price
             FROM log.delivery_line d JOIN sal.sales_order_line o ON o.line_id = d.sales_order_line_id
             WHERE d.delivery_id = @d ORDER BY d.line_no FOR UPDATE OF d
             """,
             r => new Line(r.GetGuid(0), r.GetInt32(1), r.GetGuid(2), r.GetGuid(3), r.GetString(4), r.GetDecimal(5), r.IsDBNull(6) ? null : r.GetDecimal(6), r.NullableGuid(7),
-                r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10), r.GetDecimal(11), r.GetDecimal(12)),
+                r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10), r.GetDecimal(11), r.GetDecimal(12), r.IsDBNull(13) ? null : r.GetDecimal(13)),
             cancellationToken,
             ("d", deliveryId));
 
@@ -246,11 +246,20 @@ internal sealed class DeliveryPosting(Guid plantId, Guid partyId, string deliver
         _p16.Add(new PostingLineInput(fromTransit ? "P16-CR-TRANSIT" : "P16-CR-FG", "cost_value", value, PlantId: plantId, ItemId: itemId, SubledgerRef: valueEntry, InvValueEntryId: valueEntry, Inputs: Inputs()));
     }
 
-    public void Revenue_(Guid deliveryLineId, Guid itemId, decimal revenue)
+    /// <summary>
+    /// The revenue of a delivered line and, with freight, its freight (E-SRV1-14, E-PRS-01-3): the same contract asset (or unbilled
+    /// receivable) of the delivery line, against FREIGHT_REVENUE, with no cost (P-16 version 2).
+    /// </summary>
+    public void Revenue_(Guid deliveryLineId, Guid itemId, decimal revenue, decimal freight = 0m)
     {
-        var code = Revenue!.Text(Deliveries.Presentation) == "UNBILLED_RECEIVABLE" ? "P16-DR-UR" : "P16-DR-CA";
-        _p16.Add(new PostingLineInput(code, "revenue", revenue, PartyId: partyId, SubledgerRef: deliveryLineId, Inputs: Inputs(deliveryLineId)));
+        var unbilled = Revenue!.Text(Deliveries.Presentation) == "UNBILLED_RECEIVABLE";
+        _p16.Add(new PostingLineInput(unbilled ? "P16-DR-UR" : "P16-DR-CA", "revenue", revenue, PartyId: partyId, SubledgerRef: deliveryLineId, Inputs: Inputs(deliveryLineId)));
         _p16.Add(new PostingLineInput("P16-CR-REV", "revenue", revenue, PlantId: plantId, ItemId: itemId, PartyId: partyId, Inputs: Inputs(deliveryLineId)));
+        if (freight > 0m)
+        {
+            _p16.Add(new PostingLineInput(unbilled ? "P16-DR-UR-FRT" : "P16-DR-CA-FRT", "freight", freight, PartyId: partyId, SubledgerRef: deliveryLineId, Inputs: Inputs(deliveryLineId)));
+            _p16.Add(new PostingLineInput("P16-CR-FRT", "freight", freight, PlantId: plantId, PartyId: partyId, Inputs: Inputs(deliveryLineId)));
+        }
     }
 
     public void Loss(Guid itemId, decimal value, Guid valueEntry)
@@ -649,9 +658,10 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
             if (atGate)
             {
                 var revenue = decimal.Round(line.Planned * line.UnitPrice, 2, MidpointRounding.AwayFromZero);
-                posting.Revenue_(line.Id, line.ItemId, revenue);
+                var freight = line.FreightUnitPrice is { } fp ? Pricing.Freight.Amount(line.Planned, fp) : 0m;
+                posting.Revenue_(line.Id, line.ItemId, revenue, freight);
                 delivered[line.OrderLineId] = line.Planned;
-                reached.Add(new DeliveredLine(line.Id, line.ItemId, line.Uom, line.Planned, line.UnitPrice, revenue));
+                reached.Add(new DeliveredLine(line.Id, line.ItemId, line.Uom, line.Planned, line.UnitPrice, revenue, line.FreightUnitPrice, freight));
             }
 
             await Sql.ExecuteAsync(
@@ -822,9 +832,10 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
             if (i.QtyReceived > 0m)
             {
                 var revenue = decimal.Round(i.QtyReceived * line.UnitPrice, 2, MidpointRounding.AwayFromZero);
-                posting.Revenue_(line.Id, line.ItemId, revenue);
+                var freight = line.FreightUnitPrice is { } fp ? Pricing.Freight.Amount(i.QtyReceived, fp) : 0m;
+                posting.Revenue_(line.Id, line.ItemId, revenue, freight);
                 delivered[line.OrderLineId] = i.QtyReceived;
-                reached.Add(new DeliveredLine(line.Id, line.ItemId, line.Uom, i.QtyReceived, line.UnitPrice, revenue));
+                reached.Add(new DeliveredLine(line.Id, line.ItemId, line.Uom, i.QtyReceived, line.UnitPrice, revenue, line.FreightUnitPrice, freight));
             }
 
             await TransitMoves.ReturnAsync(

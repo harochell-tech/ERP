@@ -38459,6 +38459,22 @@
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
             "format": "decimal"
+          },
+          "freightUnitPrice": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "billableFreight": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -39614,6 +39630,13 @@
               "null",
               "string"
             ]
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -39941,6 +39964,13 @@
             "items": {
               "$ref": "#/components/schemas/QuoteLineInput"
             }
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -40063,6 +40093,13 @@
               "null",
               "boolean"
             ]
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -41867,6 +41904,12 @@
             "items": {
               "$ref": "#/components/schemas/DeliveryPrintLot"
             }
+          },
+          "freight": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -44432,6 +44475,10 @@
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
             "format": "decimal"
+          },
+          "lineKind": {
+            "type": "string",
+            "default": "PRODUCT"
           }
         },
         "additionalProperties": false
@@ -49870,6 +49917,19 @@
             "items": {
               "$ref": "#/components/schemas/StateChange"
             }
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "deliveryZoneName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -49971,6 +50031,22 @@
               "null",
               "string"
             ]
+          },
+          "freightUnitPrice": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "freightAmount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -50039,6 +50115,13 @@
             }
           },
           "partyId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "deliveryZoneId": {
             "type": [
               "null",
               "string"
@@ -53887,6 +53970,19 @@
                 "$ref": "#/components/schemas/CashSaleView"
               }
             ]
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "deliveryZoneName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -53991,6 +54087,22 @@
           "quotedPrice": {
             "type": "boolean",
             "default": false
+          },
+          "freightUnitPrice": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "freightAmount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -54043,6 +54155,17 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "exemptionPending": {
+            "type": "boolean",
+            "default": false
           }
         },
         "additionalProperties": false
@@ -54317,6 +54440,18 @@
               "null",
               "string"
             ]
+          },
+          "freightTotal": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal",
+            "default": "0"
+          },
+          "freightWithheld": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -54370,6 +54505,22 @@
             "format": "decimal"
           },
           "itbis": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "freightUnitPrice": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "freightAmount": {
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": [
               "null",
@@ -56627,6 +56778,13 @@
               "null",
               "string"
             ]
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -56834,6 +56992,13 @@
             "items": {
               "$ref": "#/components/schemas/QuoteLineInput"
             }
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -57133,6 +57298,13 @@
               "null",
               "boolean"
             ]
+          },
+          "deliveryZoneId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
         "additionalProperties": false

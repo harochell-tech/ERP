@@ -6186,6 +6186,10 @@ export interface components {
             unitPrice: string;
             /** Format: decimal */
             billableNet: string;
+            /** Format: decimal */
+            freightUnitPrice?: null | string;
+            /** Format: decimal */
+            billableFreight?: null | string;
         };
         BillableDeliveryList: {
             items: components["schemas"]["BillableDeliveryLine"][];
@@ -6510,6 +6514,8 @@ export interface components {
             buyerPhone?: null | string;
             buyerIdKind?: null | string;
             buyerId?: null | string;
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
         };
         CreateCreditNote: {
             /** Format: uuid */
@@ -6592,6 +6598,8 @@ export interface components {
             customerRef: null | string;
             notes: null | string;
             lines: components["schemas"]["QuoteLineInput"][];
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
         };
         CreateRawMaterial: {
             code: string;
@@ -6625,6 +6633,8 @@ export interface components {
             /** @default false */
             exemptionPending?: boolean;
             proformaCollectsItbis?: null | boolean;
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
         };
         CreateSupplier: {
             rnc: string;
@@ -7095,6 +7105,7 @@ export interface components {
             /** Format: decimal */
             qtyDelivered: string;
             lots: components["schemas"]["DeliveryPrintLot"][];
+            freight?: null | string;
         };
         DeliveryPrintLot: {
             lotCode: string;
@@ -7785,6 +7796,8 @@ export interface components {
             netAmount: string;
             /** Format: decimal */
             itbis: string;
+            /** @default PRODUCT */
+            lineKind?: string;
         };
         InvoiceList: {
             items: components["schemas"]["InvoiceSummary"][];
@@ -9265,6 +9278,9 @@ export interface components {
             copies: components["schemas"]["QuoteLink"][];
             lines: components["schemas"]["QuoteLineView"][];
             history: components["schemas"]["StateChange"][];
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
+            deliveryZoneName?: null | string;
         };
         QuoteLineInput: {
             /** Format: uuid */
@@ -9294,6 +9310,10 @@ export interface components {
             special: boolean;
             priceListCode?: null | string;
             priceListName?: null | string;
+            /** Format: decimal */
+            freightUnitPrice?: null | string;
+            /** Format: decimal */
+            freightAmount?: null | string;
         };
         QuoteLink: {
             /** Format: uuid */
@@ -9314,6 +9334,8 @@ export interface components {
             lines: components["schemas"]["QuoteLineInput"][];
             /** Format: uuid */
             partyId?: null | string;
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
         };
         QuotePrint: {
             quoteNo: string;
@@ -10361,6 +10383,9 @@ export interface components {
             exemptionPending: boolean;
             proformaCollectsItbis: null | boolean;
             cashSale: null | components["schemas"]["CashSaleView"];
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
+            deliveryZoneName?: null | string;
         };
         SalesOrderLineInput: {
             /** Format: uuid */
@@ -10393,6 +10418,10 @@ export interface components {
             priceListName?: null | string;
             /** @default false */
             quotedPrice?: boolean;
+            /** Format: decimal */
+            freightUnitPrice?: null | string;
+            /** Format: decimal */
+            freightAmount?: null | string;
         };
         SalesOrderList: {
             items: components["schemas"]["SalesOrderSummary"][];
@@ -10407,6 +10436,10 @@ export interface components {
             lines: components["schemas"]["SalesOrderLineInput"][];
             /** Format: uuid */
             partyId?: null | string;
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
+            /** @default false */
+            exemptionPending?: boolean;
         };
         SalesOrderProforma: {
             orderNo: string;
@@ -10476,6 +10509,12 @@ export interface components {
             total: null | string;
             itbisUnavailableCode: null | string;
             itbisUnavailableReason: null | string;
+            /**
+             * Format: decimal
+             * @default 0
+             */
+            freightTotal?: string;
+            freightWithheld?: null | string;
         };
         SalesPreviewLine: {
             /** Format: int32 */
@@ -10494,6 +10533,10 @@ export interface components {
             netAmount: string;
             /** Format: decimal */
             itbis: null | string;
+            /** Format: decimal */
+            freightUnitPrice?: null | string;
+            /** Format: decimal */
+            freightAmount?: null | string;
         };
         ScrapLot: {
             /** Format: uuid */
@@ -11114,6 +11157,8 @@ export interface components {
             buyerPhone?: null | string;
             buyerIdKind?: null | string;
             buyerId?: null | string;
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
         };
         UpdateCompanyLegalName: {
             legalName: string;
@@ -11163,6 +11208,8 @@ export interface components {
             customerRef: null | string;
             notes: null | string;
             lines: components["schemas"]["QuoteLineInput"][];
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
         };
         UpdateDriver: {
             /** Format: uuid */
@@ -11249,6 +11296,8 @@ export interface components {
             /** @default false */
             exemptionPending?: boolean;
             proformaCollectsItbis?: null | boolean;
+            /** Format: uuid */
+            deliveryZoneId?: null | string;
         };
         UpdateShiftTimes: {
             /** Format: uuid */

@@ -1066,6 +1066,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PRS-03-4 | PRS-1 | A version may hold only freight prices (a customer takes its blocks from GENERAL and has its own freight). |
 | E-PRS-03-5 | PRS-1 | A freight price is per unit of the product: its base unit or one with a conversion in force, like product prices. |
 | E-PRS-03-6 | PRS-1 | Queries: the zones with their status; a list version shows its freight table by product and zone. |
+| E-PRS-04-1 | PRS-1 | Freight needs the ACTIVE freight item; without it the document goes without freight and says why. |
+| E-PRS-04-2 | PRS-1 | (Corrected) Freight rides an order only once P-16 version 2 and the FREIGHT_REVENUE map are approved; otherwise the order says why. If either is withdrawn after an order took freight, its delivery is refused with the missing-map message until fixed. Deliveries without freight do not change. |
+| E-PRS-04-3 | PRS-1 | No freight while the SALES_ITBIS rule in force does not exempt TRANSPORTE; the order says why. |
+| E-PRS-04-4 | PRS-1 | Freight counts in the order total for the credit limit. |
+| E-PRS-04-5 | PRS-1 | Freight follows the blocks delivered: recognised on what is delivered; reversing the delivery reverses it. |
+| E-PRS-04-6 | PRS-1 | A credit note on the freight line goes to SALES_DISCOUNTS (P-22), without ITBIS. |
+| E-PRS-04-7 | PRS-1 | The delivery note prints «Transporte de blocks — [zone]» under each product with the units delivered, without price. |
+| E-PRS-04-8 | PRS-1 | An order from a quote keeps the quoted freight even if the list changes. |
+| E-PRS-04-9 | PRS-1 | A cash sale with our own truck includes the freight in what must be paid, from GENERAL. |
+| E-PRS-04-10 | PRS-1 | The zone is required on an own-truck order only once the company has ACTIVE zones (pending the owner's confirmation). |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

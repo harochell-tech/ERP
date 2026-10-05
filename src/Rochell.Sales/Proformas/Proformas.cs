@@ -15,7 +15,8 @@ public static class ProformaErrors
 }
 
 /// <summary>One delivered line of a delivery, as its proforma carries it: the quantity that reached the customer at the order price.</summary>
-public sealed record DeliveredLine(Guid DeliveryLineId, Guid ItemId, string Uom, decimal Quantity, decimal UnitPrice, decimal Net);
+/// <summary>A delivered line; with freight, its freight unit price and amount (E-SRV1-15).</summary>
+public sealed record DeliveredLine(Guid DeliveryLineId, Guid ItemId, string Uom, decimal Quantity, decimal UnitPrice, decimal Net, decimal? FreightUnitPrice = null, decimal Freight = 0m);
 
 /// <summary>
 /// E-FIS1b-1…3, E-FIS1b-01-1…3: the proforma of a delivery — PF-000001, issued in the transaction that delivers the goods of an
