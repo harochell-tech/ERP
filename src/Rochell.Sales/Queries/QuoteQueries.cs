@@ -74,7 +74,7 @@ public sealed record GetQuote(Guid CompanyId, Guid SessionId, Guid QuoteId) : IQ
 /// <summary>PRS-02 (E-PRS-02-6): <paramref name="PriceListCode"/> names the list the list price came from (the customer's or GENERAL).</summary>
 public sealed record QuoteLineView(
     int LineNo, Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, decimal NetAmount, bool Special,
-    string? PriceListCode = null, string? PriceListName = null);
+    string? PriceListCode = null, string? PriceListName = null, decimal? FreightUnitPrice = null, decimal? FreightAmount = null);
 
 /// <summary>A quote copied from this one, or the one it was copied from.</summary>
 public sealed record QuoteLink(Guid QuoteId, string QuoteNo, string Status);
@@ -83,7 +83,7 @@ public sealed record QuoteLink(Guid QuoteId, string QuoteNo, string Status);
 public sealed record QuoteDetail(
     QuoteSummary Header, Guid PlantId, string? SiteAddress, string? CustomerRef, string? Notes, Guid PriceListVersionId, string? PriceApprovedBy, DateTime? PriceApprovedAt,
     bool PriceApprovalCurrent, Guid? SalesOrderId, string? OrderNo, string? ClosingReason, QuoteLink? CopiedFrom, IReadOnlyList<QuoteLink> Copies, IReadOnlyList<QuoteLineView> Lines,
-    IReadOnlyList<StateChange> History);
+    IReadOnlyList<StateChange> History, Guid? DeliveryZoneId = null, string? DeliveryZoneName = null);
 
 [RequiresPermission("sales:read")]
 public sealed class GetQuoteHandler : IQueryHandler<GetQuote>
@@ -121,7 +121,7 @@ public sealed class GetQuoteHandler : IQueryHandler<GetQuote>
             context.Transaction,
             """
             SELECT l.line_no, l.item_id, i.code, i.description, l.uom, l.quantity, l.list_price, l.unit_price, l.net_amount::numeric(19,2), l.unit_price < l.list_price,
-                   pl.code, pl.name
+                   pl.code, pl.name, l.freight_unit_price, l.freight_amount::numeric(19,2)
             FROM sal.quote q
             JOIN sal.quote_line l ON l.quote_id = q.quote_id AND l.lines_version = q.lines_version
             JOIN md.item i ON i.item_id = l.item_id
@@ -130,7 +130,7 @@ public sealed class GetQuoteHandler : IQueryHandler<GetQuote>
             WHERE q.quote_id = @q ORDER BY l.line_no
             """,
             r => new QuoteLineView(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8), r.GetBoolean(9),
-                r.NullableString(10), r.NullableString(11)),
+                r.NullableString(10), r.NullableString(11), r.NullableDecimal(12), r.NullableDecimal(13)),
             cancellationToken,
             ("q", query.QuoteId)).ConfigureAwait(false);
         var links = await Reading.ListAsync(
@@ -145,7 +145,12 @@ public sealed class GetQuoteHandler : IQueryHandler<GetQuote>
         var history = await StateHistory.ReadAsync(context, "Quote", query.QuoteId, cancellationToken).ConfigureAwait(false);
         return ApiJson.Serialize(new QuoteDetail(
             header, extra.PlantId, extra.Site, extra.CustomerRef, extra.Notes, extra.ListId, extra.ApprovedBy, extra.ApprovedAt, extra.ApprovalCurrent, extra.OrderId, extra.OrderNo,
-            extra.ClosingReason, links.Where(l => l.IsSource).Select(l => l.Link).SingleOrDefault(), [.. links.Where(l => !l.IsSource).Select(l => l.Link)], lines, history));
+            extra.ClosingReason, links.Where(l => l.IsSource).Select(l => l.Link).SingleOrDefault(), [.. links.Where(l => !l.IsSource).Select(l => l.Link)], lines, history,
+            await SalesSql.ScalarAsync<Guid?>(context.Connection, context.Transaction, "SELECT delivery_zone_id FROM sal.quote WHERE quote_id = @q", cancellationToken, ("q", query.QuoteId))
+                .ConfigureAwait(false),
+            await SalesSql.ScalarAsync<string>(
+                context.Connection, context.Transaction, "SELECT z.name FROM sal.quote q JOIN sal.delivery_zone z ON z.zone_id = q.delivery_zone_id WHERE q.quote_id = @q", cancellationToken,
+                ("q", query.QuoteId)).ConfigureAwait(false)));
     }
 }
 

@@ -8,15 +8,18 @@ namespace Rochell.Sales.Quotes;
 /// </summary>
 public sealed record QuoteLineInput(Guid ItemId, string Uom, decimal Quantity, decimal? UnitPrice = null);
 
-/// <summary>E-QUO1-02-1…4: the Vendedor quotes a DRAFT or ACTIVE customer; the quote is COT-… DRAFT, priced from the list in force.</summary>
+/// <summary>
+/// E-QUO1-02-1…4: the Vendedor quotes a DRAFT or ACTIVE customer; the quote is COT-… DRAFT, priced from the list in force. E-SRV1-19:
+/// with our own truck, <paramref name="DeliveryZoneId"/> chooses the zone and the quote shows the freight.
+/// </summary>
 public sealed record CreateQuote(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, Guid PlantId, DateOnly ValidUntil, string DeliveryTermCode, string? SiteAddress,
-    string? CustomerRef, string? Notes, IReadOnlyList<QuoteLineInput> Lines) : ICommand;
+    string? CustomerRef, string? Notes, IReadOnlyList<QuoteLineInput> Lines, Guid? DeliveryZoneId = null) : ICommand;
 
 /// <summary>Replaces a DRAFT quote's header and lines (a new lines version; an earlier price approval no longer covers them).</summary>
 public sealed record UpdateDraftQuote(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid QuoteId, long ExpectedVersion, Guid PlantId, DateOnly ValidUntil, string DeliveryTermCode,
-    string? SiteAddress, string? CustomerRef, string? Notes, IReadOnlyList<QuoteLineInput> Lines) : ICommand;
+    string? SiteAddress, string? CustomerRef, string? Notes, IReadOnlyList<QuoteLineInput> Lines, Guid? DeliveryZoneId = null) : ICommand;
 
 /// <summary>E-QUO1-02-5: DRAFT → PENDING_APPROVAL, only when a line is below its list price.</summary>
 public sealed record SubmitQuoteForApproval(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid QuoteId, long ExpectedVersion) : ICommand;

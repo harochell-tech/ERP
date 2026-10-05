@@ -11,7 +11,10 @@ public static class DeliveryTerms
 /// <summary>A line of a sales order: finished good, unit of the price list and quantity (the price comes from the list, E-VS3-03-5).</summary>
 public sealed record SalesOrderLineInput(Guid ItemId, string Uom, decimal Quantity);
 
-/// <summary>E-VS3-03-5/6: the Vendedor creates a DRAFT order PV-… priced from the price list in force (net of ITBIS).</summary>
+/// <summary>
+/// E-VS3-03-5/6: the Vendedor creates a DRAFT order PV-… priced from the price list in force (net of ITBIS). SRV-1: with our own truck,
+/// <paramref name="DeliveryZoneId"/> chooses the zone and the system adds the freight of each product priced for it (E-SRV1-12).
+/// </summary>
 /// <remarks>
 /// E-FIS1b-2, E-FIS1b-01-1: <paramref name="ExemptionPending"/> marks an order whose customer is waiting for the DGII
 /// certification — each of its deliveries issues a proforma — and <paramref name="ProformaCollectsItbis"/> says whether those
@@ -19,12 +22,13 @@ public sealed record SalesOrderLineInput(Guid ItemId, string Uom, decimal Quanti
 /// </remarks>
 public sealed record CreateSalesOrder(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, Guid PlantId, string DeliveryTermCode, string? SiteAddress, DateOnly? RequestedDate,
-    string? CustomerPoRef, IReadOnlyList<SalesOrderLineInput> Lines, bool ExemptionPending = false, bool? ProformaCollectsItbis = null) : ICommand;
+    string? CustomerPoRef, IReadOnlyList<SalesOrderLineInput> Lines, bool ExemptionPending = false, bool? ProformaCollectsItbis = null, Guid? DeliveryZoneId = null) : ICommand;
 
 /// <summary>Replaces a DRAFT order's header and lines (new lines version, repriced from the list in force).</summary>
 public sealed record UpdateSalesOrderDraft(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SalesOrderId, long ExpectedVersion, Guid PlantId, string DeliveryTermCode, string? SiteAddress,
-    DateOnly? RequestedDate, string? CustomerPoRef, IReadOnlyList<SalesOrderLineInput> Lines, bool ExemptionPending = false, bool? ProformaCollectsItbis = null) : ICommand;
+    DateOnly? RequestedDate, string? CustomerPoRef, IReadOnlyList<SalesOrderLineInput> Lines, bool ExemptionPending = false, bool? ProformaCollectsItbis = null,
+    Guid? DeliveryZoneId = null) : ICommand;
 
 /// <summary>E-VS3-03-4: DRAFT → CONFIRMED (credit auto-approved) or PENDING_CREDIT (Crédito decides).</summary>
 public sealed record SubmitForCredit(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SalesOrderId, long ExpectedVersion) : ICommand;

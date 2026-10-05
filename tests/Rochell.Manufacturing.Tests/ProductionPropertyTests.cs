@@ -142,7 +142,7 @@ public sealed class ProductionPropertyTests(PostgresFixture postgres, ITestOutpu
         await h.AdminRequireAsync(
             $"""
             UPDATE fin.posting_rule_version v SET status = 'ACTIVE', approved_by = '{h.UserId}'
-            FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND v.status = 'DRAFT' AND r.code IN ('P-12', 'P-13', 'REVAL', 'P-15', 'P-15R', 'P-16', 'P-30');
+            FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND v.version = 1 AND v.status = 'DRAFT' AND r.code IN ('P-12', 'P-13', 'REVAL', 'P-15', 'P-15R', 'P-16', 'P-30');
             """);
         await h.CreateActivePolicyAsync("CREDIT", new Dictionary<string, string>
         {

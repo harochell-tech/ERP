@@ -296,15 +296,15 @@ public static class QueryEndpoints
         // E-UX4-3/4/10: previews of a draft order or quote (POST: the lines travel in the body; read-only), the credit an order would
         // use and how a receipt would be applied.
         sales.MapPost("/orders/preview", (HttpContext http, Guid companyId, PreviewSalesOrderHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewSalesOrder>(http, (s, b) => new PreviewSalesOrder(companyId, s, b.PlantId, b.Lines, b.PartyId), handler, ct))
+                => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewSalesOrder>(http, (s, b) => new PreviewSalesOrder(companyId, s, b.PlantId, b.Lines, b.PartyId, b.DeliveryZoneId, b.ExemptionPending), handler, ct))
             .Describe<SalesPreview>(nameof(PreviewSalesOrder))
             .Accepts<SalesOrderPreviewRequest>("application/json");
         sales.MapPost("/cash-sales/preview", (HttpContext http, Guid companyId, PreviewCashSaleHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewCashSale>(http, (s, b) => new PreviewCashSale(companyId, s, b.PlantId, b.Lines), handler, ct))
+                => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewCashSale>(http, (s, b) => new PreviewCashSale(companyId, s, b.PlantId, b.Lines, b.DeliveryZoneId), handler, ct))
             .Describe<SalesPreview>(nameof(PreviewCashSale))
             .Accepts<SalesOrderPreviewRequest>("application/json");
         sales.MapPost("/quotes/preview", (HttpContext http, Guid companyId, PreviewQuoteHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunBodyAsync<QuotePreviewRequest, PreviewQuote>(http, (s, b) => new PreviewQuote(companyId, s, b.PlantId, b.Lines, b.PartyId), handler, ct))
+                => runner.RunBodyAsync<QuotePreviewRequest, PreviewQuote>(http, (s, b) => new PreviewQuote(companyId, s, b.PlantId, b.Lines, b.PartyId, b.DeliveryZoneId), handler, ct))
             .Describe<SalesPreview>(nameof(PreviewQuote))
             .Accepts<QuotePreviewRequest>("application/json");
         // E-IMP-1: what the customer file would load (read-only).

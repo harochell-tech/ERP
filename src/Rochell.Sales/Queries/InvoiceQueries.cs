@@ -68,7 +68,10 @@ public sealed class ListInvoicesHandler : IQueryHandler<ListInvoices>
 
 public sealed record GetInvoice(Guid CompanyId, Guid SessionId, Guid InvoiceId) : IQuery;
 
-public sealed record InvoiceLineView(int LineNo, Guid DeliveryLineId, string DeliveryNo, Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal Quantity, decimal UnitPrice, decimal NetAmount, decimal Itbis);
+/// <summary>E-PRS-01-2: <paramref name="LineKind"/> PRODUCT or FREIGHT (the freight of the same delivery line, exempt).</summary>
+public sealed record InvoiceLineView(
+    int LineNo, Guid DeliveryLineId, string DeliveryNo, Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal Quantity, decimal UnitPrice, decimal NetAmount, decimal Itbis,
+    string LineKind = "PRODUCT");
 
 public sealed record ExternalFiscalRecordView(string Encf, DateTime IssuedAt, string SecurityCode, string EvidenceRef, string EvidenceSha256, string? RecordedBy);
 
@@ -91,14 +94,15 @@ internal static class InvoiceLines
             """
             SELECT il.line_no, il.delivery_line_id, d.delivery_no, il.item_id, it.code, it.description, il.uom, il.quantity, il.unit_price, il.net_amount::numeric(19,2),
                    coalesce((SELECT sum(t.amount) FROM tax.tax_determination_line t JOIN sal.invoice i ON i.tax_determination_id = t.determination_id
-                             WHERE i.invoice_id = il.invoice_id AND t.subject_line_id = il.invoice_line_id AND t.effect = 'OUTPUT'), 0)::numeric(19,2)
+                             WHERE i.invoice_id = il.invoice_id AND t.subject_line_id = il.invoice_line_id AND t.effect = 'OUTPUT'), 0)::numeric(19,2), il.line_kind
             FROM sal.invoice_line il
             JOIN log.delivery_line dl ON dl.delivery_line_id = il.delivery_line_id
             JOIN log.delivery d ON d.delivery_id = dl.delivery_id
             JOIN md.item it ON it.item_id = il.item_id
             WHERE il.invoice_id = @i ORDER BY il.line_no
             """,
-            r => new InvoiceLineView(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10)),
+            r => new InvoiceLineView(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10),
+                r.GetString(11)),
             cancellationToken,
             ("i", invoiceId));
 }
@@ -229,7 +233,7 @@ public sealed record ListBillableDeliveries(Guid CompanyId, Guid SessionId, Guid
 
 public sealed record BillableDeliveryLine(
     Guid DeliveryLineId, string DeliveryNo, Guid SalesOrderId, string OrderNo, Guid PartyId, string CustomerName, string ItemCode, string Uom, decimal QtyDelivered, decimal QtyInvoiced,
-    decimal QtyBillable, decimal UnitPrice, decimal BillableNet);
+    decimal QtyBillable, decimal UnitPrice, decimal BillableNet, decimal? FreightUnitPrice = null, decimal? BillableFreight = null);
 
 public sealed record BillableDeliveryList(IReadOnlyList<BillableDeliveryLine> Items);
 
@@ -247,7 +251,8 @@ public sealed class ListBillableDeliveriesHandler : IQueryHandler<ListBillableDe
             context.Transaction,
             """
             SELECT dl.delivery_line_id, d.delivery_no, o.sales_order_id, o.order_no, o.party_id, p.legal_name, i.code, dl.uom, dl.qty_delivered, dl.qty_invoiced,
-                   dl.qty_delivered - dl.qty_invoiced, ol.unit_price, round((dl.qty_delivered - dl.qty_invoiced) * ol.unit_price, 2)::numeric(19,2)
+                   dl.qty_delivered - dl.qty_invoiced, ol.unit_price, round((dl.qty_delivered - dl.qty_invoiced) * ol.unit_price, 2)::numeric(19,2),
+                   ol.freight_unit_price, round((dl.qty_delivered - dl.qty_invoiced) * ol.freight_unit_price, 2)::numeric(19,2)
             FROM log.delivery_line dl
             JOIN log.delivery d ON d.delivery_id = dl.delivery_id
             JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id
@@ -261,7 +266,7 @@ public sealed class ListBillableDeliveriesHandler : IQueryHandler<ListBillableDe
             LIMIT 500
             """,
             r => new BillableDeliveryLine(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.GetString(6), r.GetString(7), r.GetDecimal(8), r.GetDecimal(9),
-                r.GetDecimal(10), r.GetDecimal(11), r.GetDecimal(12)),
+                r.GetDecimal(10), r.GetDecimal(11), r.GetDecimal(12), r.IsDBNull(13) ? null : r.GetDecimal(13), r.IsDBNull(14) ? null : r.GetDecimal(14)),
             cancellationToken,
             ("c", context.CompanyId),
             ("p", query.PartyId)).ConfigureAwait(false);

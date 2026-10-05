@@ -2,6 +2,7 @@ namespace Rochell.Tax;
 
 public static class TaxErrors
 {
+    public const string AuthorizationOrderHasFreight = "AUTHORIZATION_ORDER_HAS_FREIGHT";
     public const string FiscalRuleInvalid = "FISCAL_RULE_INVALID";
     public const string RuleKindMismatch = "FISCAL_RULE_KIND_MISMATCH";
     public const string SourceInvalid = "FISCAL_SOURCE_INVALID";

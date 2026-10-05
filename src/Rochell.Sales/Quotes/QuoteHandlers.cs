@@ -23,10 +23,12 @@ internal static class Quotes
 {
     public const string Aggregate = "Quote";
 
-    public sealed record Header(Guid PlantId, DateOnly ValidUntil, string Term, string? Site, string? CustomerRef, string? Notes);
+    public sealed record Header(Guid PlantId, DateOnly ValidUntil, string Term, string? Site, string? CustomerRef, string? Notes, Guid? ZoneId = null);
 
     /// <summary>A priced quote line; <paramref name="PriceListVersionId"/> is the version its list price came from (E-PRS-02-6).</summary>
-    public sealed record PricedLine(int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, decimal Net, Guid PriceListVersionId)
+    public sealed record PricedLine(
+        int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, decimal Net, Guid PriceListVersionId, decimal? FreightUnitPrice = null,
+        decimal? FreightAmount = null)
     {
         public bool Special => UnitPrice < ListPrice;
     }
@@ -46,6 +48,21 @@ internal static class Quotes
         }
 
         return new Header(plantId, validUntil, order.Term, order.Site, order.PoRef, SalesSql.Optional(notes, 1000, "The notes"));
+    }
+
+    /// <summary>E-SRV1-19: the quote's zone (as an order's, E-SRV1-11) and the freight of each line from the customer's own list.</summary>
+    public static async Task<(Header Header, List<PricedLine> Lines, decimal Total, string? Withheld)> WithFreightAsync(
+        CommandContext context, Guid partyId, Header header, Guid? zoneId, List<PricedLine> lines, CancellationToken cancellationToken)
+    {
+        var zoned = await Orders.Orders.WithZoneAsync(
+            context.Connection, context.Transaction, context.CompanyId, new Orders.Orders.Header(header.PlantId, header.Term, header.Site, null, null), zoneId, cancellationToken).ConfigureAwait(false);
+        var freight = await Pricing.Freight.PriceAsync(
+            context.Connection, context.Transaction, context.CompanyId, partyId, zoned.ZoneId, false, SalesSql.Today(context), lines.Select(l => (l.ItemId, l.Uom)), cancellationToken)
+            .ConfigureAwait(false);
+        var result = lines.Select(l => freight.Prices.TryGetValue((l.ItemId, l.Uom), out var price)
+            ? l with { FreightUnitPrice = price, FreightAmount = Pricing.Freight.Amount(l.Quantity, price) }
+            : l).ToList();
+        return (header with { ZoneId = zoned.ZoneId }, result, result.Sum(l => l.Net + (l.FreightAmount ?? 0m)), freight.Withheld);
     }
 
     /// <summary>E-QUO1-02-3: a DRAFT or ACTIVE customer; a blocked one or a party that is not a customer is refused.</summary>
@@ -117,8 +134,9 @@ internal static class Quotes
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO sal.quote_line (line_id, company_id, quote_id, lines_version, line_no, item_id, uom, quantity, list_price, unit_price, net_amount, price_list_version_id)
-                VALUES (@id, @c, @q, @v, @no, @i, @u, @qty, @lp, @p, @n, @src)
+                INSERT INTO sal.quote_line (line_id, company_id, quote_id, lines_version, line_no, item_id, uom, quantity, list_price, unit_price, net_amount, price_list_version_id,
+                  freight_unit_price, freight_amount)
+                VALUES (@id, @c, @q, @v, @no, @i, @u, @qty, @lp, @p, @n, @src, @fp, @fa)
                 """,
                 cancellationToken,
                 ("id", context.Ids.NewId()),
@@ -132,12 +150,24 @@ internal static class Quotes
                 ("lp", l.ListPrice),
                 ("p", l.UnitPrice),
                 ("n", l.Net),
-                ("src", l.PriceListVersionId)).ConfigureAwait(false);
+                ("src", l.PriceListVersionId),
+                ("fp", l.FreightUnitPrice),
+                ("fa", l.FreightAmount)).ConfigureAwait(false);
         }
     }
 
     public static object LinesPayload(IEnumerable<PricedLine> lines)
-        => lines.Select(l => new { itemId = l.ItemId, uom = l.Uom, quantity = M(l.Quantity), listPrice = M(l.ListPrice), unitPrice = M(l.UnitPrice), net = M(l.Net) }).ToList();
+        => lines.Select(l => new
+        {
+            itemId = l.ItemId,
+            uom = l.Uom,
+            quantity = M(l.Quantity),
+            listPrice = M(l.ListPrice),
+            unitPrice = M(l.UnitPrice),
+            net = M(l.Net),
+            freightUnitPrice = l.FreightUnitPrice is { } fp ? M(fp) : null,
+            freight = l.FreightAmount is { } fa ? M(fa) : null,
+        }).ToList();
 
     public static async Task<Row> LockAsync(CommandContext context, Guid quoteId, long? expectedVersion, CancellationToken cancellationToken)
     {
@@ -236,8 +266,8 @@ internal static class Quotes
             context.Transaction,
             """
             INSERT INTO sal.quote (quote_id, company_id, quote_no, party_id, plant_id, quote_date, valid_until, delivery_term_code, site_address, customer_ref, notes,
-              price_list_version_id, status, total_net, lines_version, created_by, copied_from_quote_id, version)
-            VALUES (@id, @c, @no, @p, @plant, @date, @until, @term, @site, @ref, @notes, @list, 'DRAFT', @total, 1, @by, @from, 1)
+              price_list_version_id, status, total_net, lines_version, created_by, copied_from_quote_id, version, delivery_zone_id)
+            VALUES (@id, @c, @no, @p, @plant, @date, @until, @term, @site, @ref, @notes, @list, 'DRAFT', @total, 1, @by, @from, 1, @zone)
             """,
             cancellationToken,
             ("id", context.ResultRef),
@@ -254,7 +284,8 @@ internal static class Quotes
             ("list", priceList),
             ("total", total),
             ("by", creator),
-            ("from", copiedFrom)).ConfigureAwait(false);
+            ("from", copiedFrom),
+            ("zone", header.ZoneId)).ConfigureAwait(false);
         await WriteLinesAsync(context, context.ResultRef, 1, lines, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(Aggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", commandType, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { quoteId = context.ResultRef, quoteNo, status = "DRAFT", totalNet = M(total), special = lines.Any(l => l.Special), version = 1 });
@@ -272,8 +303,9 @@ public sealed class CreateQuoteHandler : ICommandHandler<CreateQuote>
         ArgumentNullException.ThrowIfNull(context);
         var header = Quotes.ValidateHeader(context, command.PlantId, command.ValidUntil, command.DeliveryTermCode, command.SiteAddress, command.CustomerRef, command.Notes);
         await Quotes.EnsureCustomerAsync(context, command.PartyId, cancellationToken).ConfigureAwait(false);
-        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, command.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
-        return await Quotes.InsertAsync(context, command.PartyId, header, list, lines, total, null, CommandType, cancellationToken).ConfigureAwait(false);
+        var (list, priced, _) = await Quotes.PriceAsync(context, header.PlantId, command.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (zoned, lines, total, _) = await Quotes.WithFreightAsync(context, command.PartyId, header, command.DeliveryZoneId, priced, cancellationToken).ConfigureAwait(false);
+        return await Quotes.InsertAsync(context, command.PartyId, zoned, list, lines, total, null, CommandType, cancellationToken).ConfigureAwait(false);
     }
 }
 
@@ -289,7 +321,8 @@ public sealed class UpdateDraftQuoteHandler : ICommandHandler<UpdateDraftQuote>
         var header = Quotes.ValidateHeader(context, command.PlantId, command.ValidUntil, command.DeliveryTermCode, command.SiteAddress, command.CustomerRef, command.Notes);
         var row = await Quotes.LockAsync(context, command.QuoteId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         Quotes.RequireStatus(row, "DRAFT");
-        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, row.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, priced, _) = await Quotes.PriceAsync(context, header.PlantId, row.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
+        (header, var lines, var total, _) = await Quotes.WithFreightAsync(context, row.PartyId, header, command.DeliveryZoneId, priced, cancellationToken).ConfigureAwait(false);
         var version = row.Version + 1;
         var linesVersion = row.LinesVersion + 1;
         await context.AppendEventAsync(
@@ -307,7 +340,7 @@ public sealed class UpdateDraftQuoteHandler : ICommandHandler<UpdateDraftQuote>
             context.Transaction,
             """
             UPDATE sal.quote SET plant_id = @plant, valid_until = @until, delivery_term_code = @term, site_address = @site, customer_ref = @ref, notes = @notes,
-              price_list_version_id = @list, total_net = @total, lines_version = @lv, version = @v
+              price_list_version_id = @list, total_net = @total, lines_version = @lv, version = @v, delivery_zone_id = @zone
             WHERE quote_id = @q
             """,
             cancellationToken,
@@ -321,6 +354,7 @@ public sealed class UpdateDraftQuoteHandler : ICommandHandler<UpdateDraftQuote>
             ("total", total),
             ("lv", linesVersion),
             ("v", version),
+            ("zone", header.ZoneId),
             ("q", row.QuoteId)).ConfigureAwait(false);
         await Quotes.WriteLinesAsync(context, row.QuoteId, linesVersion, lines, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { quoteId = row.QuoteId, quoteNo = row.QuoteNo, status = "DRAFT", totalNet = Quotes.M(total), special = lines.Any(l => l.Special), version });
@@ -448,7 +482,7 @@ public sealed class CopyQuoteHandler : ICommandHandler<CopyQuote>
 {
     public string CommandType => "Sales.CopyQuote";
 
-    private sealed record Source(Guid PartyId, Guid PlantId, string Term, string? Site, string? CustomerRef, string? Notes, int LinesVersion);
+    private sealed record Source(Guid PartyId, Guid PlantId, string Term, string? Site, string? CustomerRef, string? Notes, int LinesVersion, Guid? ZoneId);
 
     public async Task<string> HandleAsync(CopyQuote command, CommandContext context, CancellationToken cancellationToken)
     {
@@ -457,8 +491,8 @@ public sealed class CopyQuoteHandler : ICommandHandler<CopyQuote>
         var source = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT party_id, plant_id, delivery_term_code, site_address, customer_ref, notes, lines_version FROM sal.quote WHERE company_id = @c AND quote_id = @q",
-            r => new Source(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.NullableString(3), r.NullableString(4), r.NullableString(5), r.GetInt32(6)),
+            "SELECT party_id, plant_id, delivery_term_code, site_address, customer_ref, notes, lines_version, delivery_zone_id FROM sal.quote WHERE company_id = @c AND quote_id = @q",
+            r => new Source(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.NullableString(3), r.NullableString(4), r.NullableString(5), r.GetInt32(6), r.NullableGuid(7)),
             cancellationToken,
             ("c", context.CompanyId),
             ("q", command.QuoteId)).ConfigureAwait(false)
@@ -473,8 +507,9 @@ public sealed class CopyQuoteHandler : ICommandHandler<CopyQuote>
             cancellationToken,
             ("q", command.QuoteId),
             ("v", source.LinesVersion)).ConfigureAwait(false);
-        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, source.PartyId, input, cancellationToken).ConfigureAwait(false);
-        return await Quotes.InsertAsync(context, source.PartyId, header, list, lines, total, command.QuoteId, CommandType, cancellationToken).ConfigureAwait(false);
+        var (list, priced, _) = await Quotes.PriceAsync(context, header.PlantId, source.PartyId, input, cancellationToken).ConfigureAwait(false);
+        var (zoned, lines, total, _) = await Quotes.WithFreightAsync(context, source.PartyId, header, source.ZoneId, priced, cancellationToken).ConfigureAwait(false);
+        return await Quotes.InsertAsync(context, source.PartyId, zoned, list, lines, total, command.QuoteId, CommandType, cancellationToken).ConfigureAwait(false);
     }
 }
 
@@ -488,7 +523,7 @@ public sealed class ConvertQuoteHandler : ICommandHandler<ConvertQuote>
 {
     public string CommandType => "Sales.ConvertQuote";
 
-    private sealed record Source(Guid PlantId, string Term, string? Site, string? CustomerRef, Guid PriceList, decimal Total);
+    private sealed record Source(Guid PlantId, string Term, string? Site, string? CustomerRef, Guid PriceList, decimal Total, Guid? ZoneId);
 
     public async Task<string> HandleAsync(ConvertQuote command, CommandContext context, CancellationToken cancellationToken)
     {
@@ -510,19 +545,21 @@ public sealed class ConvertQuoteHandler : ICommandHandler<ConvertQuote>
         var source = (await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT plant_id, delivery_term_code, site_address, customer_ref, price_list_version_id, total_net FROM sal.quote WHERE quote_id = @q",
-            r => new Source(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.NullableString(3), r.GetGuid(4), r.GetDecimal(5)),
+            "SELECT plant_id, delivery_term_code, site_address, customer_ref, price_list_version_id, total_net, delivery_zone_id FROM sal.quote WHERE quote_id = @q",
+            r => new Source(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.NullableString(3), r.GetGuid(4), r.GetDecimal(5), r.NullableGuid(6)),
             cancellationToken,
             ("q", row.QuoteId)).ConfigureAwait(false))!;
         var lines = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT line_no, item_id, uom, quantity, unit_price, net_amount FROM sal.quote_line WHERE quote_id = @q AND lines_version = @v ORDER BY line_no",
-            r => new Orders.Orders.PricedLine(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5)),
+            "SELECT line_no, item_id, uom, quantity, unit_price, net_amount, freight_unit_price, freight_amount FROM sal.quote_line WHERE quote_id = @q AND lines_version = @v ORDER BY line_no",
+            r => new Orders.Orders.PricedLine(
+                r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), null, r.IsDBNull(6) ? null : r.GetDecimal(6), r.IsDBNull(7) ? null : r.GetDecimal(7)),
             cancellationToken,
             ("q", row.QuoteId),
             ("v", row.LinesVersion)).ConfigureAwait(false);
-        var header = new Orders.Orders.Header(source.PlantId, source.Term, source.Site, null, source.CustomerRef);
+        // E-PRS-04-8: the order keeps the quoted zone and freight.
+        var header = new Orders.Orders.Header(source.PlantId, source.Term, source.Site, null, source.CustomerRef, source.ZoneId);
         var orderId = context.ResultRef;
         var orderNo = await Orders.Orders.InsertAsync(context, orderId, row.PartyId, header, source.PriceList, lines, source.Total, row.QuoteId, CommandType, cancellationToken)
             .ConfigureAwait(false);

@@ -121,6 +121,19 @@ internal static class AuthorizationStore
             throw new DomainException(TaxErrors.AuthorizationFieldInvalid, "The source order is not an order of the customer.");
         }
 
+        // E-SRV1-6/17: an exempt order never carries freight; an order already priced with freight is not the source of an authorization.
+        if (header.SalesOrderId is { } freighted && await ScalarAsync<bool>(
+                context,
+                """
+                SELECT EXISTS (SELECT 1 FROM sal.sales_order o JOIN sal.sales_order_line l ON l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version
+                               WHERE o.sales_order_id = @o AND l.freight_amount IS NOT NULL)
+                """,
+                cancellationToken,
+                ("o", freighted)).ConfigureAwait(false))
+        {
+            throw new DomainException(TaxErrors.AuthorizationOrderHasFreight, "The order carries freight, and a CONFOTUR order never does (E-SRV1-6): remove its zone first.");
+        }
+
         var input = lines ?? [];
         if (input.Count == 0)
         {

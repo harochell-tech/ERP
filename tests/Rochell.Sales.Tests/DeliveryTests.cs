@@ -42,7 +42,7 @@ public sealed class DeliveryTests(PostgresFixture postgres)
             $"""
             INSERT INTO md.item VALUES ('{block}', '{h.CompanyId}', 'BLOQUE-6', 'Bloque de 6 pulgadas', 'FINISHED_GOOD', 'un', 'BLOQUE', 'ACTIVE', 1);
             UPDATE fin.posting_rule_version v SET status = 'ACTIVE', approved_by = '{h.UserId}'
-            FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND r.code IN ('OPEN-INV', 'P-15', 'P-15R', 'P-16', 'P-30', 'P-18', 'P-22');
+            FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND v.version = 1 AND r.code IN ('OPEN-INV', 'P-15', 'P-15R', 'P-16', 'P-30', 'P-18', 'P-22');
             """);
         var accounts = new Dictionary<string, Guid>();
         foreach (var (role, code, control) in new[]

@@ -14,6 +14,7 @@ namespace Rochell.Sales.Invoices;
 public static class InvoiceErrors
 {
     public const string NotBillable = "DELIVERY_LINE_NOT_BILLABLE";
+    public const string FreightUnderAuthorization = "FREIGHT_UNDER_AUTHORIZATION";
     public const string QuantityExceedsDelivered = "INVOICE_EXCEEDS_DELIVERED";
     public const string EcfTypeInvalid = "ECF_TYPE_INVALID";
     public const string EncfInvalid = "ENCF_INVALID";
@@ -56,18 +57,22 @@ internal static class Invoicing
             : throw new DomainException(SalesErrors.VersionConflict, $"The invoice changed (version {row.Version}, expected {expectedVersion}); reload and retry.");
     }
 
-    public sealed record Line(Guid InvoiceLineId, Guid DeliveryLineId, Guid OrderLineId, Guid ItemId, decimal Quantity, decimal Net, string DeliveryNo, string Uom);
+    /// <summary>An invoice line; <paramref name="Kind"/> FREIGHT is the freight of its delivery line (E-PRS-01-2), which moves no quantity.</summary>
+    public sealed record Line(Guid InvoiceLineId, Guid DeliveryLineId, Guid OrderLineId, Guid ItemId, decimal Quantity, decimal Net, string DeliveryNo, string Uom, string Kind = "PRODUCT")
+    {
+        public bool IsProduct => Kind == "PRODUCT";
+    }
 
     public static Task<List<Line>> LinesAsync(CommandContext context, Guid invoiceId, CancellationToken cancellationToken)
         => Reading.ListAsync(
             context.Connection,
             context.Transaction,
             """
-            SELECT il.invoice_line_id, il.delivery_line_id, dl.sales_order_line_id, il.item_id, il.quantity, il.net_amount::numeric(19,2), d.delivery_no, il.uom
+            SELECT il.invoice_line_id, il.delivery_line_id, dl.sales_order_line_id, il.item_id, il.quantity, il.net_amount::numeric(19,2), d.delivery_no, il.uom, il.line_kind
             FROM sal.invoice_line il JOIN log.delivery_line dl ON dl.delivery_line_id = il.delivery_line_id JOIN log.delivery d ON d.delivery_id = dl.delivery_id
-            WHERE il.invoice_id = @i ORDER BY il.delivery_line_id
+            WHERE il.invoice_id = @i ORDER BY il.delivery_line_id, il.line_kind DESC
             """,
-            r => new Line(r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetGuid(3), r.GetDecimal(4), r.GetDecimal(5), r.GetString(6), r.GetString(7)),
+            r => new Line(r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetGuid(3), r.GetDecimal(4), r.GetDecimal(5), r.GetString(6), r.GetString(7), r.GetString(8)),
             cancellationToken,
             ("i", invoiceId));
 
@@ -125,7 +130,7 @@ internal static class FiscalReceiver
 
 internal static class InvoiceDrafts
 {
-    private sealed record Billable(Guid DeliveryLineId, Guid ItemId, string Uom, decimal Remaining, decimal UnitPrice, Guid OrderId);
+    private sealed record Billable(Guid DeliveryLineId, Guid ItemId, string Uom, decimal Remaining, decimal UnitPrice, Guid OrderId, decimal? FreightUnitPrice);
 
     private sealed record Buyer(string? Name, string? IdKind, string? Id);
 
@@ -145,14 +150,14 @@ internal static class InvoiceDrafts
             context.Connection,
             context.Transaction,
             """
-            SELECT dl.delivery_line_id, dl.item_id, dl.uom, dl.qty_delivered - dl.qty_invoiced, ol.unit_price, o.sales_order_id
+            SELECT dl.delivery_line_id, dl.item_id, dl.uom, dl.qty_delivered - dl.qty_invoiced, ol.unit_price, o.sales_order_id, ol.freight_unit_price
             FROM log.delivery_line dl
             JOIN log.delivery d ON d.delivery_id = dl.delivery_id
             JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id
             JOIN sal.sales_order_line ol ON ol.line_id = dl.sales_order_line_id
             WHERE dl.company_id = @c AND dl.delivery_line_id = ANY (@ids) AND o.party_id = @p AND d.status IN ('DELIVERED', 'DELIVERED_WITH_EXCEPTIONS')
             """,
-            r => new Billable(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetGuid(5)),
+            r => new Billable(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetGuid(5), r.IsDBNull(6) ? null : r.GetDecimal(6)),
             cancellationToken,
             ("c", context.CompanyId),
             ("ids", ids.ToArray()),
@@ -206,7 +211,24 @@ internal static class InvoiceDrafts
 
         var lines = billable.OrderBy(b => ids.ToList().IndexOf(b.DeliveryLineId))
             .Select(b => (b, Net: decimal.Round(b.Remaining * b.UnitPrice, 2, MidpointRounding.AwayFromZero), LineId: context.Ids.NewId())).ToList();
-        var net = lines.Sum(l => l.Net);
+
+        // E-SRV1-15, E-PRS-01-2: each delivered line with freight is invoiced with its freight line, of the freight item; E-SRV1-6: never
+        // under a fiscal authorization.
+        var freight = billable.Where(b => b.FreightUnitPrice is not null).OrderBy(b => ids.ToList().IndexOf(b.DeliveryLineId))
+            .Select(b => (b, Net: Pricing.Freight.Amount(b.Remaining, b.FreightUnitPrice!.Value), LineId: context.Ids.NewId())).ToList();
+        Guid? freightItem = null;
+        if (freight.Count > 0)
+        {
+            if (authorizationId is not null)
+            {
+                throw new DomainException(InvoiceErrors.FreightUnderAuthorization, "A delivery with freight is never invoiced under a fiscal authorization (E-SRV1-6).");
+            }
+
+            freightItem = await Pricing.Freight.ItemAsync(context.Connection, context.Transaction, context.CompanyId, cancellationToken).ConfigureAwait(false)
+                ?? throw new DomainException(Pricing.Freight.ItemMissing, "The freight item is not active (E-PRS-04-1).");
+        }
+
+        var net = lines.Sum(l => l.Net) + freight.Sum(f => f.Net);
         if (authorizationId is { } authorization)
         {
             // E-FIS1-03-1 (D-05): an exempt invoice is exempt as a whole; a line out of the scope is invoiced apart with ITBIS.
@@ -270,6 +292,28 @@ internal static class InvoiceDrafts
                 ("u", b.Uom),
                 ("q", b.Remaining),
                 ("p", b.UnitPrice),
+                ("n", lineNet)).ConfigureAwait(false);
+        }
+
+        foreach (var (b, lineNet, lineId) in freight)
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                INSERT INTO sal.invoice_line (invoice_line_id, company_id, invoice_id, line_no, delivery_line_id, item_id, uom, quantity, unit_price, net_amount, line_kind)
+                VALUES (@id, @c, @i, @no, @dl, @item, @u, @q, @p, @n, 'FREIGHT')
+                """,
+                cancellationToken,
+                ("id", lineId),
+                ("c", context.CompanyId),
+                ("i", context.ResultRef),
+                ("no", ++no),
+                ("dl", b.DeliveryLineId),
+                ("item", freightItem),
+                ("u", b.Uom),
+                ("q", b.Remaining),
+                ("p", b.FreightUnitPrice),
                 ("n", lineNet)).ConfigureAwait(false);
         }
 
@@ -393,7 +437,7 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
         var exemption = authorization is { } auth
             ? await AuthorizationUsage.CoverAsync(context, auth, row.PartyId, Invoicing.Covered(lines), cancellationToken).ConfigureAwait(false)
             : null;
-        foreach (var line in lines)
+        foreach (var line in lines.Where(l => l.IsProduct))
         {
             var remaining = await SalesSql.ScalarAsync<decimal?>(
                 context, "SELECT qty_delivered - qty_invoiced FROM log.delivery_line WHERE delivery_line_id = @l FOR UPDATE", cancellationToken, ("l", line.DeliveryLineId)).ConfigureAwait(false);
@@ -426,6 +470,7 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
         }
 
         var postingLines = new List<PostingLineInput> { new("P18-DR-AR", "invoice_total", total, PartyId: row.PartyId, SubledgerRef: arDocId, Inputs: inputs) };
+        var billed = lines.GroupBy(l => l.DeliveryLineId).ToDictionary(g => g.Key, g => g.Sum(l => l.Net));
         foreach (var line in lines)
         {
             // E-VS3-05-5: the role P-16 used for this delivery line, emptied by its full invoicing.
@@ -441,9 +486,10 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
                 cancellationToken,
                 ("c", context.CompanyId),
                 ("dl", line.DeliveryLineId)).ConfigureAwait(false);
-            if (p16.Count != 1 || p16[0].Balance != line.Net)
+            // E-PRS-01-3: the product and its freight empty the delivery line's balance together.
+            if (p16.Count != 1 || p16[0].Balance != billed[line.DeliveryLineId])
             {
-                throw new InvalidOperationException($"Delivery line {line.DeliveryLineId}: its unbilled balance does not match the invoiced amount {line.Net}.");
+                throw new InvalidOperationException($"Delivery line {line.DeliveryLineId}: its unbilled balance does not match the invoiced amount {billed[line.DeliveryLineId]}.");
             }
 
             postingLines.Add(new PostingLineInput(p16[0].Role == "CONTRACT_ASSET" ? "P18-CR-CA" : "P18-CR-UR", "line_net", line.Net, PartyId: row.PartyId, SubledgerRef: line.DeliveryLineId,
@@ -504,6 +550,11 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
             ("i", command.InvoiceId)).ConfigureAwait(false);
         foreach (var line in lines)
         {
+            if (!line.IsProduct)
+            {
+                continue; // a freight line follows its product's quantity (E-PRS-01-1)
+            }
+
             await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE log.delivery_line SET qty_invoiced = qty_invoiced + @q WHERE delivery_line_id = @l", cancellationToken, ("q", line.Quantity), ("l", line.DeliveryLineId)).ConfigureAwait(false);
             await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE sal.sales_order_line SET qty_invoiced = qty_invoiced + @q WHERE line_id = @l", cancellationToken, ("q", line.Quantity), ("l", line.OrderLineId)).ConfigureAwait(false);
             await Sql.ExecuteAsync(
@@ -755,7 +806,7 @@ public sealed class VoidUnfiscalizedInvoiceHandler : ICommandHandler<VoidUnfisca
             ("r", reason),
             ("v", version),
             ("i", command.InvoiceId)).ConfigureAwait(false);
-        foreach (var line in lines)
+        foreach (var line in lines.Where(l => l.IsProduct))
         {
             await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE log.delivery_line SET qty_invoiced = qty_invoiced - @q WHERE delivery_line_id = @l", cancellationToken, ("q", line.Quantity), ("l", line.DeliveryLineId)).ConfigureAwait(false);
             await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE sal.sales_order_line SET qty_invoiced = qty_invoiced - @q WHERE line_id = @l", cancellationToken, ("q", line.Quantity), ("l", line.OrderLineId)).ConfigureAwait(false);

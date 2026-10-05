@@ -23,8 +23,8 @@ public static class CreditExposure
             connection,
             transaction,
             """
-            SELECT coalesce(sum(round((l.qty_ordered - l.qty_delivered) * l.unit_price, 2)), 0)::numeric(19,2),
-                   coalesce(sum(round((l.qty_delivered - l.qty_invoiced) * l.unit_price, 2)), 0)::numeric(19,2)
+            SELECT coalesce(sum(round((l.qty_ordered - l.qty_delivered) * l.unit_price, 2) + coalesce(round((l.qty_ordered - l.qty_delivered) * l.freight_unit_price, 2), 0)), 0)::numeric(19,2),
+                   coalesce(sum(round((l.qty_delivered - l.qty_invoiced) * l.unit_price, 2) + coalesce(round((l.qty_delivered - l.qty_invoiced) * l.freight_unit_price, 2), 0)), 0)::numeric(19,2)
             FROM sal.sales_order o
             JOIN sal.sales_order_line l ON l.sales_order_id = o.sales_order_id AND l.lines_version = o.lines_version
             WHERE o.company_id = @c AND o.party_id = @p AND o.status IN ('CONFIRMED', 'PARTIALLY_DELIVERED', 'DELIVERED')
