@@ -198,6 +198,9 @@ public static class CommandEndpoints
         sales.MapCommand<ApproveStandardCost, ApproveStandardCostHandler>();
         sales.MapCommand<PreparePriceList, PreparePriceListHandler>();
         sales.MapCommand<ApprovePriceList, ApprovePriceListHandler>();
+        sales.MapCommand<CreatePriceList, CreatePriceListHandler>(); // PRS-02 (E-PRC1-5, E-PRS-02-1)
+        sales.MapCommand<DeactivatePriceList, DeactivatePriceListHandler>();
+        sales.MapCommand<ReactivatePriceList, ReactivatePriceListHandler>();
         sales.MapCommand<RegisterVehicle, RegisterVehicleHandler>();
         sales.MapCommand<UpdateVehicle, UpdateVehicleHandler>();
         sales.MapCommand<DeactivateVehicle, DeactivateVehicleHandler>();
@@ -328,7 +331,7 @@ public static class CommandEndpoints
         typeof(RegisterFiscalAuthorizationHandler), typeof(UpdateDraftAuthorizationHandler), typeof(AttachAuthorizationDocumentHandler), typeof(SubmitForVerificationHandler), typeof(VerifyAuthorizationHandler), typeof(ReturnAuthorizationToDraftHandler), typeof(RejectAuthorizationHandler), typeof(SuspendAuthorizationHandler), typeof(ReactivateAuthorizationHandler), typeof(ExpireFiscalAuthorizationsHandler),
         typeof(RunReconciliationHandler), typeof(CloseComponentHandler), typeof(RequestReopenHandler), typeof(ApproveReopenHandler), typeof(RejectReopenHandler),
         typeof(CreateCustomerHandler), typeof(UpdateCustomerHandler), typeof(ActivateCustomerHandler), typeof(PrepareCustomerTermsHandler), typeof(ApproveCustomerTermsHandler),
-        typeof(ImportCustomersHandler), typeof(ApproveCustomerTermsBatchHandler), typeof(ActivateCustomersHandler), typeof(PrepareStandardCostHandler), typeof(PrepareStandardCostFromRecipeHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler),
+        typeof(ImportCustomersHandler), typeof(ApproveCustomerTermsBatchHandler), typeof(ActivateCustomersHandler), typeof(PrepareStandardCostHandler), typeof(PrepareStandardCostFromRecipeHandler), typeof(ApproveStandardCostHandler), typeof(PreparePriceListHandler), typeof(ApprovePriceListHandler), typeof(CreatePriceListHandler), typeof(DeactivatePriceListHandler), typeof(ReactivatePriceListHandler),
         typeof(RegisterVehicleHandler), typeof(UpdateVehicleHandler), typeof(DeactivateVehicleHandler), typeof(ActivateVehicleHandler), typeof(RegisterDriverHandler), typeof(UpdateDriverHandler), typeof(DeactivateDriverHandler), typeof(ActivateDriverHandler),
         typeof(PrepareOpeningInventoryHandler), typeof(PostOpeningInventoryHandler), typeof(ReverseOpeningInventoryHandler),
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),

@@ -62,7 +62,7 @@ public static class QueryEndpoints
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListPurchaseTaxTypesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
-        typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler),
+        typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
@@ -226,9 +226,13 @@ public static class QueryEndpoints
         sales.MapGet("/standard-costs", (HttpContext http, Guid companyId, string? status, Guid? itemId, ListStandardCostsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListStandardCosts(companyId, s, status, itemId), handler, ct))
             .Describe<StandardCostList>(nameof(ListStandardCosts));
-        sales.MapGet("/price-lists", (HttpContext http, Guid companyId, ListPriceListsHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunAsync(http, s => new ListPriceLists(companyId, s), handler, ct))
+        sales.MapGet("/price-lists", (HttpContext http, Guid companyId, Guid? priceListId, ListPriceListsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPriceLists(companyId, s, priceListId), handler, ct))
             .Describe<PriceListList>(nameof(ListPriceLists));
+        // PRS-02 (E-PRC1-11): the named lists.
+        sales.MapGet("/price-list-headers", (HttpContext http, Guid companyId, ListPriceListHeadersHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPriceListHeaders(companyId, s), handler, ct))
+            .Describe<PriceListHeaderList>(nameof(ListPriceListHeaders));
         sales.MapGet("/price-lists/{priceListVersionId:guid}", (HttpContext http, Guid companyId, Guid priceListVersionId, GetPriceListHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetPriceList(companyId, s, priceListVersionId), handler, ct))
             .Describe<PriceListDetail>(nameof(GetPriceList), notFound: true);
@@ -287,7 +291,7 @@ public static class QueryEndpoints
         // E-UX4-3/4/10: previews of a draft order or quote (POST: the lines travel in the body; read-only), the credit an order would
         // use and how a receipt would be applied.
         sales.MapPost("/orders/preview", (HttpContext http, Guid companyId, PreviewSalesOrderHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewSalesOrder>(http, (s, b) => new PreviewSalesOrder(companyId, s, b.PlantId, b.Lines), handler, ct))
+                => runner.RunBodyAsync<SalesOrderPreviewRequest, PreviewSalesOrder>(http, (s, b) => new PreviewSalesOrder(companyId, s, b.PlantId, b.Lines, b.PartyId), handler, ct))
             .Describe<SalesPreview>(nameof(PreviewSalesOrder))
             .Accepts<SalesOrderPreviewRequest>("application/json");
         sales.MapPost("/cash-sales/preview", (HttpContext http, Guid companyId, PreviewCashSaleHandler handler, QueryRunner runner, CancellationToken ct)
@@ -295,7 +299,7 @@ public static class QueryEndpoints
             .Describe<SalesPreview>(nameof(PreviewCashSale))
             .Accepts<SalesOrderPreviewRequest>("application/json");
         sales.MapPost("/quotes/preview", (HttpContext http, Guid companyId, PreviewQuoteHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunBodyAsync<QuotePreviewRequest, PreviewQuote>(http, (s, b) => new PreviewQuote(companyId, s, b.PlantId, b.Lines), handler, ct))
+                => runner.RunBodyAsync<QuotePreviewRequest, PreviewQuote>(http, (s, b) => new PreviewQuote(companyId, s, b.PlantId, b.Lines, b.PartyId), handler, ct))
             .Describe<SalesPreview>(nameof(PreviewQuote))
             .Accepts<QuotePreviewRequest>("application/json");
         // E-IMP-1: what the customer file would load (read-only).

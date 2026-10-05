@@ -23,9 +23,12 @@ public sealed record UpdateCustomer(
 /// <summary>E-VS3-02-5: Crédito activates a customer that has approved terms (and its party, when still DRAFT).</summary>
 public sealed record ActivateCustomer(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, long ExpectedVersion) : ICommand;
 
-/// <summary>E-VS3-02-6: the customer's single DRAFT terms version, created or replaced (Crédito).</summary>
+/// <summary>
+/// E-VS3-02-6: the customer's single DRAFT terms version, created or replaced (Crédito). E-PRC1-6, E-PRS-02-3: with its price list —
+/// <paramref name="PriceListId"/> when given (ACTIVE), else the list the customer already has (GENERAL for a new customer).
+/// </summary>
 public sealed record PrepareCustomerTerms(
-    Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, int PaymentTermsDays, decimal CreditLimit, bool CreditHold) : ICommand;
+    Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PartyId, int PaymentTermsDays, decimal CreditLimit, bool CreditHold, Guid? PriceListId = null) : ICommand;
 
 /// <summary>E-VS3-02-6: the Controller approves the DRAFT (not the preparer, with step-up); in force from the approval date.</summary>
 public sealed record ApproveCustomerTerms(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid TermsVersionId) : ICommand;

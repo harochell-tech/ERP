@@ -3,6 +3,7 @@ using System.Text.Json;
 using Rochell.Finance.Policies;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
+using Rochell.Sales.Pricing;
 
 namespace Rochell.Sales.Orders;
 
@@ -27,7 +28,8 @@ internal static class Orders
 
     public sealed record Header(Guid PlantId, string Term, string? Site, DateOnly? Requested, string? PoRef);
 
-    public sealed record PricedLine(int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal UnitPrice, decimal Net);
+    /// <summary>A priced line; <paramref name="PriceListVersionId"/> is the list version its price came from (null for a quoted price, E-PRS-02-6).</summary>
+    public sealed record PricedLine(int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal UnitPrice, decimal Net, Guid? PriceListVersionId = null);
 
     public static Header ValidateHeader(string? term, string? site, DateOnly? requested, string? poRef, Guid plantId)
     {
@@ -47,18 +49,19 @@ internal static class Orders
     }
 
     /// <summary>
-    /// E-VS3-03-5: prices from the list in force for (item, unit); a missing price refuses the order. E-QUO1-03-4: an (item, unit) of
-    /// the quote an order came from keeps its quoted price in <paramref name="quoted"/>.
+    /// E-VS3-03-5, E-PRC1-3/7: prices from the customer's list in force for (item, unit), else GENERAL's; a missing price refuses the
+    /// order. <paramref name="partyId"/> null (the final consumer, E-PRC1-10) prices from GENERAL. E-QUO1-03-4: an (item, unit) of the
+    /// quote an order came from keeps its quoted price in <paramref name="quoted"/>.
     /// </summary>
     public static Task<(Guid PriceListVersionId, List<PricedLine> Lines, decimal Total)> PriceAsync(
-        CommandContext context, Guid plantId, IReadOnlyList<SalesOrderLineInput>? input, CancellationToken cancellationToken,
+        CommandContext context, Guid plantId, Guid? partyId, IReadOnlyList<SalesOrderLineInput>? input, CancellationToken cancellationToken,
         IReadOnlyDictionary<(Guid ItemId, string Uom), decimal>? quoted = null)
-        => PriceAsync(context.Connection, context.Transaction, context.CompanyId, plantId, input, cancellationToken, quoted);
+        => PriceAsync(context.Connection, context.Transaction, context.CompanyId, plantId, partyId, input, cancellationToken, quoted);
 
     /// <summary>The same pricing on any connection (E-UX4-3: the read-only preview of an order runs it too).</summary>
     public static async Task<(Guid PriceListVersionId, List<PricedLine> Lines, decimal Total)> PriceAsync(
-        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid companyId, Guid plantId, IReadOnlyList<SalesOrderLineInput>? input,
-        CancellationToken cancellationToken, IReadOnlyDictionary<(Guid ItemId, string Uom), decimal>? quoted = null)
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid companyId, Guid plantId, Guid? partyId,
+        IReadOnlyList<SalesOrderLineInput>? input, CancellationToken cancellationToken, IReadOnlyDictionary<(Guid ItemId, string Uom), decimal>? quoted = null)
     {
         var lines = input ?? [];
         if (lines.Count == 0)
@@ -71,9 +74,7 @@ internal static class Orders
             throw new DomainException(SalesErrors.NotFound, "The plant does not exist.");
         }
 
-        var list = await SalesSql.ScalarAsync<Guid?>(
-            connection, transaction, "SELECT price_list_version_id FROM sal.price_list_version WHERE company_id = @c AND status = 'ACTIVE'", cancellationToken, ("c", companyId)).ConfigureAwait(false)
-            ?? throw new DomainException(OrderErrors.PriceListMissing, "There is no approved price list.");
+        var sources = await CustomerPrices.ResolveAsync(connection, transaction, companyId, partyId, cancellationToken).ConfigureAwait(false);
         var seen = new HashSet<(Guid, string)>();
         var priced = new List<PricedLine>();
         foreach (var line in lines)
@@ -89,22 +90,27 @@ internal static class Orders
                 throw new DomainException(SalesErrors.AmountInvalid, "Quantities are positive with at most 6 decimals.");
             }
 
-            var price = quoted is not null && quoted.TryGetValue((line.ItemId, uom), out var quotedPrice)
-                ? quotedPrice
-                : await SalesSql.ScalarAsync<decimal?>(
-                    connection, transaction, "SELECT unit_price FROM sal.price_list_line WHERE price_list_version_id = @l AND item_id = @i AND uom = @u", cancellationToken,
-                    ("l", list), ("i", line.ItemId), ("u", uom)).ConfigureAwait(false)
-                  ?? throw new DomainException(OrderErrors.PriceMissing, $"The price list in force has no price for item {line.ItemId} in {uom}.");
+            decimal price;
+            Guid? from = null;
+            if (quoted is not null && quoted.TryGetValue((line.ItemId, uom), out var quotedPrice))
+            {
+                price = quotedPrice;
+            }
+            else
+            {
+                (price, var version) = await CustomerPrices.PriceAsync(connection, transaction, sources, line.ItemId, uom, cancellationToken).ConfigureAwait(false);
+                from = version;
+            }
             var net = decimal.Round(line.Quantity * price, 2, MidpointRounding.AwayFromZero);
             if (net <= 0m)
             {
                 throw new DomainException(SalesErrors.AmountInvalid, "The quantity is too small to be priced.");
             }
 
-            priced.Add(new PricedLine(priced.Count + 1, line.ItemId, uom, line.Quantity, price, net));
+            priced.Add(new PricedLine(priced.Count + 1, line.ItemId, uom, line.Quantity, price, net, from));
         }
 
-        return (list, priced, priced.Sum(l => l.Net));
+        return (sources.Header, priced, priced.Sum(l => l.Net));
     }
 
     /// <summary>E-QUO1-03-4: the quoted price of each (item, unit) of the quote the order came from (empty for an order without one).</summary>
@@ -208,8 +214,8 @@ internal static class Orders
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO sal.sales_order_line (line_id, company_id, sales_order_id, lines_version, line_no, item_id, uom, qty_ordered, unit_price, net_amount)
-                VALUES (@id, @c, @o, @v, @no, @i, @u, @q, @p, @n)
+                INSERT INTO sal.sales_order_line (line_id, company_id, sales_order_id, lines_version, line_no, item_id, uom, qty_ordered, unit_price, net_amount, price_list_version_id)
+                VALUES (@id, @c, @o, @v, @no, @i, @u, @q, @p, @n, @src)
                 """,
                 cancellationToken,
                 ("id", context.Ids.NewId()),
@@ -221,7 +227,8 @@ internal static class Orders
                 ("u", l.Uom),
                 ("q", l.Quantity),
                 ("p", l.UnitPrice),
-                ("n", l.Net)).ConfigureAwait(false);
+                ("n", l.Net),
+                ("src", l.PriceListVersionId)).ConfigureAwait(false);
         }
     }
 
@@ -341,7 +348,7 @@ public sealed class CreateSalesOrderHandler : ICommandHandler<CreateSalesOrder>
             throw new DomainException(OrderErrors.UseCashSale, "A sale to the final consumer is a cash sale: use CreateCashSale (E-CF1-4).");
         }
 
-        var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
         var orderNo = await Orders.InsertAsync(context, context.ResultRef, command.PartyId, header, list, lines, total, null, CommandType, cancellationToken, exemption).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.M(total), version = 1 });
     }
@@ -370,7 +377,7 @@ public sealed class UpdateSalesOrderDraftHandler : ICommandHandler<UpdateSalesOr
         }
 
         var quoted = await Orders.QuotedPricesAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
-        var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
+        var (list, lines, total) = await Orders.PriceAsync(context, header.PlantId, row.PartyId, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
         var version = row.Version + 1;
         var linesVersion = row.LinesVersion + 1;
         await context.AppendEventAsync(

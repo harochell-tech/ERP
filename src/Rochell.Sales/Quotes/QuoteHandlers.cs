@@ -25,7 +25,8 @@ internal static class Quotes
 
     public sealed record Header(Guid PlantId, DateOnly ValidUntil, string Term, string? Site, string? CustomerRef, string? Notes);
 
-    public sealed record PricedLine(int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, decimal Net)
+    /// <summary>A priced quote line; <paramref name="PriceListVersionId"/> is the version its list price came from (E-PRS-02-6).</summary>
+    public sealed record PricedLine(int LineNo, Guid ItemId, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, decimal Net, Guid PriceListVersionId)
     {
         public bool Special => UnitPrice < ListPrice;
     }
@@ -59,17 +60,17 @@ internal static class Quotes
     }
 
     /// <summary>
-    /// E-QUO1-02-2: the list price in force for (item, unit) — missing refuses the line with PRICE_MISSING — and the quoted price, the
-    /// list's when none is given. Nets are rounded to 2 decimals like the order's.
+    /// E-QUO1-02-2, E-PRC1-9: the list price in force for (item, unit) — the customer's list, else GENERAL; missing refuses the line
+    /// with PRICE_MISSING — and the quoted price, the list's when none is given. Nets are rounded to 2 decimals like the order's.
     /// </summary>
     public static Task<(Guid PriceListVersionId, List<PricedLine> Lines, decimal Total)> PriceAsync(
-        CommandContext context, Guid plantId, IReadOnlyList<QuoteLineInput>? input, CancellationToken cancellationToken)
-        => PriceAsync(context.Connection, context.Transaction, context.CompanyId, plantId, input, cancellationToken);
+        CommandContext context, Guid plantId, Guid partyId, IReadOnlyList<QuoteLineInput>? input, CancellationToken cancellationToken)
+        => PriceAsync(context.Connection, context.Transaction, context.CompanyId, plantId, partyId, input, cancellationToken);
 
     /// <summary>The same pricing on any connection (E-UX4-3: the read-only preview of a quote runs it too).</summary>
     public static async Task<(Guid PriceListVersionId, List<PricedLine> Lines, decimal Total)> PriceAsync(
-        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid companyId, Guid plantId, IReadOnlyList<QuoteLineInput>? input,
-        CancellationToken cancellationToken)
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction transaction, Guid companyId, Guid plantId, Guid? partyId,
+        IReadOnlyList<QuoteLineInput>? input, CancellationToken cancellationToken)
     {
         var lines = input ?? [];
         if (lines.Count == 0)
@@ -82,9 +83,7 @@ internal static class Quotes
             throw new DomainException(SalesErrors.NotFound, "The plant does not exist.");
         }
 
-        var list = await SalesSql.ScalarAsync<Guid?>(
-            connection, transaction, "SELECT price_list_version_id FROM sal.price_list_version WHERE company_id = @c AND status = 'ACTIVE'", cancellationToken, ("c", companyId)).ConfigureAwait(false)
-            ?? throw new DomainException(OrderErrors.PriceListMissing, "There is no approved price list.");
+        var sources = await Pricing.CustomerPrices.ResolveAsync(connection, transaction, companyId, partyId, cancellationToken).ConfigureAwait(false);
         var seen = new HashSet<(Guid, string)>();
         var priced = new List<PricedLine>();
         foreach (var line in lines)
@@ -96,10 +95,7 @@ internal static class Quotes
             }
 
             var quantity = SalesSql.Positive(line.Quantity, 6, "The quantity");
-            var listPrice = await SalesSql.ScalarAsync<decimal?>(
-                connection, transaction, "SELECT unit_price FROM sal.price_list_line WHERE price_list_version_id = @l AND item_id = @i AND uom = @u", cancellationToken,
-                ("l", list), ("i", line.ItemId), ("u", uom)).ConfigureAwait(false)
-                ?? throw new DomainException(OrderErrors.PriceMissing, $"The price list in force has no price for item {line.ItemId} in {uom}.");
+            var (listPrice, from) = await Pricing.CustomerPrices.PriceAsync(connection, transaction, sources, line.ItemId, uom, cancellationToken).ConfigureAwait(false);
             var unitPrice = line.UnitPrice is { } given ? SalesSql.Positive(given, 4, "The unit price") : listPrice;
             var net = decimal.Round(quantity * unitPrice, 2, MidpointRounding.AwayFromZero);
             if (net <= 0m)
@@ -107,10 +103,10 @@ internal static class Quotes
                 throw new DomainException(SalesErrors.AmountInvalid, "The quantity is too small to be priced.");
             }
 
-            priced.Add(new PricedLine(priced.Count + 1, line.ItemId, uom, quantity, listPrice, unitPrice, net));
+            priced.Add(new PricedLine(priced.Count + 1, line.ItemId, uom, quantity, listPrice, unitPrice, net, from));
         }
 
-        return (list, priced, priced.Sum(l => l.Net));
+        return (sources.Header, priced, priced.Sum(l => l.Net));
     }
 
     public static async Task WriteLinesAsync(CommandContext context, Guid quoteId, int linesVersion, IEnumerable<PricedLine> lines, CancellationToken cancellationToken)
@@ -121,8 +117,8 @@ internal static class Quotes
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO sal.quote_line (line_id, company_id, quote_id, lines_version, line_no, item_id, uom, quantity, list_price, unit_price, net_amount)
-                VALUES (@id, @c, @q, @v, @no, @i, @u, @qty, @lp, @p, @n)
+                INSERT INTO sal.quote_line (line_id, company_id, quote_id, lines_version, line_no, item_id, uom, quantity, list_price, unit_price, net_amount, price_list_version_id)
+                VALUES (@id, @c, @q, @v, @no, @i, @u, @qty, @lp, @p, @n, @src)
                 """,
                 cancellationToken,
                 ("id", context.Ids.NewId()),
@@ -135,7 +131,8 @@ internal static class Quotes
                 ("qty", l.Quantity),
                 ("lp", l.ListPrice),
                 ("p", l.UnitPrice),
-                ("n", l.Net)).ConfigureAwait(false);
+                ("n", l.Net),
+                ("src", l.PriceListVersionId)).ConfigureAwait(false);
         }
     }
 
@@ -275,7 +272,7 @@ public sealed class CreateQuoteHandler : ICommandHandler<CreateQuote>
         ArgumentNullException.ThrowIfNull(context);
         var header = Quotes.ValidateHeader(context, command.PlantId, command.ValidUntil, command.DeliveryTermCode, command.SiteAddress, command.CustomerRef, command.Notes);
         await Quotes.EnsureCustomerAsync(context, command.PartyId, cancellationToken).ConfigureAwait(false);
-        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, command.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
         return await Quotes.InsertAsync(context, command.PartyId, header, list, lines, total, null, CommandType, cancellationToken).ConfigureAwait(false);
     }
 }
@@ -292,7 +289,7 @@ public sealed class UpdateDraftQuoteHandler : ICommandHandler<UpdateDraftQuote>
         var header = Quotes.ValidateHeader(context, command.PlantId, command.ValidUntil, command.DeliveryTermCode, command.SiteAddress, command.CustomerRef, command.Notes);
         var row = await Quotes.LockAsync(context, command.QuoteId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         Quotes.RequireStatus(row, "DRAFT");
-        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, row.PartyId, command.Lines, cancellationToken).ConfigureAwait(false);
         var version = row.Version + 1;
         var linesVersion = row.LinesVersion + 1;
         await context.AppendEventAsync(
@@ -476,7 +473,7 @@ public sealed class CopyQuoteHandler : ICommandHandler<CopyQuote>
             cancellationToken,
             ("q", command.QuoteId),
             ("v", source.LinesVersion)).ConfigureAwait(false);
-        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, input, cancellationToken).ConfigureAwait(false);
+        var (list, lines, total) = await Quotes.PriceAsync(context, header.PlantId, source.PartyId, input, cancellationToken).ConfigureAwait(false);
         return await Quotes.InsertAsync(context, source.PartyId, header, list, lines, total, command.QuoteId, CommandType, cancellationToken).ConfigureAwait(false);
     }
 }

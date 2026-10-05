@@ -1046,6 +1046,20 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-SRV1-17 | SRV-1 | An order with a pending exemption or a fiscal authorization never carries freight. |
 | E-SRV1-18 | SRV-1 | New account 40500 «Ingresos por transporte» mapped to `FREIGHT_REVENUE`; the Controller approves it (A-01). |
 | E-SRV1-19 | SRV-1 | A quote also chooses the zone and shows the freight; the converted order keeps it. |
+| E-PRS-01-1 | PRS-1 | The freight lives on the product's own order (and quote) line: freight unit price and amount, always the product's quantity; shown as its own line on screen, delivery note and invoice. |
+| E-PRS-01-2 | PRS-1 | An invoiced (or proforma) delivery line gives a PRODUCT line and, with freight, a FREIGHT line of the freight item, each with its own number; a credit note may point at either. |
+| E-PRS-01-3 | PRS-1 | Freight adds to the same contract-asset balance of the delivery line (blocks + freight) and is separated only in the revenue account; CONTRACT-ASSET compares (delivered − invoiced) × (price + freight). |
+| E-PRS-01-4 | PRS-1 | GENERAL has a fixed code, is never deactivated and always keeps a version in force. |
+| E-PRS-01-5 | PRS-1 | A list goes inactive only when no customer terms in force or pending name it. |
+| E-PRS-01-6 | PRS-1 | New permission `delivery_zone:manage` (CONTROLLER, CREDITO); an inactive zone leaves new documents, orders that have it keep it. |
+| E-PRS-01-7 | PRS-1 | One freight item, code TRANSPORTE, type SERVICE, created by the Controller in Maestros or by the configuration load; only on freight lines. |
+| E-PRS-01-8 | PRS-1 | New or imported customer terms are on GENERAL unless another list is named. |
+| E-PRS-02-1 | PRS-1 | The Controller (`price_list:prepare`) deactivates and reactivates lists without a second approval, only when no customer has the list (E-PRS-01-5). |
+| E-PRS-02-2 | PRS-1 | A version is prepared for a chosen list (GENERAL when none is chosen) and its approval replaces only that list's version in force. |
+| E-PRS-02-3 | PRS-1 | Crédito names the list when preparing the terms; when it does not, the customer keeps its list. The Controller's approval (one by one or in a batch) puts it in force. |
+| E-PRS-02-4 | PRS-1 | A customer whose list has no version in force prices everything from GENERAL. |
+| E-PRS-02-5 | PRS-1 | Changing a DRAFT order or quote re-prices every line with the lists in force that day; prices that came from a quote are kept. |
+| E-PRS-02-6 | PRS-1 | Each order and quote line shows whether its price came from the customer's list, GENERAL or the quote; the customer shows its list. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

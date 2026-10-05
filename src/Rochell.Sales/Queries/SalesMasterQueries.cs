@@ -57,7 +57,7 @@ public sealed record GetCustomer(Guid CompanyId, Guid SessionId, Guid PartyId) :
 
 public sealed record CustomerTermsView(
     Guid TermsVersionId, Guid PartyId, string? CustomerName, int Version, DateOnly EffectiveFrom, int PaymentTermsDays, decimal CreditLimit, bool CreditHold, string Status,
-    string? PreparedBy, string? ApprovedBy);
+    string? PreparedBy, string? ApprovedBy, Guid PriceListId, string PriceListCode, string PriceListName);
 
 /// <remarks>E-IMP-6: <c>Emails</c> is the whole list; <c>Email</c> is its first entry.</remarks>
 public sealed record CustomerDetail(
@@ -68,15 +68,17 @@ internal static class TermsReading
 {
     public const string Select = """
         SELECT t.terms_version_id, t.party_id, p.legal_name, t.version, t.effective_from, t.payment_terms_days, t.credit_limit::numeric(19,2), t.credit_hold, t.status,
-               coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email)
+               coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email), pl.price_list_id, pl.code, pl.name
         FROM sal.customer_terms_version t
+        JOIN sal.price_list pl ON pl.price_list_id = t.price_list_id
         JOIN md.party p ON p.party_id = t.party_id
         JOIN iam.user pu ON pu.user_id = t.prepared_by
         LEFT JOIN iam.user au ON au.user_id = t.approved_by
         """;
 
     public static CustomerTermsView Map(System.Data.Common.DbDataReader r)
-        => new(r.GetGuid(0), r.GetGuid(1), r.NullableString(2), r.GetInt32(3), r.Date(4), r.GetInt32(5), r.GetDecimal(6), r.GetBoolean(7), r.GetString(8), r.NullableString(9), r.NullableString(10));
+        => new(r.GetGuid(0), r.GetGuid(1), r.NullableString(2), r.GetInt32(3), r.Date(4), r.GetInt32(5), r.GetDecimal(6), r.GetBoolean(7), r.GetString(8), r.NullableString(9), r.NullableString(10),
+            r.GetGuid(11), r.GetString(12), r.GetString(13));
 }
 
 [RequiresPermission("sales:read")]
@@ -179,9 +181,12 @@ public sealed class ListStandardCostsHandler : IQueryHandler<ListStandardCosts>
     }
 }
 
-public sealed record ListPriceLists(Guid CompanyId, Guid SessionId) : IQuery;
+/// <summary>The versions of every list, or of <paramref name="PriceListId"/> (PRS-02).</summary>
+public sealed record ListPriceLists(Guid CompanyId, Guid SessionId, Guid? PriceListId = null) : IQuery;
 
-public sealed record PriceListSummary(Guid PriceListVersionId, int Version, DateOnly EffectiveFrom, string Status, int Lines, string? PreparedBy, string? ApprovedBy);
+public sealed record PriceListSummary(
+    Guid PriceListVersionId, int Version, DateOnly EffectiveFrom, string Status, int Lines, string? PreparedBy, string? ApprovedBy, Guid PriceListId, string PriceListCode,
+    string PriceListName);
 
 public sealed record PriceListList(IReadOnlyList<PriceListSummary> Items);
 
@@ -199,17 +204,58 @@ public sealed class ListPriceListsHandler : IQueryHandler<ListPriceLists>
             context.Transaction,
             """
             SELECT v.price_list_version_id, v.version, v.effective_from, v.status,
-                   (SELECT count(*) FROM sal.price_list_line l WHERE l.price_list_version_id = v.price_list_version_id)::int, coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email)
+                   (SELECT count(*) FROM sal.price_list_line l WHERE l.price_list_version_id = v.price_list_version_id)::int, coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email),
+                   pl.price_list_id, pl.code, pl.name
             FROM sal.price_list_version v
+            JOIN sal.price_list pl ON pl.price_list_id = v.price_list_id
             JOIN iam.user pu ON pu.user_id = v.prepared_by
             LEFT JOIN iam.user au ON au.user_id = v.approved_by
-            WHERE v.company_id = @c
-            ORDER BY v.version DESC
+            WHERE v.company_id = @c AND (@l::uuid IS NULL OR v.price_list_id = @l)
+            ORDER BY pl.code <> 'GENERAL', pl.code, v.version DESC
             """,
-            r => new PriceListSummary(r.GetGuid(0), r.GetInt32(1), r.Date(2), r.GetString(3), r.GetInt32(4), r.NullableString(5), r.NullableString(6)),
+            r => new PriceListSummary(r.GetGuid(0), r.GetInt32(1), r.Date(2), r.GetString(3), r.GetInt32(4), r.NullableString(5), r.NullableString(6), r.GetGuid(7), r.GetString(8), r.GetString(9)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("l", query.PriceListId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new PriceListList(items));
+    }
+}
+
+/// <summary>E-PRC1-11: the named lists — status, the version in force, how many customers have each in their terms in force.</summary>
+public sealed record ListPriceListHeaders(Guid CompanyId, Guid SessionId) : IQuery;
+
+public sealed record PriceListHeaderView(
+    Guid PriceListId, string Code, string Name, string Status, long Version, Guid? ActiveVersionId, int? ActiveVersion, DateOnly? ActiveFrom, bool HasDraft, int Customers);
+
+public sealed record PriceListHeaderList(IReadOnlyList<PriceListHeaderView> Items);
+
+[RequiresPermission("sales:read")]
+public sealed class ListPriceListHeadersHandler : IQueryHandler<ListPriceListHeaders>
+{
+    public string QueryType => "Sales.ListPriceListHeaders";
+
+    public async Task<string> HandleAsync(ListPriceListHeaders query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT l.price_list_id, l.code, l.name, l.status, l.version, a.price_list_version_id, a.version, a.effective_from,
+                   EXISTS (SELECT 1 FROM sal.price_list_version d WHERE d.price_list_id = l.price_list_id AND d.status = 'DRAFT'),
+                   (SELECT count(*) FROM sal.customer_terms_version t WHERE t.price_list_id = l.price_list_id AND t.status = 'ACTIVE')::int
+            FROM sal.price_list l
+            LEFT JOIN sal.price_list_version a ON a.price_list_id = l.price_list_id AND a.status = 'ACTIVE'
+            WHERE l.company_id = @c
+            ORDER BY l.code <> 'GENERAL', l.code
+            """,
+            r => new PriceListHeaderView(
+                r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetInt64(4), r.NullableGuid(5), r.IsDBNull(6) ? null : r.GetInt32(6), r.IsDBNull(7) ? null : r.Date(7),
+                r.GetBoolean(8), r.GetInt32(9)),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new PriceListList(items));
+        return ApiJson.Serialize(new PriceListHeaderList(items));
     }
 }
 

@@ -41,7 +41,7 @@ public sealed class EndpointCoverageTests(PostgresFixture postgres)
 
         Assert.Equal(Handled(typeof(ICommandHandler<>)), commands);
         Assert.Equal(Handled(typeof(IQueryHandler<>)).Select(t => t.Name), queries);
-        Assert.Equal(204, commands.Count); // + 3 expense order commands (GAS1-05); + RegisterExpenseInvoice (GAS1-04); + 5 of GAS1-03 (expense categories); + CancelCashSale (CF1-03); + 7 of CF1-02; + 6 of MAIL-02; 44 of VS#1 + 5 of VS2-02 + 4 of VS2-03 + 1 of VS2-04 + 4 of VS2-05 + 1 of UI-01 + 11 of FIN1-02 + 2 of FIN1-03 + 19 of VS3-02 + 3 of VS3-02b + 6 of VS3-03 + 8 of VS3-04 + 4 of VS3-05 + 3 of VS3-06 + 9 of VS3-07 + 9 of MFG1-02 + 5 of MFG1-03 + 4 of MFG1-04 + 1 of MFG1-05 + 9 of FIS1-02 + 1 of FIS1-04 + 9 of QUO1-02 + 1 of QUO1-03 + 3 of UX2-01 + 1 of UX4-01 + 6 of IMP-01 + 2 of FIS1b-03 + 2 of FIS1b-04 + 4 of FIS1b-05
+        Assert.Equal(207, commands.Count); // + Create / Deactivate / ReactivatePriceList (PRS-02); + 3 expense order commands (GAS1-05); + RegisterExpenseInvoice (GAS1-04); + 5 of GAS1-03 (expense categories); + CancelCashSale (CF1-03); + 7 of CF1-02; + 6 of MAIL-02; 44 of VS#1 + 5 of VS2-02 + 4 of VS2-03 + 1 of VS2-04 + 4 of VS2-05 + 1 of UI-01 + 11 of FIN1-02 + 2 of FIN1-03 + 19 of VS3-02 + 3 of VS3-02b + 6 of VS3-03 + 8 of VS3-04 + 4 of VS3-05 + 3 of VS3-06 + 9 of VS3-07 + 9 of MFG1-02 + 5 of MFG1-03 + 4 of MFG1-04 + 1 of MFG1-05 + 9 of FIS1-02 + 1 of FIS1-04 + 9 of QUO1-02 + 1 of QUO1-03 + 3 of UX2-01 + 1 of UX4-01 + 6 of IMP-01 + 2 of FIS1b-03 + 2 of FIS1b-04 + 4 of FIS1b-05
     }
 
     [Fact]
