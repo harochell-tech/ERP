@@ -1916,6 +1916,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/create-price-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreatePriceList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/deactivate-price-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DeactivatePriceList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/reactivate-price-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReactivatePriceList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/register-vehicle": {
         parameters: {
             query?: never;
@@ -4084,6 +4132,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["ListPriceLists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/price-list-headers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListPriceListHeaders"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6401,6 +6465,10 @@ export interface components {
             code: string;
             name: string;
         };
+        CreatePriceList: {
+            code: string;
+            name: string;
+        };
         CreatePurchaseOrder: {
             /** Format: uuid */
             plantId: string;
@@ -6758,6 +6826,10 @@ export interface components {
             status: string;
             preparedBy: null | string;
             approvedBy: null | string;
+            /** Format: uuid */
+            priceListId: string;
+            priceListCode: string;
+            priceListName: string;
         };
         DeactivateAccount: {
             /** Format: uuid */
@@ -6772,6 +6844,12 @@ export interface components {
         DeactivateExpenseCategory: {
             /** Format: uuid */
             expenseCategoryId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
+        DeactivatePriceList: {
+            /** Format: uuid */
+            priceListId: string;
             /** Format: int64 */
             expectedVersion: number;
         };
@@ -8421,6 +8499,8 @@ export interface components {
             /** Format: decimal */
             creditLimit: string;
             creditHold: boolean;
+            /** Format: uuid */
+            priceListId?: null | string;
         };
         PrepareExpenseCategory: {
             code: string;
@@ -8448,6 +8528,8 @@ export interface components {
         };
         PreparePriceList: {
             lines: components["schemas"]["PriceListLine"][];
+            /** Format: uuid */
+            priceListId?: null | string;
         };
         PrepareRecipe: {
             /** Format: uuid */
@@ -8505,6 +8587,27 @@ export interface components {
             header: components["schemas"]["PriceListSummary"];
             lines: components["schemas"]["PriceListLineView"][];
         };
+        PriceListHeaderList: {
+            items: components["schemas"]["PriceListHeaderView"][];
+        };
+        PriceListHeaderView: {
+            /** Format: uuid */
+            priceListId: string;
+            code: string;
+            name: string;
+            status: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: uuid */
+            activeVersionId: null | string;
+            /** Format: int32 */
+            activeVersion: null | number;
+            /** Format: date */
+            activeFrom: null | string;
+            hasDraft: boolean;
+            /** Format: int32 */
+            customers: number;
+        };
         PriceListLine: {
             /** Format: uuid */
             itemId: string;
@@ -8536,6 +8639,10 @@ export interface components {
             lines: number;
             preparedBy: null | string;
             approvedBy: null | string;
+            /** Format: uuid */
+            priceListId: string;
+            priceListCode: string;
+            priceListName: string;
         };
         ProblemDetails: {
             type?: null | string;
@@ -9043,6 +9150,8 @@ export interface components {
             /** Format: decimal */
             netAmount: string;
             special: boolean;
+            priceListCode?: null | string;
+            priceListName?: null | string;
         };
         QuoteLink: {
             /** Format: uuid */
@@ -9061,6 +9170,8 @@ export interface components {
             /** Format: uuid */
             plantId: string;
             lines: components["schemas"]["QuoteLineInput"][];
+            /** Format: uuid */
+            partyId?: null | string;
         };
         QuotePrint: {
             quoteNo: string;
@@ -9135,6 +9246,12 @@ export interface components {
         ReactivateExpenseCategory: {
             /** Format: uuid */
             expenseCategoryId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
+        ReactivatePriceList: {
+            /** Format: uuid */
+            priceListId: string;
             /** Format: int64 */
             expectedVersion: number;
         };
@@ -10117,6 +10234,10 @@ export interface components {
             qtyInvoiced: string;
             /** Format: uuid */
             salesOrderLineId: string;
+            priceListCode?: null | string;
+            priceListName?: null | string;
+            /** @default false */
+            quotedPrice?: boolean;
         };
         SalesOrderList: {
             items: components["schemas"]["SalesOrderSummary"][];
@@ -10129,6 +10250,8 @@ export interface components {
             /** Format: uuid */
             plantId: string;
             lines: components["schemas"]["SalesOrderLineInput"][];
+            /** Format: uuid */
+            partyId?: null | string;
         };
         SalesOrderProforma: {
             orderNo: string;
@@ -19794,6 +19917,234 @@ export interface operations {
             };
         };
     };
+    CreatePriceList: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePriceList"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeactivatePriceList: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeactivatePriceList"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReactivatePriceList: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactivatePriceList"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RegisterVehicle: {
         parameters: {
             query?: never;
@@ -29123,7 +29474,9 @@ export interface operations {
     };
     ListPriceLists: {
         parameters: {
-            query?: never;
+            query?: {
+                priceListId?: string;
+            };
             header?: never;
             path: {
                 companyId: string;
@@ -29139,6 +29492,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriceListList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPriceListHeaders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceListHeaderList"];
                 };
             };
             /** @description Bad Request */

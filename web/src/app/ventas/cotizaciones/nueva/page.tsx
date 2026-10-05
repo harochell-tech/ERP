@@ -82,7 +82,7 @@ function QuoteForm() {
     (data?.quote
       ? { plantId: data.quote.plantId, lines: data.quote.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.quantity, unitPrice: compareDecimals(l.unitPrice, l.listPrice) === 0 ? "" : l.unitPrice })) }
       : null);
-  const preview = useSalesPreview("quote", previewSource?.plantId ?? "", previewSource?.lines ?? []);
+  const preview = useSalesPreview("quote", previewSource?.plantId ?? "", previewSource?.lines ?? [], values?.partyId ?? data?.quote?.header.partyId ?? "");
 
   if (!allowed) {
     return <NoPermission />;
