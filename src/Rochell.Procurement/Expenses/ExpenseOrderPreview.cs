@@ -49,6 +49,14 @@ public sealed class PreviewExpensePurchaseOrderHandler : IQueryHandler<PreviewEx
         }
 
         var ids = query.Lines.Select(_ => Guid.NewGuid()).ToList();
+        var cents = new decimal(0, 0, 0, false, 2); // amounts as the API writes them: 2 decimals
+        if (query.Lines.All(l => l.TaxTypeId is null))
+        {
+            // E-USD1-03-3: a foreign supplier's lines are in USD without taxes.
+            var usd = cents + valid.Sum(v => v.Net);
+            return ApiJson.Serialize(new ExpenseOrderPreview([.. valid.Select((v, i) => new ExpenseOrderPreviewLine(i + 1, cents + v.Net, cents))], usd, cents, usd, null, null));
+        }
+
         var estimate = await TaxEngine.EstimateItbisAsync(
             context.Connection,
             context.Transaction,
@@ -58,7 +66,6 @@ public sealed class PreviewExpensePurchaseOrderHandler : IQueryHandler<PreviewEx
             [.. query.Lines.Select((l, i) => new TaxLineInput(
                 ids[i], null, valid[i].Net, l.TaxTypeId, classes[l.ExpenseCategoryId] == ExpenseLineClasses.Service ? TaxLineScopes.ExpenseService : TaxLineScopes.ExpenseGoods))],
             cancellationToken).ConfigureAwait(false);
-        var cents = new decimal(0, 0, 0, false, 2); // amounts as the API writes them: 2 decimals
         var net = cents + valid.Sum(v => v.Net);
         return ApiJson.Serialize(new ExpenseOrderPreview(
             [.. valid.Select((v, i) => new ExpenseOrderPreviewLine(i + 1, cents + v.Net, estimate.ByLine?[ids[i]]))],

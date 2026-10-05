@@ -15,10 +15,13 @@ public sealed record ListSuppliers(Guid CompanyId, Guid SessionId, Guid? PlantId
 /// waits for verification, none verified) or NONE; <see cref="OpenApAmount"/> sums the open AP documents of its posted invoices.
 /// </summary>
 /// <summary>E-VS3-02-10: <see cref="PaymentTermsDays"/> proposes the due date of the supplier's invoices on screen.</summary>
-/// <remarks>E-IMP-6, E-IMP-01-2: <c>Phone</c> and <c>Emails</c> (the first is the principal one) are the supplier's contact data.</remarks>
+/// <remarks>
+/// E-IMP-6, E-IMP-01-2: <c>Phone</c> and <c>Emails</c> (the first is the principal one) are the supplier's contact data. E-USD1-03-9: a
+/// FOREIGN supplier has <c>Country</c> and optionally <c>ForeignTaxId</c>, no RNC.
+/// </remarks>
 public sealed record SupplierView(
     Guid SupplierId, string PartyKind, string? Rnc, string LegalName, string Status, DateTime? RncValidatedAt, long Version, string BankAccountState, decimal OpenApAmount, int? PaymentTermsDays,
-    string? Phone, IReadOnlyList<string> Emails);
+    string? Phone, IReadOnlyList<string> Emails, string? Country = null, string? ForeignTaxId = null);
 
 public sealed record SupplierList(IReadOnlyList<SupplierView> Items, int Limit, int Offset);
 
@@ -45,13 +48,15 @@ public sealed class ListSuppliersHandler : IQueryHandler<ListSuppliers>
                     JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.accounting_status::text = 'POSTED'
                     WHERE d.party_id = p.party_id),
                    p.supplier_payment_terms_days, p.phone,
-                   ARRAY(SELECT e.email FROM md.party_email e WHERE e.company_id = p.company_id AND e.party_id = p.party_id ORDER BY e.position)
+                   ARRAY(SELECT e.email FROM md.party_email e WHERE e.company_id = p.company_id AND e.party_id = p.party_id ORDER BY e.position),
+                   p.country, p.foreign_tax_id
             FROM md.party p
             WHERE p.company_id = @c AND p.is_supplier AND (CAST(@status AS text) IS NULL OR p.status::text = CAST(@status AS text))
             ORDER BY p.legal_name, p.party_id
             LIMIT @limit OFFSET @offset
             """,
-            r => new SupplierView(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.GetString(3), r.GetString(4), r.NullableUtc(5), r.GetInt64(6), r.GetString(7), r.GetDecimal(8), r.IsDBNull(9) ? null : r.GetInt32(9), r.NullableString(10), r.GetFieldValue<string[]>(11)),
+            r => new SupplierView(r.GetGuid(0), r.GetString(1), r.NullableString(2), r.GetString(3), r.GetString(4), r.NullableUtc(5), r.GetInt64(6), r.GetString(7), r.GetDecimal(8), r.IsDBNull(9) ? null : r.GetInt32(9), r.NullableString(10), r.GetFieldValue<string[]>(11),
+                r.IsDBNull(12) ? null : r.GetString(12), r.NullableString(13)),
             cancellationToken,
             ("c", context.CompanyId),
             ("now", context.Clock.UtcNow),

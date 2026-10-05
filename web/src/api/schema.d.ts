@@ -188,6 +188,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/master-data/create-foreign-supplier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateForeignSupplier"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/master-data/update-foreign-supplier-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UpdateForeignSupplierDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/master-data/update-supplier": {
         parameters: {
             query?: never;
@@ -5874,6 +5906,12 @@ export interface components {
             openAmount: string;
             /** Format: date */
             dueDate: string;
+            /** @default DOP */
+            currency?: string;
+            /** Format: decimal */
+            originalAmountUsd?: null | string;
+            /** Format: decimal */
+            openAmountUsd?: null | string;
         };
         ApplicableRate: {
             currency: string;
@@ -6645,6 +6683,11 @@ export interface components {
             baseUom: string;
             itemCategory: string;
         };
+        CreateForeignSupplier: {
+            legalName: string;
+            country: string;
+            foreignTaxId?: null | string;
+        };
         CreateFreightItem: {
             description: string;
         };
@@ -7405,7 +7448,7 @@ export interface components {
             /** Format: uuid */
             expenseCategoryId: string;
             /** Format: uuid */
-            taxTypeId: string;
+            taxTypeId: null | string;
             /** Format: decimal */
             quantity: string;
             /** Format: decimal */
@@ -7418,7 +7461,7 @@ export interface components {
             /** Format: uuid */
             expenseCategoryId: string;
             /** Format: uuid */
-            taxTypeId: string;
+            taxTypeId: null | string;
             /** Format: decimal */
             quantity: string;
             /** Format: decimal */
@@ -9203,6 +9246,8 @@ export interface components {
             total: string;
             /** @default INVENTORY */
             docClass?: string;
+            /** @default DOP */
+            currency?: string;
         };
         PurchaseOrderLineInput: {
             /** Format: uuid */
@@ -9340,6 +9385,8 @@ export interface components {
             total: string;
             /** @default INVENTORY */
             docClass?: string;
+            /** @default DOP */
+            currency?: string;
         };
         PurchaseOrderToReceive: {
             /** Format: uuid */
@@ -11061,6 +11108,14 @@ export interface components {
             docClass?: string;
             /** Format: uuid */
             plantId?: null | string;
+            /** @default DOP */
+            currency?: string;
+            /** Format: decimal */
+            totalAmountUsd?: null | string;
+            /** Format: decimal */
+            exchangeRate?: null | string;
+            /** Format: decimal */
+            openAmountUsd?: null | string;
         };
         SupplierInvoiceLineInput: {
             /** Format: uuid */
@@ -11100,6 +11155,10 @@ export interface components {
             /** Format: uuid */
             taxTypeId?: null | string;
             taxTypeCode?: null | string;
+            /** Format: decimal */
+            unitPriceUsd?: null | string;
+            /** Format: decimal */
+            netAmountUsd?: null | string;
         };
         SupplierInvoiceList: {
             items: components["schemas"]["SupplierInvoiceSummary"][];
@@ -11148,6 +11207,14 @@ export interface components {
             printedTotalDifference: null | string;
             /** @default INVENTORY */
             docClass?: string;
+            /** @default DOP */
+            currency?: string;
+            /** Format: decimal */
+            totalAmountUsd?: null | string;
+            /** Format: decimal */
+            exchangeRate?: null | string;
+            /** Format: decimal */
+            openAmountUsd?: null | string;
         };
         SupplierList: {
             items: components["schemas"]["SupplierView"][];
@@ -11174,6 +11241,8 @@ export interface components {
             paymentTermsDays: null | number;
             phone: null | string;
             emails: string[];
+            country?: null | string;
+            foreignTaxId?: null | string;
         };
         SuspendAuthorization: {
             /** Format: uuid */
@@ -11370,6 +11439,15 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             lines: components["schemas"]["ExpenseOrderLineInput"][];
+        };
+        UpdateForeignSupplierDraft: {
+            /** Format: uuid */
+            partyId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            legalName: string;
+            country: string;
+            foreignTaxId?: null | string;
         };
         UpdateManualJournal: {
             /** Format: uuid */
@@ -11978,6 +12056,158 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateSupplier"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateForeignSupplier: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateForeignSupplier"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateForeignSupplierDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateForeignSupplierDraft"];
             };
         };
         responses: {

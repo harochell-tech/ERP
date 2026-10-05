@@ -41,3 +41,37 @@ for TESORERO, CONTADOR, CONTROLLER, CUENTAS_POR_PAGAR, COMPRADOR, AUDITOR (135 p
 the screens (USD1-07). 215 commands.
 
 Tests: `ExchangeRateTests` (Finance).
+
+## USD1-03 — foreign supplier orders and invoices (migration 0087; E-USD1-03-1…8)
+
+- **Foreign supplier** (E-USD1-03-9/10): `CreateForeignSupplier` / `UpdateForeignSupplierDraft` — legal name, country (two letters,
+  `COUNTRY_INVALID`) and optional foreign tax id, no RNC; unique per country and tax id (`FOREIGN_TAX_ID_DUPLICATE`); activated with
+  `ActivateSupplier`. `UpdateSupplier` refuses it (`SUPPLIER_KIND_MISMATCH`). `ListSuppliers` adds `country` / `foreignTaxId`. The ADM
+  Cloud import keeps loading local suppliers only. 217 commands.
+- **Who**: a supplier of kind FOREIGN buys only expenses in USD (E-USD1-03-1). `CreatePurchaseOrder` and `RegisterSupplierInvoice`
+  (inventory) refuse it with `FOREIGN_SUPPLIER_EXPENSES_ONLY`.
+- **Order**: `CreateExpensePurchaseOrder` / `UpdateExpensePurchaseOrderDraft` take the currency from the supplier; USD lines have no tax
+  type (`EXPENSE_TAX_TYPE_CURRENCY` otherwise; a peso line without one gets the same code). `ApprovePurchaseOrder` compares the
+  approval limit and step-up threshold with the peso value at today's rate (`EXCHANGE_RATE_MISSING` without it). `PreviewExpensePurchaseOrder`
+  returns no taxes when every line is without tax type.
+- **Invoice**: `RegisterExpenseInvoice` for a foreign supplier takes the supplier's own number (1–40 characters,
+  `FOREIGN_INVOICE_NUMBER_INVALID`), prices in USD, no tax type, and the rate of its date (`ExchangeRateBook.ForDateAsync`). Lines keep
+  `unit_price_fc` / `net_amount_fc`; `net_amount` is the peso net with the rounding cent on the largest line, `unit_price` the USD price at
+  the rate to 6 decimals; the header keeps `exchange_rate`, `total_amount_fc` and the peso `total_amount`.
+- **Match**: without order, the peso total (no taxes) against `expense_invoice_approval_threshold`; with order, the USD price against the
+  order's USD price (percentage tolerance), the amount difference valued in pesos at the invoice's rate.
+- **Posting (P-38)**: `P38-DR-EXP` per line to its category's account, `P38-CR-AP` to AP_FOREIGN with `amount_fc` = the USD total. The AP
+  document is in USD (`original_amount_fc` / `open_amount_fc`). No tax determination (the posted-evidence check accepts a USD invoice
+  without one). Reversal: the exact inverse; the AP document closes in both currencies.
+- **Posting engine**: `PostingLineInput.AmountFc` makes a line USD (`currency = 'USD'`, `amount_fc`); `GlEntryRow.AmountFc` enters the row
+  hash only when present, so every peso row hashes as before. `PostingEngine.ReadEntry(reader, amountFcOrdinal)` and the audit's group
+  reader read it.
+- **Reconciliation**: AP-GL and the AP-REC close snapshot compare open AP with AP_CONTROL + AP_FOREIGN.
+- **606**: `tax.report_606` leaves out USD invoices (E-USD1-03-7).
+- **Categories**: `PrepareExpenseCategory` accepts a non-control ASSET account with 606 type 04; `UpdateExpenseCategoryDraft` keeps such a
+  category at 04 (DB guard `pur.expense_category_account_valid`).
+- **Queries**: supplier invoice list / detail add `currency`, `totalAmountUsd`, `exchangeRate`, `openAmountUsd` (ITBIS 0 and gross =
+  total for USD; the printed total of a USD invoice is in USD), lines `unitPriceUsd` / `netAmountUsd`, AP document currency and USD
+  amounts; purchase order list / detail add `currency` (totals in the order's currency).
+
+Tests: `ForeignInvoiceTests` (USD-02, USD-03, rounding, refusals, fixed-asset categories).

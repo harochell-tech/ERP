@@ -9,6 +9,11 @@ internal static class SupplierRules
 {
     public const string Aggregate = "Party";
 
+    public static async Task<string?> KindAsync(CommandContext context, Guid partyId, CancellationToken cancellationToken)
+        => (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT party_kind FROM md.party WHERE company_id = @c AND party_id = @p", r => r.GetString(0), cancellationToken,
+            ("c", context.CompanyId), ("p", partyId)).ConfigureAwait(false)).SingleOrDefault();
+
     public static (string Rnc, string LegalName) Validate(IRncRegistry registry, string rnc, string legalName)
     {
         var check = registry.Check(rnc);
@@ -83,6 +88,10 @@ public sealed class UpdateSupplierHandler(IRncRegistry? registry = null) : IComm
         ArgumentNullException.ThrowIfNull(context);
         var (rnc, legalName) = SupplierRules.Validate(_registry, command.Rnc, command.LegalName);
         await MasterRows.EnsureDraftAtVersionAsync(context, "party", "party_id", command.PartyId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
+        if (await SupplierRules.KindAsync(context, command.PartyId, cancellationToken).ConfigureAwait(false) == "FOREIGN")
+        {
+            throw new DomainException(MasterDataErrors.SupplierKindMismatch, "A foreign supplier is corrected with UpdateForeignSupplierDraft (E-USD1-03-9).");
+        }
         var newVersion = command.ExpectedVersion + 1;
 
         await context.AppendEventAsync(

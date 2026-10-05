@@ -16,7 +16,7 @@ public sealed record ListPurchaseOrders(
     int Limit = 50,
     int Offset = 0) : IPlantScopedQuery;
 
-/// <summary>E-UX4-2: <see cref="Total"/> is the order's net, Σ of each line's quantity × unit price rounded to 2 decimals.</summary>
+/// <summary>E-UX4-2: <see cref="Total"/> is the order's net, Σ of each line's quantity × unit price rounded to 2 decimals, in the order's <see cref="Currency"/> (E-USD1-03-2).</summary>
 public sealed record PurchaseOrderSummary(
     Guid PurchaseOrderId,
     string PoNo,
@@ -28,7 +28,8 @@ public sealed record PurchaseOrderSummary(
     string Status,
     long Version,
     decimal Total,
-    string DocClass = "INVENTORY");
+    string DocClass = "INVENTORY",
+    string Currency = "DOP");
 
 public sealed record PurchaseOrderList(IReadOnlyList<PurchaseOrderSummary> Items, int Limit, int Offset);
 
@@ -47,7 +48,7 @@ public sealed class ListPurchaseOrdersHandler : IQueryHandler<ListPurchaseOrders
             context.Transaction,
             """
             SELECT po.po_id, po.po_no, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.status::text, po.version,
-                   (SELECT coalesce(sum(round(l.qty_ordered * l.unit_price, 2)), 0)::numeric(19,2) FROM pur.purchase_order_line l WHERE l.po_id = po.po_id), po.doc_class
+                   (SELECT coalesce(sum(round(l.qty_ordered * l.unit_price, 2)), 0)::numeric(19,2) FROM pur.purchase_order_line l WHERE l.po_id = po.po_id), po.doc_class, po.currency
             FROM pur.purchase_order po
             JOIN md.party p ON p.party_id = po.party_id
             JOIN md.plant pl ON pl.plant_id = po.plant_id
@@ -58,7 +59,7 @@ public sealed class ListPurchaseOrdersHandler : IQueryHandler<ListPurchaseOrders
             ORDER BY po.order_date DESC, po.po_no DESC
             LIMIT @limit OFFSET @offset
             """,
-            r => new PurchaseOrderSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.GetString(7), r.GetInt64(8), r.GetDecimal(9), r.GetString(10)),
+            r => new PurchaseOrderSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.GetString(7), r.GetInt64(8), r.GetDecimal(9), r.GetString(10), r.GetString(11).Trim()),
             cancellationToken,
             ("c", context.CompanyId),
             ("plant", query.PlantId),
@@ -118,7 +119,8 @@ public sealed record PurchaseOrderDetail(
     IReadOnlyList<PurchaseOrderReceiptView> GoodsReceipts,
     IReadOnlyList<StateChange> History,
     decimal Total,
-    string DocClass = "INVENTORY");
+    string DocClass = "INVENTORY",
+    string Currency = "DOP");
 
 [RequiresPermission("purchase_order:read")]
 public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
@@ -134,7 +136,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             context.Transaction,
             """
             SELECT po.po_id, po.po_no, po.revision, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.status::text,
-                   coalesce(cu.display_name, cu.email), coalesce(au.display_name, au.email), po.approved_at, po.policy_version_id, po.version, po.doc_class
+                   coalesce(cu.display_name, cu.email), coalesce(au.display_name, au.email), po.approved_at, po.policy_version_id, po.version, po.doc_class, po.currency
             FROM pur.purchase_order po
             JOIN md.party p ON p.party_id = po.party_id
             JOIN md.plant pl ON pl.plant_id = po.plant_id
@@ -144,7 +146,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             """,
             r => new PurchaseOrderDetail(
                 r.GetGuid(0), r.GetString(1), r.GetInt32(2), r.GetGuid(3), r.GetString(4), r.GetGuid(5), r.GetString(6), r.Date(7), r.GetString(8),
-                r.NullableString(9), r.NullableString(10), r.NullableUtc(11), r.NullableGuid(12), r.GetInt64(13), [], [], [], 0m, r.GetString(14)),
+                r.NullableString(9), r.NullableString(10), r.NullableUtc(11), r.NullableGuid(12), r.GetInt64(13), [], [], [], 0m, r.GetString(14), r.GetString(15).Trim()),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.PurchaseOrderId),

@@ -16,7 +16,8 @@ public sealed record PostingLineInput(
     Guid? SubledgerRef = null,
     Guid? InvValueEntryId = null,
     IReadOnlyDictionary<string, string>? Inputs = null,
-    Guid? AccountId = null);
+    Guid? AccountId = null,
+    decimal? AmountFc = null);
 
 /// <summary>A posting to prepare (validate) before any write, and to write afterwards with the source event id (Patch 1 §5.2 steps 7 and 11).</summary>
 public sealed record PostingRequest(string RuleCode, DateOnly BusinessDate, DateTime OccurredAt, IReadOnlyList<PostingLineInput> Lines, int Generation = 1, string JournalType = "AUTO");

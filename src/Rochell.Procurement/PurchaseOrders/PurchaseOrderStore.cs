@@ -75,13 +75,16 @@ internal static class PurchaseOrderStore
         await using (var supplier = Sql.Command(
             connection,
             transaction,
-            "SELECT EXISTS (SELECT 1 FROM md.party WHERE company_id = @c AND party_id = @p AND status = 'ACTIVE' AND is_supplier)",
+            "SELECT party_kind::text FROM md.party WHERE company_id = @c AND party_id = @p AND status = 'ACTIVE' AND is_supplier",
             ("c", companyId),
             ("p", partyId)))
         {
-            if (await supplier.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
+            switch (await supplier.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string)
             {
-                throw new DomainException(ProcurementErrors.SupplierNotActive, "The supplier does not exist or is not ACTIVE.");
+                case null:
+                    throw new DomainException(ProcurementErrors.SupplierNotActive, "The supplier does not exist or is not ACTIVE.");
+                case "FOREIGN":
+                    throw new DomainException(Expenses.ExpenseErrors.ForeignSupplierExpensesOnly, "A foreign supplier is bought from with an expense order in USD (E-USD1-03-1).");
             }
         }
 

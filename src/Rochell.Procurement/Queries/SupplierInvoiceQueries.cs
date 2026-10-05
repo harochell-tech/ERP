@@ -22,6 +22,8 @@ public sealed record ListSupplierInvoices(
 /// is the AP document's open amount (null until posted); <see cref="PaymentStatus"/> is VOIDED, REVERSED, NOT_POSTED (no AP
 /// document), PAID (open 0), PARTIAL (open below original) or OPEN. E-UX4-7: <see cref="PrintedTotal"/> is the total the supplier
 /// printed (typed at registration, optional) and <see cref="PrintedTotalDifference"/> printed − gross, once the gross is determined.
+/// E-USD1-03: a foreign invoice is in USD — <see cref="TotalAmount"/> is its peso total at <see cref="ExchangeRate"/>, it has no taxes (ITBIS
+/// 0, gross = total), and <see cref="TotalAmountUsd"/> / <see cref="OpenAmountUsd"/> are in USD; its printed total is in USD.
 /// </summary>
 public sealed record SupplierInvoiceSummary(
     Guid SupplierInvoiceId,
@@ -40,7 +42,11 @@ public sealed record SupplierInvoiceSummary(
     string PaymentStatus,
     decimal? PrintedTotal,
     decimal? PrintedTotalDifference,
-    string DocClass = "INVENTORY");
+    string DocClass = "INVENTORY",
+    string Currency = "DOP",
+    decimal? TotalAmountUsd = null,
+    decimal? ExchangeRate = null,
+    decimal? OpenAmountUsd = null);
 
 public sealed record SupplierInvoiceList(IReadOnlyList<SupplierInvoiceSummary> Items, int Limit, int Offset);
 
@@ -73,7 +79,8 @@ public sealed class ListSupplierInvoicesHandler : IQueryHandler<ListSupplierInvo
             """,
             r => new SupplierInvoiceSummary(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.Date(4), r.Date(5), r.GetString(6), r.GetString(7), r.GetDecimal(8), r.GetInt64(9),
-                r.NullableDecimal(10), r.NullableDecimal(11), r.NullableDecimal(12), r.GetString(13), r.NullableDecimal(14), r.NullableDecimal(15), r.GetString(16)),
+                r.NullableDecimal(10), r.NullableDecimal(11), r.NullableDecimal(12), r.GetString(13), r.NullableDecimal(14), r.NullableDecimal(15), r.GetString(16),
+                r.GetString(17).Trim(), r.NullableDecimal(18), r.NullableDecimal(19), r.NullableDecimal(20)),
             cancellationToken,
             ("c", context.CompanyId),
             ("doc", query.DocumentStatus),
@@ -119,11 +126,14 @@ public sealed record SupplierInvoiceLineView(
     Guid? ExpenseCategoryId = null,
     string? ExpenseCategoryName = null,
     Guid? TaxTypeId = null,
-    string? TaxTypeCode = null);
+    string? TaxTypeCode = null,
+    decimal? UnitPriceUsd = null,
+    decimal? NetAmountUsd = null);
 
 public sealed record DeterminedTaxView(Guid SiLineId, string TaxCode, decimal Base, decimal Rate, decimal Amount, string Effect, Guid RuleVersionId);
 
-public sealed record ApDocumentView(Guid ApDocumentId, string DocType, decimal OriginalAmount, decimal OpenAmount, DateOnly DueDate);
+public sealed record ApDocumentView(
+    Guid ApDocumentId, string DocType, decimal OriginalAmount, decimal OpenAmount, DateOnly DueDate, string Currency = "DOP", decimal? OriginalAmountUsd = null, decimal? OpenAmountUsd = null);
 
 /// <summary>E-UX3-6: a released payment applied to the invoice — its net applied amount (0 once reversed) and its status.</summary>
 public sealed record SupplierInvoicePaymentView(Guid PaymentId, string PaymentNo, DateOnly ValueDate, string Status, decimal AmountApplied);
@@ -132,8 +142,8 @@ public sealed record SupplierInvoicePaymentView(Guid PaymentId, string PaymentNo
 internal static class ApAmounts
 {
     public const string Columns = """
-                   CASE WHEN si.tax_determination_id IS NOT NULL THEN coalesce(t.itbis, 0) END,
-                   CASE WHEN si.tax_determination_id IS NOT NULL THEN si.total_amount + coalesce(t.itbis, 0) + coalesce(t.other, 0) END,
+                   CASE WHEN si.tax_determination_id IS NOT NULL THEN coalesce(t.itbis, 0) WHEN si.currency = 'USD' THEN CAST(0 AS numeric(19,4)) END,
+                   CASE WHEN si.tax_determination_id IS NOT NULL THEN si.total_amount + coalesce(t.itbis, 0) + coalesce(t.other, 0) WHEN si.currency = 'USD' THEN si.total_amount END,
                    ap.open_amount,
                    CASE WHEN si.document_status::text = 'VOIDED' THEN 'VOIDED'
                         WHEN si.accounting_status::text = 'REVERSED' THEN 'REVERSED'
@@ -142,8 +152,9 @@ internal static class ApAmounts
                         WHEN ap.open_amount < ap.original_amount THEN 'PARTIAL'
                         ELSE 'OPEN' END,
                    si.printed_total,
-                   CASE WHEN si.tax_determination_id IS NOT NULL AND si.printed_total IS NOT NULL THEN (si.printed_total - (si.total_amount + coalesce(t.itbis, 0) + coalesce(t.other, 0)))::numeric(19,2) END,
-                   si.doc_class
+                   CASE WHEN si.currency = 'USD' AND si.printed_total IS NOT NULL THEN (si.printed_total - si.total_amount_fc)::numeric(19,2)
+                        WHEN si.tax_determination_id IS NOT NULL AND si.printed_total IS NOT NULL THEN (si.printed_total - (si.total_amount + coalesce(t.itbis, 0) + coalesce(t.other, 0)))::numeric(19,2) END,
+                   si.doc_class, si.currency, si.total_amount_fc, si.exchange_rate, ap.open_amount_fc
 
         """;
 
@@ -183,7 +194,11 @@ public sealed record SupplierInvoiceDetail(
     decimal? PrintedTotal,
     decimal? PrintedTotalDifference,
     string DocClass = "INVENTORY",
-    Guid? PlantId = null);
+    Guid? PlantId = null,
+    string Currency = "DOP",
+    decimal? TotalAmountUsd = null,
+    decimal? ExchangeRate = null,
+    decimal? OpenAmountUsd = null);
 
 [RequiresPermission("supplier_invoice:read")]
 public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice>
@@ -212,7 +227,8 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
             r => new SupplierInvoiceDetail(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.Date(4), r.Date(5), r.GetString(6), r.GetString(7), r.GetDecimal(8),
                 r.NullableString(9), r.NullableString(10), r.NullableGuid(11), r.NullableGuid(12), r.GetInt64(13), [], [], null, [],
-                r.NullableDecimal(14), r.NullableDecimal(15), r.NullableDecimal(16), r.GetString(17), [], r.NullableDecimal(18), r.NullableDecimal(19), r.GetString(20), r.NullableGuid(21)),
+                r.NullableDecimal(14), r.NullableDecimal(15), r.NullableDecimal(16), r.GetString(17), [], r.NullableDecimal(18), r.NullableDecimal(19), r.GetString(20), r.NullableGuid(25),
+                r.GetString(21).Trim(), r.NullableDecimal(22), r.NullableDecimal(23), r.NullableDecimal(24)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.SupplierInvoiceId)).ConfigureAwait(false)
@@ -224,7 +240,8 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
             """
             SELECT l.si_line_id, l.line_no, l.line_kind, l.po_line_id, po.po_id, po.po_no, pl.item_id, i.code, l.qty, l.unit_price, l.net_amount,
                    m.si_line_id IS NOT NULL, m.qty_available_to_invoice, m.qty_diff, m.price_diff, m.amount_diff, m.qty_exceeds, m.within_tolerance,
-                   m.policy_version_id, m.evaluated_at, l.description, l.expense_category_id, c.name, l.tax_rule_id, r.code
+                   m.policy_version_id, m.evaluated_at, l.description, l.expense_category_id, c.name, l.tax_rule_id, r.code,
+                   l.unit_price_fc, l.net_amount_fc
             FROM pur.supplier_invoice_line l
             LEFT JOIN pur.purchase_order_line pl ON pl.po_line_id = l.po_line_id
             LEFT JOIN pur.purchase_order po ON po.po_id = pl.po_id
@@ -241,7 +258,7 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
                 r.GetBoolean(11)
                     ? new MatchResultView(r.GetDecimal(12), r.GetDecimal(13), r.GetDecimal(14), r.GetDecimal(15), r.GetBoolean(16), r.GetBoolean(17), r.GetGuid(18), r.Utc(19))
                     : null,
-                r.NullableString(20), r.NullableGuid(21), r.NullableString(22), r.NullableGuid(23), r.NullableString(24)),
+                r.NullableString(20), r.NullableGuid(21), r.NullableString(22), r.NullableGuid(23), r.NullableString(24), r.NullableDecimal(25), r.NullableDecimal(26)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.SupplierInvoiceId)).ConfigureAwait(false);
@@ -265,8 +282,8 @@ public sealed class GetSupplierInvoiceHandler : IQueryHandler<GetSupplierInvoice
         var ap = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT ap_doc_id, doc_type, original_amount, open_amount, due_date FROM fin.ap_document WHERE company_id = @c AND source_doc_id = @id",
-            r => new ApDocumentView(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetDecimal(3), r.Date(4)),
+            "SELECT ap_doc_id, doc_type, original_amount, open_amount, due_date, currency, original_amount_fc, open_amount_fc FROM fin.ap_document WHERE company_id = @c AND source_doc_id = @id",
+            r => new ApDocumentView(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.GetDecimal(3), r.Date(4), r.GetString(5).Trim(), r.NullableDecimal(6), r.NullableDecimal(7)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.SupplierInvoiceId)).ConfigureAwait(false);

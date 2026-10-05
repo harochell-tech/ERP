@@ -8,8 +8,11 @@ using Rochell.Tax;
 
 namespace Rochell.Procurement.Expenses;
 
-/// <summary>E-GAS-05-1: one line of an expense order — what is bought, its category, its tax type, the quantity and the agreed price.</summary>
-public sealed record ExpenseOrderLineInput(string Description, Guid ExpenseCategoryId, Guid TaxTypeId, decimal Quantity, decimal UnitPrice);
+/// <summary>
+/// E-GAS-05-1: one line of an expense order — what is bought, its category, its tax type, the quantity and the agreed price. A foreign
+/// supplier's order is in USD and its lines carry no tax type (E-USD1-03-2/3).
+/// </summary>
+public sealed record ExpenseOrderLineInput(string Description, Guid ExpenseCategoryId, Guid? TaxTypeId, decimal Quantity, decimal UnitPrice);
 
 /// <summary>
 /// E-GAS-05-1: a DRAFT purchase order of expenses — never received in the warehouse (E-GAS-05-5); submitted, approved, rejected and
@@ -29,8 +32,11 @@ public sealed record CloseExpensePurchaseOrder(Guid CompanyId, Guid SessionId, s
 /// <summary>Shared rules of expense orders.</summary>
 internal static class ExpensePurchaseOrders
 {
-    /// <summary>An ACTIVE supplier, 1 to 200 lines, an ACTIVE category and a tax type in force on <paramref name="date"/> for every line.</summary>
-    public static async Task<List<(string Description, decimal Quantity, decimal UnitPrice, decimal Net)>> ValidateAsync(
+    /// <summary>
+    /// An ACTIVE supplier, 1 to 200 lines, an ACTIVE category and a tax type in force on <paramref name="date"/> for every line (none for a
+    /// foreign supplier). Returns the lines and the order's currency.
+    /// </summary>
+    public static async Task<(List<(string Description, decimal Quantity, decimal UnitPrice, decimal Net)> Lines, string Currency)> ValidateAsync(
         CommandContext context, Guid partyId, DateOnly date, IReadOnlyList<ExpenseOrderLineInput> lines, CancellationToken cancellationToken)
     {
         if (lines is not { Count: > 0 and <= 200 })
@@ -39,8 +45,9 @@ internal static class ExpensePurchaseOrders
         }
 
         var valid = lines.Select(l => ExpenseInvoices.ValidLine(new ExpenseLineInput(l.Description, l.ExpenseCategoryId, l.TaxTypeId, l.Quantity, l.UnitPrice))).ToList();
-        await ExpenseInvoices.RequireSupplierAndTypesAsync(context, partyId, date, lines.Select(l => l.ExpenseCategoryId), lines.Select(l => l.TaxTypeId), cancellationToken).ConfigureAwait(false);
-        return valid;
+        var currency = await ExpenseInvoices.RequireSupplierAndTypesAsync(
+            context, partyId, date, lines.Select(l => l.ExpenseCategoryId), [.. lines.Select(l => l.TaxTypeId)], cancellationToken).ConfigureAwait(false);
+        return (valid, currency);
     }
 
     public static async Task InsertLinesAsync(
@@ -89,7 +96,7 @@ public sealed class CreateExpensePurchaseOrderHandler : ICommandHandler<CreateEx
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
-        var valid = await ExpensePurchaseOrders.ValidateAsync(context, command.PartyId, command.OrderDate, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (valid, currency) = await ExpensePurchaseOrders.ValidateAsync(context, command.PartyId, command.OrderDate, command.Lines, cancellationToken).ConfigureAwait(false);
         var creator = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         var poId = context.ResultRef;
         var poNo = await DocumentNumbers.NextAsync(context, DocumentNumbers.PurchaseOrder, command.OrderDate.Year, cancellationToken).ConfigureAwait(false);
@@ -108,6 +115,7 @@ public sealed class CreateExpensePurchaseOrderHandler : ICommandHandler<CreateEx
                     partyId = command.PartyId,
                     plantId = command.PlantId,
                     orderDate = command.OrderDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    currency,
                     lines = ExpensePurchaseOrders.Payload(command.Lines),
                 }),
                 Publish: false),
@@ -116,8 +124,8 @@ public sealed class CreateExpensePurchaseOrderHandler : ICommandHandler<CreateEx
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO pur.purchase_order (po_id, company_id, po_no, party_id, plant_id, order_date, status, created_by, version, doc_class)
-            VALUES (@id, @c, @no, @party, @plant, @date, 'DRAFT', @creator, 1, 'EXPENSE')
+            INSERT INTO pur.purchase_order (po_id, company_id, po_no, party_id, plant_id, order_date, status, created_by, version, doc_class, currency)
+            VALUES (@id, @c, @no, @party, @plant, @date, 'DRAFT', @creator, 1, 'EXPENSE', @currency)
             """,
             cancellationToken,
             ("id", poId),
@@ -126,10 +134,11 @@ public sealed class CreateExpensePurchaseOrderHandler : ICommandHandler<CreateEx
             ("party", command.PartyId),
             ("plant", command.PlantId),
             ("date", command.OrderDate),
-            ("creator", creator)).ConfigureAwait(false);
+            ("creator", creator),
+            ("currency", currency)).ConfigureAwait(false);
         await ExpensePurchaseOrders.InsertLinesAsync(context, poId, command.Lines, valid, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(PurchaseOrderStore.Aggregate, poId, "DOCUMENT", null, PurchaseOrderStatus.Draft, CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { purchaseOrderId = poId, poNo, status = PurchaseOrderStatus.Draft, version = 1 });
+        return JsonSerializer.Serialize(new { purchaseOrderId = poId, poNo, status = PurchaseOrderStatus.Draft, currency, version = 1 });
     }
 }
 
@@ -149,7 +158,7 @@ public sealed class UpdateExpensePurchaseOrderDraftHandler : ICommandHandler<Upd
             throw new DomainException(ProcurementErrors.InvalidState, "An inventory order is corrected with UpdatePurchaseOrderDraft (E-GAS-01-1).");
         }
 
-        var valid = await ExpensePurchaseOrders.ValidateAsync(context, header.PartyId, header.OrderDate, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (valid, _) = await ExpensePurchaseOrders.ValidateAsync(context, header.PartyId, header.OrderDate, command.Lines, cancellationToken).ConfigureAwait(false);
         var version = header.Version + 1;
         await context.AppendEventAsync(
             new EventDraft(

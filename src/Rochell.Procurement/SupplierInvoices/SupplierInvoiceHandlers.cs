@@ -12,7 +12,7 @@ namespace Rochell.Procurement.SupplierInvoices;
 
 internal sealed record InvoiceHeader(
     Guid Id, Guid PartyId, string FiscalNumber, DateOnly DocDate, string Status, string AccountingStatus, Guid CreatedBy, long Version, string DocClass = SupplierInvoiceClasses.Inventory,
-    Guid? PlantId = null);
+    Guid? PlantId = null, string Currency = "DOP", decimal? ExchangeRate = null);
 
 internal static partial class SupplierInvoiceStore
 {
@@ -27,7 +27,8 @@ internal static partial class SupplierInvoiceStore
             context.Connection,
             context.Transaction,
             """
-            SELECT si_id, party_id, supplier_fiscal_number, doc_date, document_status::text, accounting_status::text, created_by, version, doc_class, plant_id
+            SELECT si_id, party_id, supplier_fiscal_number, doc_date, document_status::text, accounting_status::text, created_by, version, doc_class, plant_id,
+                   currency, exchange_rate
             FROM pur.supplier_invoice WHERE company_id = @c AND si_id = @s FOR UPDATE
             """,
             ("c", context.CompanyId),
@@ -40,7 +41,7 @@ internal static partial class SupplierInvoiceStore
 
         var header = new InvoiceHeader(
             reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetFieldValue<DateOnly>(3), reader.GetString(4), reader.GetString(5), reader.GetGuid(6), reader.GetInt64(7),
-            reader.GetString(8), reader.IsDBNull(9) ? null : reader.GetGuid(9));
+            reader.GetString(8), reader.IsDBNull(9) ? null : reader.GetGuid(9), reader.GetString(10).Trim(), reader.IsDBNull(11) ? null : reader.GetDecimal(11));
         return header.Version == expectedVersion
             ? header
             : throw new DomainException(ProcurementErrors.VersionConflict, $"The invoice is at version {header.Version}, not {expectedVersion}.");
@@ -137,13 +138,16 @@ public sealed class RegisterSupplierInvoiceHandler : ICommandHandler<RegisterSup
         await using (var supplier = Sql.Command(
             context.Connection,
             context.Transaction,
-            "SELECT status = 'ACTIVE' AND is_supplier FROM md.party WHERE company_id = @c AND party_id = @p",
+            "SELECT CASE WHEN NOT (status = 'ACTIVE' AND is_supplier) THEN 'INACTIVE' ELSE party_kind::text END FROM md.party WHERE company_id = @c AND party_id = @p",
             ("c", context.CompanyId),
             ("p", command.PartyId)))
         {
-            if (await supplier.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
+            switch (await supplier.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string)
             {
-                throw new DomainException(ProcurementErrors.SupplierNotActive, "The supplier does not exist or is not ACTIVE.");
+                case null or "INACTIVE":
+                    throw new DomainException(ProcurementErrors.SupplierNotActive, "The supplier does not exist or is not ACTIVE.");
+                case "FOREIGN":
+                    throw new DomainException(Expenses.ExpenseErrors.ForeignSupplierExpensesOnly, "A foreign supplier is billed with an expense invoice in USD (E-USD1-03-1).");
             }
         }
 

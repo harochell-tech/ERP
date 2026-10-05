@@ -120,7 +120,7 @@ public static class GroupReader
             """
             SELECT gl_entry_id, journal_id, line_no, company_id, posting_date, account_id, account_role, debit, credit, currency, plant_id,
                    item_id, party_id, subledger_type, subledger_ref, inv_value_entry_id, source_event_id, rule_line_code,
-                   determination_inputs::text, row_hash
+                   determination_inputs::text, row_hash, amount_fc
             FROM fin.gl_entry WHERE company_id = @c AND journal_id = @g ORDER BY line_no
             """,
             companyId,
@@ -129,7 +129,7 @@ public static class GroupReader
                 r.GetGuid(0), r.GetGuid(1), r.GetInt32(2), r.GetGuid(3), r.GetFieldValue<DateOnly>(4), r.GetGuid(5), r.GetString(6),
                 r.GetDecimal(7), r.GetDecimal(8), r.GetString(9), NullableGuid(r, 10), NullableGuid(r, 11), NullableGuid(r, 12),
                 r.IsDBNull(13) ? null : r.GetString(13), NullableGuid(r, 14), NullableGuid(r, 15), r.GetGuid(16), r.GetString(17),
-                r.GetString(18)).ComputeRowHash(),
+                r.GetString(18), r.IsDBNull(20) ? null : r.GetDecimal(20)).ComputeRowHash(),
             19,
             cancellationToken).ConfigureAwait(false);
         return new GroupRows([.. header.Rows, .. entries.Rows]);

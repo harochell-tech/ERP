@@ -4,6 +4,15 @@ public static class MasterDataErrors
 {
     public const string RncInvalid = "RNC_INVALID";
     public const string RncDuplicate = "RNC_DUPLICATE";
+
+    /// <summary>E-USD1-03-9: the foreign supplier's country is a two-letter code.</summary>
+    public const string CountryInvalid = "COUNTRY_INVALID";
+
+    /// <summary>E-USD1-03-9: one supplier per country and foreign tax id.</summary>
+    public const string ForeignTaxIdDuplicate = "FOREIGN_TAX_ID_DUPLICATE";
+
+    /// <summary>E-USD1-03-9: a local supplier is corrected with UpdateSupplier, a foreign one with UpdateForeignSupplierDraft.</summary>
+    public const string SupplierKindMismatch = "SUPPLIER_KIND_MISMATCH";
     public const string NotFound = "NOT_FOUND";
     public const string NotDraft = "NOT_DRAFT";
     public const string VersionConflict = "VERSION_CONFLICT";

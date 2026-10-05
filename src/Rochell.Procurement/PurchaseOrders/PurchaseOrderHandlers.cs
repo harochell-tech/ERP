@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Policies;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
@@ -138,7 +139,7 @@ public sealed class ApprovePurchaseOrderHandler : ICommandHandler<ApprovePurchas
 
         var today = BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow);
         var policy = await PolicyResolver.ResolveAsync(context, PolicyCodes.Purchasing, today, cancellationToken).ConfigureAwait(false);
-        var total = await TotalAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
+        var total = await TotalAsync(context, header.Id, today, cancellationToken).ConfigureAwait(false);
         if (!await IsControllerAsync(context, approver, header.PlantId, cancellationToken).ConfigureAwait(false)
             && total > policy.Decimal(PolicyParameters.PoApprovalLimit))
         {
@@ -173,10 +174,23 @@ public sealed class ApprovePurchaseOrderHandler : ICommandHandler<ApprovePurchas
         return JsonSerializer.Serialize(new { purchaseOrderId = header.Id, status = PurchaseOrderStatus.Approved, version = header.Version + 1 });
     }
 
-    private static async Task<decimal> TotalAsync(CommandContext context, Guid poId, CancellationToken cancellationToken)
+    /// <summary>The order's total in pesos; a USD order's at today's rate (E-USD1-03-2), since the approval amounts are in pesos.</summary>
+    private static async Task<decimal> TotalAsync(CommandContext context, Guid poId, DateOnly today, CancellationToken cancellationToken)
     {
-        await using var command = Sql.Command(context.Connection, context.Transaction, "SELECT coalesce(sum(qty_ordered * unit_price), 0) FROM pur.purchase_order_line WHERE po_id = @p", ("p", poId));
-        return (decimal)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
+        var (currency, total) = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT o.currency, coalesce((SELECT sum(qty_ordered * unit_price) FROM pur.purchase_order_line WHERE po_id = o.po_id), 0) FROM pur.purchase_order o WHERE o.po_id = @p",
+            r => (r.GetString(0).Trim(), r.GetDecimal(1)),
+            cancellationToken,
+            ("p", poId)).ConfigureAwait(false)).Single();
+        if (currency == "DOP")
+        {
+            return total;
+        }
+
+        var rate = await ExchangeRateBook.ForDateAsync(context.Connection, context.Transaction, context.CompanyId, currency, today, cancellationToken).ConfigureAwait(false);
+        return ExchangeRateBook.ToPesos(total, rate.Rate);
     }
 
     private static async Task<bool> IsControllerAsync(CommandContext context, Guid userId, Guid plantId, CancellationToken cancellationToken)

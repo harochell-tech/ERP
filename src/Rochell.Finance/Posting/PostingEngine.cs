@@ -18,6 +18,9 @@ namespace Rochell.Finance.Posting;
 public sealed class PostingEngine
 {
     public const string Currency = "DOP";
+
+    /// <summary>E-USD1-01-3: a line of a USD control (foreign payables, USD banks) keeps its USD amount; its debit and credit stay in pesos.</summary>
+    public const string ForeignCurrency = "USD";
     public const string RoundingLineCode = "R-08";
     public const string RoundingRole = "ROUNDING_DIFFERENCE";
 
@@ -144,9 +147,9 @@ public sealed class PostingEngine
 
             entries.Add(new GlEntryRow(
                 context.Ids.NewId(), journal.JournalId, ++lineNo, context.CompanyId, plan.PostingDate, line.AccountId, line.Rule.AccountRole,
-                line.Debit, line.Credit, Currency, line.Input.PlantId, line.Input.ItemId, line.Input.PartyId, line.Rule.Subledger,
+                line.Debit, line.Credit, line.Input.AmountFc is null ? Currency : ForeignCurrency, line.Input.PlantId, line.Input.ItemId, line.Input.PartyId, line.Rule.Subledger,
                 line.Input.SubledgerRef, line.Input.InvValueEntryId, sourceEventId, line.Rule.Code,
-                JsonCanonicalizer.Canonicalize(JsonSerializer.Serialize(inputs))));
+                JsonCanonicalizer.Canonicalize(JsonSerializer.Serialize(inputs)), line.Input.AmountFc));
         }
 
         await WriteEntriesAsync(context, plan.PeriodId, entries, cancellationToken).ConfigureAwait(false);
@@ -547,10 +550,10 @@ public sealed class PostingEngine
                 """
                 INSERT INTO fin.gl_entry (gl_entry_id, journal_id, line_no, company_id, posting_date, account_id, account_role, debit, credit,
                   currency, plant_id, item_id, party_id, subledger_type, subledger_ref, inv_value_entry_id, source_event_id, rule_line_code,
-                  determination_inputs, row_hash)
+                  determination_inputs, row_hash, amount_fc)
                 VALUES (@id, @journal_id, @line_no, @company_id, @posting_date, @account_id, @account_role, @debit, @credit,
                   @currency, @plant_id, @item_id, @party_id, @subledger_type, @subledger_ref, @inv_value_entry_id, @source_event_id, @rule_line_code,
-                  CAST(@inputs AS jsonb), @row_hash)
+                  CAST(@inputs AS jsonb), @row_hash, @amount_fc)
                 """,
                 cancellationToken,
                 ("id", e.GlEntryId),
@@ -572,7 +575,8 @@ public sealed class PostingEngine
                 ("source_event_id", e.SourceEventId),
                 ("rule_line_code", e.RuleLineCode),
                 ("inputs", e.DeterminationInputs),
-                ("row_hash", e.ComputeRowHash())).ConfigureAwait(false);
+                ("row_hash", e.ComputeRowHash()),
+                ("amount_fc", e.AmountFc)).ConfigureAwait(false);
         }
 
         // Balance projection last, in a stable key order (lock order level 9).
@@ -632,7 +636,7 @@ public sealed class PostingEngine
             """
             SELECT gl_entry_id, journal_id, line_no, company_id, posting_date, account_id, account_role, debit, credit, currency,
                    plant_id, item_id, party_id, subledger_type, subledger_ref, inv_value_entry_id, source_event_id, rule_line_code,
-                   determination_inputs::text
+                   determination_inputs::text, amount_fc
             FROM fin.gl_entry WHERE journal_id = @j ORDER BY line_no
             """,
             ("j", journalId));
@@ -640,14 +644,17 @@ public sealed class PostingEngine
         var rows = new List<GlEntryRow>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            rows.Add(ReadEntry(reader));
+            rows.Add(ReadEntry(reader, 19));
         }
 
         return rows;
     }
 
-    /// <summary>Reads a fin.gl_entry row in declared column order (used by tests to recompute row hashes).</summary>
-    public static GlEntryRow ReadEntry(DbDataReader reader)
+    /// <summary>
+    /// Reads a fin.gl_entry row in declared column order (used by tests to recompute row hashes); <paramref name="amountFcOrdinal"/> is where
+    /// the reader has amount_fc, when it selects it.
+    /// </summary>
+    public static GlEntryRow ReadEntry(DbDataReader reader, int? amountFcOrdinal = null)
     {
         ArgumentNullException.ThrowIfNull(reader);
         return new GlEntryRow(
@@ -655,7 +662,8 @@ public sealed class PostingEngine
             reader.GetString(6), reader.GetDecimal(7), reader.GetDecimal(8), reader.GetString(9).Trim(),
             reader.IsDBNull(10) ? null : reader.GetGuid(10), reader.IsDBNull(11) ? null : reader.GetGuid(11), reader.IsDBNull(12) ? null : reader.GetGuid(12),
             reader.IsDBNull(13) ? null : reader.GetString(13), reader.IsDBNull(14) ? null : reader.GetGuid(14), reader.IsDBNull(15) ? null : reader.GetGuid(15),
-            reader.GetGuid(16), reader.GetString(17), reader.GetString(18));
+            reader.GetGuid(16), reader.GetString(17), reader.GetString(18),
+            amountFcOrdinal is { } fc && !reader.IsDBNull(fc) ? reader.GetDecimal(fc) : null);
     }
 
     private static async Task<T?> ScalarAsync<T>(CommandContext context, string sql, CancellationToken cancellationToken, params (string Name, object? Value)[] parameters)

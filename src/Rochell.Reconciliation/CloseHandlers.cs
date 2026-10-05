@@ -363,7 +363,7 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
               SELECT 'ap_open' AS kind, party_id::text AS key, NULL AS a, sum(open_amount)::text AS b FROM fin.ap_document WHERE company_id = @c GROUP BY party_id
               UNION ALL
               SELECT 'ap_control', coalesce(party_id::text, '-'), NULL, sum(credit - debit)::text FROM fin.gl_entry
-              WHERE company_id = @c AND account_role = 'AP_CONTROL' GROUP BY party_id
+              WHERE company_id = @c AND account_role IN ('AP_CONTROL', 'AP_FOREIGN') GROUP BY party_id
               ORDER BY 1, 2
               """;
         var rows = new List<Dictionary<string, string?>>();

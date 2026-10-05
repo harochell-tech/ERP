@@ -22,6 +22,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
         "MIGRATION_CLEARING", "RAW_MATERIAL", "UNAPPLIED_RECEIPTS", "UNBILLED_RECEIVABLE", "BALANCE_SHEET", "INCOME_STATEMENT", "CHARGE_RECOGNIZED", "IN_PROGRESS",
         "IN_TRANSIT", "NOT_POSTED", "PENDING_EXTERNAL", "POSTING_BLOCKED", "SALES_ITBIS",
         "SELECTIVE_TAX_EXPENSE", "OTHER_TAX_EXPENSE", "LEGAL_TIP_EXPENSE", // account roles TAX-606 reads (E-GAS-06-5)
+        "AP_FOREIGN", // AP-GL counts foreign payables too (E-USD1-03-5)
     };
 
     private static DateOnly Today(TestHarness h) => BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);

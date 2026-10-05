@@ -29,12 +29,14 @@ public sealed record RegisterSupplierInvoice(
 /// its tax type (a PURCHASE_TAX_TYPE rule), the quantity and the unit price.
 /// </summary>
 /// <remarks>E-GAS-05-2: <paramref name="PurchaseOrderLineId"/> names the expense order line it bills; its category and tax type are the order line's.</remarks>
-public sealed record ExpenseLineInput(string Description, Guid ExpenseCategoryId, Guid TaxTypeId, decimal Quantity, decimal UnitPrice, Guid? PurchaseOrderLineId = null);
+public sealed record ExpenseLineInput(string Description, Guid ExpenseCategoryId, Guid? TaxTypeId, decimal Quantity, decimal UnitPrice, Guid? PurchaseOrderLineId = null);
 
 /// <summary>
 /// E-GAS-04-1, E-GAS-6: registers a DRAFT expense invoice without a purchase order — electricity, telephone, tolls, repairs. It
 /// goes through the same match (against the approval amount, E-GAS-04-2), exception approval, posting (P-37), void and reversal as
 /// any supplier invoice. <paramref name="PlantId"/> is mandatory (E-GAS-01-8).
+/// For a foreign supplier (E-USD1-03-3): <paramref name="SupplierFiscalNumber"/> is the supplier's own invoice number, prices are in USD,
+/// lines carry no tax type, and the invoice takes the rate of its date (E-USD1-03-4).
 /// </summary>
 public sealed record RegisterExpenseInvoice(
     Guid CompanyId,
