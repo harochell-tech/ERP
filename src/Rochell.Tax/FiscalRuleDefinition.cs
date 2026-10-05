@@ -42,6 +42,7 @@ public sealed record FiscalRuleDefinition(
     public static readonly IReadOnlySet<string> ItemCategories = new HashSet<string>(StringComparer.Ordinal)
     {
         "CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA", "BLOQUE", "ADOQUIN", "OTRO_PT", // finished goods since E-VS3-05-1
+        "TRANSPORTE", // the freight service (E-SRV1-8), exempt through SALES_ITBIS (E-SRV1-16)
     };
 
     private static readonly string[] ItbisKeys = ["tax_code", "rate", "effect", "exempt_item_categories"];
