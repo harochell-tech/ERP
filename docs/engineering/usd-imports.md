@@ -23,3 +23,21 @@ The books stay in pesos: every amount column that existed keeps its peso value; 
 `fin.gl_entry.amount_fc` is not yet in the row hash: the posting engine writes it from USD1-03, and its hash then covers it.
 
 Tests: `UsdImportSchemaTests` (Procurement).
+
+## USD1-02 — exchange rates (migration 0086; E-USD1-02-1…8)
+
+| Command / query | Permission | What it does |
+| --- | --- | --- |
+| `PrepareExchangeRate` (currency USD, date, rate, source) | `exchange_rate:prepare` | DRAFT; today or a past day (`EXCHANGE_RATE_FUTURE`); positive, 4 decimals, with its source |
+| `ApproveExchangeRate` | `exchange_rate:approve` | Someone else than the preparer (SoD and four eyes); supersedes the ACTIVE rate of the same day |
+| `DiscardExchangeRate` | `exchange_rate:prepare` | DRAFT → DISCARDED |
+| `ListExchangeRates` (GET `/finance/exchange-rates?from=&to=`) | `exchange_rate:read` | The rates of a range (default the last 30 days) |
+| `GetExchangeRateForDate` (GET `/finance/exchange-rates/for-date?date=`) | `exchange_rate:read` | The rate a document of that date takes and the day it comes from |
+
+`ExchangeRateBook.ForDateAsync` is what every USD document will call: the ACTIVE rate of its day; on a Saturday or Sunday the last
+ACTIVE rate before it; a weekday without its rate refuses with `EXCHANGE_RATE_MISSING` (a weekday holiday is entered by Tesorería with the
+previous business day's rate, E-USD1-02-7). `ToPesos` rounds a USD amount at a rate to 2 decimals. Migration 0086: `exchange_rate:read`
+for TESORERO, CONTADOR, CONTROLLER, CUENTAS_POR_PAGAR, COMPRADOR, AUDITOR (135 permissions). The Inicio notices of E-USD1-02-6 come with
+the screens (USD1-07). 215 commands.
+
+Tests: `ExchangeRateTests` (Finance).
