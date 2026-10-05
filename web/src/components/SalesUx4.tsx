@@ -78,11 +78,12 @@ export function useSalesPreview(
   kind: "order" | "quote" | "cash",
   plantId: string,
   lines: readonly { itemId: string; uom: string; quantity: string; unitPrice?: string }[],
+  partyId = "",
 ): { preview: Preview | null; pending: boolean; problem: string | null } {
   const { companyId } = useSession();
   const [state, setState] = useState<{ preview: Preview | null; pending: boolean; problem: string | null }>({ preview: null, pending: false, problem: null });
   const ready = plantId ? previewableLines(lines.map((l) => ({ ...l }))) : null;
-  const key = ready ? JSON.stringify([kind, plantId, ready.map((l) => [l.itemId, l.uom, l.quantity, (l as { unitPrice?: string }).unitPrice?.trim() ?? ""])]) : "";
+  const key = ready ? JSON.stringify([kind, plantId, ready.map((l) => [l.itemId, l.uom, l.quantity, (l as { unitPrice?: string }).unitPrice?.trim() ?? ""]), partyId]) : "";
   useEffect(() => {
     if (!key) {
       return;
@@ -98,10 +99,13 @@ export function useSalesPreview(
             ? await previewQuery(kind === "cash" ? "/api/v1/companies/{companyId}/sales/cash-sales/preview" : "/api/v1/companies/{companyId}/sales/orders/preview", companyId, {
                 plantId,
                 lines: body.map(([itemId, uom, quantity]) => ({ itemId, uom, quantity })),
+                // PRS-02 (E-PRC1-3): the customer's list prices the preview; a cash sale is always GENERAL (E-PRC1-10).
+                partyId: kind === "order" && partyId ? partyId : null,
               })
             : await previewQuery("/api/v1/companies/{companyId}/sales/quotes/preview", companyId, {
                 plantId,
                 lines: body.map(([itemId, uom, quantity, unitPrice]) => ({ itemId, uom, quantity, unitPrice: unitPrice === "" || !/^\d{1,13}(\.\d{1,4})?$/.test(unitPrice) ? null : unitPrice })),
+                partyId: partyId || null,
               });
         if (!cancelled) {
           setState({ preview: result, pending: false, problem: null });

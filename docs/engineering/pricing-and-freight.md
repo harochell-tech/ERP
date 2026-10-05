@@ -20,3 +20,25 @@ Baseline `docs/architecture/prs1/frozen-baseline-prs1.md`; approved errata E-PRC
 `FiscalRuleDefinition.ItemCategories` accepts TRANSPORTE, so SALES_ITBIS can list it among its exempt categories (E-SRV1-16).
 
 Tests: `PriceListFreightSchemaTests` (Sales).
+
+## PRS-02 — price lists per customer (migration 0083; E-PRS-02-1…6)
+
+| Command / query | Permission | What it does |
+| --- | --- | --- |
+| `CreatePriceList` (code, name) | `price_list:prepare` | A named list, ACTIVE; priced by preparing its first version |
+| `DeactivatePriceList` / `ReactivatePriceList` | `price_list:prepare` | Out of use and back; never GENERAL (`PRICE_LIST_GENERAL`), never a list in customers' terms in force or pending (`PRICE_LIST_IN_USE`) |
+| `PreparePriceList` + `PriceListId` | `price_list:prepare` | A DRAFT version of that list (GENERAL when omitted), numbered per list; an inactive list is refused (`PRICE_LIST_INACTIVE`) |
+| `ApprovePriceList` | `price_list:approve` | Supersedes only the version in force of the same list |
+| `PrepareCustomerTerms` + `PriceListId` | `customer_terms:prepare` | The customer's list in the terms: the one given (ACTIVE), else the one the customer already has, else GENERAL |
+| `ListPriceListHeaders` (GET `/sales/price-list-headers`) | `sales:read` | Lists with status, version in force, pending draft and customers on each |
+| `ListPriceLists` (+ `priceListId`), `GetPriceList` | `sales:read` | Versions carry their list's id, code and name |
+
+Pricing (`Pricing/CustomerPrices.cs`): orders, quotes and their previews take each (item, unit) from the version in force of the
+customer's list (from the terms in force), else GENERAL's; neither refuses with `PRICE_MISSING`. A customer whose list has no
+version in force, a customer without terms and every cash sale price from GENERAL. The order / quote header records the customer's
+version (GENERAL's when it has none); each order and quote line records the version its price came from (migration 0083 adds
+`sal.quote_line.price_list_version_id`); a quoted price on an order has none. Lines read `priceListCode` / `priceListName`, and an
+order line `quotedPrice`; customer terms read `priceListId` / `priceListCode` / `priceListName`. The previews take `partyId`.
+207 commands.
+
+Tests: `CustomerPriceListTests` (PRC-02…08 and deactivation), `PriceListFreightSchemaTests` (PRC-01).

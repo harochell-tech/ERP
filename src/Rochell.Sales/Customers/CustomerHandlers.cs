@@ -360,6 +360,15 @@ public sealed class PrepareCustomerTermsHandler : ICommandHandler<PrepareCustome
             context, "SELECT terms_version_id FROM sal.customer_terms_version WHERE company_id = @c AND party_id = @p AND status = 'DRAFT' FOR UPDATE", cancellationToken,
             ("c", context.CompanyId), ("p", command.PartyId)).ConfigureAwait(false);
         var id = draft ?? context.ResultRef;
+        var list = command.PriceListId is { } given
+            ? await Pricing.PriceLists.ActiveOrGeneralAsync(context, given, cancellationToken).ConfigureAwait(false)
+            : await SalesSql.ScalarAsync<Guid?>(
+                  context,
+                  "SELECT price_list_id FROM sal.customer_terms_version WHERE company_id = @c AND party_id = @p AND status IN ('DRAFT', 'ACTIVE') ORDER BY version DESC LIMIT 1",
+                  cancellationToken,
+                  ("c", context.CompanyId),
+                  ("p", command.PartyId)).ConfigureAwait(false)
+              ?? await Pricing.PriceLists.ActiveOrGeneralAsync(context, null, cancellationToken).ConfigureAwait(false);
         var eventVersion = await SalesSql.NextEventVersionAsync(context, Terms.Aggregate, id, cancellationToken).ConfigureAwait(false);
         var eventId = await context.AppendEventAsync(
             new EventDraft(
@@ -368,7 +377,7 @@ public sealed class PrepareCustomerTermsHandler : ICommandHandler<PrepareCustome
                 Terms.Aggregate,
                 id,
                 eventVersion,
-                JsonSerializer.Serialize(new { termsVersionId = id, partyId = command.PartyId, paymentTermsDays = command.PaymentTermsDays, creditLimit = limit, creditHold = command.CreditHold }),
+                JsonSerializer.Serialize(new { termsVersionId = id, partyId = command.PartyId, paymentTermsDays = command.PaymentTermsDays, creditLimit = limit, creditHold = command.CreditHold, priceListId = list }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
         if (draft is null)
@@ -380,8 +389,8 @@ public sealed class PrepareCustomerTermsHandler : ICommandHandler<PrepareCustome
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO sal.customer_terms_version (terms_version_id, company_id, party_id, version, effective_from, payment_terms_days, credit_limit, credit_hold, status, prepared_by)
-                VALUES (@id, @c, @p, @v, @today, @days, @limit, @hold, 'DRAFT', @by)
+                INSERT INTO sal.customer_terms_version (terms_version_id, company_id, party_id, version, effective_from, payment_terms_days, credit_limit, credit_hold, status, prepared_by, price_list_id)
+                VALUES (@id, @c, @p, @v, @today, @days, @limit, @hold, 'DRAFT', @by, @list)
                 """,
                 cancellationToken,
                 ("id", id),
@@ -392,7 +401,8 @@ public sealed class PrepareCustomerTermsHandler : ICommandHandler<PrepareCustome
                 ("days", command.PaymentTermsDays),
                 ("limit", command.CreditLimit),
                 ("hold", command.CreditHold),
-                ("by", preparer)).ConfigureAwait(false);
+                ("by", preparer),
+                ("list", list)).ConfigureAwait(false);
             await context.AppendStateAsync(Terms.Aggregate, id, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
         }
         else
@@ -400,8 +410,9 @@ public sealed class PrepareCustomerTermsHandler : ICommandHandler<PrepareCustome
             await Sql.ExecuteAsync(
                 context.Connection,
                 context.Transaction,
-                "UPDATE sal.customer_terms_version SET payment_terms_days = @days, credit_limit = @limit, credit_hold = @hold WHERE terms_version_id = @id",
+                "UPDATE sal.customer_terms_version SET payment_terms_days = @days, credit_limit = @limit, credit_hold = @hold, price_list_id = @list WHERE terms_version_id = @id",
                 cancellationToken,
+                ("list", list),
                 ("days", command.PaymentTermsDays),
                 ("limit", command.CreditLimit),
                 ("hold", command.CreditHold),

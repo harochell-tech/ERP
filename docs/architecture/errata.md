@@ -1054,6 +1054,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PRS-01-6 | PRS-1 | New permission `delivery_zone:manage` (CONTROLLER, CREDITO); an inactive zone leaves new documents, orders that have it keep it. |
 | E-PRS-01-7 | PRS-1 | One freight item, code TRANSPORTE, type SERVICE, created by the Controller in Maestros or by the configuration load; only on freight lines. |
 | E-PRS-01-8 | PRS-1 | New or imported customer terms are on GENERAL unless another list is named. |
+| E-PRS-02-1 | PRS-1 | The Controller (`price_list:prepare`) deactivates and reactivates lists without a second approval, only when no customer has the list (E-PRS-01-5). |
+| E-PRS-02-2 | PRS-1 | A version is prepared for a chosen list (GENERAL when none is chosen) and its approval replaces only that list's version in force. |
+| E-PRS-02-3 | PRS-1 | Crédito names the list when preparing the terms; when it does not, the customer keeps its list. The Controller's approval (one by one or in a batch) puts it in force. |
+| E-PRS-02-4 | PRS-1 | A customer whose list has no version in force prices everything from GENERAL. |
+| E-PRS-02-5 | PRS-1 | Changing a DRAFT order or quote re-prices every line with the lists in force that day; prices that came from a quote are kept. |
+| E-PRS-02-6 | PRS-1 | Each order and quote line shows whether its price came from the customer's list, GENERAL or the quote; the customer shows its list. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

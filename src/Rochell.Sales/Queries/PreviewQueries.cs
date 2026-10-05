@@ -19,16 +19,17 @@ namespace Rochell.Sales.Queries;
 /// E-UX4-3: a draft order's lines priced exactly as CreateSalesOrder prices them (the list in force, net of ITBIS, 2 decimals) and
 /// the ITBIS the sales rules in force today would add. Needs <c>sales_order:create</c>, like the form it serves.
 /// </summary>
-public sealed record PreviewSalesOrder(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines) : IQuery;
+/// <summary>PRS-02: <paramref name="PartyId"/> prices from that customer's list (E-PRC1-3); without it, from GENERAL.</summary>
+public sealed record PreviewSalesOrder(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines, Guid? PartyId = null) : IQuery;
 
 /// <summary>The HTTP body of the order preview.</summary>
-public sealed record SalesOrderPreviewRequest(Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines);
+public sealed record SalesOrderPreviewRequest(Guid PlantId, IReadOnlyList<SalesOrderLineInput> Lines, Guid? PartyId = null);
 
 /// <summary>E-UX4-3: a draft quote's lines priced as CreateQuote prices them (a price below the list's is a special price). Needs <c>quote:manage</c>.</summary>
-public sealed record PreviewQuote(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<QuoteLineInput> Lines) : IQuery;
+public sealed record PreviewQuote(Guid CompanyId, Guid SessionId, Guid PlantId, IReadOnlyList<QuoteLineInput> Lines, Guid? PartyId = null) : IQuery;
 
 /// <summary>The HTTP body of the quote preview.</summary>
-public sealed record QuotePreviewRequest(Guid PlantId, IReadOnlyList<QuoteLineInput> Lines);
+public sealed record QuotePreviewRequest(Guid PlantId, IReadOnlyList<QuoteLineInput> Lines, Guid? PartyId = null);
 
 /// <summary><see cref="SpecialPrice"/>: the unit price is below the list price (the quote needs price approval, E-QUO1-3).</summary>
 public sealed record SalesPreviewLine(
@@ -64,7 +65,7 @@ public sealed class PreviewSalesOrderHandler : IQueryHandler<PreviewSalesOrder>
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(context);
-        var (list, lines, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, lines, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.PartyId, query.Lines, cancellationToken).ConfigureAwait(false);
         return await SalesPreviews.BuildAsync(
             context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.UnitPrice, l.UnitPrice, false, l.Net, null))], cancellationToken).ConfigureAwait(false);
     }
@@ -82,7 +83,7 @@ public sealed class PreviewCashSaleHandler : IQueryHandler<PreviewCashSale>
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(context);
-        var (list, lines, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, lines, _) = await Orders.Orders.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, null, query.Lines, cancellationToken).ConfigureAwait(false);
         return await SalesPreviews.BuildAsync(
             context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.UnitPrice, l.UnitPrice, false, l.Net, null))], cancellationToken).ConfigureAwait(false);
     }
@@ -97,7 +98,7 @@ public sealed class PreviewQuoteHandler : IQueryHandler<PreviewQuote>
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(context);
-        var (list, lines, _) = await Quotes.Quotes.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, lines, _) = await Quotes.Quotes.PriceAsync(context.Connection, context.Transaction, context.CompanyId, query.PlantId, query.PartyId, query.Lines, cancellationToken).ConfigureAwait(false);
         return await SalesPreviews.BuildAsync(
             context, list, [.. lines.Select(l => new SalesPreviewLine(l.LineNo, l.ItemId, l.Uom, l.Quantity, l.ListPrice, l.UnitPrice, l.Special, l.Net, null))], cancellationToken).ConfigureAwait(false);
     }

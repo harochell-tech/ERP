@@ -36,6 +36,7 @@ public sealed class PriceListFreightSchemaTests(PostgresFixture postgres)
         "INSERT INTO sal.price_list_freight (price_list_version_id, company_id, item_id, uom, zone_id, unit_price) " +
         $"VALUES ('{version}', '{h.CompanyId}', '{item}', (SELECT base_uom FROM md.item WHERE item_id = '{item}'), '{zone}', {price})";
 
+    [Trait("AcceptancePrs1", "PRC-01")]
     [Fact]
     public async Task GENERAL_holds_the_list_of_today_and_every_customer_and_is_never_deactivated()
     {

@@ -363,7 +363,7 @@ public sealed class CreateCashSaleHandler : ICommandHandler<CreateCashSale>
         ArgumentNullException.ThrowIfNull(context);
         var header = Orders.Orders.ValidateHeader(command.DeliveryTermCode, command.SiteAddress, command.RequestedDate, null, command.PlantId);
         var buyer = CashSaleStore.Buyer(command.BuyerName, command.BuyerPhone, command.BuyerIdKind, command.BuyerId);
-        var (list, lines, total) = await Orders.Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken).ConfigureAwait(false);
+        var (list, lines, total) = await Orders.Orders.PriceAsync(context, header.PlantId, null, command.Lines, cancellationToken).ConfigureAwait(false);
         var consumer = await CashSaleStore.ConsumerAsync(context, CommandType, cancellationToken).ConfigureAwait(false);
         var orderNo = await Orders.Orders.InsertAsync(context, context.ResultRef, consumer, header, list, lines, total, null, CommandType, cancellationToken, buyer: buyer).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { salesOrderId = context.ResultRef, orderNo, status = "DRAFT", totalNet = Orders.Orders.M(total), version = 1 });
@@ -388,7 +388,7 @@ public sealed class UpdateCashSaleDraftHandler : ICommandHandler<UpdateCashSaleD
         }
 
         var quoted = await Orders.Orders.QuotedPricesAsync(context, command.SalesOrderId, cancellationToken).ConfigureAwait(false);
-        var (list, lines, total) = await Orders.Orders.PriceAsync(context, header.PlantId, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
+        var (list, lines, total) = await Orders.Orders.PriceAsync(context, header.PlantId, null, command.Lines, cancellationToken, quoted).ConfigureAwait(false);
         var version = row.Version + 1;
         var linesVersion = row.LinesVersion + 1;
         await context.AppendEventAsync(

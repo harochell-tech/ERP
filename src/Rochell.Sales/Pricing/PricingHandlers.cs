@@ -444,8 +444,9 @@ public sealed class PreparePriceListHandler : ICommandHandler<PreparePriceList>
         }
 
         await SalesSql.LockAsync(context, "price-list", cancellationToken).ConfigureAwait(false);
+        var listId = await PriceLists.ActiveOrGeneralAsync(context, command.PriceListId, cancellationToken).ConfigureAwait(false);
         var preparer = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        var version = (await SalesSql.ScalarAsync<int?>(context, "SELECT max(version) FROM sal.price_list_version WHERE company_id = @c", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false) ?? 0) + 1;
+        var version = (await SalesSql.ScalarAsync<int?>(context, "SELECT max(version) FROM sal.price_list_version WHERE price_list_id = @l", cancellationToken, ("l", listId)).ConfigureAwait(false) ?? 0) + 1;
         var eventId = await context.AppendEventAsync(
             new EventDraft(
                 "PriceListPrepared",
@@ -453,15 +454,16 @@ public sealed class PreparePriceListHandler : ICommandHandler<PreparePriceList>
                 Pricing.PriceAggregate,
                 context.ResultRef,
                 1,
-                JsonSerializer.Serialize(new { priceListVersionId = context.ResultRef, version, lines = normalized.Select(l => new { itemId = l.ItemId, uom = l.Uom, unitPrice = Pricing.Money4(l.Price) }) }),
+                JsonSerializer.Serialize(new { priceListVersionId = context.ResultRef, priceListId = listId, version, lines = normalized.Select(l => new { itemId = l.ItemId, uom = l.Uom, unitPrice = Pricing.Money4(l.Price) }) }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(
             context.Connection,
             context.Transaction,
-            "INSERT INTO sal.price_list_version (price_list_version_id, company_id, version, effective_from, status, prepared_by) VALUES (@id, @c, @v, @today, 'DRAFT', @by)",
+            "INSERT INTO sal.price_list_version (price_list_version_id, company_id, price_list_id, version, effective_from, status, prepared_by) VALUES (@id, @c, @l, @v, @today, 'DRAFT', @by)",
             cancellationToken,
             ("id", context.ResultRef),
+            ("l", listId),
             ("c", context.CompanyId),
             ("v", version),
             ("today", today),
@@ -481,7 +483,7 @@ public sealed class PreparePriceListHandler : ICommandHandler<PreparePriceList>
         }
 
         await context.AppendStateAsync(Pricing.PriceAggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { priceListVersionId = context.ResultRef, version, status = "DRAFT", lines = normalized.Count });
+        return JsonSerializer.Serialize(new { priceListVersionId = context.ResultRef, priceListId = listId, version, status = "DRAFT", lines = normalized.Count });
     }
 }
 
@@ -506,8 +508,15 @@ public sealed class ApprovePriceListHandler : ICommandHandler<ApprovePriceList>
             ?? throw new DomainException(SalesErrors.NotFound, "The price list does not exist.");
         var approver = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         await Pricing.EnsureApprovableAsync(context, row, approver, "price list", cancellationToken).ConfigureAwait(false);
+        // E-PRS-02-2: it replaces only the version in force of its own list.
         var previous = await SalesSql.ScalarAsync<Guid?>(
-            context, "SELECT price_list_version_id FROM sal.price_list_version WHERE company_id = @c AND status = 'ACTIVE'", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false);
+            context,
+            """
+            SELECT a.price_list_version_id FROM sal.price_list_version a JOIN sal.price_list_version d ON d.price_list_id = a.price_list_id
+            WHERE d.price_list_version_id = @id AND a.status = 'ACTIVE'
+            """,
+            cancellationToken,
+            ("id", command.PriceListVersionId)).ConfigureAwait(false);
         var today = SalesSql.Today(context);
         var eventId = await context.AppendEventAsync(
             new EventDraft(
@@ -535,5 +544,157 @@ public sealed class ApprovePriceListHandler : ICommandHandler<ApprovePriceList>
             ("id", command.PriceListVersionId)).ConfigureAwait(false);
         await context.AppendStateAsync(Pricing.PriceAggregate, command.PriceListVersionId, "DOCUMENT", "DRAFT", "ACTIVE", CommandType, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { priceListVersionId = command.PriceListVersionId, status = "ACTIVE", effectiveFrom = today, superseded = previous });
+    }
+}
+
+/// <summary>E-PRC1-1/5: the named lists' header rows (GENERAL is the migration's, E-PRC1-4).</summary>
+internal static class PriceLists
+{
+    public const string Aggregate = "PriceListHeader";
+
+    public sealed record Row(Guid Id, string Code, string Status, long Version);
+
+    public static async Task<Row> LockAsync(CommandContext context, Guid priceListId, long? expectedVersion, CancellationToken cancellationToken)
+    {
+        var row = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT price_list_id, code, status, version FROM sal.price_list WHERE company_id = @c AND price_list_id = @id FOR UPDATE",
+            r => new Row(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetInt64(3)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("id", priceListId)).ConfigureAwait(false)
+            ?? throw new DomainException(SalesErrors.NotFound, "The price list does not exist.");
+        if (expectedVersion is { } expected && expected != row.Version)
+        {
+            throw new DomainException(SalesErrors.VersionConflict, $"The price list is at version {row.Version}, not {expected}.");
+        }
+
+        return row;
+    }
+
+    /// <summary>The list a version or customer terms name: the given one, which must be ACTIVE, or GENERAL.</summary>
+    public static async Task<Guid> ActiveOrGeneralAsync(CommandContext context, Guid? priceListId, CancellationToken cancellationToken)
+    {
+        if (priceListId is not { } id)
+        {
+            return await SalesSql.ScalarAsync<Guid>(context, "SELECT sal.general_price_list(@c)", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false);
+        }
+
+        var row = await LockAsync(context, id, null, cancellationToken).ConfigureAwait(false);
+        return row.Status == "ACTIVE" ? row.Id : throw new DomainException(PriceListErrors.Inactive, $"The price list {row.Code} is inactive.");
+    }
+
+    public static async Task<string> TransitionAsync(
+        CommandContext context, Row row, string to, string eventType, string commandType, CancellationToken cancellationToken)
+    {
+        var version = row.Version + 1;
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(eventType, 1, Aggregate, row.Id, await SalesSql.NextEventVersionAsync(context, Aggregate, row.Id, cancellationToken).ConfigureAwait(false),
+                JsonSerializer.Serialize(new { priceListId = row.Id, code = row.Code, status = to }), Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection, context.Transaction, "UPDATE sal.price_list SET status = @s, version = @v WHERE price_list_id = @id", cancellationToken,
+            ("s", to), ("v", version), ("id", row.Id)).ConfigureAwait(false);
+        await context.AppendStateAsync(Aggregate, row.Id, "DOCUMENT", row.Status, to, commandType, eventId, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { priceListId = row.Id, code = row.Code, status = to, version });
+    }
+}
+
+[RequiresPermission("price_list:prepare")]
+public sealed class CreatePriceListHandler : ICommandHandler<CreatePriceList>
+{
+    public string CommandType => "Sales.CreatePriceList";
+
+    public async Task<string> HandleAsync(CreatePriceList command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var code = (command.Code ?? string.Empty).Trim().ToUpperInvariant();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(code, "^[A-Z0-9][A-Z0-9_]{1,29}$"))
+        {
+            throw new DomainException(SalesErrors.FieldInvalid, "The code has 2 to 30 capitals, digits or underscores.");
+        }
+
+        var name = SalesSql.Optional(command.Name, 80, "The name") ?? throw new DomainException(SalesErrors.FieldRequired, "The list needs a name.");
+        await SalesSql.LockAsync(context, "price-list", cancellationToken).ConfigureAwait(false);
+        await SalesSql.ScalarAsync<Guid>(context, "SELECT sal.general_price_list(@c)", cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false);
+        if (await SalesSql.ScalarAsync<Guid?>(context, "SELECT price_list_id FROM sal.price_list WHERE company_id = @c AND code = @code", cancellationToken,
+                ("c", context.CompanyId), ("code", code)).ConfigureAwait(false) is not null)
+        {
+            throw new DomainException(PriceListErrors.CodeUsed, $"There is already a price list {code}.");
+        }
+
+        var by = await SalesSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
+        var eventId = await context.AppendEventAsync(
+            new EventDraft("PriceListCreated", 1, PriceLists.Aggregate, context.ResultRef, 1,
+                JsonSerializer.Serialize(new { priceListId = context.ResultRef, code, name }), Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "INSERT INTO sal.price_list (price_list_id, company_id, code, name, status, created_by, version) VALUES (@id, @c, @code, @name, 'ACTIVE', @by, 1)",
+            cancellationToken,
+            ("id", context.ResultRef),
+            ("c", context.CompanyId),
+            ("code", code),
+            ("name", name),
+            ("by", by)).ConfigureAwait(false);
+        await context.AppendStateAsync(PriceLists.Aggregate, context.ResultRef, "DOCUMENT", null, "ACTIVE", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { priceListId = context.ResultRef, code, name, status = "ACTIVE", version = 1 });
+    }
+}
+
+[RequiresPermission("price_list:prepare")]
+public sealed class DeactivatePriceListHandler : ICommandHandler<DeactivatePriceList>
+{
+    public string CommandType => "Sales.DeactivatePriceList";
+
+    public async Task<string> HandleAsync(DeactivatePriceList command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var row = await PriceLists.LockAsync(context, command.PriceListId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
+        if (row.Code == "GENERAL")
+        {
+            throw new DomainException(PriceListErrors.General, "GENERAL is always in use (E-PRS-01-4).");
+        }
+
+        if (row.Status != "ACTIVE")
+        {
+            throw new DomainException(SalesErrors.InvalidState, $"The price list is {row.Status}.");
+        }
+
+        var customers = await SalesSql.ScalarAsync<long>(
+            context,
+            "SELECT count(DISTINCT party_id) FROM sal.customer_terms_version WHERE company_id = @c AND price_list_id = @id AND status IN ('ACTIVE', 'DRAFT')",
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("id", row.Id)).ConfigureAwait(false);
+        if (customers > 0)
+        {
+            throw new DomainException(PriceListErrors.InUse, $"{customers} customer(s) have {row.Code} in their terms in force or pending (E-PRS-01-5).");
+        }
+
+        return await PriceLists.TransitionAsync(context, row, "INACTIVE", "PriceListDeactivated", CommandType, cancellationToken).ConfigureAwait(false);
+    }
+}
+
+[RequiresPermission("price_list:prepare")]
+public sealed class ReactivatePriceListHandler : ICommandHandler<ReactivatePriceList>
+{
+    public string CommandType => "Sales.ReactivatePriceList";
+
+    public async Task<string> HandleAsync(ReactivatePriceList command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var row = await PriceLists.LockAsync(context, command.PriceListId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
+        if (row.Status != "INACTIVE")
+        {
+            throw new DomainException(SalesErrors.InvalidState, $"The price list is {row.Status}.");
+        }
+
+        return await PriceLists.TransitionAsync(context, row, "ACTIVE", "PriceListReactivated", CommandType, cancellationToken).ConfigureAwait(false);
     }
 }

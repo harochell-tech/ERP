@@ -71,7 +71,10 @@ public sealed class ListQuotesHandler : IQueryHandler<ListQuotes>
 
 public sealed record GetQuote(Guid CompanyId, Guid SessionId, Guid QuoteId) : IQuery;
 
-public sealed record QuoteLineView(int LineNo, Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, decimal NetAmount, bool Special);
+/// <summary>PRS-02 (E-PRS-02-6): <paramref name="PriceListCode"/> names the list the list price came from (the customer's or GENERAL).</summary>
+public sealed record QuoteLineView(
+    int LineNo, Guid ItemId, string ItemCode, string ItemDescription, string Uom, decimal Quantity, decimal ListPrice, decimal UnitPrice, decimal NetAmount, bool Special,
+    string? PriceListCode = null, string? PriceListName = null);
 
 /// <summary>A quote copied from this one, or the one it was copied from.</summary>
 public sealed record QuoteLink(Guid QuoteId, string QuoteNo, string Status);
@@ -117,13 +120,17 @@ public sealed class GetQuoteHandler : IQueryHandler<GetQuote>
             context.Connection,
             context.Transaction,
             """
-            SELECT l.line_no, l.item_id, i.code, i.description, l.uom, l.quantity, l.list_price, l.unit_price, l.net_amount::numeric(19,2), l.unit_price < l.list_price
+            SELECT l.line_no, l.item_id, i.code, i.description, l.uom, l.quantity, l.list_price, l.unit_price, l.net_amount::numeric(19,2), l.unit_price < l.list_price,
+                   pl.code, pl.name
             FROM sal.quote q
             JOIN sal.quote_line l ON l.quote_id = q.quote_id AND l.lines_version = q.lines_version
             JOIN md.item i ON i.item_id = l.item_id
+            LEFT JOIN sal.price_list_version pv ON pv.price_list_version_id = l.price_list_version_id
+            LEFT JOIN sal.price_list pl ON pl.price_list_id = pv.price_list_id
             WHERE q.quote_id = @q ORDER BY l.line_no
             """,
-            r => new QuoteLineView(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8), r.GetBoolean(9)),
+            r => new QuoteLineView(r.GetInt32(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8), r.GetBoolean(9),
+                r.NullableString(10), r.NullableString(11)),
             cancellationToken,
             ("q", query.QuoteId)).ConfigureAwait(false);
         var links = await Reading.ListAsync(

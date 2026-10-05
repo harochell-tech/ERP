@@ -76,7 +76,7 @@ function OrderForm() {
     [companyId, allowed, editId],
   );
   const previewSource = values ?? (data?.order ? { plantId: data.order.plantId, lines: data.order.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.qtyOrdered })) } : null);
-  const preview = useSalesPreview("order", previewSource?.plantId ?? "", previewSource?.lines ?? []);
+  const preview = useSalesPreview("order", previewSource?.plantId ?? "", previewSource?.lines ?? [], values?.partyId ?? data?.order?.header.partyId ?? "");
 
   if (!allowed) {
     return <NoPermission />;
