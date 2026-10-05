@@ -205,20 +205,22 @@ CREATE TABLE pur.import_settlement_document (
 -- A document is settled in one settlement only (a draft that is cancelled first deletes its documents).
 CREATE UNIQUE INDEX import_settlement_document_once ON pur.import_settlement_document (company_id, document_kind, document_id);
 
--- The allocation over the received lines: their receipt value and the cost added (by value; the cent left goes to the largest line).
+-- The allocation over the shipment's lines (E-USD-12): an expense line of the foreign invoice (spare parts to their expense category,
+-- trucks and forklifts to their fixed-asset category — E-USD-10/11) or a received line of raw material; its value and the cost added
+-- (by value; the cent left goes to the largest line).
 CREATE TABLE pur.import_settlement_allocation (
-  settlement_id          uuid          NOT NULL,
-  company_id             uuid          NOT NULL,
-  goods_receipt_line_id  uuid          NOT NULL,
-  item_id                uuid          NOT NULL,
-  receipt_value          numeric(19,4) NOT NULL,
-  added_cost             numeric(19,4) NOT NULL,
-  CONSTRAINT import_settlement_allocation_pk PRIMARY KEY (settlement_id, goods_receipt_line_id),
+  settlement_id  uuid          NOT NULL,
+  company_id     uuid          NOT NULL,
+  target_kind    text          NOT NULL,
+  target_id      uuid          NOT NULL,
+  base_value     numeric(19,4) NOT NULL,
+  added_cost     numeric(19,4) NOT NULL,
+  CONSTRAINT import_settlement_allocation_pk PRIMARY KEY (settlement_id, target_kind, target_id),
   CONSTRAINT import_settlement_allocation_header_fk FOREIGN KEY (company_id, settlement_id) REFERENCES pur.import_settlement (company_id, settlement_id),
-  CONSTRAINT import_settlement_allocation_item_fk FOREIGN KEY (company_id, item_id) REFERENCES md.item (company_id, item_id),
-  CONSTRAINT import_settlement_allocation_amounts CHECK (receipt_value > 0 AND added_cost >= 0 AND added_cost = round(added_cost, 2))
+  CONSTRAINT import_settlement_allocation_kind CHECK (target_kind IN ('EXPENSE_LINE', 'RECEIPT_LINE')),
+  CONSTRAINT import_settlement_allocation_amounts CHECK (base_value > 0 AND added_cost >= 0 AND added_cost = round(added_cost, 2))
 );
-CREATE UNIQUE INDEX import_settlement_allocation_once ON pur.import_settlement_allocation (company_id, goods_receipt_line_id);
+CREATE UNIQUE INDEX import_settlement_allocation_once ON pur.import_settlement_allocation (company_id, target_kind, target_id);
 
 -- Documents and allocations are written while the settlement is DRAFT, never afterwards.
 CREATE FUNCTION pur.import_settlement_child_guard() RETURNS trigger

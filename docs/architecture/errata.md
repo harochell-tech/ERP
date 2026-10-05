@@ -1092,13 +1092,25 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-USD-7 | USD-1 | Payments from a USD account, or from a peso account at the bank's rate that day; the difference against the invoice's rate is realized exchange gain or loss. |
 | E-USD-8 | USD-1 | Open USD balances are revalued at the month's last rate and reversed the next day (unrealized exchange difference). |
 | E-USD-9 | USD-1 | USD bank accounts with their own GL account and USD statements. |
+| E-USD-10 | USD-1 | An import is mostly an expense purchase (GAS-1) in USD: spare parts to their expense category, trucks and forklifts to a fixed-asset category; imported raw material follows the inventory purchase. |
+| E-USD-11 | USD-1 | A category may point to a (non-control) asset account with 606 type «04»; only the cost is capitalized — the asset register and depreciation belong to a separate fixed-assets module. |
+| E-USD-12 | USD-1 | The settlement spreads the shipment's costs (DUA duties, agent fees, freight, insurance, local transport) over its lines by value, each part to its line's category account (expense or asset) or to inventory for raw material. |
+| E-USD-13 | USD-1 | The customs agent bills locally in pesos with NCF and ITBIS (expense invoice, category «Gestión aduanal»); its net enters the settlement, its ITBIS is recoverable. |
+| E-USD-14 | USD-1 | The DUA carries duties, ITBIS and other charges and creates a payable to the DGA; duties enter the settlement; ITBIS is recoverable and goes to the 606. |
+| E-USD-15 | USD-1 | Sales in USD are out of USD-1: their own baseline (USD-2) for the e-CF in USD, receipts and receivables in USD. The USD bank account is in USD-1. |
 | E-USD1-01-1 | USD-1 | One rate per currency and day, 4 decimals; prepared and approved by someone else; an approved rate never changes — a correction is a new rate of the same day that supersedes it. |
 | E-USD1-01-2 | USD-1 | Orders, invoices, payables and payments keep the currency, the USD amount, the rate and the peso equivalent (rounded to 2 decimals per document). |
 | E-USD1-01-3 | USD-1 | The ledger stays in pesos; lines of USD controls (foreign payables, USD banks) also keep their USD amount. |
 | E-USD1-01-4 | USD-1 | The DUA is its own document (number, date, CIF, duties, ITBIS, other charges) and creates a payable to the DGA (a local supplier) paid like any other. |
-| E-USD1-01-5 | USD-1 | The settlement is prepared by Cuentas por pagar and approved (posted) by the Controller; allocation by value, the leftover cent to the largest line. |
+| E-USD1-01-5 | USD-1 | The settlement is prepared by Cuentas por pagar and approved (posted) by the Controller; allocation by value over expense lines or received lines (E-USD-12), the leftover cent to the largest line. |
 | E-USD1-01-6 | USD-1 | New roles: foreign payables (control), imports to settle, exchange gain, exchange loss, unrealized exchange difference. |
 | E-USD1-01-7 | USD-1 | Permissions: rates prepared by Tesorero and Contador, approved by the Controller; settlements prepared by Cuentas por pagar, approved by the Controller; prepare ≠ approve. |
+| E-USD1-02-1 | USD-1 | On weekends and holidays (no Banco Central rate) a document takes the last approved rate before its date; any business day still needs its own rate (E-USD-2). |
+| E-USD1-02-2 | USD-1 | Rates are entered for today or past days, never future ones. |
+| E-USD1-02-3 | USD-1 | A rate is corrected by a new rate of the same day that supersedes it on approval; documents already registered keep the rate they used. |
+| E-USD1-02-4 | USD-1 | Rates are entered by hand with their source («Banco Central — tasa de venta»); automatic download later. |
+| E-USD1-02-5 | USD-1 | Queries: rates by date range and «rate for a date» (the applicable rate and the day it comes from). |
+| E-USD1-02-6 | USD-1 | Inicio: «Tasas por aprobar» for the Controller; «Falta la tasa de hoy» for Tesorería when USD documents are open. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
