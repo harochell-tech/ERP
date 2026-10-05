@@ -1111,6 +1111,8 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-USD1-02-4 | USD-1 | Rates are entered by hand with their source («Banco Central — tasa de venta»); automatic download later. |
 | E-USD1-02-5 | USD-1 | Queries: rates by date range and «rate for a date» (the applicable rate and the day it comes from). |
 | E-USD1-02-6 | USD-1 | Inicio: «Tasas por aprobar» for the Controller; «Falta la tasa de hoy» for Tesorería when USD documents are open. |
+| E-USD1-02-7 | USD-1 | Saturdays and Sundays take the last approved rate; a weekday holiday is not told apart from a business day without rate: Tesorería enters that day the previous business day's rate (source «Feriado: tasa del [fecha]») and the Controller approves it. No holiday calendar. |
+| E-USD1-02-8 | USD-1 | New read permission `exchange_rate:read` for Tesorero, Contador, Controller, Cuentas por pagar, Comprador and Auditor (135 permissions). |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

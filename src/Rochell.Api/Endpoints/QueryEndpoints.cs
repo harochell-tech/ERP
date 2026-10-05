@@ -4,6 +4,7 @@ using Rochell.Api.Http;
 using Rochell.Audit;
 using Rochell.Finance.Configuration;
 using Rochell.Finance.Explain;
+using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
 using Rochell.Identity.Queries;
@@ -57,7 +58,7 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
-        typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
+        typeof(ListExchangeRatesHandler), typeof(GetExchangeRateForDateHandler), typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListPurchaseTaxTypesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
@@ -383,6 +384,13 @@ public static class QueryEndpoints
             .Describe<EventJournals>(nameof(ListEventJournals), notFound: true);
 
         // E-B03-15-1: configuration lists for the approval screens (configuration:read).
+        // USD1-02 (E-USD1-02-5): exchange rates.
+        finance.MapGet("/exchange-rates", (HttpContext http, Guid companyId, DateOnly? from, DateOnly? to, ListExchangeRatesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListExchangeRates(companyId, s, from, to), handler, ct))
+            .Describe<ExchangeRateList>(nameof(ListExchangeRates));
+        finance.MapGet("/exchange-rates/for-date", (HttpContext http, Guid companyId, DateOnly date, GetExchangeRateForDateHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetExchangeRateForDate(companyId, s, date), handler, ct))
+            .Describe<ApplicableRate>(nameof(GetExchangeRateForDate));
         finance.MapGet("/accounts", (HttpContext http, Guid companyId, ListAccountsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListAccounts(companyId, s), handler, ct))
             .Describe<AccountList>(nameof(ListAccounts));

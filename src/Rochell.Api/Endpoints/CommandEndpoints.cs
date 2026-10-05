@@ -3,6 +3,7 @@ using Rochell.Api.Hosting;
 using Rochell.Api.Http;
 using Rochell.Audit;
 using Rochell.Finance.Configuration;
+using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
 using Rochell.Identity.RoleChanges;
@@ -140,6 +141,9 @@ public static class CommandEndpoints
         finance.MapCommand<PrepareAccountingPolicyVersion, PrepareAccountingPolicyVersionHandler>();
         finance.MapCommand<ApproveAccountingPolicyVersion, ApproveAccountingPolicyVersionHandler>();
         finance.MapCommand<CreateAccount, CreateAccountHandler>();
+        finance.MapCommand<PrepareExchangeRate, PrepareExchangeRateHandler>(); // USD1-02 (E-USD-2)
+        finance.MapCommand<ApproveExchangeRate, ApproveExchangeRateHandler>();
+        finance.MapCommand<DiscardExchangeRate, DiscardExchangeRateHandler>();
         finance.MapCommand<UpdateAccount, UpdateAccountHandler>();
         finance.MapCommand<DeactivateAccount, DeactivateAccountHandler>();
         finance.MapCommand<ActivateAccount, ActivateAccountHandler>();
@@ -328,7 +332,7 @@ public static class CommandEndpoints
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),
         typeof(ApproveAccountingPolicyVersionHandler),
-        typeof(CreateAccountHandler), typeof(UpdateAccountHandler), typeof(DeactivateAccountHandler), typeof(ActivateAccountHandler),
+        typeof(CreateAccountHandler), typeof(PrepareExchangeRateHandler), typeof(ApproveExchangeRateHandler), typeof(DiscardExchangeRateHandler), typeof(UpdateAccountHandler), typeof(DeactivateAccountHandler), typeof(ActivateAccountHandler),
         typeof(PrepareManualJournalHandler), typeof(UpdateManualJournalHandler), typeof(SubmitManualJournalHandler), typeof(WithdrawManualJournalHandler),
         typeof(ApproveManualJournalHandler), typeof(RejectManualJournalHandler), typeof(ReverseManualJournalHandler),
         typeof(PrepareReportStructureHandler), typeof(ApproveReportStructureHandler),
