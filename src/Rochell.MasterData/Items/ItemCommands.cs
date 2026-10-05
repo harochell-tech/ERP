@@ -38,5 +38,11 @@ public sealed record DefineUomConversion(
     decimal Factor,
     DateOnly EffectiveFrom) : ICommand;
 
+/// <summary>
+/// E-SRV1-8, E-PRS-01-7, E-PRS-03-1: creates the company's one freight item in DRAFT — code TRANSPORTE, type SERVICE, category
+/// TRANSPORTE, unit «un» — with the permission that creates items; someone with <c>item:activate</c> activates it.
+/// </summary>
+public sealed record CreateFreightItem(Guid CompanyId, Guid SessionId, string IdempotencyKey, string Description) : ICommand;
+
 /// <summary>DRAFT → ACTIVE (E-PR04-3).</summary>
 public sealed record ActivateItem(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ItemId, long ExpectedVersion) : ICommand;

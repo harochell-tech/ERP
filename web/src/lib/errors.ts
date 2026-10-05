@@ -194,6 +194,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PRICE_LIST_INACTIVE: "La lista de precios está inactiva.",
   PRICE_LIST_IN_USE: "La lista la tienen clientes en sus condiciones vigentes o pendientes; cámbieles la lista primero.",
   PRICE_LIST_GENERAL: "La lista «General» siempre está en uso; no se puede desactivar.",
+  ZONE_NAME_USED: "Ya existe una zona con ese nombre.",
+  ZONE_INACTIVE: "La zona está inactiva.",
   SITE_ADDRESS_REQUIRED: "Indique la dirección de la obra para una entrega en obra.",
   QUANTITY_EXCEEDS_OPEN: "La cantidad supera lo pendiente de entregar del pedido.",
   OPEN_DELIVERIES: "El pedido tiene conduces abiertos.",

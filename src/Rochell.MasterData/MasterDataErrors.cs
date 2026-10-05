@@ -27,4 +27,7 @@ public static class ItemCategories
 
     /// <summary>E-VS3-01-2: categories of finished goods.</summary>
     public static IReadOnlyList<string> FinishedGoods { get; } = ["BLOQUE", "ADOQUIN", "OTRO_PT"];
+
+    /// <summary>E-SRV1-8: the freight service.</summary>
+    public static IReadOnlyList<string> Services { get; } = ["TRANSPORTE"];
 }

@@ -20,6 +20,27 @@ internal static class Pricing
                ("c", context.CompanyId), ("i", itemId)).ConfigureAwait(false)
            ?? throw new DomainException(SalesErrors.NotFinishedGood, $"Item {itemId} is not a finished good of the company.");
 
+    /// <summary>A finished good's base unit, or a unit with a conversion in force to it (price and freight lines alike).</summary>
+    public static async Task EnsureSellingUomAsync(CommandContext context, Guid itemId, string uom, DateOnly today, CancellationToken cancellationToken)
+    {
+        var baseUom = await FinishedGoodBaseUomAsync(context, itemId, cancellationToken).ConfigureAwait(false);
+        if (uom != baseUom && await SalesSql.ScalarAsync<string>(
+                context,
+                """
+                SELECT from_uom FROM md.uom_conversion
+                WHERE company_id = @c AND item_id = @i AND from_uom = @u AND to_uom = @b AND effective_from <= @d AND (effective_to IS NULL OR effective_to > @d)
+                """,
+                cancellationToken,
+                ("c", context.CompanyId),
+                ("i", itemId),
+                ("u", uom),
+                ("b", baseUom),
+                ("d", today)).ConfigureAwait(false) is null)
+        {
+            throw new DomainException(SalesErrors.UomNotConvertible, $"Unit {uom} is neither the base unit ({baseUom}) nor has a conversion in force for item {itemId}.");
+        }
+    }
+
     public sealed record Approval(string Status, Guid PreparedBy);
 
     public static async Task EnsureApprovableAsync(CommandContext context, Approval row, Guid approver, string what, CancellationToken cancellationToken)
@@ -406,9 +427,10 @@ public sealed class PreparePriceListHandler : ICommandHandler<PreparePriceList>
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var lines = command.Lines ?? [];
-        if (lines.Count == 0)
+        var freightLines = command.Freight ?? [];
+        if (lines.Count == 0 && freightLines.Count == 0)
         {
-            throw new DomainException(SalesErrors.LinesRequired, "A price list has at least one line.");
+            throw new DomainException(SalesErrors.LinesRequired, "A price list has at least one product or freight price (E-PRS-03-4).");
         }
 
         var today = SalesSql.Today(context);
@@ -423,24 +445,34 @@ public sealed class PreparePriceListHandler : ICommandHandler<PreparePriceList>
             }
 
             var price = SalesSql.Positive(line.UnitPrice, 4, "The unit price");
-            var baseUom = await Pricing.FinishedGoodBaseUomAsync(context, line.ItemId, cancellationToken).ConfigureAwait(false);
-            if (uom != baseUom && await SalesSql.ScalarAsync<string>(
-                    context,
-                    """
-                    SELECT from_uom FROM md.uom_conversion
-                    WHERE company_id = @c AND item_id = @i AND from_uom = @u AND to_uom = @b AND effective_from <= @d AND (effective_to IS NULL OR effective_to > @d)
-                    """,
-                    cancellationToken,
-                    ("c", context.CompanyId),
-                    ("i", line.ItemId),
-                    ("u", uom),
-                    ("b", baseUom),
-                    ("d", today)).ConfigureAwait(false) is null)
+            await Pricing.EnsureSellingUomAsync(context, line.ItemId, uom, today, cancellationToken).ConfigureAwait(false);
+            normalized.Add((line.ItemId, uom, price));
+        }
+
+        var freightSeen = new HashSet<(Guid, string, Guid)>();
+        var freight = new List<(Guid ItemId, string Uom, Guid ZoneId, decimal Price)>();
+        foreach (var line in freightLines)
+        {
+            var uom = (line.Uom ?? string.Empty).Trim();
+            if (!freightSeen.Add((line.ItemId, uom, line.ZoneId)))
             {
-                throw new DomainException(SalesErrors.UomNotConvertible, $"Unit {uom} is neither the base unit ({baseUom}) nor has a conversion in force for item {line.ItemId}.");
+                throw new DomainException(SalesErrors.DuplicateLine, "Each product, unit and zone has one freight price in a version.");
             }
 
-            normalized.Add((line.ItemId, uom, price));
+            var price = SalesSql.Positive(line.UnitPrice, 4, "The freight price");
+            await Pricing.EnsureSellingUomAsync(context, line.ItemId, uom, today, cancellationToken).ConfigureAwait(false);
+            if (await SalesSql.ScalarAsync<string>(context, "SELECT status FROM sal.delivery_zone WHERE company_id = @c AND zone_id = @z", cancellationToken,
+                    ("c", context.CompanyId), ("z", line.ZoneId)).ConfigureAwait(false) is not { } zoneStatus)
+            {
+                throw new DomainException(SalesErrors.NotFound, $"Zone {line.ZoneId} does not exist.");
+            }
+
+            if (zoneStatus != "ACTIVE")
+            {
+                throw new DomainException(Zones.ZoneErrors.Inactive, $"Zone {line.ZoneId} is inactive.");
+            }
+
+            freight.Add((line.ItemId, uom, line.ZoneId, price));
         }
 
         await SalesSql.LockAsync(context, "price-list", cancellationToken).ConfigureAwait(false);
@@ -454,7 +486,14 @@ public sealed class PreparePriceListHandler : ICommandHandler<PreparePriceList>
                 Pricing.PriceAggregate,
                 context.ResultRef,
                 1,
-                JsonSerializer.Serialize(new { priceListVersionId = context.ResultRef, priceListId = listId, version, lines = normalized.Select(l => new { itemId = l.ItemId, uom = l.Uom, unitPrice = Pricing.Money4(l.Price) }) }),
+                JsonSerializer.Serialize(new
+                {
+                    priceListVersionId = context.ResultRef,
+                    priceListId = listId,
+                    version,
+                    lines = normalized.Select(l => new { itemId = l.ItemId, uom = l.Uom, unitPrice = Pricing.Money4(l.Price) }),
+                    freight = freight.Select(f => new { itemId = f.ItemId, uom = f.Uom, zoneId = f.ZoneId, unitPrice = Pricing.Money4(f.Price) }),
+                }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(
@@ -482,8 +521,23 @@ public sealed class PreparePriceListHandler : ICommandHandler<PreparePriceList>
                 ("p", price)).ConfigureAwait(false);
         }
 
+        foreach (var (itemId, uom, zoneId, price) in freight)
+        {
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "INSERT INTO sal.price_list_freight (price_list_version_id, company_id, item_id, uom, zone_id, unit_price) VALUES (@id, @c, @i, @u, @z, @p)",
+                cancellationToken,
+                ("id", context.ResultRef),
+                ("c", context.CompanyId),
+                ("i", itemId),
+                ("u", uom),
+                ("z", zoneId),
+                ("p", price)).ConfigureAwait(false);
+        }
+
         await context.AppendStateAsync(Pricing.PriceAggregate, context.ResultRef, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { priceListVersionId = context.ResultRef, priceListId = listId, version, status = "DRAFT", lines = normalized.Count });
+        return JsonSerializer.Serialize(new { priceListVersionId = context.ResultRef, priceListId = listId, version, status = "DRAFT", lines = normalized.Count, freight = freight.Count });
     }
 }
 

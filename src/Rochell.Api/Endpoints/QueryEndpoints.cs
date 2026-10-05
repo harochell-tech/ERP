@@ -21,6 +21,7 @@ using Rochell.Sales.Mail;
 using Rochell.Sales.Proformas;
 using Rochell.Sales.Queries;
 using Rochell.Sales.Refunds;
+using Rochell.Sales.Zones;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
 using Rochell.Tax.Reports;
@@ -62,7 +63,7 @@ public static class QueryEndpoints
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListPurchaseTaxTypesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
         typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
-        typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler),
+        typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler), typeof(ListDeliveryZonesHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
@@ -229,6 +230,10 @@ public static class QueryEndpoints
         sales.MapGet("/price-lists", (HttpContext http, Guid companyId, Guid? priceListId, ListPriceListsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPriceLists(companyId, s, priceListId), handler, ct))
             .Describe<PriceListList>(nameof(ListPriceLists));
+        // PRS-03 (E-PRS-03-6): delivery zones.
+        sales.MapGet("/delivery-zones", (HttpContext http, Guid companyId, string? status, ListDeliveryZonesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListDeliveryZones(companyId, s, status), handler, ct))
+            .Describe<DeliveryZoneList>(nameof(ListDeliveryZones));
         // PRS-02 (E-PRC1-11): the named lists.
         sales.MapGet("/price-list-headers", (HttpContext http, Guid companyId, ListPriceListHeadersHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPriceListHeaders(companyId, s), handler, ct))

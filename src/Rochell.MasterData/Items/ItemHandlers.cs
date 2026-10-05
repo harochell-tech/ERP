@@ -113,6 +113,19 @@ public sealed class CreateFinishedGoodHandler : ICommandHandler<CreateFinishedGo
     }
 }
 
+[RequiresPermission("item:create")]
+public sealed class CreateFreightItemHandler : ICommandHandler<CreateFreightItem>
+{
+    public string CommandType => "MasterData.CreateFreightItem";
+
+    public Task<string> HandleAsync(CreateFreightItem command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        return ItemCreation.CreateAsync(context, "SERVICE", ItemCategories.Services, "TRANSPORTE", command.Description, "un", "TRANSPORTE", CommandType, cancellationToken);
+    }
+}
+
 /// <summary>E-PR04-1: requires item:activate (Controller), because a conversion changes inventory quantities.</summary>
 [RequiresPermission("item:activate")]
 public sealed class DefineUomConversionHandler : ICommandHandler<DefineUomConversion>
