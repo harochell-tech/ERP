@@ -142,7 +142,8 @@ public static class BankGl
             var cancelled = glItems.Where(e => e.PaymentId is not null)
                 .GroupBy(e => e.PaymentId)
                 .Where(g => ((g.Any(e => e.Kind == "OUTSTANDING_PAYMENT") && g.Any(e => e.Kind == "OUTSTANDING_RETURN"))
-                             || (g.Any(e => e.Kind == "OUTSTANDING_RECEIPT") && g.Any(e => e.Kind == "OUTSTANDING_RECEIPT_REVERSAL")))
+                             || (g.Any(e => e.Kind == "OUTSTANDING_RECEIPT") && g.Any(e => e.Kind == "OUTSTANDING_RECEIPT_REVERSAL"))
+                             || (g.Any(e => e.Kind == "OUTSTANDING_TRANSFER") && g.Any(e => e.Kind == "OUTSTANDING_TRANSFER_REVERSAL")))
                             && g.Sum(e => e.Signed) == 0m)
                 .SelectMany(g => g)
                 .ToHashSet();
@@ -174,7 +175,8 @@ public static class BankGl
         => await ReconSql.ScalarAsync<decimal>(
             context.Connection,
             context.Transaction,
-            "SELECT coalesce(sum(debit - credit), 0) FROM fin.gl_entry WHERE company_id = @c AND subledger_type = 'BANK' AND subledger_ref = @b AND posting_date < @from",
+            // E-USD1-05b-4: a USD account reconciles in USD — its lines' USD, signed as their pesos.
+            "SELECT coalesce(sum(CASE WHEN currency = 'USD' THEN sign(debit - credit) * amount_fc ELSE debit - credit END), 0) FROM fin.gl_entry WHERE company_id = @c AND subledger_type = 'BANK' AND subledger_ref = @b AND posting_date < @from",
             cancellationToken,
             ("c", context.CompanyId),
             ("b", account),
@@ -186,7 +188,7 @@ public static class BankGl
             context.Connection,
             context.Transaction,
             """
-            SELECT e.gl_entry_id, e.posting_date, e.debit - e.credit,
+            SELECT e.gl_entry_id, e.posting_date, CASE WHEN e.currency = 'USD' THEN sign(e.debit - e.credit) * e.amount_fc ELSE e.debit - e.credit END,
                    CASE WHEN pay.payment_id IS NOT NULL THEN 'OUTSTANDING_PAYMENT'
                         WHEN rev.payment_id IS NOT NULL THEN 'OUTSTANDING_RETURN'
                         WHEN chg.line_id IS NOT NULL THEN 'OUTSTANDING_CHARGE'
@@ -195,10 +197,13 @@ public static class BankGl
                         WHEN rb.receipt_id IS NOT NULL THEN 'OUTSTANDING_BOUNCE'
                         WHEN dp.deposit_id IS NOT NULL THEN 'OUTSTANDING_DEPOSIT'
                         WHEN rf.refund_id IS NOT NULL THEN 'OUTSTANDING_REFUND'
+                        WHEN tr.transfer_id IS NOT NULL THEN 'OUTSTANDING_TRANSFER'
+                        WHEN trv.transfer_id IS NOT NULL THEN 'OUTSTANDING_TRANSFER_REVERSAL'
                         ELSE 'UNLINKED_ENTRY' END,
-                   coalesce(pay.payment_no, rev.payment_no, chg.line_id::text, rc.receipt_no, rr.receipt_no, rb.receipt_no, dp.deposit_no, rf.refund_no, e.gl_entry_id::text),
-                   coalesce(dl.value_date, cl.value_date, chg.value_date, rcl.value_date, rbl.value_date, dpl.value_date, rfl.value_date),
-                   coalesce(pay.payment_id, rev.payment_id, rc.receipt_id, rr.receipt_id)
+                   coalesce(pay.payment_no, rev.payment_no, chg.line_id::text, rc.receipt_no, rr.receipt_no, rb.receipt_no, dp.deposit_no, rf.refund_no, tr.transfer_no, trv.transfer_no,
+                            e.gl_entry_id::text),
+                   coalesce(dl.value_date, cl.value_date, chg.value_date, rcl.value_date, rbl.value_date, dpl.value_date, rfl.value_date, trl.value_date),
+                   coalesce(pay.payment_id, rev.payment_id, rc.receipt_id, rr.receipt_id, tr.transfer_id, trv.transfer_id)
             FROM fin.gl_entry e
             JOIN fin.gl_journal j ON j.journal_id = e.journal_id
             LEFT JOIN fin.gl_journal o ON o.journal_id = j.reverses_journal_id
@@ -216,6 +221,9 @@ public static class BankGl
             LEFT JOIN fin.bank_statement_line dpl ON dpl.matched_deposit_id = dp.deposit_id
             LEFT JOIN fin.customer_refund rf ON j.journal_type = 'AUTO' AND rf.company_id = e.company_id AND rf.posting_event_id = j.source_event_id
             LEFT JOIN fin.bank_statement_line rfl ON rfl.matched_refund_id = rf.refund_id
+            LEFT JOIN fin.bank_transfer tr ON j.journal_type = 'AUTO' AND tr.company_id = e.company_id AND tr.posting_event_id = j.source_event_id
+            LEFT JOIN fin.bank_transfer trv ON j.journal_type = 'REVERSAL' AND trv.company_id = e.company_id AND trv.posting_event_id = o.source_event_id
+            LEFT JOIN fin.bank_statement_line trl ON trl.matched_transfer_id = tr.transfer_id AND trl.bank_account_id = e.subledger_ref
             WHERE e.company_id = @c AND e.subledger_type = 'BANK' AND e.subledger_ref = @b AND e.posting_date <= @d
             ORDER BY e.posting_date, e.gl_entry_id
             """,
@@ -240,6 +248,10 @@ public static class BankGl
                           (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
                            JOIN fin.receipt_deposit d ON d.posting_event_id = j.source_event_id
                            WHERE d.deposit_id = l.matched_deposit_id AND j.journal_type = 'AUTO' AND e.subledger_type = 'BANK')
+                        WHEN l.matched_transfer_id IS NOT NULL THEN
+                          (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
+                           JOIN fin.bank_transfer t ON t.posting_event_id = j.source_event_id
+                           WHERE t.transfer_id = l.matched_transfer_id AND j.journal_type = 'AUTO' AND e.subledger_type = 'BANK' AND e.subledger_ref = l.bank_account_id)
                         WHEN l.matched_refund_id IS NOT NULL THEN
                           (SELECT min(e.posting_date) FROM fin.gl_entry e JOIN fin.gl_journal j ON j.journal_id = e.journal_id
                            JOIN fin.customer_refund f ON f.posting_event_id = j.source_event_id

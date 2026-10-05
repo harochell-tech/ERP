@@ -114,6 +114,7 @@ public sealed class MatchBankLineToRefundHandler : ICommandHandler<MatchBankLine
 
         var line = await BankLines.LockLineAsync(context, command.LineId, command.ExpectedLineVersion, cancellationToken).ConfigureAwait(false);
         await BankLines.ShareBankAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
+        await BankLines.RequirePesoAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
         if (refund.Status != "RELEASED" || refund.Date is not { } released)
         {
             throw new DomainException(StatementErrors.RefundNotMatchable, $"{refund.No} is {refund.Status}; a line matches a RELEASED refund.");

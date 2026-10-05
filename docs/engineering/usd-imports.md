@@ -124,3 +124,24 @@ Tests: `ImportSettlementTests` (USD-05 with the baseline's figures, the settleme
   `amountUsd`, `exchangeRate`.
 
 Tests: `ForeignPaymentTests` (USD-07, partial payments from a USD account with a gain, currency and IBAN rules).
+
+## USD1-05b — transfers between own accounts and USD statements (migration 0090; E-USD1-05b-1…5)
+
+| Command / query | Permission | What it does |
+| --- | --- | --- |
+| `PrepareBankTransfer` | `payment:prepare` | PREPARED TRF-YYYY-NNNNNN; `Amount` in USD when a USD account takes part, `ExchangeRate` only across currencies |
+| `VoidBankTransfer` | `payment:void` | PREPARED → VOIDED with a reason |
+| `ReleaseBankTransfer` | `payment:release` (step-up, four eyes) | Posts P-42 on the value date |
+| `ReverseBankTransfer` | `payment:reverse` (step-up) | Exact reversal today, reason ≥ 10 characters |
+| `MatchBankLineToTransfer` | `bank_line:match` | The origin's DEBIT or the destination's CREDIT line, by that side's amount, within value date … +10 days |
+| `ListBankTransfers` (GET `/treasury/bank-transfers`) | `payment:read` | |
+
+- **Amounts** (`fin.bank_transfer`, checked by `fin.bank_transfer_amounts_ok`): DOP→DOP the same pesos, no rate; DOP→USD `from_amount` =
+  USD × rate; USD→DOP `to_amount` = USD × rate; USD→USD the same USD and `amount_dop` at the day's approved rate.
+- **P-42**: `P42-DR-BANK` to the destination, `P42-CR-BANK` from the origin, both `amount_dop`; a USD account's line carries its USD.
+- **Statements**: a payment's line on a USD account matches `amount_fc` (`BankLines.LockPaymentAsync`); `UnmatchBankLine` handles
+  transfer lines; `RecognizeBankCharge`, receipt / deposit and refund matching refuse USD accounts (`BankLines.RequirePesoAccountAsync`).
+- **BANK-GL**: every BANK amount is `sign(debit − credit) × amount_fc` on USD lines, `debit − credit` on peso lines — a USD account reconciles in
+  USD; transfer entries are OUTSTANDING_TRANSFER until their line is matched, and a transfer and its reversal in transit cancel.
+
+Tests: `BankTransferTests` (Reconciliation; USD-09). 229 commands.

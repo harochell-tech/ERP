@@ -128,6 +128,7 @@ public sealed class MatchBankLineToReceiptHandler : ICommandHandler<MatchBankLin
 
         var line = await BankLines.LockLineAsync(context, command.LineId, command.ExpectedLineVersion, cancellationToken).ConfigureAwait(false);
         await BankLines.ShareBankAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
+        await BankLines.RequirePesoAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
         var lineVersion = line.Version + 1;
         if (line.Direction == StatementFile.Debit)
         {
@@ -217,6 +218,7 @@ public sealed class MatchBankLineToReceiptHandler : ICommandHandler<MatchBankLin
 
         var line = await BankLines.LockLineAsync(context, command.LineId, command.ExpectedLineVersion, cancellationToken).ConfigureAwait(false);
         await BankLines.ShareBankAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
+        await BankLines.RequirePesoAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
         if (line.Direction != StatementFile.Credit || deposit.Status != "DEPOSITED")
         {
             throw new DomainException(StatementErrors.ReceiptNotMatchable, $"A deposit waiting for its line ({deposit.No} is {deposit.Status}) matches a CREDIT line.");

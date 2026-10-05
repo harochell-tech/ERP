@@ -48,12 +48,25 @@ internal static class BankLines
         => await Reading.SingleOrDefaultAsync(
                context.Connection,
                context.Transaction,
-               "SELECT bank_account_id, amount, value_date, status::text, version, payment_no FROM fin.payment WHERE payment_id = @id AND company_id = @c FOR UPDATE",
+               // E-USD1-05b-3: a USD account's line shows the payment's USD.
+               "SELECT bank_account_id, CASE WHEN currency = 'USD' THEN amount_fc ELSE amount END, value_date, status::text, version, payment_no FROM fin.payment WHERE payment_id = @id AND company_id = @c FOR UPDATE",
                r => new Payment(r.GetGuid(0), r.GetDecimal(1), r.Date(2), r.GetString(3), r.GetInt64(4), r.GetString(5)),
                cancellationToken,
                ("id", paymentId),
                ("c", context.CompanyId)).ConfigureAwait(false)
            ?? throw new DomainException(PaymentErrors.NotFound, "The payment does not exist.");
+
+    /// <summary>E-USD1-05b-5: what only a peso account's statement takes (charges, customer receipts, deposits and refunds).</summary>
+    public static async Task RequirePesoAccountAsync(CommandContext context, Guid bankAccountId, CancellationToken cancellationToken)
+    {
+        if (await PaymentRules.ScalarAsync<string>(context, "SELECT currency FROM fin.bank_account WHERE bank_account_id = @b", cancellationToken, ("b", bankAccountId))
+                .ConfigureAwait(false) is "USD")
+        {
+            throw new DomainException(
+                StatementErrors.UsdAccountNotSupported,
+                "A USD account's line is matched to a payment or a transfer; its charges are recorded as an expense and USD sales come with USD-2 (E-USD1-05b-5).");
+        }
+    }
 
     /// <summary>Third in the lock order (E-VS2-05-8); shared, so matches never wait on each other but a close of the account does.</summary>
     public static async Task ShareBankAccountAsync(CommandContext context, Guid bankAccountId, CancellationToken cancellationToken)
@@ -279,6 +292,12 @@ public sealed class UnmatchBankLineHandler : ICommandHandler<UnmatchBankLine>
             return await ReceiptUnmatching.UnmatchAsync(command, context, receiptId, depositId, reason, CommandType, cancellationToken).ConfigureAwait(false);
         }
 
+        // E-USD1-05b-3: a transfer's line.
+        if (await TransferLines.MatchedAsync(context, command.LineId, cancellationToken).ConfigureAwait(false) is { } transferId)
+        {
+            return await TransferLines.UnmatchAsync(command, context, transferId, reason, CommandType, cancellationToken).ConfigureAwait(false);
+        }
+
         // E-FIS1b-01-9: a customer refund's line.
         if (await RefundLines.MatchedAsync(context, command.LineId, cancellationToken).ConfigureAwait(false) is { } refundId)
         {
@@ -397,6 +416,8 @@ public sealed class RecognizeBankChargeHandler : ICommandHandler<RecognizeBankCh
         {
             throw new DomainException(StatementErrors.LineNotDebit, "A bank charge is a DEBIT line; a CREDIT line stays unmatched as an in-transit item or is matched as a payment's return (E-VS2-05-7, E-VS2-05-10).");
         }
+
+        await BankLines.RequirePesoAccountAsync(context, line.BankAccountId, cancellationToken).ConfigureAwait(false);
 
         var inputs = new Dictionary<string, string> { ["value_date"] = BankLines.Date(line.ValueDate), ["description"] = line.Description };
         var lines = new List<PostingLineInput>

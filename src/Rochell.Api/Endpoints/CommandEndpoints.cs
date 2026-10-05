@@ -46,6 +46,7 @@ using Rochell.Tax.Authorizations;
 using Rochell.Treasury.BankAccounts;
 using Rochell.Treasury.Payments;
 using Rochell.Treasury.Statements;
+using Rochell.Treasury.Transfers;
 
 namespace Rochell.Api.Endpoints;
 
@@ -98,6 +99,11 @@ public static class CommandEndpoints
         treasury.MapCommand<VoidPayment, VoidPaymentHandler>();
         treasury.MapCommand<ReleaseSupplierPayment, ReleaseSupplierPaymentHandler>();
         treasury.MapCommand<ReversePayment, ReversePaymentHandler>();
+        treasury.MapCommand<PrepareBankTransfer, PrepareBankTransferHandler>(); // USD1-05b (E-USD1-05b-1…5)
+        treasury.MapCommand<VoidBankTransfer, VoidBankTransferHandler>();
+        treasury.MapCommand<ReleaseBankTransfer, ReleaseBankTransferHandler>();
+        treasury.MapCommand<ReverseBankTransfer, ReverseBankTransferHandler>();
+        treasury.MapCommand<MatchBankLineToTransfer, MatchBankLineToTransferHandler>();
         treasury.MapCommand<ImportBankStatement, ImportBankStatementHandler>();
         treasury.MapCommand<MatchBankLine, MatchBankLineHandler>();
         treasury.MapCommand<MatchBankLineToReceipt, MatchBankLineToReceiptHandler>();
@@ -332,7 +338,8 @@ public static class CommandEndpoints
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
-        typeof(ReversePaymentHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(MatchBankLineToReceiptHandler), typeof(MatchBankLineToRefundHandler), typeof(UnmatchBankLineHandler),
+        typeof(ReversePaymentHandler), typeof(PrepareBankTransferHandler), typeof(VoidBankTransferHandler), typeof(ReleaseBankTransferHandler),
+        typeof(ReverseBankTransferHandler), typeof(MatchBankLineToTransferHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(MatchBankLineToReceiptHandler), typeof(MatchBankLineToRefundHandler), typeof(UnmatchBankLineHandler),
         typeof(RecognizeBankChargeHandler),
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
