@@ -1092,6 +1092,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-USD-7 | USD-1 | Payments from a USD account, or from a peso account at the bank's rate that day; the difference against the invoice's rate is realized exchange gain or loss. |
 | E-USD-8 | USD-1 | Open USD balances are revalued at the month's last rate and reversed the next day (unrealized exchange difference). |
 | E-USD-9 | USD-1 | USD bank accounts with their own GL account and USD statements. |
+| E-USD1-01-1 | USD-1 | One rate per currency and day, 4 decimals; prepared and approved by someone else; an approved rate never changes — a correction is a new rate of the same day that supersedes it. |
+| E-USD1-01-2 | USD-1 | Orders, invoices, payables and payments keep the currency, the USD amount, the rate and the peso equivalent (rounded to 2 decimals per document). |
+| E-USD1-01-3 | USD-1 | The ledger stays in pesos; lines of USD controls (foreign payables, USD banks) also keep their USD amount. |
+| E-USD1-01-4 | USD-1 | The DUA is its own document (number, date, CIF, duties, ITBIS, other charges) and creates a payable to the DGA (a local supplier) paid like any other. |
+| E-USD1-01-5 | USD-1 | The settlement is prepared by Cuentas por pagar and approved (posted) by the Controller; allocation by value, the leftover cent to the largest line. |
+| E-USD1-01-6 | USD-1 | New roles: foreign payables (control), imports to settle, exchange gain, exchange loss, unrealized exchange difference. |
+| E-USD1-01-7 | USD-1 | Permissions: rates prepared by Tesorero and Contador, approved by the Controller; settlements prepared by Cuentas por pagar, approved by the Controller; prepare ≠ approve. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
