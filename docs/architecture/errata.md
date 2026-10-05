@@ -1076,6 +1076,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PRS-04-8 | PRS-1 | An order from a quote keeps the quoted freight even if the list changes. |
 | E-PRS-04-9 | PRS-1 | A cash sale with our own truck includes the freight in what must be paid, from GENERAL. |
 | E-PRS-04-10 | PRS-1 | The zone is required on an own-truck order only once the company has ACTIVE zones. Approved 2026-10-05. |
+| E-PRS-05-1 | PRS-1 | Maestros › Listas de precios: lists with version in force, pending draft and customers; create, deactivate, reactivate; a new version copies the one in force, with product prices and freight per product and zone. |
+| E-PRS-05-2 | PRS-1 | Maestros › Zonas de entrega: create, rename, deactivate, reactivate. |
+| E-PRS-05-3 | PRS-1 | Maestros › Productos terminados: «Crear artículo de flete» while it does not exist; activated like any item. |
+| E-PRS-05-4 | PRS-1 | The customer shows its list; Crédito chooses it from a list when preparing the terms. |
+| E-PRS-05-5 | PRS-1 | Order, quote and cash sale: the zone with our own truck; each line's price source and freight; a notice when freight is withheld. |
+| E-PRS-05-6 | PRS-1 | The freight prints as its own line: on the conduce without price, on the invoice and the quote with price and «Exento». |
+| E-PRS-05-7 | PRS-1 | E2E-PR1 over the API and Playwright; the authorization-with-freight refusal test; `docs/acceptance/prs1.md` and its traceability test. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

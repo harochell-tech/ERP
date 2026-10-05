@@ -9377,6 +9377,8 @@ export interface components {
             itbis: string;
             /** Format: decimal */
             total: string;
+            /** @default false */
+            exempt?: boolean;
         };
         QuoteSummary: {
             /** Format: uuid */

@@ -76,3 +76,11 @@ Tests: `CustomerPriceListTests` (PRC-02…08 and deactivation), `PriceListFreigh
 - Fixtures that activate rules by code now activate version 1 only.
 
 Tests: `FreightFlowTests` (SRV-03…13 and the withheld reasons).
+
+## PRS-05 — screens, E2E-PR1 and the acceptance matrix (E-PRS-05-1…7)
+
+- `GetQuotePrint` adds a freight line after its product (`exempt`); the quote's e-mail HTML marks it «(exento)».
+- Screens: `web.md` (PRS-05). Dev seed `tests/Rochell.DevStack/PriceSeed.cs`: zones Higüey and Bávaro, the freight item, FREIGHT_REVENUE on
+  40500, P-16 v2 approved, «Hotel Playa Bávaro» on GENERAL; the dev SALES_ITBIS exempts TRANSPORTE.
+- E2E-PR1 over the API: `PriceListAcceptanceTests`; Playwright `web/e2e/price-journey.spec.ts`; matrix `docs/acceptance/prs1.md` checked by
+  `AcceptancePrs1TraceabilityTests`.

@@ -22,7 +22,7 @@ namespace Rochell.DevStack;
 /// </summary>
 internal static class SalesSeed
 {
-    private const string SalesItbis = """{"tax_code":"ITBIS","rate":"0.18","effect":"OUTPUT","exempt_item_categories":[]}""";
+    private const string SalesItbis = """{"tax_code":"ITBIS","rate":"0.18","effect":"OUTPUT","exempt_item_categories":["TRANSPORTE"]}"""; // PRS-05: freight exempt (E-SRV1-16)
 
     public static async Task RunAsync(TestHarness h, Guid plantId, Guid controller, Guid approver)
     {

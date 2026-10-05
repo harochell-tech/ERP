@@ -195,6 +195,7 @@ function QuoteDetail() {
         <dd>
           {plantName(h.plantCode)} · {DELIVERY_TERMS[h.deliveryTermCode] ?? h.deliveryTermCode}
           {data.siteAddress ? ` · obra: ${data.siteAddress}` : ""}
+          {data.deliveryZoneName ? ` · zona ${data.deliveryZoneName}` : ""}
         </dd>
         {data.customerRef ? (
           <>
@@ -267,6 +268,12 @@ function QuoteDetail() {
               <td className="num">{l.lineNo}</td>
               <td>
                 {l.itemCode} — {l.itemDescription}
+                {l.priceListName ? <div className="muted">Lista {l.priceListName}</div> : null}
+                {l.freightAmount ? (
+                  <div className="muted" data-testid={`quote-line-freight:${l.lineNo}`}>
+                    + flete a {data.deliveryZoneName ?? "la zona"}: {formatQuantity(l.quantity)} × <Money value={l.freightUnitPrice} /> = <Money value={l.freightAmount} /> (exento)
+                  </div>
+                ) : null}
               </td>
               <td>{l.uom}</td>
               <td className="num">{formatQuantity(l.quantity)}</td>

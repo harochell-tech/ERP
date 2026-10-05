@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { query } from "@/api/client";
+import { query, type Schemas } from "@/api/client";
 import { ErrorBox, Field, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
 import { matchesSearch } from "@/lib/ux4b";
@@ -87,6 +87,41 @@ function Activate({ itemId, code, version, onDone }: { itemId: string; code: str
   );
 }
 
+/**
+ * PRS-05 (E-PRS-05-3, E-PRS-01-7): the freight item «Transporte de blocks» — one per company, created here while it does not exist and
+ * activated like any item; it is what the invoice's freight lines show.
+ */
+function FreightItem({ item, onDone }: { item: Schemas["ItemView"] | undefined; onDone: () => void }) {
+  const { can } = useSession();
+  const create = useCommand("create-freight-item", "/api/v1/companies/{companyId}/master-data/create-freight-item");
+  if (item === undefined && !can("item:create")) {
+    return null;
+  }
+  return (
+    <section data-testid="freight-item">
+      <h2>Artículo de flete</h2>
+      {item ? (
+        <p>
+          {item.description} ({item.code}) · <StatusBadge status={item.status} />
+          {item.status !== "ACTIVE" && can("item:activate") ? <Activate itemId={item.itemId} code={item.code} version={item.version} onDone={onDone} /> : null}
+        </p>
+      ) : (
+        <>
+          <p className="muted">El flete de las entregas con nuestro camión se factura con este artículo de servicio, exento de ITBIS.</p>
+          <button
+            type="button"
+            disabled={create.busy}
+            onClick={async () => (await create.run({ description: "Transporte de blocks" }, undefined, "Artículo de flete creado; falta activarlo.")) && onDone()}
+          >
+            Crear artículo de flete
+          </button>
+        </>
+      )}
+      <ErrorBox error={create.error} />
+    </section>
+  );
+}
+
 export default function Page() {
   const { companyId, can } = useSession();
   const { data, error, reload } = useLoad(
@@ -105,6 +140,7 @@ export default function Page() {
     <>
       <h1>Productos terminados</h1>
       {can("item:create") ? <CreateFinishedGood onDone={reload} /> : null}
+      {data ? <FreightItem item={data.items.find((i) => i.itemType === "SERVICE")} onDone={reload} /> : null}
       <div className="inline-form" role="search">
         <Field label="Buscar producto">
           <input type="search" placeholder="Código o descripción" value={search} onChange={(e) => setSearch(e.target.value)} />

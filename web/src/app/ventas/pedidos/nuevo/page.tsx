@@ -8,6 +8,7 @@ import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermission, useFieldErrors } from "@/components/ui";
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { DELIVERY_TERMS } from "@/lib/labels";
+import { useZones, ZoneField } from "@/components/ZoneField";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -36,6 +37,7 @@ interface Values {
   customerPoRef: string;
   lines: Line[];
   exemption: Exemption;
+  deliveryZoneId?: string;
 }
 
 const EMPTY_LINE: Line = { itemId: "", uom: "", quantity: "" };
@@ -51,6 +53,7 @@ function OrderForm() {
   const fe = useFieldErrors<string>();
   const allowed = can("sales_order:create");
   const permission = scope("sales_order:create");
+  const { zones } = useZones();
 
   const { data, error } = useLoad(
     allowed
@@ -61,7 +64,8 @@ function OrderForm() {
             query("/api/v1/companies/{companyId}/sales/price-lists", { path: { companyId } }),
             editId ? query("/api/v1/companies/{companyId}/sales/orders/{salesOrderId}", { path: { companyId, salesOrderId: editId } }) : Promise.resolve(null),
           ]);
-          const active = lists.items.find((l) => l.status === "ACTIVE");
+          // PRS-05: the products offered are GENERAL's (every product is there); the price of each line is the server's preview.
+          const active = lists.items.find((l) => l.status === "ACTIVE" && l.priceListCode === "GENERAL") ?? lists.items.find((l) => l.status === "ACTIVE");
           const prices = active
             ? (await query("/api/v1/companies/{companyId}/sales/price-lists/{priceListVersionId}", { path: { companyId, priceListVersionId: active.priceListVersionId } })).lines
             : [];
@@ -76,7 +80,15 @@ function OrderForm() {
     [companyId, allowed, editId],
   );
   const previewSource = values ?? (data?.order ? { plantId: data.order.plantId, lines: data.order.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.qtyOrdered })) } : null);
-  const preview = useSalesPreview("order", previewSource?.plantId ?? "", previewSource?.lines ?? [], values?.partyId ?? data?.order?.header.partyId ?? "");
+  const ownTruck = (values?.deliveryTermCode ?? data?.order?.header.deliveryTermCode) === "DELIVERED_OWN_TRANSPORT";
+  const preview = useSalesPreview(
+    "order",
+    previewSource?.plantId ?? "",
+    previewSource?.lines ?? [],
+    values?.partyId ?? data?.order?.header.partyId ?? "",
+    ownTruck ? (values?.deliveryZoneId ?? data?.order?.deliveryZoneId ?? "") : "",
+    (values?.exemption ?? "NONE") !== "NONE" || (values === null && (data?.order?.exemptionPending ?? false)),
+  );
 
   if (!allowed) {
     return <NoPermission />;
@@ -97,6 +109,7 @@ function OrderForm() {
           customerPoRef: order.customerPoRef ?? "",
           lines: order.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.qtyOrdered })),
           exemption: !order.exemptionPending ? "NONE" : order.proformaCollectsItbis ? "WITH_ITBIS" : "WITHOUT_ITBIS",
+          deliveryZoneId: order.deliveryZoneId ?? "",
         }
       : { partyId: "", plantId: data.plants[0]?.plantId ?? "", deliveryTermCode: "PICKUP_AT_PLANT", siteAddress: "", requestedDate: "", customerPoRef: "", lines: [{ ...EMPTY_LINE }], exemption: "NONE" });
   const set = (change: Partial<Values>) => setValues({ ...current, ...change });
@@ -120,6 +133,7 @@ function OrderForm() {
       partyId: !current.partyId && "Elija el cliente.",
       plantId: !current.plantId && "Elija la planta.",
       siteAddress: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.siteAddress.trim() === "" && "Una entrega en obra necesita la dirección de la obra.",
+      deliveryZoneId: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && zones.length > 0 && !current.deliveryZoneId && "Elija la zona de entrega.",
     };
     lines.forEach((l, i) => {
       found[`line-${i}-item`] = !l.itemId && "Elija el producto.";
@@ -137,6 +151,7 @@ function OrderForm() {
       lines,
       exemptionPending: current.exemption !== "NONE",
       proformaCollectsItbis: current.exemption === "NONE" ? null : current.exemption === "WITH_ITBIS",
+      deliveryZoneId: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.deliveryZoneId ? current.deliveryZoneId : null,
     };
     const response = order
       ? await update.run({ salesOrderId: order.header.salesOrderId, expectedVersion: order.header.version, ...header }, current)
@@ -182,6 +197,9 @@ function OrderForm() {
           <Field label="Dirección de la obra" required error={fe.errors.siteAddress}>
             <input aria-label="Dirección de la obra" value={current.siteAddress} onChange={(e) => set({ siteAddress: e.target.value })} />
           </Field>
+        ) : null}
+        {current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" ? (
+          <ZoneField value={current.deliveryZoneId ?? ""} onChange={(deliveryZoneId) => set({ deliveryZoneId })} error={fe.errors.deliveryZoneId} zones={zones} />
         ) : null}
         <Field label="Fecha solicitada (opcional)">
           <input type="date" value={current.requestedDate} onChange={(e) => set({ requestedDate: e.target.value })} />
@@ -238,7 +256,7 @@ function OrderForm() {
                 </td>
                 <td>{line.uom}</td>
                 <td className="num">
-                  <Money value={price?.unitPrice} />
+                  <Money value={priced && priced.itemId === line.itemId ? priced.listPrice : price?.unitPrice} />
                 </td>
                 <td className="num">
                   <input
@@ -252,6 +270,11 @@ function OrderForm() {
                 </td>
                 <td className="num">
                   {priced && priced.itemId === line.itemId ? <Money value={priced.netAmount} testId={`preview-line-net:${index + 1}`} /> : <span className="muted">—</span>}
+                  {priced && priced.itemId === line.itemId && priced.freightAmount ? (
+                    <div className="muted" data-testid={`preview-line-freight:${index + 1}`}>
+                      + flete <Money value={priced.freightAmount} />
+                    </div>
+                  ) : null}
                 </td>
                 <td>
                   {current.lines.length > 1 ? (

@@ -145,6 +145,7 @@ function OrderDetail() {
       <p>
         {h.customerName} · {formatDate(h.orderDate)} · planta {plantName(h.plantCode)} · {DELIVERY_TERMS[h.deliveryTermCode] ?? h.deliveryTermCode}
         {order.siteAddress ? ` · obra: ${order.siteAddress}` : ""}
+        {order.deliveryZoneName ? ` · zona ${order.deliveryZoneName}` : ""}
         {order.requestedDate ? ` · solicitado para ${formatDate(order.requestedDate)}` : ""}
         {order.customerPoRef ? ` · OC del cliente ${order.customerPoRef}` : ""}
       </p>
@@ -182,6 +183,15 @@ function OrderDetail() {
               <td className="num">{l.lineNo}</td>
               <td>
                 {l.itemCode} — {l.itemDescription}
+                {/* PRS-05 (E-PRS-05-5): where the price came from, and the freight of the line. */}
+                <div className="muted" data-testid={`order-line-source:${l.lineNo}`}>
+                  {l.quotedPrice ? "Precio de la cotización" : l.priceListName ? `Lista ${l.priceListName}` : null}
+                </div>
+                {l.freightAmount ? (
+                  <div className="muted" data-testid={`order-line-freight:${l.lineNo}`}>
+                    + flete a {order.deliveryZoneName ?? "la zona"}: {formatQuantity(l.qtyOrdered)} × <Money value={l.freightUnitPrice} /> = <Money value={l.freightAmount} /> (exento)
+                  </div>
+                ) : null}
               </td>
               <td>{l.uom}</td>
               <td className="num">{formatQuantity(l.qtyOrdered)}</td>
@@ -196,7 +206,7 @@ function OrderDetail() {
             </tr>
           ))}
           <tr>
-            <th colSpan={5}>Total neto (sin ITBIS, RD$)</th>
+            <th colSpan={5}>Total neto con flete (sin ITBIS, RD$)</th>
             <td className="num">
               <Money value={h.totalNet} testId="order-total" />
             </td>

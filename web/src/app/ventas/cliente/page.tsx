@@ -89,6 +89,10 @@ function PrepareTerms({ partyId, current, onDone }: { partyId: string; current: 
   const [days, setDays] = useState(current ? String(current.paymentTermsDays) : "30");
   const [limit, setLimit] = useState(current?.creditLimit ?? "");
   const [hold, setHold] = useState(current?.creditHold ?? false);
+  // PRS-05 (E-PRS-05-4, E-PRS-02-3): the customer's price list rides its terms; it keeps the one in force unless Crédito changes it.
+  const [list, setList] = useState(current?.priceListId ?? "");
+  const { companyId } = useSession();
+  const lists = useLoad(() => query("/api/v1/companies/{companyId}/sales/price-list-headers", { path: { companyId } }), [companyId]);
   const fe = useFieldErrors<"days" | "limit">();
   return (
     <form
@@ -104,7 +108,7 @@ function PrepareTerms({ partyId, current, onDone }: { partyId: string; current: 
         ) {
           return;
         }
-        if (await prepare.run({ partyId, paymentTermsDays: Number(days), creditLimit, creditHold: hold })) {
+        if (await prepare.run({ partyId, paymentTermsDays: Number(days), creditLimit, creditHold: hold, priceListId: list || null })) {
           onDone();
         }
       }}
@@ -114,6 +118,18 @@ function PrepareTerms({ partyId, current, onDone }: { partyId: string; current: 
       </Field>
       <Field label="Límite de crédito" required error={fe.errors.limit} hint={current ? "En RD$. Se propone el límite vigente." : "En RD$."}>
         <input inputMode="decimal" value={limit} onChange={(e) => setLimit(e.target.value)} />
+      </Field>
+      <Field label="Lista de precios" hint="Lo que no esté en ella se cobra con «General»; el flete sale solo de ella.">
+        <select aria-label="Lista de precios" value={list} onChange={(e) => setList(e.target.value)}>
+          {current ? null : <option value="">General</option>}
+          {(lists.data?.items ?? [])
+            .filter((l) => l.status === "ACTIVE" || l.priceListId === list)
+            .map((l) => (
+              <option key={l.priceListId} value={l.priceListId}>
+                {l.name}
+              </option>
+            ))}
+        </select>
       </Field>
       <label className="field">
         <span>Retener crédito</span>
@@ -148,6 +164,7 @@ function TermsRow({ terms, onDone }: { terms: Schemas["CustomerTermsView"]; onDo
         <Money value={terms.creditLimit} />
       </td>
       <td>{terms.creditHold ? "Sí" : "No"}</td>
+      <td data-testid={`terms-list:${terms.version}`}>{terms.priceListName}</td>
       <td>
         <StatusBadge status={terms.status} />
       </td>
@@ -264,7 +281,12 @@ function CustomerDetail() {
       <h2>Crédito usado</h2>
       <p className="muted">Lo que el cliente ya debe o tiene comprometido; la evaluación de crédito de un pedido lo suma al monto del pedido.</p>
       <Exposure partyId={data.partyId} />
-      <h2>Términos de crédito</h2>
+      <h2>Términos de crédito y lista de precios</h2>
+      {data.terms.find((t) => t.status === "ACTIVE") ? (
+        <p data-testid="customer-price-list">
+          Compra con la lista <strong>{data.terms.find((t) => t.status === "ACTIVE")?.priceListName}</strong>.
+        </p>
+      ) : null}
       {can("customer_terms:prepare") ? (
         <PrepareTerms key={data.terms.find((t) => t.status === "ACTIVE")?.termsVersionId ?? "none"} partyId={data.partyId} current={data.terms.find((t) => t.status === "ACTIVE")} onDone={reload} />
       ) : null}
@@ -281,6 +303,7 @@ function CustomerDetail() {
               <th className="num">Días</th>
               <th className="num">Límite (RD$)</th>
               <th>Retenido</th>
+              <th>Lista de precios</th>
               <th>Estado</th>
               <th>Preparó</th>
               <th>Aprobó</th>

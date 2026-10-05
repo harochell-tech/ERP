@@ -9,6 +9,7 @@ import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermissio
 import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { compareDecimals, DEFAULT_QUOTE_VALIDITY_DAYS, isSpecialPrice } from "@/lib/quotes";
 import { addDays, DELIVERY_TERMS, todayInDominicanRepublic } from "@/lib/labels";
+import { useZones, ZoneField } from "@/components/ZoneField";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -36,6 +37,7 @@ interface Values {
   customerRef: string;
   notes: string;
   lines: Line[];
+  deliveryZoneId?: string;
 }
 
 const EMPTY_LINE: Line = { itemId: "", uom: "", quantity: "", unitPrice: "" };
@@ -53,6 +55,7 @@ function QuoteForm() {
   const fe = useFieldErrors<string>();
   const allowed = can("quote:manage") && can("sales:read");
   const permission = scope("quote:manage");
+  const { zones } = useZones();
 
   const { data, error } = useLoad(
     allowed
@@ -63,7 +66,8 @@ function QuoteForm() {
             query("/api/v1/companies/{companyId}/sales/price-lists", { path: { companyId } }),
             editId ? query("/api/v1/companies/{companyId}/sales/quotes/{quoteId}", { path: { companyId, quoteId: editId } }) : Promise.resolve(null),
           ]);
-          const active = lists.items.find((l) => l.status === "ACTIVE");
+          // PRS-05: the products offered are GENERAL's (every product is there); the price of each line is the server's preview.
+          const active = lists.items.find((l) => l.status === "ACTIVE" && l.priceListCode === "GENERAL") ?? lists.items.find((l) => l.status === "ACTIVE");
           const prices = active
             ? (await query("/api/v1/companies/{companyId}/sales/price-lists/{priceListVersionId}", { path: { companyId, priceListVersionId: active.priceListVersionId } })).lines
             : [];
@@ -82,7 +86,14 @@ function QuoteForm() {
     (data?.quote
       ? { plantId: data.quote.plantId, lines: data.quote.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.quantity, unitPrice: compareDecimals(l.unitPrice, l.listPrice) === 0 ? "" : l.unitPrice })) }
       : null);
-  const preview = useSalesPreview("quote", previewSource?.plantId ?? "", previewSource?.lines ?? [], values?.partyId ?? data?.quote?.header.partyId ?? "");
+  const ownTruck = (values?.deliveryTermCode ?? data?.quote?.header.deliveryTermCode) === "DELIVERED_OWN_TRANSPORT";
+  const preview = useSalesPreview(
+    "quote",
+    previewSource?.plantId ?? "",
+    previewSource?.lines ?? [],
+    values?.partyId ?? data?.quote?.header.partyId ?? "",
+    ownTruck ? (values?.deliveryZoneId ?? data?.quote?.deliveryZoneId ?? "") : "",
+  );
 
   if (!allowed) {
     return <NoPermission />;
@@ -113,6 +124,7 @@ function QuoteForm() {
           siteAddress: quote.siteAddress ?? "",
           customerRef: quote.customerRef ?? "",
           notes: quote.notes ?? "",
+          deliveryZoneId: quote.deliveryZoneId ?? "",
           // A line at its list price stays "the list's" (empty); any other quoted price is kept as typed.
           lines: quote.lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.quantity, unitPrice: compareDecimals(l.unitPrice, l.listPrice) === 0 ? "" : l.unitPrice })),
         }
@@ -137,6 +149,7 @@ function QuoteForm() {
       plantId: !current.plantId && "Elija la planta.",
       validUntil: !current.validUntil && "Indique la fecha de vigencia.",
       siteAddress: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.siteAddress.trim() === "" && "Una entrega en obra necesita la dirección de la obra.",
+      deliveryZoneId: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && zones.length > 0 && !current.deliveryZoneId && "Elija la zona de entrega.",
     };
     lines.forEach((l, i) => {
       found[`line-${i}-item`] = !l.itemId && "Elija el producto.";
@@ -154,6 +167,7 @@ function QuoteForm() {
       customerRef: optional(current.customerRef),
       notes: optional(current.notes),
       lines: lines.map((l) => ({ itemId: l.itemId, uom: l.uom, quantity: l.quantity, unitPrice: l.unitPrice === "" ? null : l.unitPrice })),
+      deliveryZoneId: current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" && current.deliveryZoneId ? current.deliveryZoneId : null,
     };
     const response = quote
       ? await update.run({ quoteId: quote.header.quoteId, expectedVersion: quote.header.version, ...header }, current)
@@ -203,6 +217,9 @@ function QuoteForm() {
           <Field label="Dirección de la obra" required error={fe.errors.siteAddress}>
             <input aria-label="Dirección de la obra" value={current.siteAddress} onChange={(e) => set({ siteAddress: e.target.value })} />
           </Field>
+        ) : null}
+        {current.deliveryTermCode === "DELIVERED_OWN_TRANSPORT" ? (
+          <ZoneField value={current.deliveryZoneId ?? ""} onChange={(deliveryZoneId) => set({ deliveryZoneId })} error={fe.errors.deliveryZoneId} zones={zones} />
         ) : null}
         <Field label="Referencia del cliente (opcional)">
           <input aria-label="Referencia del cliente (opcional)" value={current.customerRef} onChange={(e) => set({ customerRef: e.target.value })} />
@@ -284,6 +301,11 @@ function QuoteForm() {
                 </td>
                 <td className="num">
                   {priced && priced.itemId === line.itemId ? <Money value={priced.netAmount} testId={`preview-line-net:${index + 1}`} /> : <span className="muted">—</span>}
+                  {priced && priced.itemId === line.itemId && priced.freightAmount ? (
+                    <div className="muted" data-testid={`preview-line-freight:${index + 1}`}>
+                      + flete <Money value={priced.freightAmount} />
+                    </div>
+                  ) : null}
                 </td>
                 <td>
                   {current.lines.length > 1 ? (

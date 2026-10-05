@@ -698,3 +698,20 @@ statement; Cobros sends it.
   the Controller approves it over the amount, it is posted and the 606 shows it; an expense order of 10 repairs approved and 6 of
   them billed and posted.
 
+## PRS-05 — price lists per customer and freight (E-PRS-05-1…7)
+
+- **Maestros › Listas de precios** (`/maestros/precios/`): the lists (GENERAL first) with status, version in force, pending draft and
+  customers; «Nueva lista»; deactivate / reactivate; the selected list's prices and freight in force (`current-prices`,
+  `current-prices-freight`); «Preparar nueva versión» copies the version in force into two tables — product prices and freight per
+  product and zone; the versions with «Aprobar» for the Aprobador de políticas.
+- **Maestros › Zonas de entrega** (`/maestros/zonas/`): add, rename, deactivate, reactivate.
+- **Maestros › Productos terminados**: «Crear artículo de flete» while the company has none; activated like any item.
+- **Ventas › Cliente**: the terms show and choose the price list (`customer-price-list`, `terms-list:<version>`).
+- **Order, quote and cash sale forms**: with our own truck, `components/ZoneField.tsx` asks the zone (required once the company has
+  zones); the preview passes `partyId`, `deliveryZoneId` (and the exemption) and shows each line's freight (`preview-line-freight:<n>`),
+  `preview-freight` and why freight was withheld (`preview-freight-withheld`); each line's price is the server's.
+- **Order and quote details**: the zone, each line's source («Lista …», «Precio de la cotización») and its freight.
+- **Printed conduce**: a freight row under the product (`conduce-freight:<n>`), no price. **Invoice**: the freight line reads «Flete · exento
+  de ITBIS». **Printed quote**: freight lines «(exento)».
+- Playwright `web/e2e/price-journey.spec.ts` (desktop and mobile); the sales journey chooses the zone Higüey.
+

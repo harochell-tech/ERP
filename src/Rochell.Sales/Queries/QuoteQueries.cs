@@ -156,7 +156,8 @@ public sealed class GetQuoteHandler : IQueryHandler<GetQuote>
 
 public sealed record GetQuotePrint(Guid CompanyId, Guid SessionId, Guid QuoteId) : IQuery;
 
-public sealed record QuotePrintLine(int LineNo, string ItemCode, string ItemName, string Uom, decimal Quantity, decimal UnitPrice, decimal Net, decimal Itbis, decimal Total);
+/// <summary>A printed line; PRS-05 (E-PRS-05-6): a freight line follows its product, <paramref name="Exempt"/> of ITBIS.</summary>
+public sealed record QuotePrintLine(int LineNo, string ItemCode, string ItemName, string Uom, decimal Quantity, decimal UnitPrice, decimal Net, decimal Itbis, decimal Total, bool Exempt = false);
 
 /// <summary>E-QUO1-12: what the customer receives — issuer, customer, lines with informative ITBIS at the quote date's rule (E-QUO1-5), validity and notes.</summary>
 public sealed record QuotePrint(
@@ -172,7 +173,9 @@ public sealed class GetQuotePrintHandler : IQueryHandler<GetQuotePrint>
         string QuoteNo, DateOnly QuoteDate, DateOnly ValidUntil, string Status, string IssuerRnc, string IssuerName, string CustomerRnc, string CustomerName, string Term, string? Site,
         string? CustomerRef, string? Notes, int LinesVersion);
 
-    private sealed record Row(Guid LineId, int LineNo, string ItemCode, string ItemName, string Category, string Uom, decimal Quantity, decimal UnitPrice, decimal Net);
+    private sealed record Row(
+        Guid LineId, int LineNo, string ItemCode, string ItemName, string Category, string Uom, decimal Quantity, decimal UnitPrice, decimal Net, decimal? FreightUnitPrice, decimal? Freight,
+        string? FreightName);
 
     public async Task<string> HandleAsync(GetQuotePrint query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -198,21 +201,32 @@ public sealed class GetQuotePrintHandler : IQueryHandler<GetQuotePrint>
             context.Connection,
             context.Transaction,
             """
-            SELECT l.line_id, l.line_no, i.code, i.description, i.item_category, l.uom, l.quantity, l.unit_price, l.net_amount::numeric(19,2)
+            SELECT l.line_id, l.line_no, i.code, i.description, i.item_category, l.uom, l.quantity, l.unit_price, l.net_amount::numeric(19,2), l.freight_unit_price,
+                   l.freight_amount::numeric(19,2),
+                   coalesce((SELECT f.description FROM md.item f WHERE f.company_id = l.company_id AND f.item_category = 'TRANSPORTE'), 'Transporte') || ' — ' || z.name
             FROM sal.quote_line l JOIN md.item i ON i.item_id = l.item_id
+            JOIN sal.quote q ON q.quote_id = l.quote_id LEFT JOIN sal.delivery_zone z ON z.zone_id = q.delivery_zone_id
             WHERE l.quote_id = @q AND l.lines_version = @v ORDER BY l.line_no
             """,
-            r => new Row(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8)),
+            r => new Row(
+                r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetDecimal(6), r.GetDecimal(7), r.GetDecimal(8), r.NullableDecimal(9),
+                r.NullableDecimal(10), r.NullableString(11)),
             cancellationToken,
             ("q", query.QuoteId),
             ("v", head.LinesVersion)).ConfigureAwait(false);
         var taxes = await TaxEngine.PreviewSalesItbisAsync(
             context.Connection, context.Transaction, context.CompanyId, head.QuoteDate, [.. rows.Select(r => new TaxableLine(r.LineId, r.Category, r.Net))], cancellationToken).ConfigureAwait(false);
-        var lines = rows.Select(r =>
+        var lines = new List<QuotePrintLine>();
+        foreach (var r in rows)
         {
             var itbis = taxes.Where(t => t.LineId == r.LineId && t.Effect == TaxEffects.Output).Sum(t => t.Amount);
-            return new QuotePrintLine(r.LineNo, r.ItemCode, r.ItemName, r.Uom, r.Quantity, r.UnitPrice, r.Net, itbis, r.Net + itbis);
-        }).ToList();
+            lines.Add(new QuotePrintLine(lines.Count + 1, r.ItemCode, r.ItemName, r.Uom, r.Quantity, r.UnitPrice, r.Net, itbis, r.Net + itbis));
+            if (r.Freight is { } freight)
+            {
+                lines.Add(new QuotePrintLine(lines.Count + 1, "TRANSPORTE", r.FreightName ?? "Transporte", r.Uom, r.Quantity, r.FreightUnitPrice!.Value, freight, 0m, freight, Exempt: true));
+            }
+        }
+
         return ApiJson.Serialize(new QuotePrint(
             head.QuoteNo, head.QuoteDate, head.ValidUntil, head.Status, head.Status == "SENT" && head.ValidUntil < QuoteReading.Today(context), head.IssuerRnc, head.IssuerName,
             head.CustomerRnc, head.CustomerName, head.Term, head.Site, head.CustomerRef, head.Notes, lines, lines.Sum(l => l.Net), lines.Sum(l => l.Itbis), lines.Sum(l => l.Total)));

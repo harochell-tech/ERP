@@ -33,7 +33,8 @@ export const NAV: readonly NavGroup[] = [
       { href: "/maestros/cuentas-bancarias/", label: "Cuentas bancarias de la empresa", permission: "bank:read" },
       { href: "/maestros/productos-terminados/", label: "Productos terminados", permission: "master_data:read" },
       { href: "/maestros/costos-estandar/", label: "Costos estándar", permission: "sales:read" },
-      { href: "/maestros/precios/", label: "Lista de precios", permission: "sales:read" },
+      { href: "/maestros/precios/", label: "Listas de precios", permission: "sales:read" }, // PRS-05 (E-PRS-05-1)
+      { href: "/maestros/zonas/", label: "Zonas de entrega", permission: "sales:read" }, // PRS-05 (E-PRS-05-2)
       { href: "/maestros/flota/", label: "Vehículos y choferes", permission: "sales:read" },
       { href: "/maestros/categorias-gasto/", label: "Categorías de gasto", permission: "master_data:read" }, // GAS1-07 (E-GAS-07-1)
       { href: "/maestros/padron-rnc/", label: "Padrón RNC (DGII)", permission: "rnc:read" },

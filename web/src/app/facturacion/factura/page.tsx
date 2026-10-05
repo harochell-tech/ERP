@@ -417,6 +417,7 @@ function InvoiceDetail() {
               <td className="mono">{l.deliveryNo}</td>
               <td>
                 {l.itemCode} — {l.itemDescription}
+                {l.lineKind === "FREIGHT" ? <div className="muted" data-testid={`invoice-line-freight:${l.lineNo}`}>Flete · exento de ITBIS</div> : null}
               </td>
               <td className="num">
                 {formatQuantity(l.quantity)} {l.uom}
