@@ -35,6 +35,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/maestros/costos-estandar/", label: "Costos estándar", permission: "sales:read" },
       { href: "/maestros/precios/", label: "Lista de precios", permission: "sales:read" },
       { href: "/maestros/flota/", label: "Vehículos y choferes", permission: "sales:read" },
+      { href: "/maestros/categorias-gasto/", label: "Categorías de gasto", permission: "master_data:read" }, // GAS1-07 (E-GAS-07-1)
       { href: "/maestros/padron-rnc/", label: "Padrón RNC (DGII)", permission: "rnc:read" },
     ],
   },

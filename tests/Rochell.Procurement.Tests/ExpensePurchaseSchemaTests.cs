@@ -104,6 +104,7 @@ public sealed class ExpensePurchaseSchemaTests(PostgresFixture postgres)
         }
     }
 
+    [Trait("AcceptanceGas1", "GAS-12")]
     [Theory]
     // E-GAS-01-1: a document is of inventory or of expenses.
     [InlineData("INSERT INTO pur.purchase_order_line (po_line_id, company_id, po_id, line_no, qty_ordered, unit_price, receipt_tolerance_pct, version, description, expense_category_id, tax_rule_id) VALUES (gen_random_uuid(), c, po_inv, 1, 1, 100, 0, 1, 'Peaje', cat, tax);", SqlStates.RaiseException)]
@@ -144,6 +145,7 @@ public sealed class ExpensePurchaseSchemaTests(PostgresFixture postgres)
         }
     }
 
+    [Trait("AcceptanceGas1", "GAS-12")]
     [Theory]
     // E-GAS-01-8: an expense invoice has its plant; an inventory invoice has none.
     [InlineData("INSERT INTO pur.supplier_invoice (si_id, company_id, party_id, supplier_fiscal_number, doc_date, due_date, document_status, accounting_status, total_amount, created_by, version, doc_class) VALUES (gen_random_uuid(), c, supplier, 'B0100000903', DATE '2026-10-02', DATE '2026-10-02', 'DRAFT', 'NOT_POSTED', 100, u, 1, 'EXPENSE');", SqlStates.CheckViolation)]

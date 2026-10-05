@@ -33,8 +33,11 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
   const [bankAccountId, setBankAccountId] = useState("");
   const [valueDate, setValueDate] = useState(today);
   const [reference, setReference] = useState("");
-  const [chosen, setChosen] = useState<Record<string, string>>(() =>
-    Object.fromEntries(supplier.invoices.map((i) => [i.apDocId, normalizeInput(formatDecimal(i.openAmount))])),
+  // What the treasurer typed per invoice; an invoice not typed yet pays its open balance — also one that shows up later, when the
+  // due-date filter widens (GAS1-07 found it: «Todo» added an invoice without an amount).
+  const [typed, setChosen] = useState<Record<string, string>>({});
+  const chosen: Record<string, string> = Object.fromEntries(
+    supplier.invoices.map((i) => [i.apDocId, typed[i.apDocId] ?? normalizeInput(formatDecimal(i.openAmount))]),
   );
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const fe = useFieldErrors();
@@ -115,7 +118,7 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
                     inputMode="decimal"
                     value={chosen[i.apDocId] ?? ""}
                     disabled={!picked[i.apDocId]}
-                    onChange={(e) => setChosen({ ...chosen, [i.apDocId]: e.target.value })}
+                    onChange={(e) => setChosen({ ...typed, [i.apDocId]: e.target.value })}
                     {...fieldAria(amountError, messageId, picked[i.apDocId] ?? false)}
                   />
                   <FieldMessage id={messageId} error={amountError} />

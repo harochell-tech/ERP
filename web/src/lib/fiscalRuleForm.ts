@@ -105,7 +105,22 @@ export interface FiscalRuleForm {
   amount: string;
   /** PURCHASE_WITHHOLDING (E-GAS-01-7): the lines it applies to; absent or empty = every line. */
   appliesTo?: string[];
+  /** PURCHASE_TAX_TYPE (E-GAS-07-5): the name shown in the lines' list. */
+  label?: string;
+  /** PURCHASE_TAX_TYPE: each tax the type charges on the net; none for an exempt type. */
+  components?: TaxComponentRow[];
 }
+
+/** GAS1-07 (E-GAS-07-5): one tax of a purchase tax type, its rate typed in %. */
+export interface TaxComponentRow {
+  taxCode: string;
+  ratePercent: string;
+  rateSource?: string;
+  effect: string;
+}
+
+/** E-GAS-02-1: the effects a component of a tax type may have (the server's list). */
+export const TAX_TYPE_EFFECTS = ["RECOVERABLE_INPUT", "SELECTIVE_TAX", "OTHER_TAX", "LEGAL_TIP"] as const;
 
 const ITBIS_KEYS = ["tax_code", "rate", "effect", "exempt_item_categories"];
 const WITHHOLDING_KEYS = ["tax_code", "rate", "base", "party_types", "isr_withholding_type", "applies_to"];
@@ -155,6 +170,9 @@ export function parseFiscalDefinition(kind: string, json: string): { form: Fisca
     }
     return { form, error: null };
   }
+  if (kind === "PURCHASE_TAX_TYPE") {
+    return parseTaxType(obj, form);
+  }
   const allowed = kind === "PURCHASE_WITHHOLDING" ? WITHHOLDING_KEYS : ITBIS_KEYS;
   const unknown = Object.keys(obj).filter((k) => !allowed.includes(k));
   if (unknown.length > 0) {
@@ -185,6 +203,37 @@ export function parseFiscalDefinition(kind: string, json: string): { form: Fisca
   return { form, error: null };
 }
 
+function parseTaxType(obj: Record<string, unknown>, form: FiscalRuleForm): { form: FiscalRuleForm; error: null } | { form: null; error: string } {
+  const unknown = Object.keys(obj).filter((k) => k !== "label" && k !== "components");
+  if (unknown.length > 0) {
+    return { form: null, error: `Clave desconocida para este tipo: ${unknown.join(", ")}.` };
+  }
+  if (typeof obj.label !== "string" || !Array.isArray(obj.components)) {
+    return { form: null, error: "Un tipo de impuesto lleva \"label\" (texto) y \"components\" (lista; vacía si es exento)." };
+  }
+  const rows: TaxComponentRow[] = [];
+  for (const component of obj.components as unknown[]) {
+    const c = component as Record<string, unknown> | null;
+    if (c === null || typeof c !== "object" || Object.keys(c).some((k) => !["tax_code", "rate", "effect"].includes(k))) {
+      return { form: null, error: "Cada componente lleva solo \"tax_code\", \"rate\" y \"effect\"." };
+    }
+    if (typeof c.tax_code !== "string" || typeof c.rate !== "string" || typeof c.effect !== "string") {
+      return { form: null, error: "\"tax_code\", \"rate\" y \"effect\" de un componente deben ser texto." };
+    }
+    rows.push({ taxCode: c.tax_code, ratePercent: fractionToPercent(c.rate) ?? c.rate, rateSource: c.rate, effect: c.effect });
+  }
+  form.label = obj.label;
+  form.components = rows;
+  return { form, error: null };
+}
+
+/** The rate to send: the stored text while the typed percentage still means it, else the fraction of what was typed. */
+function rateOf(ratePercent: string, rateSource: string | undefined): string {
+  const fraction = percentToFraction(ratePercent);
+  const kept = rateSource !== undefined && fraction !== null && shiftDecimalPoint(rateSource, 0) === fraction;
+  return kept ? rateSource : (fraction ?? ratePercent.trim());
+}
+
 /** Catalogue order first, then anything else as it came (the server refuses unknown codes and says which). */
 function inOrder(values: readonly string[], order: readonly string[]): string[] {
   const unique = [...new Set(values)];
@@ -206,10 +255,18 @@ export function buildFiscalDefinition(kind: FiscalRuleKind | string, form: Fisca
     }
     return JSON.stringify({ classes }, null, 2);
   }
-  const fraction = percentToFraction(form.ratePercent);
+  if (kind === "PURCHASE_TAX_TYPE") {
+    return JSON.stringify(
+      {
+        label: (form.label ?? "").trim(),
+        components: (form.components ?? []).map((c) => ({ tax_code: c.taxCode.trim(), rate: rateOf(c.ratePercent, c.rateSource), effect: c.effect })),
+      },
+      null,
+      2,
+    );
+  }
   // The stored text is kept while the percentage still means it ("0.30" stays "0.30", not "0.3").
-  const kept = form.rateSource !== undefined && fraction !== null && shiftDecimalPoint(form.rateSource, 0) === fraction;
-  const rate = kept ? form.rateSource : (fraction ?? form.ratePercent.trim());
+  const rate = rateOf(form.ratePercent, form.rateSource);
   const taxCode = form.taxCode.trim();
   if (kind === "PURCHASE_WITHHOLDING") {
     const definition: Record<string, unknown> = {
@@ -233,7 +290,7 @@ export function buildFiscalDefinition(kind: FiscalRuleKind | string, form: Fisca
   );
 }
 
-export type FiscalFormField = "amount" | "taxCode" | "ratePercent" | "effect" | "base" | "partyTypes" | "isrWithholdingType" | `class-${string}`;
+export type FiscalFormField = "amount" | "taxCode" | "ratePercent" | "effect" | "base" | "partyTypes" | "isrWithholdingType" | "label" | `class-${string}` | `component-${number}-${string}`;
 
 /** The form's own checks, in Spanish (the server checks the same and more). */
 export function validateFiscalForm(kind: string, form: FiscalRuleForm): Partial<Record<FiscalFormField, string>> {
@@ -253,12 +310,33 @@ export function validateFiscalForm(kind: string, form: FiscalRuleForm): Partial<
     }
     return errors;
   }
+  if (kind === "PURCHASE_TAX_TYPE") {
+    const label = (form.label ?? "").trim();
+    if (label.length === 0 || label.length > 60) {
+      errors.label = "Nombre de 1 a 60 caracteres, como se verá en la lista de las líneas (p. ej. «ITBIS 18 %»).";
+    }
+    const seen = new Set<string>();
+    (form.components ?? []).forEach((c, i) => {
+      const code = c.taxCode.trim();
+      if (!/^[A-Z][A-Z0-9_]*$/.test(code)) {
+        errors[`component-${i}-taxCode`] = "Código en mayúsculas (ITBIS, ISC, CDT, PROPINA…).";
+      } else if (seen.has(code)) {
+        errors[`component-${i}-taxCode`] = "Código repetido en el tipo.";
+      }
+      seen.add(code);
+      if (!isRate(c.ratePercent)) {
+        errors[`component-${i}-ratePercent`] = "Tasa en %: mayor que 0 y hasta 100.";
+      }
+      if (!(TAX_TYPE_EFFECTS as readonly string[]).includes(c.effect)) {
+        errors[`component-${i}-effect`] = "Elija a dónde va el impuesto.";
+      }
+    });
+    return errors;
+  }
   if (!/^[A-Z][A-Z0-9_]*$/.test(form.taxCode.trim())) {
     errors.taxCode = "Código en mayúsculas, dígitos y guion bajo (p. ej. ITBIS).";
   }
-  const percent = form.ratePercent.replace(/%/g, "").replace(/\s/g, "");
-  const fraction = percentToFraction(percent);
-  if (!isDecimal(percent, 4) || percent.startsWith("-") || fraction === null || !/[1-9]/.test(fraction) || !isAtMostOne(fraction)) {
+  if (!isRate(form.ratePercent)) {
     errors.ratePercent = "Tasa en %: mayor que 0 y hasta 100, con hasta 4 decimales (p. ej. 18).";
   }
   if (kind === "PURCHASE_WITHHOLDING") {
@@ -275,6 +353,13 @@ export function validateFiscalForm(kind: string, form: FiscalRuleForm): Partial<
     errors.effect = "Elija el efecto del impuesto.";
   }
   return errors;
+}
+
+/** A percentage greater than 0 and at most 100, with up to 4 decimals. */
+function isRate(ratePercent: string): boolean {
+  const percent = ratePercent.replace(/%/g, "").replace(/\s/g, "");
+  const fraction = percentToFraction(percent);
+  return isDecimal(percent, 4) && !percent.startsWith("-") && fraction !== null && /[1-9]/.test(fraction) && isAtMostOne(fraction);
 }
 
 /** "1", "0.18", "1.000" are at most one; "1.01", "2" are not (text only). */
@@ -370,6 +455,19 @@ export interface CaseRow {
  */
 export function initialCases(kind: string, definition: string): CaseRow[] {
   const form = parseFiscalDefinition(kind, definition).form;
+  if (kind === "PURCHASE_TAX_TYPE") {
+    // E-GAS-02-3: a tax type is tested on the net alone; an exempt type expects no tax.
+    return [
+      {
+        caseId: "caso-1",
+        partyType: "COMPANY",
+        itemCategory: "",
+        netAmount: "1000.00",
+        itbisAmount: "0.00",
+        expected: (form?.components ?? []).map((c) => ({ taxCode: c.taxCode, amount: "", effect: c.effect })),
+      },
+    ];
+  }
   const withholding = kind === "PURCHASE_WITHHOLDING";
   return [
     {
@@ -401,7 +499,7 @@ export function rowsToCases(rows: readonly CaseRow[]): CaseRow[] {
 }
 
 /** Per-cell messages keyed "case-<i>-<field>" or "case-<i>-expected-<j>-<field>"; empty when the table can be sent. */
-export function validateCases(rows: readonly CaseRow[]): Record<string, string> {
+export function validateCases(rows: readonly CaseRow[], kind = ""): Record<string, string> {
   const errors: Record<string, string> = {};
   const ids = new Set<string>();
   rows.forEach((r, i) => {
@@ -415,7 +513,7 @@ export function validateCases(rows: readonly CaseRow[]): Record<string, string> 
     if (!r.partyType) {
       errors[`case-${i}-partyType`] = "Elija el tipo de contraparte.";
     }
-    if (!r.itemCategory) {
+    if (!r.itemCategory && kind !== "PURCHASE_TAX_TYPE") {
       errors[`case-${i}-itemCategory`] = "Elija la categoría.";
     }
     if (!isDecimal(normalizeInput(r.netAmount), 4) || r.netAmount.trim().startsWith("-")) {

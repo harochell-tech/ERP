@@ -97,6 +97,7 @@ test("payment from the proposal to a reconciled bank statement", async ({ browse
   await expect(invoiceRow.getByTestId("si-payment-status")).toHaveText("Pagada");
   await expect(invoiceRow.getByTestId("si-open")).toHaveText("0.00");
   await invoiceRow.getByRole("link", { name: "B0100000001" }).click();
+  await expect(controller).toHaveURL(/\/cxp\/factura\/\?id=/); // the list may hold other invoices (GAS1-07 journeys)
   await expect(controller.getByTestId("si-payment-status")).toHaveText("Pagada");
   await expect(controller.getByTestId("si-payments")).toContainText("PAG-000001");
 });

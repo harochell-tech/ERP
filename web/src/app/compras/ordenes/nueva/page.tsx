@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { query, type Schemas } from "@/api/client";
@@ -205,6 +206,9 @@ export default function NewPurchaseOrder() {
 
   return (
     <>
+      <p className="actions">
+        <strong>Orden de inventario</strong> · <Link href="/compras/ordenes/gasto/">Orden de gastos (servicios y suministros)</Link>
+      </p>
       <h1>Nueva orden de compra</h1>
       <p className="muted">El número de la orden (OC-año-000000) lo asigna el sistema al guardarla.</p>
       <div>

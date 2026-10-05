@@ -675,3 +675,26 @@ statement; Cobros sends it.
 - Inicio: «Hacer una venta de contado» and «Ventas de contado pendientes de pago».
 - `lib/cashSales.ts` (buyer identification, payment checks, steps); Playwright `cash-sale-journey.spec.ts` (desktop and mobile).
 
+## GAS1-07 — purchases of expenses and services (E-GAS-07-1…9)
+
+- **Maestros › Categorías de gasto** (`/maestros/categorias-gasto/`): the list with account, 606 type, class, status and who
+  prepared / approved; «Nueva categoría» (name → code, expense account, 606 type, service or good) and «Corregir» for drafts;
+  the Controller ticks drafts prepared by someone else and approves them together (confirmation, step-up); «Desactivar» /
+  «Descartar» and «Reactivar».
+- **CxP › Factura de gastos** (`/cxp/facturas/gasto/`, linked from the inventory form): `components/ExpenseLines.tsx` holds the lines
+  (description, category and tax type lists — ACTIVE categories, types in force on the invoice's date —, quantity, price) and the
+  server's preview 400 ms after the last change (`expense-preview-net` / `-taxes` / `-total`). An approved expense order of the
+  supplier fills the lines with what is left to bill; its category and tax type cannot change. «Registrar y cotejar» registers
+  and matches; the invoice then reads «Cotejada, lista para contabilizar» or «Pendiente de aprobación».
+- **Compras › Orden de gastos** (`/compras/ordenes/gasto/`): the same lines and preview; «Guardar borrador» / «Guardar y enviar».
+- Details: each expense line reads «description (category · TIPO)»; the taxes SELECTIVE_TAX / OTHER_TAX / LEGAL_TIP in Spanish
+  (`lib/ux4a-compras.ts`).
+- **Fiscal › Reglas**: the kind «Tipo de impuesto de compras de gastos» has its guided form (name, components with rate in % and
+  where each goes, none for an exempt type; its regression case is on the net alone, without item category), and a withholding
+  has the «Aplica a» boxes (`lib/fiscalRuleForm.ts`).
+- **Inicio**: «Categorías de gasto por aprobar» (count of DRAFT categories) for `expense_category:approve`.
+- Tests: `web/tests/unit/expenses.test.ts`; Playwright `web/e2e/expense-journey.spec.ts` (desktop and mobile): the Contador prepares a
+  category, the Controller approves it, Cuentas por pagar registers a 30,000.00 telephone bill (39,000.00 with ITBIS, ISC and CDT),
+  the Controller approves it over the amount, it is posted and the 606 shows it; an expense order of 10 repairs approved and 6 of
+  them billed and posted.
+

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { query } from "@/api/client";
@@ -107,6 +108,9 @@ export default function NewInvoice() {
 
   return (
     <>
+      <p className="actions">
+        <strong>Factura de inventario</strong> · <Link href="/cxp/facturas/gasto/">Factura de gastos (sin artículo registrado)</Link>
+      </p>
       <h1>Registrar factura de proveedor</h1>
       <div>
         <Field label="Proveedor" required error={fe.errors.partyId}>

@@ -37,6 +37,7 @@ public sealed class PurchaseTaxTypeTests(PostgresFixture postgres)
 
     private static TaxLineInput Expense(Guid taxType, decimal net, string scope = TaxLineScopes.ExpenseService) => new(Guid.CreateVersion7(), null, net, taxType, scope);
 
+    [Trait("AcceptanceGas1", "GAS-02")]
     [Fact]
     public async Task Each_expense_line_carries_only_the_components_of_its_own_tax_type()
     {

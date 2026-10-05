@@ -55,6 +55,7 @@ public sealed class ExpenseCategoryTests(PostgresFixture postgres)
             "ExpenseCategory:" + await h.ScalarAsync<string>($"SELECT string_agg(coalesce(from_state, 'null') || '>' || to_state, ',' ORDER BY state_history_id) FROM core.state_history WHERE aggregate_id = '{id}'"));
     }
 
+    [Trait("AcceptanceGas1", "GAS-01")]
     [Fact]
     public async Task A_batch_approves_what_it_can_and_reports_the_rest()
     {

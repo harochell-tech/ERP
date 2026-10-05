@@ -69,3 +69,22 @@ public sealed class PreviewExpensePurchaseOrderHandler : IQueryHandler<PreviewEx
             estimate.UnavailableReason));
     }
 }
+
+/// <summary>
+/// E-GAS-07-6: an expense invoice priced while it is typed (the same computation as the order's preview, on the invoice's date),
+/// for Cuentas por pagar (<c>supplier_invoice:register</c>).
+/// </summary>
+public sealed record PreviewExpenseInvoice(Guid CompanyId, Guid SessionId, DateOnly DocDate, IReadOnlyList<ExpenseOrderLineInput> Lines) : IQuery;
+
+[RequiresPermission("supplier_invoice:register")]
+public sealed class PreviewExpenseInvoiceHandler : IQueryHandler<PreviewExpenseInvoice>
+{
+    public string QueryType => "Procurement.PreviewExpenseInvoice";
+
+    public Task<string> HandleAsync(PreviewExpenseInvoice query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        return new PreviewExpensePurchaseOrderHandler().HandleAsync(
+            new PreviewExpensePurchaseOrder(query.CompanyId, query.SessionId, query.DocDate, query.Lines), context, cancellationToken);
+    }
+}
