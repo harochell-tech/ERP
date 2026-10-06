@@ -49,7 +49,15 @@ export default function NewExpenseOrder() {
     [companyId, allowed],
   );
   const masters = useExpenseMasters(companyId, values.orderDate, allowed);
-  const preview = useExpensePreview(companyId, "/api/v1/companies/{companyId}/procurement/expense-purchase-orders/preview", values.orderDate, values.lines);
+  // USD1-07a (E-USD1-07-3): a foreign supplier's order is in USD, without tax type, with the day's rate and pesos from the server.
+  const foreign = base.data?.suppliers.find((s) => s.supplierId === values.partyId)?.partyKind === "FOREIGN";
+  const preview = useExpensePreview(
+    companyId,
+    "/api/v1/companies/{companyId}/procurement/expense-purchase-orders/preview",
+    values.orderDate,
+    values.lines,
+    foreign ? "USD" : "DOP",
+  );
 
   if (!allowed) {
     return <NoPermission />;
@@ -61,7 +69,7 @@ export default function NewExpenseOrder() {
   const plantId = values.plantId || base.data.plants[0]?.plantId || "";
 
   const save = async (andSubmit: boolean) => {
-    if (!fe.check({ partyId: !values.partyId && "Elija el proveedor.", plantId: !plantId && "Elija la planta.", ...checkExpenseLines(values.lines) })) {
+    if (!fe.check({ partyId: !values.partyId && "Elija el proveedor.", plantId: !plantId && "Elija la planta.", ...checkExpenseLines(values.lines, foreign) })) {
       return;
     }
     const response = await create.run(
@@ -72,7 +80,7 @@ export default function NewExpenseOrder() {
         lines: values.lines.map((l) => ({
           description: l.description.trim(),
           expenseCategoryId: l.expenseCategoryId,
-          taxTypeId: l.taxTypeId,
+          taxTypeId: foreign ? null : l.taxTypeId,
           quantity: normalizeInput(l.quantity),
           unitPrice: normalizeInput(l.unitPrice),
         })),
@@ -120,8 +128,9 @@ export default function NewExpenseOrder() {
           <input type="date" aria-label="Fecha de la orden" value={values.orderDate} onChange={(e) => set({ orderDate: e.target.value })} />
         </Field>
       </div>
-      <ExpenseLinesEditor lines={values.lines} onChange={(lines) => set({ lines })} masters={masters.data} errors={fe.errors} preview={preview.preview} />
-      <ExpenseTotals preview={preview.preview} problem={preview.problem} />
+      {foreign ? <p className="muted">Proveedor del exterior: la orden es en dólares; su aprobación compara su valor en pesos a la tasa del día.</p> : null}
+      <ExpenseLinesEditor lines={values.lines} onChange={(lines) => set({ lines })} masters={masters.data} errors={fe.errors} preview={preview.preview} usd={foreign} />
+      <ExpenseTotals preview={preview.preview} problem={preview.problem} usd={foreign} />
       <div className="actions form-actions">
         <button type="button" disabled={create.busy || submit.busy} onClick={() => void save(false)}>
           Guardar borrador

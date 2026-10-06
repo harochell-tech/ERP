@@ -115,7 +115,24 @@ function InvoiceDetail() {
         <dd>
           {formatDate(invoice.docDate)} / {formatDate(invoice.dueDate)}
         </dd>
-        <dt>Neto</dt>
+        {/* USD1-07a (E-USD1-07-3): a foreign invoice in USD with its rate; the peso amounts are at that rate. */}
+        {invoice.currency === "USD" ? (
+          <>
+            <dt>Total en dólares</dt>
+            <dd data-testid="si-usd">
+              US$ <Money value={invoice.totalAmountUsd ?? "0"} />
+              {invoice.openAmountUsd != null ? (
+                <>
+                  {" "}
+                  · saldo US$ <Money value={invoice.openAmountUsd} />
+                </>
+              ) : null}
+            </dd>
+            <dt>Tasa</dt>
+            <dd data-testid="si-rate">{invoice.exchangeRate}</dd>
+          </>
+        ) : null}
+        <dt>{invoice.currency === "USD" ? "Neto en pesos" : "Neto"}</dt>
         <dd>
           <Money value={invoice.totalAmount} currency />
         </dd>

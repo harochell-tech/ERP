@@ -17,6 +17,7 @@ import { useLoad } from "@/lib/useQuery";
 // GAS1-07 (E-GAS-07-2): an expense invoice — electricity, telephone, repairs — with or without an expense order. Each line says
 // what was bought, its category and its tax type; the server prices it while it is typed. «Registrar y cotejar» registers it and
 // matches it at once: below the approval amount (or within the order) it is ready to post, otherwise the Controller approves it.
+// USD1-07a (E-USD1-07-3): a foreign supplier's invoice is in USD — its own number, no tax type, the day's rate and pesos from the server.
 
 interface Values {
   partyId: string;
@@ -71,7 +72,8 @@ export default function NewExpenseInvoice() {
       : null,
     [companyId, values.partyId],
   );
-  const preview = useExpensePreview(companyId, "/api/v1/companies/{companyId}/procurement/expense-invoices/preview", values.docDate, values.lines);
+  const foreign = base.data?.suppliers.find((s) => s.supplierId === values.partyId)?.partyKind === "FOREIGN";
+  const preview = useExpensePreview(companyId, "/api/v1/companies/{companyId}/procurement/expense-invoices/preview", values.docDate, values.lines, foreign ? "USD" : "DOP");
 
   if (!allowed) {
     return <NoPermission />;
@@ -108,11 +110,11 @@ export default function NewExpenseInvoice() {
     const found: Record<string, string | false> = {
       partyId: !values.partyId && "Elija el proveedor.",
       plantId: !values.plantId && "Elija la planta.",
-      fiscalNumber: !values.fiscalNumber.trim() && "Indique el NCF de la factura.",
+      fiscalNumber: !values.fiscalNumber.trim() && (foreign ? "Indique el número de la factura del proveedor." : "Indique el NCF de la factura."),
       docDate: !values.docDate && "Indique la fecha de la factura.",
       dueDate: !values.dueDate && "Indique el vencimiento.",
       printedTotal: printedTotal !== "" && !isPositiveDecimal(printedTotal, 2) && "El total impreso debe ser mayor que cero, con hasta 2 decimales.",
-      ...checkExpenseLines(values.lines),
+      ...checkExpenseLines(values.lines, foreign),
     };
     if (!fe.check(found)) {
       return;
@@ -128,7 +130,7 @@ export default function NewExpenseInvoice() {
         lines: values.lines.map((l) => ({
           description: l.description.trim(),
           expenseCategoryId: l.expenseCategoryId,
-          taxTypeId: l.taxTypeId,
+          taxTypeId: foreign ? null : l.taxTypeId,
           quantity: normalizeInput(l.quantity),
           unitPrice: normalizeInput(l.unitPrice),
           purchaseOrderLineId: l.purchaseOrderLineId ?? null,
@@ -186,9 +188,15 @@ export default function NewExpenseInvoice() {
             ))}
           </select>
         </Field>
-        <Field label="NCF" required error={fe.errors.fiscalNumber}>
-          <input aria-label="NCF" value={values.fiscalNumber} onChange={(e) => set({ fiscalNumber: e.target.value.toUpperCase() })} />
-        </Field>
+        {foreign ? (
+          <Field label="Número de la factura del proveedor" required error={fe.errors.fiscalNumber}>
+            <input aria-label="Número de la factura del proveedor" maxLength={40} value={values.fiscalNumber} onChange={(e) => set({ fiscalNumber: e.target.value })} />
+          </Field>
+        ) : (
+          <Field label="NCF" required error={fe.errors.fiscalNumber}>
+            <input aria-label="NCF" value={values.fiscalNumber} onChange={(e) => set({ fiscalNumber: e.target.value.toUpperCase() })} />
+          </Field>
+        )}
         <Field label="Fecha de la factura" required error={fe.errors.docDate}>
           <input
             type="date"
@@ -200,10 +208,15 @@ export default function NewExpenseInvoice() {
         <Field label="Vence" required error={fe.errors.dueDate}>
           <input type="date" aria-label="Vence" value={values.dueDate} onChange={(e) => set({ dueDate: e.target.value })} />
         </Field>
-        <Field label="Total según la factura (opcional)" error={fe.errors.printedTotal}>
+        <Field label={foreign ? "Total según la factura en US$ (opcional)" : "Total según la factura (opcional)"} error={fe.errors.printedTotal}>
           <input aria-label="Total según la factura" inputMode="decimal" value={values.printedTotal} onChange={(e) => set({ printedTotal: e.target.value })} />
         </Field>
       </div>
+      {foreign ? (
+        <p className="muted" data-testid="foreign-invoice-note">
+          Proveedor del exterior: la factura es en dólares, sin NCF, ITBIS ni retenciones, a la tasa aprobada de su fecha.
+        </p>
+      ) : null}
       <ExpenseLinesEditor
         lines={values.lines}
         onChange={(lines) => set({ lines })}
@@ -211,8 +224,9 @@ export default function NewExpenseInvoice() {
         errors={fe.errors}
         preview={preview.preview}
         fromOrder={values.purchaseOrderId !== ""}
+        usd={foreign}
       />
-      <ExpenseTotals preview={preview.preview} problem={preview.problem} />
+      <ExpenseTotals preview={preview.preview} problem={preview.problem} usd={foreign} />
       <div className="actions form-actions">
         <button type="button" className="primary" disabled={register.busy || match.busy} onClick={submit}>
           Registrar y cotejar

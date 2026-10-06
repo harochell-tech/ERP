@@ -7864,6 +7864,12 @@ export interface components {
             total: null | string;
             taxesUnavailableCode: null | string;
             taxesUnavailableReason: null | string;
+            /** Format: decimal */
+            exchangeRate?: null | string;
+            /** Format: date */
+            rateDate?: null | string;
+            /** Format: decimal */
+            totalDop?: null | string;
         };
         ExpenseOrderPreviewLine: {
             /** Format: int32 */
@@ -7877,6 +7883,7 @@ export interface components {
             /** Format: date */
             orderDate: string;
             lines: components["schemas"]["ExpenseOrderLineInput"][];
+            currency?: null | string;
         };
         ExpireFiscalAuthorizations: Record<string, never>;
         ExternalFiscalRecordView: {

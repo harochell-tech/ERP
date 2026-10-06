@@ -56,7 +56,11 @@ export default function ExpenseCategories() {
   }
   const items = list.data.items;
   const approvable = items.filter((c) => c.status === "DRAFT" && !isMyUserId(c.preparedBy));
-  const expenseAccounts = (accounts.data?.items ?? []).filter((a) => a.status === "ACTIVE" && !a.isControl && (a.accountClass === "EXPENSE" || a.code.startsWith("6")));
+  // E-USD1-03-6: a category may also point to a fixed-asset account (ASSET, not control) when its 606 type is 04.
+  const expenseAccounts = (accounts.data?.items ?? []).filter(
+    (a) => a.status === "ACTIVE" && !a.isControl && (a.accountClass === "EXPENSE" || a.code.startsWith("6") || a.accountClass === "ASSET"),
+  );
+  const assetIds = new Set(expenseAccounts.filter((a) => a.accountClass === "ASSET").map((a) => a.accountId));
   const busy = prepare.busy || update.busy || approve.busy || deactivate.busy || reactivate.busy;
   const toggle = (id: string) =>
     setSelected((s) => {
@@ -76,7 +80,9 @@ export default function ExpenseCategories() {
     const found = {
       name: !draft.name.trim() && "Indique el nombre.",
       accountId: !draft.expenseCategoryId && !draft.accountId && "Elija la cuenta de gasto.",
-      goodsType606: !draft.goodsType606 && "Elija el tipo del 606.",
+      goodsType606:
+        (!draft.goodsType606 && "Elija el tipo del 606.") ||
+        (assetIds.has(draft.accountId) && draft.goodsType606 !== "04" && "Una categoría de activo fijo es del tipo 04 del 606."),
     };
     if (!fe.check(found)) {
       return;
@@ -151,12 +157,17 @@ export default function ExpenseCategories() {
             <input aria-label="Nombre de la categoría" maxLength={120} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           </Field>
           {draft.expenseCategoryId ? null : (
-            <Field label="Cuenta de gasto" required error={fe.errors.accountId}>
-              <select aria-label="Cuenta de gasto" value={draft.accountId} onChange={(e) => setDraft({ ...draft, accountId: e.target.value })}>
+            <Field label="Cuenta de gasto o de activo fijo" required error={fe.errors.accountId}>
+              <select
+                aria-label="Cuenta de gasto"
+                value={draft.accountId}
+                onChange={(e) => setDraft({ ...draft, accountId: e.target.value, goodsType606: assetIds.has(e.target.value) ? "04" : draft.goodsType606 })}
+              >
                 <option value="">Seleccione…</option>
                 {expenseAccounts.map((a) => (
                   <option key={a.accountId} value={a.accountId}>
                     {a.code} {a.name}
+                    {assetIds.has(a.accountId) ? " (activo fijo)" : ""}
                   </option>
                 ))}
               </select>

@@ -715,3 +715,20 @@ statement; Cobros sends it.
   de ITBIS». **Printed quote**: freight lines «(exento)».
 - Playwright `web/e2e/price-journey.spec.ts` (desktop and mobile); the sales journey chooses the zone Higüey.
 
+
+## USD1-07a — USD screens: rates, foreign suppliers, purchases and imports (E-USD1-07-1…4)
+
+- **Contabilidad › Tasas de cambio** (`/contabilidad/tasas/`, `exchange_rate:read`): the rates of a date range; Tesorería / the Contador enter a
+  rate (today or a past day, 4 decimals, its source); the Controller approves or the preparer discards a draft. Inicio: «Tasas de cambio por
+  aprobar» (drafts by someone else) and «Falta la tasa del dólar de hoy» (the for-date query fails).
+- **Maestros › Proveedores**: «Nuevo proveedor del exterior» (`CreateForeignSupplier`), the row shows country · tax id and edits them while a
+  draft (`UpdateForeignSupplierDraft`). The supplier's page asks a foreign supplier's bank for SWIFT/BIC or name and its account or IBAN.
+- **Categorías de gasto**: fixed-asset accounts are offered (marked «activo fijo»); choosing one sets the 606 type 04.
+- **Expense order / invoice**: the supplier's kind decides the currency. In USD the lines have no tax type, the invoice asks the supplier's own
+  number, and `ExpenseTotals` shows the server's rate of the date and the pesos (`useExpensePreview(…, "USD")`). The invoice detail shows the
+  USD total and balance and the rate.
+- **Compras › DUA** (`/compras/dua/`): register (DGA among local suppliers, plant, number, dates, CIF, duties, ITBIS, other) and reverse an unpaid,
+  unsettled DUA (step-up, reason).
+- **Compras › Liquidaciones de importación** (`/compras/liquidaciones/`, `/compras/liquidacion/?id=`): tick the foreign goods invoices
+  («Mercancía»), the cost invoices («Costo») and unsettled DUAs; the draft page shows each document's cost and the allocation by value; the
+  Controller approves (step-up, four eyes) or reverses; Cuentas por pagar cancels a draft.

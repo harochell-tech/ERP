@@ -31,20 +31,30 @@ export function useExpenseMasters(companyId: string, date: string, enabled: bool
   );
 }
 
-/** Lines whose every field is complete enough to price, in the shape both previews take. */
-export function previewLines(lines: readonly ExpenseLine[]): Schemas["ExpenseOrderLineInput"][] | null {
+/**
+ * Lines whose every field is complete enough to price, in the shape both previews take. In USD (a foreign supplier, E-USD1-03-3) the
+ * lines carry no tax type.
+ */
+export function previewLines(lines: readonly ExpenseLine[], usd = false): Schemas["ExpenseOrderLineInput"][] | null {
   const ready = lines.map((l) => ({ ...l, quantity: normalizeInput(l.quantity), unitPrice: normalizeInput(l.unitPrice) }));
-  return ready.length > 0 && ready.every((l) => l.description.trim() && l.expenseCategoryId && l.taxTypeId && isPositiveDecimal(l.quantity, 6) && isPositiveDecimal(l.unitPrice, 6))
-    ? ready.map((l) => ({ description: l.description.trim(), expenseCategoryId: l.expenseCategoryId, taxTypeId: l.taxTypeId, quantity: l.quantity, unitPrice: l.unitPrice }))
+  return ready.length > 0 &&
+    ready.every((l) => l.description.trim() && l.expenseCategoryId && (usd || l.taxTypeId) && isPositiveDecimal(l.quantity, 6) && isPositiveDecimal(l.unitPrice, 6))
+    ? ready.map((l) => ({
+        description: l.description.trim(),
+        expenseCategoryId: l.expenseCategoryId,
+        taxTypeId: usd ? null : l.taxTypeId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      }))
     : null;
 }
 
 type PreviewPath = "/api/v1/companies/{companyId}/procurement/expense-purchase-orders/preview" | "/api/v1/companies/{companyId}/procurement/expense-invoices/preview";
 
 /** The server's net and taxes of the lines on <paramref name="date"/>, asked 400 ms after the last change. */
-export function useExpensePreview(companyId: string, path: PreviewPath, date: string, lines: readonly ExpenseLine[]) {
-  const ready = date ? previewLines(lines) : null;
-  const key = ready ? JSON.stringify({ orderDate: date, lines: ready }) : "";
+export function useExpensePreview(companyId: string, path: PreviewPath, date: string, lines: readonly ExpenseLine[], currency = "DOP") {
+  const ready = date ? previewLines(lines, currency === "USD") : null;
+  const key = ready ? JSON.stringify({ orderDate: date, lines: ready, currency }) : "";
   const [state, setState] = useState<{ key: string; preview: Schemas["ExpenseOrderPreview"] | null; problem: string | null }>({ key: "", preview: null, problem: null });
   useEffect(() => {
     if (!key) {
@@ -68,7 +78,7 @@ export function useExpensePreview(companyId: string, path: PreviewPath, date: st
   return state.key === key && key ? state : { key, preview: null, problem: null };
 }
 
-export function ExpenseTotals({ preview, problem }: { preview: Schemas["ExpenseOrderPreview"] | null; problem: string | null }) {
+export function ExpenseTotals({ preview, problem, usd = false }: { preview: Schemas["ExpenseOrderPreview"] | null; problem: string | null; usd?: boolean }) {
   if (problem) {
     return (
       <p className="muted" data-testid="expense-preview-problem">
@@ -83,19 +93,33 @@ export function ExpenseTotals({ preview, problem }: { preview: Schemas["ExpenseO
     <div className="preview-box" data-testid="expense-preview">
       <h3>Importes calculados por el sistema (vista previa, no se guarda)</h3>
       <dl>
-        <dt>Neto</dt>
+        <dt>{usd ? "Neto (US$)" : "Neto"}</dt>
         <dd>
           <MoneyText value={preview.netTotal} testId="expense-preview-net" />
         </dd>
-        <dt>Impuestos según el tipo de cada línea</dt>
-        <dd>
-          {preview.taxTotal !== null ? (
-            <MoneyText value={preview.taxTotal} testId="expense-preview-taxes" />
-          ) : (
-            <span>No se pueden calcular: {preview.taxesUnavailableReason ?? preview.taxesUnavailableCode}</span>
-          )}
-        </dd>
-        <dt>Total</dt>
+        {usd ? (
+          <>
+            <dt>Tasa del día</dt>
+            <dd data-testid="expense-preview-rate">
+              {preview.exchangeRate ?? "—"}
+              {preview.rateDate ? ` (aprobada para el ${preview.rateDate})` : ""}
+            </dd>
+            <dt>Equivalente en RD$</dt>
+            <dd>{preview.totalDop != null ? <MoneyText value={preview.totalDop} testId="expense-preview-dop" /> : "—"}</dd>
+          </>
+        ) : (
+          <>
+            <dt>Impuestos según el tipo de cada línea</dt>
+            <dd>
+              {preview.taxTotal !== null ? (
+                <MoneyText value={preview.taxTotal} testId="expense-preview-taxes" />
+              ) : (
+                <span>No se pueden calcular: {preview.taxesUnavailableReason ?? preview.taxesUnavailableCode}</span>
+              )}
+            </dd>
+          </>
+        )}
+        <dt>{usd ? "Total (US$)" : "Total"}</dt>
         <dd>{preview.total !== null ? <MoneyText value={preview.total} testId="expense-preview-total" /> : "—"}</dd>
       </dl>
     </div>
@@ -110,6 +134,7 @@ export function ExpenseLinesEditor({
   errors,
   preview,
   fromOrder = false,
+  usd = false,
 }: {
   lines: ExpenseLine[];
   onChange: (lines: ExpenseLine[]) => void;
@@ -117,7 +142,10 @@ export function ExpenseLinesEditor({
   errors: Partial<Record<string, string>>;
   preview: Schemas["ExpenseOrderPreview"] | null;
   fromOrder?: boolean;
+  /** E-USD1-07-3: a foreign supplier's lines are in USD, without tax type. */
+  usd?: boolean;
 }) {
+  const money = usd ? "US$" : "RD$";
   const set = (index: number, change: Partial<ExpenseLine>) => onChange(lines.map((l, i) => (i === index ? { ...l, ...change } : l)));
   return (
     <>
@@ -126,11 +154,11 @@ export function ExpenseLinesEditor({
           <tr>
             <th>Descripción</th>
             <th>Categoría de gasto</th>
-            <th>Tipo de impuesto</th>
+            {usd ? null : <th>Tipo de impuesto</th>}
             <th className="num">Cantidad</th>
-            <th className="num">Precio (RD$)</th>
-            <th className="num">Neto (RD$)</th>
-            <th className="num">Impuestos (RD$)</th>
+            <th className="num">Precio ({money})</th>
+            <th className="num">Neto ({money})</th>
+            {usd ? null : <th className="num">Impuestos (RD$)</th>}
             <th />
           </tr>
         </thead>
@@ -166,23 +194,25 @@ export function ExpenseLinesEditor({
                   </select>
                   <FieldMessage id={`expense-line-${index}-category`} error={errors[`line-${index}-category`]} />
                 </td>
-                <td>
-                  <select
-                    aria-label={`Tipo de impuesto ${index + 1}`}
-                    disabled={fromOrder}
-                    value={line.taxTypeId}
-                    onChange={(e) => set(index, { taxTypeId: e.target.value })}
-                    {...fieldAria(errors[`line-${index}-tax`], `expense-line-${index}-tax`, true)}
-                  >
-                    <option value="">Seleccione…</option>
-                    {masters.types.map((t) => (
-                      <option key={t.taxTypeId} value={t.taxTypeId}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldMessage id={`expense-line-${index}-tax`} error={errors[`line-${index}-tax`]} />
-                </td>
+                {usd ? null : (
+                  <td>
+                    <select
+                      aria-label={`Tipo de impuesto ${index + 1}`}
+                      disabled={fromOrder}
+                      value={line.taxTypeId}
+                      onChange={(e) => set(index, { taxTypeId: e.target.value })}
+                      {...fieldAria(errors[`line-${index}-tax`], `expense-line-${index}-tax`, true)}
+                    >
+                      <option value="">Seleccione…</option>
+                      {masters.types.map((t) => (
+                        <option key={t.taxTypeId} value={t.taxTypeId}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldMessage id={`expense-line-${index}-tax`} error={errors[`line-${index}-tax`]} />
+                  </td>
+                )}
                 <td className="num">
                   <input
                     aria-label={`Cantidad ${index + 1}`}
@@ -204,7 +234,9 @@ export function ExpenseLinesEditor({
                   <FieldMessage id={`expense-line-${index}-price`} error={errors[`line-${index}-price`]} />
                 </td>
                 <td className="num">{priced ? <Money value={priced.netAmount} testId={`expense-line-net:${index + 1}`} /> : <span className="muted">—</span>}</td>
-                <td className="num">{priced?.taxes != null ? <Money value={priced.taxes} testId={`expense-line-taxes:${index + 1}`} /> : <span className="muted">—</span>}</td>
+                {usd ? null : (
+                  <td className="num">{priced?.taxes != null ? <Money value={priced.taxes} testId={`expense-line-taxes:${index + 1}`} /> : <span className="muted">—</span>}</td>
+                )}
                 <td>
                   {lines.length > 1 && !fromOrder ? (
                     <button type="button" onClick={() => onChange(lines.filter((_, i) => i !== index))}>
@@ -229,12 +261,12 @@ export function ExpenseLinesEditor({
 }
 
 /** The form's own checks of the lines, keyed as the editor shows them. */
-export function checkExpenseLines(lines: readonly ExpenseLine[]): Record<string, string | false> {
+export function checkExpenseLines(lines: readonly ExpenseLine[], usd = false): Record<string, string | false> {
   const found: Record<string, string | false> = {};
   lines.forEach((l, i) => {
     found[`line-${i}-description`] = !l.description.trim() && "Diga qué se compra.";
     found[`line-${i}-category`] = !l.expenseCategoryId && "Elija la categoría.";
-    found[`line-${i}-tax`] = !l.taxTypeId && "Elija el tipo de impuesto.";
+    found[`line-${i}-tax`] = !usd && !l.taxTypeId && "Elija el tipo de impuesto.";
     found[`line-${i}-quantity`] = !isPositiveDecimal(normalizeInput(l.quantity), 6) && "Cantidad mayor que cero (hasta 6 decimales).";
     found[`line-${i}-price`] = !isPositiveDecimal(normalizeInput(l.unitPrice), 6) && "Precio mayor que cero (hasta 6 decimales).";
   });
