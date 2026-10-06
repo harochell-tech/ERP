@@ -344,6 +344,15 @@ public sealed class CloseComponentHandler : ICommandHandler<CloseComponent>, IPr
               SELECT 'wip', subledger_ref::text, NULL, sum(debit - credit)::text FROM fin.gl_entry WHERE company_id = @c AND account_role = 'WIP' GROUP BY subledger_ref
               ORDER BY 1, 2
               """
+            : component == Components.FixedAssets
+            ? """
+              SELECT 'assets' AS kind, status AS key, count(*)::text AS a, sum(cost - accumulated)::text AS b FROM fa.asset WHERE company_id = @c GROUP BY status
+              UNION ALL
+              SELECT 'gl', a.code, NULL, sum(e.debit - e.credit)::text FROM fin.gl_entry e JOIN fin.account a ON a.account_id = e.account_id
+              WHERE e.company_id = @c AND e.account_role IN ('FIXED_ASSET_COST', 'FIXED_ASSET_ACCUMULATED', 'PURCHASE_EXPENSE')
+                AND a.account_class = 'ASSET' GROUP BY a.code
+              ORDER BY 1, 2
+              """
             : component == Components.AccountsReceivable
             ? """
               SELECT 'ar_open' AS kind, party_id::text AS key, NULL AS a, sum(open_amount)::text AS b FROM fin.ar_document WHERE company_id = @c GROUP BY party_id
