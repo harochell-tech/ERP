@@ -161,6 +161,7 @@ public sealed class ImportSettlementTests(PostgresFixture postgres)
         Assert.Equal(90000m, drafted); // 30,000.00 of duties + 60,000.00 of freight
     }
 
+    [Trait("AcceptanceUsd1", "USD-06")]
     [Fact]
     public async Task A_DUA_is_owed_to_a_local_supplier_once_per_number_and_reversed_while_unpaid()
     {

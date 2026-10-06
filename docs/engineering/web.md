@@ -732,3 +732,19 @@ statement; Cobros sends it.
 - **Compras › Liquidaciones de importación** (`/compras/liquidaciones/`, `/compras/liquidacion/?id=`): tick the foreign goods invoices
   («Mercancía»), the cost invoices («Costo») and unsettled DUAs; the draft page shows each document's cost and the allocation by value; the
   Controller approves (step-up, four eyes) or reverses; Cuentas por pagar cancels a draft.
+
+## USD1-07b — USD screens: treasury and close; E2E-U1 (E-USD1-07-5…7)
+
+- **Cuentas bancarias de la empresa**: the currency (DOP / USD) when registering.
+- **Propuesta de pago**: a foreign supplier's invoices show their USD balance and are paid in USD; a peso account asks «Tasa que cobró el
+  banco»; a USD account uses the approved rate of the value date; peso invoices only offer peso accounts. **Pago**: «En dólares» with the
+  rate (bank's or approved).
+- **Tesorería › Transferencias entre cuentas** (`/tesoreria/transferencias/`): prepare (amount in USD when a USD account takes part, the bank's
+  rate across currencies), release (someone else, step-up), void, reverse (reason ≥ 10). **Conciliación bancaria** offers «Conciliar con
+  transferencia» for a line of either side.
+- **Contabilidad › Revaluación de saldos en dólares** (`/contabilidad/revaluacion/`): revalue a month (step-up), list, undo (reason ≥ 10).
+- **Reportes fiscales › IT-1**: «ITBIS pagado en importaciones» with the number of DUAs.
+- **Playwright** `usd-journey.spec.ts` (chromium): today's rate entered and approved from Inicio, a foreign supplier created and activated,
+  its USD invoice with the server's rate and pesos approved and posted, a DUA, and the settlement approved by the Controller. DevStack
+  `UsdSeed` maps AP_FOREIGN, IMPORT_CLEARING and the FX accounts, approves P-38…P-43R and the category «Montacargas y equipos».
+- E2E-U1 over the API: `UsdAcceptanceTests`; acceptance matrix `docs/acceptance/usd1.md` (`AcceptanceUsd1TraceabilityTests`; USD-04 pending).

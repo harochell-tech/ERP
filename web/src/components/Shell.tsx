@@ -107,6 +107,7 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/tesoreria/propuesta/", label: "Propuesta de pago", permission: "payment:read" },
       { href: "/tesoreria/pagos/", label: "Pagos", permission: "payment:read" },
+      { href: "/tesoreria/transferencias/", label: "Transferencias entre cuentas", permission: "payment:read" }, // USD1-07b (E-USD1-07-5)
       { href: "/tesoreria/extractos/", label: "Extractos bancarios", permission: "bank:read" },
       { href: "/tesoreria/conciliacion/", label: "Conciliación bancaria", permission: "bank:read" },
     ],
@@ -116,6 +117,7 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/contabilidad/ajustes/", label: "Diario de ajustes", permission: "ledger:read" },
       { href: "/contabilidad/tasas/", label: "Tasas de cambio", permission: "exchange_rate:read" }, // USD1-07a (E-USD1-07-1)
+      { href: "/contabilidad/revaluacion/", label: "Revaluación de saldos en dólares", permission: "exchange_rate:read" }, // USD1-07b (E-USD1-07-6)
       { href: "/contabilidad/balanza/", label: "Balanza", permission: "ledger:read" },
       { href: "/contabilidad/mayor/", label: "Mayor", permission: "ledger:read" },
       { href: "/contabilidad/estados/", label: "Estados financieros", permission: "ledger:read" },

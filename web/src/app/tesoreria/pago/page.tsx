@@ -107,11 +107,21 @@ function PaymentDetail() {
       <p className="muted">Transferencia a {payment.supplierName}</p>
       <dl className="summary">
         <div>
-          <dt>Monto</dt>
+          <dt>{payment.amountUsd ? "Monto en pesos" : "Monto"}</dt>
           <dd>
             <Money value={payment.amount} testId="payment-amount" currency />
           </dd>
         </div>
+        {/* USD1-07b (E-USD1-07-5): a payment of USD invoices — its USD and the rate that values it; the exchange difference is posted at release. */}
+        {payment.amountUsd ? (
+          <div>
+            <dt>En dólares</dt>
+            <dd data-testid="payment-usd">
+              US$ <Money value={payment.amountUsd} /> a {payment.exchangeRate}
+              {payment.currency === "USD" ? " (cuenta en dólares)" : " (tasa del banco)"}
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt>Fecha valor</dt>
           <dd>{formatDate(payment.valueDate)}</dd>

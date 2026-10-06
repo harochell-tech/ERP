@@ -20,6 +20,8 @@ const MONEY_SCALE = 2;
 // VS2-08 / E-VS2-07-4: POSTED invoices with a balance due by the chosen date, per supplier with its payability; the treasurer
 // picks invoices and amounts and prepares one payment for one supplier. Preparing reserves nothing and posts nothing (E-VS2-6);
 // the payment's total is the server's, shown on the payment once prepared (E-UI-3).
+// USD1-07b (E-USD1-07-5, E-USD1-05-2/3): a foreign supplier's invoices are paid in USD — from a USD account at the day's approved rate, or
+// from a peso account at the rate the bank charged, typed here; the exchange difference is the server's, at release.
 function PrepareForm({ supplier, today }: { supplier: Supplier; today: string }) {
   const { companyId, can } = useSession();
   const router = useRouter();
@@ -29,7 +31,10 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
     (_, doc) => `Pago ${doc ? `${doc} ` : ""}preparado para ${supplier.supplierName}; falta que otra persona lo libere.`,
   );
   const { data: banks } = useLoad(() => query("/api/v1/companies/{companyId}/treasury/bank-accounts", { path: { companyId } }), [companyId]);
-  const active = (banks?.items ?? []).filter((b) => b.status === "ACTIVE");
+  const usd = supplier.invoices.some((i) => i.currency === "USD");
+  // Peso invoices leave a peso account; USD invoices a USD or a peso account.
+  const active = (banks?.items ?? []).filter((b) => b.status === "ACTIVE" && (usd || b.currency === "DOP"));
+  const [rate, setRate] = useState("");
   const [bankAccountId, setBankAccountId] = useState("");
   const [valueDate, setValueDate] = useState(today);
   const [reference, setReference] = useState("");
@@ -37,12 +42,13 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
   // due-date filter widens (GAS1-07 found it: «Todo» added an invoice without an amount).
   const [typed, setChosen] = useState<Record<string, string>>({});
   const chosen: Record<string, string> = Object.fromEntries(
-    supplier.invoices.map((i) => [i.apDocId, typed[i.apDocId] ?? normalizeInput(formatDecimal(i.openAmount))]),
+    supplier.invoices.map((i) => [i.apDocId, typed[i.apDocId] ?? normalizeInput(formatDecimal(usd ? (i.openAmountUsd ?? i.openAmount) : i.openAmount))]),
   );
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const fe = useFieldErrors();
   const canPrepare = can("payment:prepare") && supplier.partyBankAccountId !== null;
   const bank = bankAccountId || active[0]?.bankAccountId || "";
+  const needsRate = usd && active.find((b) => b.bankAccountId === bank)?.currency === "DOP";
 
   return (
     <form
@@ -58,6 +64,7 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
           invoices: applications.length === 0 && "Marque al menos una factura para pagar.",
           bank: bank === "" && "Elija la cuenta de la empresa.",
           valueDate: valueDate === "" && "Indique la fecha valor.",
+          rate: needsRate && !isPositiveDecimal(normalizeInput(rate), 4) && "Escriba la tasa que cobró el banco (hasta 4 decimales).",
         };
         for (const a of applications) {
           found[`amount-${a.apDocId}`] = !isPositiveDecimal(a.amount, MONEY_SCALE) && "Monto mayor que cero, con máximo 2 decimales.";
@@ -72,6 +79,7 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
           valueDate,
           bankReference: reference.trim() === "" ? null : reference.trim(),
           applications,
+          exchangeRate: needsRate ? normalizeInput(rate) : null,
         });
         if (response) {
           router.push(`/tesoreria/pago/?id=${response.resultRef}`);
@@ -86,7 +94,8 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
             <th>Fecha</th>
             <th>Vence</th>
             <th className="num">Saldo abierto (RD$)</th>
-            <th className="num">A pagar (RD$)</th>
+            {usd ? <th className="num">Saldo abierto (US$)</th> : null}
+            <th className="num">A pagar ({usd ? "US$" : "RD$"})</th>
           </tr>
         </thead>
         <tbody>
@@ -110,6 +119,11 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
                 <td className="num">
                   <Money value={i.openAmount} />
                 </td>
+                {usd ? (
+                  <td className="num">
+                    <Money value={i.openAmountUsd} />
+                  </td>
+                ) : null}
                 <td className="num">
                   <input
                     aria-label={`A pagar ${i.supplierFiscalNumber}`}
@@ -141,10 +155,18 @@ function PrepareForm({ supplier, today }: { supplier: Supplier; today: string })
               {active.map((b) => (
                 <option key={b.bankAccountId} value={b.bankAccountId}>
                   {bankAccountLabel(b)}
+                  {usd ? ` (${b.currency})` : ""}
                 </option>
               ))}
             </select>
           </Field>
+          {needsRate ? (
+            <Field label="Tasa que cobró el banco (RD$ por US$)" required error={fe.errors.rate}>
+              <input aria-label="Tasa del banco" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
+            </Field>
+          ) : usd ? (
+            <p className="muted">Desde una cuenta en dólares el pago se valora a la tasa aprobada de la fecha valor.</p>
+          ) : null}
           <Field label="Fecha valor" required error={fe.errors.valueDate}>
             <input type="date" value={valueDate} onChange={(e) => setValueDate(e.target.value)} />
           </Field>
