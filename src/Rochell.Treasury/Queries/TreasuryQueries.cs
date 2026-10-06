@@ -58,9 +58,9 @@ public sealed class GetApAgingHandler : IQueryHandler<GetApAging>
             context.Connection,
             context.Transaction,
             """
-            SELECT d.ap_doc_id, i.si_id, i.supplier_fiscal_number, d.party_id, p.legal_name, d.doc_date, d.due_date, d.open_amount
+            SELECT d.ap_doc_id, i.source_id, i.doc_number, d.party_id, p.legal_name, d.doc_date, d.due_date, d.open_amount
             FROM fin.ap_document d
-            JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.accounting_status::text = 'POSTED'
+            JOIN fin.ap_source i ON i.ap_doc_id = d.ap_doc_id AND i.accounting_status = 'POSTED'
             JOIN md.party p ON p.party_id = d.party_id
             WHERE d.company_id = @c AND d.open_amount > 0
             ORDER BY p.legal_name, d.party_id, d.due_date, d.ap_doc_id
@@ -165,11 +165,11 @@ public sealed class GetPaymentProposalHandler : IQueryHandler<GetPaymentProposal
             context.Connection,
             context.Transaction,
             """
-            SELECT d.ap_doc_id, i.si_id, i.supplier_fiscal_number, d.party_id, p.legal_name, p.status::text, d.doc_date, d.due_date, d.original_amount, d.open_amount
+            SELECT d.ap_doc_id, i.source_id, i.doc_number, d.party_id, p.legal_name, p.status::text, d.doc_date, d.due_date, d.original_amount, d.open_amount
             FROM fin.ap_document d
-            JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.accounting_status::text = 'POSTED'
+            JOIN fin.ap_source i ON i.ap_doc_id = d.ap_doc_id AND i.accounting_status = 'POSTED'
             JOIN md.party p ON p.party_id = d.party_id
-            WHERE d.company_id = @c AND d.open_amount > 0 AND d.due_date <= @until AND (CAST(@supplier AS uuid) IS NULL OR d.party_id = CAST(@supplier AS uuid))
+            WHERE d.company_id = @c AND d.open_amount > 0 AND d.currency = 'DOP' AND d.due_date <= @until AND (CAST(@supplier AS uuid) IS NULL OR d.party_id = CAST(@supplier AS uuid))
             ORDER BY p.legal_name, d.party_id, d.due_date, d.ap_doc_id
             """,
             r => new Row(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.Date(6), r.Date(7), r.GetDecimal(8), r.GetDecimal(9)),
@@ -348,12 +348,12 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
             context.Connection,
             context.Transaction,
             """
-            SELECT a.ap_doc_id, i.si_id, i.supplier_fiscal_number, d.due_date, a.amount, a.reverses_application_id IS NOT NULL
+            SELECT a.ap_doc_id, i.source_id, i.doc_number, d.due_date, a.amount, a.reverses_application_id IS NOT NULL
             FROM fin.ap_application a
             JOIN fin.ap_document d ON d.ap_doc_id = a.ap_doc_id
-            JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id
+            JOIN fin.ap_source i ON i.ap_doc_id = d.ap_doc_id
             WHERE a.payment_id = @id
-            ORDER BY a.reverses_application_id IS NOT NULL, i.supplier_fiscal_number
+            ORDER BY a.reverses_application_id IS NOT NULL, i.doc_number
             """,
             Application,
             cancellationToken,
@@ -363,12 +363,12 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
                 context.Connection,
                 context.Transaction,
                 """
-                SELECT a.ap_doc_id, i.si_id, i.supplier_fiscal_number, d.due_date, a.amount, false
+                SELECT a.ap_doc_id, i.source_id, i.doc_number, d.due_date, a.amount, false
                 FROM fin.payment_allocation a
                 JOIN fin.ap_document d ON d.ap_doc_id = a.ap_doc_id
-                JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id
+                JOIN fin.ap_source i ON i.ap_doc_id = d.ap_doc_id
                 WHERE a.payment_id = @id AND a.payment_version = @v
-                ORDER BY i.supplier_fiscal_number
+                ORDER BY i.doc_number
                 """,
                 Application,
                 cancellationToken,

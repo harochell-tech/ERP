@@ -247,12 +247,12 @@ public static class Reconciliations
             HAVING coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0)
                    <> CASE WHEN p.status::text = 'REVERSED' THEN 0 ELSE p.amount END
             UNION ALL
-            -- Each AP document of a POSTED invoice: original − open = Σ live applications.
+            -- Each AP document of a POSTED invoice or DUA: original − open = Σ live applications.
             SELECT 'ap_doc:' || d.ap_doc_id::text, d.original_amount - d.open_amount,
                    coalesce(sum(CASE WHEN a.reverses_application_id IS NULL THEN a.amount ELSE -a.amount END), 0),
                    'AP_DOCUMENT_APPLICATION_DIFFERENCE', 'ERROR', NULL
             FROM fin.ap_document d
-            JOIN pur.supplier_invoice i ON i.si_id = d.source_doc_id AND i.accounting_status::text = 'POSTED'
+            JOIN fin.ap_source i ON i.ap_doc_id = d.ap_doc_id AND i.accounting_status = 'POSTED'
             LEFT JOIN fin.ap_application a ON a.ap_doc_id = d.ap_doc_id
             WHERE d.company_id = @c
             GROUP BY d.ap_doc_id, d.original_amount, d.open_amount

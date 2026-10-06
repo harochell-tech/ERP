@@ -9,7 +9,7 @@ internal static class PaymentRules
 {
     public const string Aggregate = "Payment";
 
-    public sealed record ApDoc(Guid ApDocId, Guid PartyId, DateOnly DocDate, decimal OpenAmount);
+    public sealed record ApDoc(Guid ApDocId, Guid PartyId, DateOnly DocDate, decimal OpenAmount, string Currency = "DOP");
 
     public sealed record PaymentRow(
         Guid PartyId,
@@ -103,6 +103,12 @@ internal static class PaymentRules
                 throw new DomainException(PaymentErrors.ApplicationWrongSupplier, $"AP document {a.ApDocId} belongs to another supplier (E-VS2-9).");
             }
 
+            if (doc.Currency != "DOP")
+            {
+                // USD payables are paid with the exchange difference of USD1-05 (E-USD-7); a peso payment never settles them.
+                throw new DomainException(PaymentErrors.ApDocumentCurrency, $"AP document {a.ApDocId} is in {doc.Currency}; it is paid in its currency (E-USD-7).");
+            }
+
             if (a.Amount > doc.OpenAmount)
             {
                 throw new DomainException(PaymentErrors.ApplicationExceedsOpenAmount, $"{Money(a.Amount)} exceeds the open amount {Money(doc.OpenAmount)} of AP document {a.ApDocId} (PAY-03).");
@@ -124,12 +130,12 @@ internal static class PaymentRules
             context.Connection,
             context.Transaction,
             $"""
-            SELECT ap_doc_id, party_id, doc_date, open_amount FROM fin.ap_document
+            SELECT ap_doc_id, party_id, doc_date, open_amount, currency FROM fin.ap_document
             WHERE company_id = @c AND ap_doc_id = ANY(@ids)
             ORDER BY ap_doc_id
             {(lockRows ? "FOR UPDATE" : string.Empty)}
             """,
-            r => new ApDoc(r.GetGuid(0), r.GetGuid(1), r.Date(2), r.GetDecimal(3)),
+            r => new ApDoc(r.GetGuid(0), r.GetGuid(1), r.Date(2), r.GetDecimal(3), r.GetString(4).Trim()),
             cancellationToken,
             ("c", context.CompanyId),
             ("ids", ids)).ConfigureAwait(false);

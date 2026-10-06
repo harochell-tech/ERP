@@ -283,6 +283,9 @@ internal static class ExpenseInvoices
     /// <summary>E-GAS-04-6: the exact reversal of the P-37 journal while the AP document has no applications; its NCF is free again.</summary>
     public static async Task<string> ReverseAsync(CommandContext context, InvoiceHeader header, string reason, PostingEngine engine, string commandType, CancellationToken cancellationToken)
     {
+        // E-USD1-04-7: an invoice in a live import settlement is reversed only after the settlement.
+        await Imports.ImportSettlements.RequireNotSettledAsync(context, Imports.ImportSettlements.GoodsKind, header.Id, cancellationToken).ConfigureAwait(false);
+        await Imports.ImportSettlements.RequireNotSettledAsync(context, Imports.ImportSettlements.ExpenseKind, header.Id, cancellationToken).ConfigureAwait(false);
         var (apDocId, open, postingEventId) = (await Reading.ListAsync(
             context.Connection,
             context.Transaction,
