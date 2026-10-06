@@ -460,7 +460,7 @@ try
 
         case "open-periods":
             {
-                // E-PR05-3: twelve calendar-month periods with INV-MOV, AP-REC, BANK-REC (E-VS2-01-6), ACR-NTX and ACR-TAX (E-FIN1-01-3) AR-REC (E-VS3-05-7), OP-DAY and COST-SET (E-MFG1-05-5) open. Existing periods are left untouched.
+                // E-PR05-3: twelve calendar-month periods with INV-MOV, AP-REC, BANK-REC (E-VS2-01-6), ACR-NTX and ACR-TAX (E-FIN1-01-3) AR-REC (E-VS3-05-7), OP-DAY and COST-SET, FA-REC (E-AF1-01-9) (E-MFG1-05-5) open. Existing periods are left untouched.
                 if (args.Length != 3 || !int.TryParse(args[2], out var year) || year is < 2000 or > 2100)
                 {
                     await Console.Error.WriteLineAsync("Usage: rochell-migrate open-periods <company-rnc> <year>");
@@ -481,7 +481,7 @@ try
                            RETURNING company_id, period_id)
                     INSERT INTO fin.close_component_state (company_id, period_id, component, status, version)
                     SELECT i.company_id, i.period_id, comp, 'OPEN', 1
-                    FROM inserted i CROSS JOIN (VALUES ('INV-MOV'), ('AP-REC'), ('BANK-REC'), ('ACR-NTX'), ('ACR-TAX'), ('AR-REC'), ('OP-DAY'), ('COST-SET')) AS v (comp)
+                    FROM inserted i CROSS JOIN (VALUES ('INV-MOV'), ('AP-REC'), ('BANK-REC'), ('ACR-NTX'), ('ACR-TAX'), ('AR-REC'), ('OP-DAY'), ('COST-SET'), ('FA-REC')) AS v (comp)
                     """,
                     connection);
                 open.Parameters.AddWithValue("rnc", args[1]);

@@ -150,6 +150,7 @@ export const COMPONENTS: Readonly<Record<string, string>> = {
   "AR-REC": "Cuentas por cobrar",
   "OP-DAY": "Producción del día",
   "COST-SET": "Liquidación de costos",
+  "FA-REC": "Activos fijos",
 };
 
 /** E-UX1-01-5: dates read dd/mm/aaaa; a date-time value shows its Dominican calendar day. */

@@ -16,7 +16,7 @@ public static class ReconciliationErrors
     public const string ReasonRequired = "REASON_REQUIRED";
 }
 
-/// <summary>Close components of VS#1 (Frozen Baseline §11.7), BANK-REC of VS#2 (E-VS2-06-7), the FIN-1 and VS#3 ones and OP-DAY / COST-SET of MFG-1.</summary>
+/// <summary>Close components of VS#1 (Frozen Baseline §11.7), BANK-REC of VS#2 (E-VS2-06-7), the FIN-1 and VS#3 ones OP-DAY / COST-SET of MFG-1 and FA-REC of AF-1.</summary>
 public static class Components
 {
     public const string InventoryMovements = "INV-MOV";
@@ -30,6 +30,9 @@ public static class Components
     public const string ProductionDay = "OP-DAY";
     public const string CostSettlement = "COST-SET";
 
+    /// <summary>E-AF1-01-9: fixed assets (depreciation, disposals, the initial load), blocked by FA-GL differences.</summary>
+    public const string FixedAssets = "FA-REC";
+
     public static bool IsKnown(string component)
-        => component is InventoryMovements or AccountsPayable or BankReconciliation or Accruals or TaxAccruals or AccountsReceivable or ProductionDay or CostSettlement;
+        => component is InventoryMovements or AccountsPayable or BankReconciliation or Accruals or TaxAccruals or AccountsReceivable or ProductionDay or CostSettlement or FixedAssets;
 }

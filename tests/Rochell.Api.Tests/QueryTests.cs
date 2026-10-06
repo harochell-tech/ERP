@@ -107,7 +107,7 @@ public sealed class QueryTests(PostgresFixture postgres)
         Assert.Equal(12, items.Count);
         Assert.Equal("2026-01-01", items[0].GetProperty("startsOn").GetString());
         Assert.Equal(
-            "ACR-NTX:OPEN,ACR-TAX:OPEN,AP-REC:OPEN,AR-REC:OPEN,BANK-REC:OPEN,COST-SET:OPEN,INV-MOV:CLOSED,OP-DAY:OPEN", // BANK-REC since VS2-01 (E-VS2-01-6), ACR-* since FIN1-01, AR-REC since VS3-05, OP-DAY and COST-SET since MFG1-05
+            "ACR-NTX:OPEN,ACR-TAX:OPEN,AP-REC:OPEN,AR-REC:OPEN,BANK-REC:OPEN,COST-SET:OPEN,FA-REC:OPEN,INV-MOV:CLOSED,OP-DAY:OPEN", // BANK-REC since VS2-01 (E-VS2-01-6), ACR-* since FIN1-01, AR-REC since VS3-05, OP-DAY and COST-SET since MFG1-05
             string.Join(',', items[0].GetProperty("components").EnumerateArray().Select(c => c.GetProperty("component").GetString() + ":" + c.GetProperty("status").GetString())));
     }
 }
