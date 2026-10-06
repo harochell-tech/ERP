@@ -5564,6 +5564,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/fixed-assets/depreciation-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PreviewDepreciation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/fixed-assets/disposals": {
         parameters: {
             query?: never;
@@ -6885,6 +6901,12 @@ export interface components {
             status: string;
             preparedBy: null | string;
             approvedBy: null | string;
+            /** Format: decimal */
+            bookValue: string;
+            /** Format: decimal */
+            gain: string;
+            /** Format: decimal */
+            loss: string;
             /** Format: int64 */
             version: number;
         };
@@ -8218,6 +8240,30 @@ export interface components {
             version: number;
             bankAccountAlias: null | string;
         };
+        DepreciationPreview: {
+            month: string;
+            /** Format: date */
+            lastDay: string;
+            ended: boolean;
+            alreadyPosted: boolean;
+            skippedMonth: null | string;
+            /** Format: decimal */
+            total: string;
+            lines: components["schemas"]["DepreciationPreviewLine"][];
+        };
+        DepreciationPreviewLine: {
+            /** Format: uuid */
+            assetId: string;
+            assetNo: string;
+            description: string;
+            plantName: string;
+            /** Format: int32 */
+            monthNumber: number;
+            /** Format: int32 */
+            usefulLifeMonths: number;
+            /** Format: decimal */
+            amount: string;
+        };
         DepreciationRunList: {
             items: components["schemas"]["DepreciationRunView"][];
         };
@@ -8735,6 +8781,7 @@ export interface components {
             monthsDepreciated: number;
             /** Format: int32 */
             usefulLifeMonths: null | number;
+            externalCode: null | string;
             /** Format: int64 */
             version: number;
         };
@@ -36977,6 +37024,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DepreciationRunList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PreviewDepreciation: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepreciationPreview"];
                 };
             };
             /** @description Bad Request */

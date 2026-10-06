@@ -64,7 +64,7 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
-        typeof(ListAssetClassesHandler), typeof(ListFixedAssetsHandler), typeof(GetFixedAssetHandler), typeof(ListDepreciationRunsHandler), typeof(ListAssetDisposalsHandler), typeof(ListAssetLoadsHandler), typeof(PreviewAssetLoadHandler),
+        typeof(ListAssetClassesHandler), typeof(ListFixedAssetsHandler), typeof(GetFixedAssetHandler), typeof(ListDepreciationRunsHandler), typeof(PreviewDepreciationHandler), typeof(ListAssetDisposalsHandler), typeof(ListAssetLoadsHandler), typeof(PreviewAssetLoadHandler),
         typeof(ListExchangeRatesHandler), typeof(ListFxRevaluationsHandler), typeof(GetExchangeRateForDateHandler), typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
@@ -413,6 +413,9 @@ public static class QueryEndpoints
         fixedAssets.MapGet("/depreciation-runs", (HttpContext http, Guid companyId, ListDepreciationRunsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListDepreciationRuns(companyId, s), handler, ct))
             .Describe<DepreciationRunList>(nameof(ListDepreciationRuns)); // AF1-03
+        fixedAssets.MapGet("/depreciation-preview", (HttpContext http, Guid companyId, DateOnly month, PreviewDepreciationHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new PreviewDepreciation(companyId, s, month), handler, ct))
+            .Describe<DepreciationPreview>(nameof(PreviewDepreciation)); // AF1-05
         fixedAssets.MapGet("/disposals", (HttpContext http, Guid companyId, string? status, ListAssetDisposalsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListAssetDisposals(companyId, s, status), handler, ct))
             .Describe<AssetDisposalList>(nameof(ListAssetDisposals));

@@ -63,7 +63,7 @@ public sealed record ListFixedAssets(
 
 public sealed record FixedAssetSummary(
     Guid AssetId, string AssetNo, string Description, Guid ExpenseCategoryId, string CategoryName, Guid PlantId, string PlantName, string Status, DateOnly AcquiredOn,
-    DateOnly? InServiceOn, string? Responsible, decimal Cost, decimal Accumulated, decimal BookValue, int MonthsDepreciated, int? UsefulLifeMonths, long Version);
+    DateOnly? InServiceOn, string? Responsible, decimal Cost, decimal Accumulated, decimal BookValue, int MonthsDepreciated, int? UsefulLifeMonths, string? ExternalCode, long Version);
 
 public sealed record FixedAssetList(IReadOnlyList<FixedAssetSummary> Items, int Limit, int Offset);
 
@@ -179,7 +179,7 @@ internal static class FixedAssetSql
 {
     public const string Summary = """
         SELECT x.asset_id, x.asset_no, x.description, x.expense_category_id, c.name, x.plant_id, coalesce(pl.name, pl.code), x.status, x.acquired_on, x.in_service_on,
-               x.responsible, x.cost::numeric(19,2), x.accumulated::numeric(19,2), (x.cost - x.accumulated)::numeric(19,2), x.months_depreciated, x.useful_life_months, x.version
+               x.responsible, x.cost::numeric(19,2), x.accumulated::numeric(19,2), (x.cost - x.accumulated)::numeric(19,2), x.months_depreciated, x.useful_life_months, x.external_code, x.version
         FROM fa.asset x
         JOIN pur.expense_category c ON c.expense_category_id = x.expense_category_id
         JOIN md.plant pl ON pl.plant_id = x.plant_id
@@ -190,5 +190,5 @@ internal static class FixedAssetSql
         => new(
             r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetGuid(5), r.GetString(6), r.GetString(7), r.Date(8),
             r.IsDBNull(9) ? null : r.Date(9), r.NullableString(10), r.GetDecimal(11), r.GetDecimal(12), r.GetDecimal(13), r.GetInt32(14),
-            r.IsDBNull(15) ? null : r.GetInt32(15), r.GetInt64(16));
+            r.IsDBNull(15) ? null : r.GetInt32(15), r.NullableString(16), r.GetInt64(17));
 }

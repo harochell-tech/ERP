@@ -763,3 +763,23 @@ Material on recipes and standard costs; Cuenta on adjustments and role maps; Cue
 lines. Short lists (status, plant, bank account, machine, shift, units) stay `<select>`; the ledger keeps its own account search.
 
 Journeys choose with `pick(field, text, option?)` / `pickFirst(field)` (`e2e/support.ts`); unit tests: `tests/unit/searchSelect.test.ts`.
+
+## AF1-05 — Contabilidad › Activos fijos (E-AF1-05-1…10)
+
+`components/FixedAssets.tsx` holds the tabs and labels shared by six pages:
+
+- `/contabilidad/activos/` — the cards filtered by status, plant and category (picker), with cost, accumulated and book value; the Contador's
+  «Crear fichas de facturas ya contabilizadas» (confirmed).
+- `/contabilidad/activo/?id=` — the card: origin (invoice link or initial load with the old code), class, residual, what is left, months,
+  movements and history; by status and permission: put into service, transfer, correct, prepare the disposal.
+- `/contabilidad/activos/clases/` — each fixed-asset category with its class in force and its draft (categories without one stand out);
+  the Contador prepares (accounts as pickers) or discards; the Controller approves (step-up).
+- `/contabilidad/activos/depreciacion/` — the server's preview of a month, then «Registrar depreciación» (step-up); the months posted, the
+  latest undone with a reason.
+- `/contabilidad/activos/bajas/` — drafts and posted disposals with the server's book value and gain / loss; the Controller approves, the
+  Contador cancels.
+- `/contabilidad/activos/carga/` — the CSV template, the file and cut-off, the server's preview per row; the Contador prepares; the
+  Controller approves, discards or reverses.
+
+Inicio: «Activos por poner en servicio», «Depreciación del mes pendiente» (the preview of the last ended month), «Clases de activos por
+aprobar», «Bajas de activos por aprobar», «Cargas de activos por aprobar». Journey: `e2e/fixed-assets-journey.spec.ts` (desktop).

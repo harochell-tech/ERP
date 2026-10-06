@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { query } from "@/api/client";
+import { lastEndedMonth } from "@/components/FixedAssets";
 import { EmptyState } from "@/components/StateNotices";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { isReadyToRelease } from "@/lib/production";
@@ -91,6 +92,50 @@ const TASKS: readonly Task[] = [
         () => 0,
         () => 1,
       ),
+  },
+  // AF1-05 (E-AF1-05-8): fixed assets — the Contador's service and month's depreciation, the Controller's approvals.
+  {
+    href: "/contabilidad/activos/?estado=AWAITING_SERVICE",
+    label: "Activos por poner en servicio",
+    permission: "fixed_asset:manage",
+    countPermission: "ledger:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/fixed-assets/assets", { path: { companyId }, query: { status: "AWAITING_SERVICE", limit: COUNT_LIMIT } })).items.length,
+  },
+  {
+    href: "/contabilidad/activos/depreciacion/",
+    label: "Depreciación del mes pendiente",
+    permission: "fixed_asset:manage",
+    countPermission: "ledger:read",
+    count: async (companyId) => {
+      const p = await query("/api/v1/companies/{companyId}/fixed-assets/depreciation-preview", { path: { companyId }, query: { month: lastEndedMonth() } });
+      return p.skippedMonth || (!p.alreadyPosted && p.lines.length > 0) ? 1 : 0;
+    },
+  },
+  {
+    href: "/contabilidad/activos/clases/",
+    label: "Clases de activos por aprobar",
+    permission: "fixed_asset:approve",
+    countPermission: "ledger:read",
+    count: async (companyId, _plantId, isMine) =>
+      (await query("/api/v1/companies/{companyId}/fixed-assets/classes", { path: { companyId }, query: { status: "DRAFT" } })).items.filter((k) => !isMine(k.preparedByName))
+        .length,
+  },
+  {
+    href: "/contabilidad/activos/bajas/",
+    label: "Bajas de activos por aprobar",
+    permission: "fixed_asset:approve",
+    countPermission: "ledger:read",
+    count: async (companyId, _plantId, isMine) =>
+      (await query("/api/v1/companies/{companyId}/fixed-assets/disposals", { path: { companyId }, query: { status: "DRAFT" } })).items.filter((d) => !isMine(d.preparedBy)).length,
+  },
+  {
+    href: "/contabilidad/activos/carga/",
+    label: "Cargas de activos por aprobar",
+    permission: "fixed_asset:approve",
+    countPermission: "ledger:read",
+    count: async (companyId, _plantId, isMine) =>
+      (await query("/api/v1/companies/{companyId}/fixed-assets/loads", { path: { companyId } })).items.filter((l) => l.status === "DRAFT" && !isMine(l.preparedBy)).length,
   },
   { href: "/tesoreria/propuesta/", label: "Preparar pagos a proveedores", permission: "payment:prepare" },
   {

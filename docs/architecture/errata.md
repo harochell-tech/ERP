@@ -1209,6 +1209,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-AF1-04-7 | AF1-04 | FA-GL, per account: the live cards' cost = the asset account; their accumulated = the accumulated depreciation account; a difference is an error that blocks FA-REC. |
 | E-AF1-04-8 | AF1-04 | An ended month with depreciation left to post is a warning, and an error blocking FA-REC when it is the month of the period being closed (the run's cutoff month). |
 | E-AF1-04-9 | AF1-04 | Closing FA-REC needs an FA-GL run of the period without errors, like the other components. |
+| E-AF1-05-1 | AF1-05 | Contabilidad › Activos fijos with Activos, the card, Clases, Depreciación del mes, Bajas and Carga inicial. |
+| E-AF1-05-2 | AF1-05 | The asset list filters by status, plant and category; columns number, previous code, description, category, plant, status, cost, accumulated, book value; the Contador's «Crear fichas de facturas ya contabilizadas» with confirmation. |
+| E-AF1-05-3 | AF1-05 | The card shows its data, source invoice (link), class, residual, what is left to depreciate and months left, movements and history; actions by status and permission: put into service, transfer, correct, prepare the disposal. |
+| E-AF1-05-4 | AF1-05 | Clases: each fixed-asset category with its class in force and its draft; categories without an approved class stand out; the Contador prepares or discards, the Controller approves. |
+| E-AF1-05-5 | AF1-05 | Depreciación del mes: the server's preview (a new query) per asset with the total, then posted with step-up; below, the months with «Deshacer» for the latest. |
+| E-AF1-05-6 | AF1-05 | Bajas: drafts and posted disposals; before approving, the Controller sees the book value and the estimated gain or loss computed by the server. |
+| E-AF1-05-7 | AF1-05 | Carga inicial: CSV template, file and cut-off, the preview with errors per row, prepare; the Controller approves or reverses. |
+| E-AF1-05-8 | AF1-05 | Inicio: «Activos por poner en servicio» and «Depreciación del mes pendiente» for the Contador; «Clases por aprobar», «Bajas por aprobar» and «Cargas por aprobar» for the Controller. |
+| E-AF1-05-9 | AF1-05 | E2E-AF1 over the API and Playwright: class → invoice with an asset → settlement → service → depreciation of an ended month → sale → reconciliation, the documents dated in earlier months. |
+| E-AF1-05-10 | AF1-05 | Acceptance matrix `docs/acceptance/af1.md` and a traceability test that fails when AF-01…11 or E2E-AF1 has no test. |
 | E-UX5-1 | UX5-01 | Customers and suppliers are chosen in a picker you type into: the list filters on any part of the name or the RNC, ignoring accents and capitals; each option shows the legal name and the RNC (or the country when foreign). |
 | E-UX5-2 | UX5-01 | Keyboard: ↑ ↓ to move, Enter to choose, Escape to close; on a phone the keyboard opens and the list takes the screen's width; a «×» clears the choice. |
 | E-UX5-3 | UX5-01 | It replaces every customer and supplier selector, in forms and filters; new documents keep offering only the active ones, as today. |

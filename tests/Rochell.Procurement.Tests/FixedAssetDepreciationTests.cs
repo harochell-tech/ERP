@@ -228,6 +228,22 @@ public sealed class FixedAssetDepreciationTests(PostgresFixture postgres)
         Assert.Equal("SALE|POSTED|450000.00", $"{disposals[0].GetProperty("kind").GetString()}|{disposals[0].GetProperty("status").GetString()}|{disposals[0].GetProperty("price").GetString()}");
     }
 
+    [Trait("AcceptanceAf1", "AF-10")]
+    [Fact]
+    public async Task AF10_after_a_transfer_the_next_depreciation_goes_to_the_new_plant()
+    {
+        var x = await InServiceAsync(postgres, 60, settle: true);
+        await using var h = x.H;
+        var other = await h.CreatePlantAsync();
+        var contador = await h.SessionWithRolesAsync("CONTADOR");
+        var version = await h.ScalarAsync<long>("SELECT version FROM fa.asset");
+        await h.RunAsync(new TransferFixedAsset(h.CompanyId, contador, "t", x.AssetId, version, other, Today(h)), new TransferFixedAssetHandler());
+        await DepreciateAsync(x, MonthOf(Today(h)).AddMonths(1));
+
+        Assert.True(await h.ScalarAsync<bool>("SELECT bool_and(plant_id = @p) FROM fin.gl_entry WHERE rule_line_code LIKE 'P44-%'", ("p", other)));
+        Assert.Equal(other, await h.ScalarAsync<Guid>("SELECT plant_id FROM fa.depreciation_line"));
+    }
+
     [Fact]
     public async Task A_card_is_scrapped_in_its_first_month_at_its_cost_and_a_draft_disposal_can_be_cancelled()
     {
