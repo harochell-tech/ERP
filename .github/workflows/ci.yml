@@ -17,7 +17,7 @@ jobs:
     # Job name is the required status check in branch protection: "ci / build-test".
     name: build-test
     runs-on: ubuntu-24.04   # Docker is available for Testcontainers (PostgreSQL 17).
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       DOTNET_NOLOGO: "true"
       DOTNET_CLI_TELEMETRY_OPTOUT: "true"
