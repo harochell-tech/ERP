@@ -22,9 +22,9 @@ public sealed class ImportSettlementTests(PostgresFixture postgres)
     private const string P39 = "0192f001-0000-7000-8000-000000000031";
     private const string P40 = "0192f001-0000-7000-8000-000000000032";
 
-    private sealed record Shipment(Foreign F, Guid Goods, Guid Freight, Guid Agent, Guid Dua);
+    internal sealed record Shipment(Foreign F, Guid Goods, Guid Freight, Guid Agent, Guid Dua);
 
-    private static async Task<Guid> PostedAsync(TestHarness h, Foreign f, string key, Guid supplier, string number, params ExpenseLineInput[] lines)
+    internal static async Task<Guid> PostedAsync(TestHarness h, Foreign f, string key, Guid supplier, string number, params ExpenseLineInput[] lines)
     {
         var si = (await h.RunAsync(
             new RegisterExpenseInvoice(h.CompanyId, f.W.Clerk, key, supplier, number, Today(h), Today(h).AddDays(30), f.W.Plant, lines), new RegisterExpenseInvoiceHandler())).ResultRef;
@@ -51,7 +51,7 @@ public sealed class ImportSettlementTests(PostgresFixture postgres)
     }
 
     /// <summary>The goods invoice, the freight (a second foreign supplier), the agent (local, with ITBIS) and the DUA, all posted.</summary>
-    private static async Task<Shipment> ShipmentAsync(TestHarness h)
+    internal static async Task<Shipment> ShipmentAsync(TestHarness h)
     {
         var f = await ForeignAsync(h);
         await h.CreateActiveMapAsync("IMPORT_CLEARING", await h.CreateAccountAsync("13900", "Importaciones por liquidar", isControl: true));

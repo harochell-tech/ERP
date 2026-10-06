@@ -2,6 +2,8 @@ using System.Text;
 using Rochell.Api.Hosting;
 using Rochell.Api.Http;
 using Rochell.Audit;
+using Rochell.FixedAssets.Cards;
+using Rochell.FixedAssets.Classes;
 using Rochell.Finance.Configuration;
 using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Ledger;
@@ -149,6 +151,16 @@ public static class CommandEndpoints
         procurement.MapCommand<ReverseImportSettlement, ReverseImportSettlementHandler>();
         procurement.MapCommand<RepostEvent, RepostEventHandler>();
         procurement.MapCommand<ApproveValuationResidualAdjustment, ApproveValuationResidualAdjustmentHandler>();
+
+        // AF1-02 (E-AF1-01-1): fixed assets — classes, cards, service and transfers.
+        var fixedAssets = company.MapGroup("/fixed-assets").WithTags("FixedAssets");
+        fixedAssets.MapCommand<PrepareAssetClass, PrepareAssetClassHandler>();
+        fixedAssets.MapCommand<ApproveAssetClass, ApproveAssetClassHandler>();
+        fixedAssets.MapCommand<DiscardAssetClass, DiscardAssetClassHandler>();
+        fixedAssets.MapCommand<PutFixedAssetInService, PutFixedAssetInServiceHandler>();
+        fixedAssets.MapCommand<TransferFixedAsset, TransferFixedAssetHandler>();
+        fixedAssets.MapCommand<UpdateFixedAsset, UpdateFixedAssetHandler>();
+        fixedAssets.MapCommand<CreateCardsForPostedInvoices, CreateCardsForPostedInvoicesHandler>();
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapCommand<PrepareAccountRoleMap, PrepareAccountRoleMapHandler>();
@@ -383,6 +395,8 @@ public static class CommandEndpoints
         typeof(StartProductionRunHandler), typeof(CancelProductionRunHandler), typeof(RecordShiftSummaryHandler), typeof(PostShiftSummaryHandler), typeof(ReverseShiftSummaryHandler),
         typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler), typeof(SettleCostCollectorHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
+        typeof(PrepareAssetClassHandler), typeof(ApproveAssetClassHandler), typeof(DiscardAssetClassHandler), typeof(PutFixedAssetInServiceHandler),
+        typeof(TransferFixedAssetHandler), typeof(UpdateFixedAssetHandler), typeof(CreateCardsForPostedInvoicesHandler),
     ];
 
     /// <summary>"CreatePurchaseOrder" → "create-purchase-order".</summary>
