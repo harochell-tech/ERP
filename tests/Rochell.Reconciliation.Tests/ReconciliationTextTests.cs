@@ -23,6 +23,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
         "IN_TRANSIT", "NOT_POSTED", "PENDING_EXTERNAL", "POSTING_BLOCKED", "SALES_ITBIS",
         "SELECTIVE_TAX_EXPENSE", "OTHER_TAX_EXPENSE", "LEGAL_TIP_EXPENSE", // account roles TAX-606 reads (E-GAS-06-5)
         "AP_FOREIGN", // AP-GL counts foreign payables too (E-USD1-03-5)
+        "IMPORT_CLEARING", "CUSTOMS_DECLARATION", // the role and the document kind IMPORT-CLEARING reads (E-USD1-06-4)
     };
 
     private static DateOnly Today(TestHarness h) => BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
@@ -85,7 +86,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
 
         Assert.Contains("CLASSIFICATION_MISSING", produced);   // from tax.report_606
         Assert.Contains("BANK_GL_DIFFERENCE", produced);       // from BankGl.cs
-        Assert.Equal(66, produced.Count); // + the three of TAX-606 for expense taxes (E-GAS-06-5); + the three of CASH-SALE (E-CF1-10, 11); // + the three of PROFORMA-ASIG (E-FIS1b-01-12)
+        Assert.Equal(70, produced.Count); // + AP_USD_DIFFERENCE, IMPORT_CLEARING_DIFFERENCE, IMPORT_SETTLEMENT_OVERDUE, FX_REVALUATION_MISSING (USD1-06); // + the three of TAX-606 for expense taxes (E-GAS-06-5); + the three of CASH-SALE (E-CF1-10, 11); // + the three of PROFORMA-ASIG (E-FIS1b-01-12)
         Assert.Equal(produced, catalogued);                     // none missing, none stale
         Assert.Equal(Reconciliations.All.Order(StringComparer.Ordinal), definitions.Select(d => d.GetProperty("reconCode").GetString()));
         Assert.All(definitions, d => Assert.False(string.IsNullOrWhiteSpace(d.GetProperty("name").GetString())));

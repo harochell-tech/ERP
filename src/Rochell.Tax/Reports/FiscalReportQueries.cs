@@ -99,10 +99,14 @@ public sealed record It1SalesLine(string EcfType, int Invoices, decimal TaxedNet
 
 public sealed record It1Withholding(string Kind, int Count, decimal Amount);
 
-/// <summary>E-FIS2-02-6: what the IT-1 is prepared from — sales by e-CF type, credit notes, the 606's purchase ITBIS, customer withholdings.</summary>
+/// <summary>
+/// E-FIS2-02-6: what the IT-1 is prepared from — sales by e-CF type, credit notes, the 606's purchase ITBIS, customer withholdings. E-USD1-06-5:
+/// <see cref="ImportDeclarations"/> / <see cref="ImportItbis"/> are the month's POSTED DUAs and the ITBIS paid at customs (not in the 606,
+/// pending the accountant, X-1).
+/// </summary>
 public sealed record It1Summary(
     string Period, IReadOnlyList<It1SalesLine> Sales, int CreditNotes, decimal CreditNotesNet, decimal CreditNotesItbis, decimal PurchaseItbisBilled,
-    decimal PurchaseItbisToCost, decimal PurchaseItbisToAdvance, IReadOnlyList<It1Withholding> CustomerWithholdings);
+    decimal PurchaseItbisToCost, decimal PurchaseItbisToAdvance, IReadOnlyList<It1Withholding> CustomerWithholdings, int ImportDeclarations = 0, decimal ImportItbis = 0m);
 
 [RequiresPermission("fiscal_report:read")]
 public sealed class GetIt1SummaryHandler : IQueryHandler<GetIt1Summary>
@@ -164,7 +168,18 @@ public sealed class GetIt1SummaryHandler : IQueryHandler<GetIt1Summary>
             r => new It1Withholding(r.GetString(0), r.GetInt32(1), r.GetDecimal(2)),
             cancellationToken,
             args).ConfigureAwait(false);
-        return ApiJson.Serialize(new It1Summary(query.Period, sales, notes.Count, notes.Net, notes.Itbis, purchases.Billed, purchases.Cost, purchases.Advance, withholdings));
+        var imports = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT count(*)::int, coalesce(sum(itbis_amount), 0)::numeric(19,2) FROM pur.customs_declaration
+            WHERE company_id = @c AND status = 'POSTED' AND dua_date >= @m0 AND dua_date < @m1
+            """,
+            r => (Count: r.GetInt32(0), Itbis: r.GetDecimal(1)),
+            cancellationToken,
+            args).ConfigureAwait(false)).Single();
+        return ApiJson.Serialize(new It1Summary(
+            query.Period, sales, notes.Count, notes.Net, notes.Itbis, purchases.Billed, purchases.Cost, purchases.Advance, withholdings, imports.Count, imports.Itbis));
     }
 }
 

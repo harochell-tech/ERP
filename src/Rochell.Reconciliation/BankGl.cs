@@ -175,8 +175,8 @@ public static class BankGl
         => await ReconSql.ScalarAsync<decimal>(
             context.Connection,
             context.Transaction,
-            // E-USD1-05b-4: a USD account reconciles in USD — its lines' USD, signed as their pesos.
-            "SELECT coalesce(sum(CASE WHEN currency = 'USD' THEN sign(debit - credit) * amount_fc ELSE debit - credit END), 0) FROM fin.gl_entry WHERE company_id = @c AND subledger_type = 'BANK' AND subledger_ref = @b AND posting_date < @from",
+            // E-USD1-05b-4: a USD account reconciles in USD — its lines' USD, signed as their pesos; its revaluation lines (pesos only) count nothing.
+            "SELECT coalesce(sum(CASE WHEN currency = 'USD' THEN sign(debit - credit) * amount_fc WHEN (SELECT currency FROM fin.bank_account WHERE bank_account_id = @b) = 'USD' THEN 0 ELSE debit - credit END), 0) FROM fin.gl_entry WHERE company_id = @c AND subledger_type = 'BANK' AND subledger_ref = @b AND posting_date < @from",
             cancellationToken,
             ("c", context.CompanyId),
             ("b", account),
@@ -188,7 +188,7 @@ public static class BankGl
             context.Connection,
             context.Transaction,
             """
-            SELECT e.gl_entry_id, e.posting_date, CASE WHEN e.currency = 'USD' THEN sign(e.debit - e.credit) * e.amount_fc ELSE e.debit - e.credit END,
+            SELECT e.gl_entry_id, e.posting_date, CASE WHEN e.currency = 'USD' THEN sign(e.debit - e.credit) * e.amount_fc WHEN (SELECT currency FROM fin.bank_account WHERE bank_account_id = @b) = 'USD' THEN 0 ELSE e.debit - e.credit END,
                    CASE WHEN pay.payment_id IS NOT NULL THEN 'OUTSTANDING_PAYMENT'
                         WHEN rev.payment_id IS NOT NULL THEN 'OUTSTANDING_RETURN'
                         WHEN chg.line_id IS NOT NULL THEN 'OUTSTANDING_CHARGE'

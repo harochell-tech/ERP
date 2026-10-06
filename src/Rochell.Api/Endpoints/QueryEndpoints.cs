@@ -60,7 +60,7 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
-        typeof(ListExchangeRatesHandler), typeof(GetExchangeRateForDateHandler), typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
+        typeof(ListExchangeRatesHandler), typeof(ListFxRevaluationsHandler), typeof(GetExchangeRateForDateHandler), typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListPurchaseTaxTypesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
@@ -401,6 +401,9 @@ public static class QueryEndpoints
         finance.MapGet("/exchange-rates", (HttpContext http, Guid companyId, DateOnly? from, DateOnly? to, ListExchangeRatesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListExchangeRates(companyId, s, from, to), handler, ct))
             .Describe<ExchangeRateList>(nameof(ListExchangeRates));
+        finance.MapGet("/fx-revaluations", (HttpContext http, Guid companyId, ListFxRevaluationsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListFxRevaluations(companyId, s), handler, ct))
+            .Describe<FxRevaluationList>(nameof(ListFxRevaluations)); // USD1-06
         finance.MapGet("/exchange-rates/for-date", (HttpContext http, Guid companyId, DateOnly date, GetExchangeRateForDateHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetExchangeRateForDate(companyId, s, date), handler, ct))
             .Describe<ApplicableRate>(nameof(GetExchangeRateForDate));

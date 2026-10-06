@@ -158,6 +158,8 @@ public static class CommandEndpoints
         finance.MapCommand<ApproveAccountingPolicyVersion, ApproveAccountingPolicyVersionHandler>();
         finance.MapCommand<CreateAccount, CreateAccountHandler>();
         finance.MapCommand<PrepareExchangeRate, PrepareExchangeRateHandler>(); // USD1-02 (E-USD-2)
+        finance.MapCommand<PostFxRevaluation, PostFxRevaluationHandler>(); // USD1-06 (E-USD1-06-1…3)
+        finance.MapCommand<UndoFxRevaluation, UndoFxRevaluationHandler>();
         finance.MapCommand<ApproveExchangeRate, ApproveExchangeRateHandler>();
         finance.MapCommand<DiscardExchangeRate, DiscardExchangeRateHandler>();
         finance.MapCommand<UpdateAccount, UpdateAccountHandler>();
@@ -351,7 +353,7 @@ public static class CommandEndpoints
         typeof(ApproveImportSettlementHandler), typeof(ReverseImportSettlementHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),
         typeof(ApproveAccountingPolicyVersionHandler),
-        typeof(CreateAccountHandler), typeof(PrepareExchangeRateHandler), typeof(ApproveExchangeRateHandler), typeof(DiscardExchangeRateHandler), typeof(UpdateAccountHandler), typeof(DeactivateAccountHandler), typeof(ActivateAccountHandler),
+        typeof(CreateAccountHandler), typeof(PrepareExchangeRateHandler), typeof(PostFxRevaluationHandler), typeof(UndoFxRevaluationHandler), typeof(ApproveExchangeRateHandler), typeof(DiscardExchangeRateHandler), typeof(UpdateAccountHandler), typeof(DeactivateAccountHandler), typeof(ActivateAccountHandler),
         typeof(PrepareManualJournalHandler), typeof(UpdateManualJournalHandler), typeof(SubmitManualJournalHandler), typeof(WithdrawManualJournalHandler),
         typeof(ApproveManualJournalHandler), typeof(RejectManualJournalHandler), typeof(ReverseManualJournalHandler),
         typeof(PrepareReportStructureHandler), typeof(ApproveReportStructureHandler),
