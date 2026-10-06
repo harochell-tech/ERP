@@ -1188,6 +1188,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-AF1-02-7 | AF1-02 | The Contador corrects a live card's description and who is in charge; its cost changes only through invoices, settlements and their reversals. |
 | E-AF1-02-8 | AF1-02 | A one-off command «Crear fichas de facturas ya contabilizadas» creates the missing cards of invoices posted before AF-1 with their settlements' cost, so the initial load does not count them twice. |
 | E-AF1-02-9 | AF1-02 | Queries: classes, cards (filters status, plant, class) and one card with its history; read with `ledger:read`. |
+| E-AF1-02-10 | AF1-02 | A settlement where an invoice whose line is a fixed asset appears as a cost of other goods is refused (`FIXED_ASSET_IN_SETTLEMENT`): a fixed-asset invoice is settled as goods, never as another line's cost. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
