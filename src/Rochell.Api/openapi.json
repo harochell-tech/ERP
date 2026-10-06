@@ -49176,6 +49176,26 @@
               "null",
               "string"
             ]
+          },
+          "currency": {
+            "type": "string",
+            "default": "DOP"
+          },
+          "amountUsd": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "exchangeRate": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -50350,6 +50370,14 @@
             "items": {
               "$ref": "#/components/schemas/PaymentApplication"
             }
+          },
+          "exchangeRate": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -51453,6 +51481,18 @@
           "openAmount": {
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
+            "format": "decimal"
+          },
+          "currency": {
+            "type": "string",
+            "default": "DOP"
+          },
+          "openAmountUsd": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "decimal"
           }
         },
@@ -54471,6 +54511,10 @@
           },
           "glAccountCode": {
             "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "default": "DOP"
           }
         },
         "additionalProperties": false
@@ -59948,6 +59992,14 @@
             "items": {
               "$ref": "#/components/schemas/PaymentApplication"
             }
+          },
+          "exchangeRate": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false

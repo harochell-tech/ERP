@@ -16,8 +16,10 @@ public sealed class PrepareSupplierPaymentHandler : ICommandHandler<PrepareSuppl
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
-        var amount = await PaymentRules.ValidatePlanAsync(
-            context, command.PartyId, command.BankAccountId, command.PartyBankAccountId, command.ValueDate, command.Applications, cancellationToken).ConfigureAwait(false);
+        var plan = await PaymentRules.ValidatePlanAsync(
+            context, command.PartyId, command.BankAccountId, command.PartyBankAccountId, command.ValueDate, command.Applications, cancellationToken, command.ExchangeRate)
+            .ConfigureAwait(false);
+        var amount = plan.Amount;
         var preparer = await PaymentRules.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         var reference = PaymentRules.Reference(command.BankReference);
 
@@ -50,6 +52,9 @@ public sealed class PrepareSupplierPaymentHandler : ICommandHandler<PrepareSuppl
                     bankAccountId = command.BankAccountId,
                     partyBankAccountId = command.PartyBankAccountId,
                     amount = PaymentRules.Money(amount),
+                    currency = plan.Currency,
+                    amountUsd = plan.AmountUsd is { } usd ? PaymentRules.Money(usd) : null,
+                    exchangeRate = plan.Rate?.ToString("0.0000", System.Globalization.CultureInfo.InvariantCulture),
                     valueDate = command.ValueDate,
                     bankReference = reference,
                     applications = PaymentRules.ApplicationsPayload(command.Applications),
@@ -61,8 +66,8 @@ public sealed class PrepareSupplierPaymentHandler : ICommandHandler<PrepareSuppl
             context.Transaction,
             """
             INSERT INTO fin.payment (payment_id, company_id, direction, party_id, bank_account_id, party_bank_account_id, method, amount, currency,
-              value_date, bank_reference, status, prepared_by, version, payment_no)
-            VALUES (@id, @c, 'DISBURSEMENT', @party, @bank, @party_bank, 'TRANSFER', @amount, 'DOP', @value_date, @reference, 'PREPARED', @preparer, 1, @no)
+              value_date, bank_reference, status, prepared_by, version, payment_no, amount_fc, exchange_rate)
+            VALUES (@id, @c, 'DISBURSEMENT', @party, @bank, @party_bank, 'TRANSFER', @amount, @currency, @value_date, @reference, 'PREPARED', @preparer, 1, @no, @usd, @rate)
             """,
             cancellationToken,
             ("id", context.ResultRef),
@@ -74,10 +79,22 @@ public sealed class PrepareSupplierPaymentHandler : ICommandHandler<PrepareSuppl
             ("value_date", command.ValueDate),
             ("reference", reference),
             ("preparer", preparer),
-            ("no", paymentNo)).ConfigureAwait(false);
+            ("no", paymentNo),
+            ("currency", plan.Currency),
+            ("usd", plan.AmountUsd),
+            ("rate", plan.Rate)).ConfigureAwait(false);
         await PaymentRules.WriteAllocationsAsync(context, context.ResultRef, 1, command.Applications, cancellationToken).ConfigureAwait(false);
         await context.AppendStateAsync(PaymentRules.Aggregate, context.ResultRef, "DOCUMENT", null, "PREPARED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { paymentId = context.ResultRef, paymentNo, status = "PREPARED", amount = PaymentRules.Money(amount), version = 1 });
+        return JsonSerializer.Serialize(new
+        {
+            paymentId = context.ResultRef,
+            paymentNo,
+            status = "PREPARED",
+            amount = PaymentRules.Money(amount),
+            amountUsd = plan.AmountUsd is { } fc ? PaymentRules.Money(fc) : null,
+            exchangeRate = plan.Rate?.ToString("0.0000", System.Globalization.CultureInfo.InvariantCulture),
+            version = 1,
+        });
     }
 }
 
@@ -91,8 +108,15 @@ public sealed class UpdatePreparedPaymentHandler : ICommandHandler<UpdatePrepare
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var row = await PaymentRules.ReadLockedAsync(context, command.PaymentId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
-        var amount = await PaymentRules.ValidatePlanAsync(
-            context, row.PartyId, command.BankAccountId, command.PartyBankAccountId, command.ValueDate, command.Applications, cancellationToken).ConfigureAwait(false);
+        var plan = await PaymentRules.ValidatePlanAsync(
+            context, row.PartyId, command.BankAccountId, command.PartyBankAccountId, command.ValueDate, command.Applications, cancellationToken, command.ExchangeRate)
+            .ConfigureAwait(false);
+        if (plan.Currency != row.Currency)
+        {
+            throw new DomainException(PaymentErrors.ApDocumentCurrency, $"The payment leaves a {row.Currency} account; prepare a new one to pay from a {plan.Currency} account.");
+        }
+
+        var amount = plan.Amount;
         var reference = PaymentRules.Reference(command.BankReference);
         var version = row.Version + 1;
 
@@ -110,6 +134,9 @@ public sealed class UpdatePreparedPaymentHandler : ICommandHandler<UpdatePrepare
                     bankAccountId = command.BankAccountId,
                     partyBankAccountId = command.PartyBankAccountId,
                     amount = PaymentRules.Money(amount),
+                    currency = plan.Currency,
+                    amountUsd = plan.AmountUsd is { } usd ? PaymentRules.Money(usd) : null,
+                    exchangeRate = plan.Rate?.ToString("0.0000", System.Globalization.CultureInfo.InvariantCulture),
                     valueDate = command.ValueDate,
                     bankReference = reference,
                     applications = PaymentRules.ApplicationsPayload(command.Applications),
@@ -121,7 +148,7 @@ public sealed class UpdatePreparedPaymentHandler : ICommandHandler<UpdatePrepare
             context.Transaction,
             """
             UPDATE fin.payment SET bank_account_id = @bank, party_bank_account_id = @party_bank, amount = @amount, value_date = @value_date,
-              bank_reference = @reference, version = @version
+              bank_reference = @reference, version = @version, amount_fc = @usd, exchange_rate = @rate
             WHERE payment_id = @id
             """,
             cancellationToken,
@@ -131,7 +158,9 @@ public sealed class UpdatePreparedPaymentHandler : ICommandHandler<UpdatePrepare
             ("value_date", command.ValueDate),
             ("reference", reference),
             ("version", version),
-            ("id", command.PaymentId)).ConfigureAwait(false);
+            ("id", command.PaymentId),
+            ("usd", plan.AmountUsd),
+            ("rate", plan.Rate)).ConfigureAwait(false);
         await PaymentRules.WriteAllocationsAsync(context, command.PaymentId, version, command.Applications, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { paymentId = command.PaymentId, status = "PREPARED", amount = PaymentRules.Money(amount), version });
     }
@@ -171,6 +200,9 @@ public sealed class ReleaseSupplierPaymentHandler : ICommandHandler<ReleaseSuppl
 {
     public const string RuleCode = "R-09";
 
+    /// <summary>E-USD1-05-5: the payment of USD payables, with its realized exchange difference.</summary>
+    public const string ForeignRuleCode = "P-41";
+
     private readonly PostingEngine _engine = new();
 
     public string CommandType => "Treasury.ReleaseSupplierPayment";
@@ -199,7 +231,7 @@ public sealed class ReleaseSupplierPaymentHandler : ICommandHandler<ReleaseSuppl
         var docs = await PaymentRules.ReadApDocsAsync(context, allocations.Select(a => a.ApDocId).ToArray(), lockRows: true, cancellationToken).ConfigureAwait(false);
         foreach (var a in allocations)
         {
-            var open = docs[a.ApDocId].OpenAmount;
+            var open = docs[a.ApDocId].OpenAmountFc ?? docs[a.ApDocId].OpenAmount;
             if (a.Amount > open)
             {
                 throw new DomainException(
@@ -236,16 +268,62 @@ public sealed class ReleaseSupplierPaymentHandler : ICommandHandler<ReleaseSuppl
         }
 
         var number = new Dictionary<string, string> { ["payment_no"] = row.PaymentNo };
-        var lines = allocations
-            .Select(a => new PostingLineInput("R09-DR-AP", "applied_amount", a.Amount, PartyId: row.PartyId, SubledgerRef: a.ApDocId, Inputs: number))
-            .Append(new PostingLineInput("R09-CR-BANK", "payment_amount", row.Amount, PartyId: row.PartyId, SubledgerRef: row.BankAccountId, Inputs: number))
-            .ToList();
-        var plan = await _engine.PrepareAsync(context, new PostingRequest(RuleCode, row.ValueDate, now, lines), cancellationToken).ConfigureAwait(false);
+        var usd = row.AmountFc is not null;
+
+        // E-USD1-05-4: a USD payable is relieved at its carrying pesos (its invoice's rate) in proportion to the USD applied, the last USD
+        // taking what is left; the bank's pesos against them are the realized exchange difference.
+        var pesos = allocations.ToDictionary(
+            a => a.ApDocId,
+            a => !usd ? a.Amount
+                : a.Amount == docs[a.ApDocId].OpenAmountFc ? docs[a.ApDocId].OpenAmount
+                : decimal.Round(docs[a.ApDocId].OpenAmount * a.Amount / docs[a.ApDocId].OpenAmountFc!.Value, 2, MidpointRounding.AwayFromZero));
+        List<PostingLineInput> lines;
+        var difference = row.Amount - pesos.Values.Sum();
+        if (!usd)
+        {
+            lines = allocations
+                .Select(a => new PostingLineInput("R09-DR-AP", "applied_amount", a.Amount, PartyId: row.PartyId, SubledgerRef: a.ApDocId, Inputs: number))
+                .Append(new PostingLineInput("R09-CR-BANK", "payment_amount", row.Amount, PartyId: row.PartyId, SubledgerRef: row.BankAccountId, Inputs: number))
+                .ToList();
+        }
+        else
+        {
+            var numbers = (await Reading.ListAsync(
+                context.Connection,
+                context.Transaction,
+                "SELECT ap_doc_id, doc_number FROM fin.ap_source WHERE ap_doc_id = ANY(@ids)",
+                r => (Id: r.GetGuid(0), Number: r.GetString(1)),
+                cancellationToken,
+                ("ids", allocations.Select(a => a.ApDocId).ToArray())).ConfigureAwait(false)).ToDictionary(n => n.Id, n => n.Number);
+            var rate = row.ExchangeRate!.Value.ToString("0.0000", System.Globalization.CultureInfo.InvariantCulture);
+            Dictionary<string, string> Inputs(decimal amountUsd, string? invoice = null)
+            {
+                var inputs = new Dictionary<string, string>(number) { ["amount_usd"] = PaymentRules.Money(amountUsd), ["rate"] = rate };
+                if (invoice is not null)
+                {
+                    inputs["number"] = invoice;
+                }
+
+                return inputs;
+            }
+
+            lines = allocations
+                .Select(a => new PostingLineInput(
+                    "P41-DR-AP", "applied_amount", pesos[a.ApDocId], PartyId: row.PartyId, SubledgerRef: a.ApDocId, AmountFc: a.Amount, Inputs: Inputs(a.Amount, numbers[a.ApDocId])))
+                .Append(new PostingLineInput(
+                    "P41-CR-BANK", "payment_amount", row.Amount, PartyId: row.PartyId, SubledgerRef: row.BankAccountId, AmountFc: row.Currency == "USD" ? row.AmountFc : null,
+                    Inputs: Inputs(row.AmountFc!.Value)))
+                .Append(new PostingLineInput("P41-DR-FXL", "fx_loss", Math.Max(difference, 0m), PartyId: row.PartyId, Inputs: Inputs(row.AmountFc!.Value)))
+                .Append(new PostingLineInput("P41-CR-FXG", "fx_gain", Math.Max(-difference, 0m), PartyId: row.PartyId, Inputs: Inputs(row.AmountFc!.Value)))
+                .ToList();
+        }
+
+        var plan = await _engine.PrepareAsync(context, new PostingRequest(usd ? ForeignRuleCode : RuleCode, row.ValueDate, now, lines), cancellationToken).ConfigureAwait(false);
 
         var version = row.Version + 1;
         var eventId = await context.AppendEventAsync(
             new EventDraft(
-                "SupplierPaymentReleased",
+                usd ? "ForeignPaymentReleased" : "SupplierPaymentReleased",
                 1,
                 PaymentRules.Aggregate,
                 command.PaymentId,
@@ -257,15 +335,19 @@ public sealed class ReleaseSupplierPaymentHandler : ICommandHandler<ReleaseSuppl
                     partyId = row.PartyId,
                     bankAccountId = row.BankAccountId,
                     amount = PaymentRules.Money(row.Amount),
+                    amountUsd = row.AmountFc is { } fc ? PaymentRules.Money(fc) : null,
+                    exchangeRate = row.ExchangeRate?.ToString("0.0000", System.Globalization.CultureInfo.InvariantCulture),
+                    exchangeDifference = usd ? PaymentRules.Money(difference) : null,
                     valueDate = row.ValueDate,
                     postingDate = plan.PostingDate,
                     lateEntry = plan.LateEntry,
                     applications = allocations.Select(a => new
                     {
                         apDocId = a.ApDocId,
-                        amount = PaymentRules.Money(a.Amount),
+                        amount = PaymentRules.Money(pesos[a.ApDocId]),
+                        amountUsd = usd ? PaymentRules.Money(a.Amount) : null,
                         openBefore = PaymentRules.Money(docs[a.ApDocId].OpenAmount),
-                        openAfter = PaymentRules.Money(docs[a.ApDocId].OpenAmount - a.Amount),
+                        openAfter = PaymentRules.Money(docs[a.ApDocId].OpenAmount - pesos[a.ApDocId]),
                     }),
                 }),
                 Publish: true,
@@ -278,20 +360,22 @@ public sealed class ReleaseSupplierPaymentHandler : ICommandHandler<ReleaseSuppl
             await Sql.ExecuteAsync(
                 context.Connection,
                 context.Transaction,
-                "INSERT INTO fin.ap_application (application_id, company_id, payment_id, ap_doc_id, amount, event_id) VALUES (@id, @c, @p, @d, @a, @e)",
+                "INSERT INTO fin.ap_application (application_id, company_id, payment_id, ap_doc_id, amount, event_id, amount_fc) VALUES (@id, @c, @p, @d, @a, @e, @fc)",
                 cancellationToken,
                 ("id", context.Ids.NewId()),
                 ("c", context.CompanyId),
                 ("p", command.PaymentId),
                 ("d", a.ApDocId),
-                ("a", a.Amount),
-                ("e", eventId)).ConfigureAwait(false);
+                ("a", pesos[a.ApDocId]),
+                ("e", eventId),
+                ("fc", usd ? a.Amount : (decimal?)null)).ConfigureAwait(false);
             await Sql.ExecuteAsync(
                 context.Connection,
                 context.Transaction,
-                "UPDATE fin.ap_document SET open_amount = open_amount - @a, version = version + 1 WHERE ap_doc_id = @d",
+                "UPDATE fin.ap_document SET open_amount = open_amount - @a, open_amount_fc = open_amount_fc - @fc, version = version + 1 WHERE ap_doc_id = @d",
                 cancellationToken,
-                ("a", a.Amount),
+                ("a", pesos[a.ApDocId]),
+                ("fc", usd ? a.Amount : (decimal?)null),
                 ("d", a.ApDocId)).ConfigureAwait(false);
         }
 

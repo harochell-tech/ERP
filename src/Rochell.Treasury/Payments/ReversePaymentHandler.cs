@@ -18,7 +18,7 @@ public sealed class ReversePaymentHandler : ICommandHandler<ReversePayment>
 
     private sealed record Payment(Guid PartyId, Guid BankAccountId, decimal Amount, string Status, long Version, string PaymentNo, Guid? PostingEventId);
 
-    private sealed record LiveApplication(Guid ApplicationId, Guid ApDocId, decimal Amount);
+    private sealed record LiveApplication(Guid ApplicationId, Guid ApDocId, decimal Amount, decimal? AmountFc = null);
 
     public async Task<string> HandleAsync(ReversePayment command, CommandContext context, CancellationToken cancellationToken)
     {
@@ -57,12 +57,12 @@ public sealed class ReversePaymentHandler : ICommandHandler<ReversePayment>
             context.Connection,
             context.Transaction,
             """
-            SELECT a.application_id, a.ap_doc_id, a.amount FROM fin.ap_application a
+            SELECT a.application_id, a.ap_doc_id, a.amount, a.amount_fc FROM fin.ap_application a
             WHERE a.payment_id = @p AND a.reverses_application_id IS NULL
               AND NOT EXISTS (SELECT 1 FROM fin.ap_application r WHERE r.reverses_application_id = a.application_id)
             ORDER BY a.ap_doc_id
             """,
-            r => new LiveApplication(r.GetGuid(0), r.GetGuid(1), r.GetDecimal(2)),
+            r => new LiveApplication(r.GetGuid(0), r.GetGuid(1), r.GetDecimal(2), r.IsDBNull(3) ? null : r.GetDecimal(3)),
             cancellationToken,
             ("p", command.PaymentId)).ConfigureAwait(false);
         var docs = await PaymentRules.ReadApDocsAsync(context, applications.Select(a => a.ApDocId).Distinct().ToArray(), lockRows: true, cancellationToken).ConfigureAwait(false);
@@ -124,8 +124,8 @@ public sealed class ReversePaymentHandler : ICommandHandler<ReversePayment>
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO fin.ap_application (application_id, company_id, payment_id, ap_doc_id, amount, event_id, reverses_application_id)
-                VALUES (@id, @c, @p, @d, @a, @e, @original)
+                INSERT INTO fin.ap_application (application_id, company_id, payment_id, ap_doc_id, amount, event_id, reverses_application_id, amount_fc)
+                VALUES (@id, @c, @p, @d, @a, @e, @original, @fc)
                 """,
                 cancellationToken,
                 ("id", reversalId),
@@ -134,13 +134,15 @@ public sealed class ReversePaymentHandler : ICommandHandler<ReversePayment>
                 ("d", original.ApDocId),
                 ("a", original.Amount),
                 ("e", eventId),
-                ("original", original.ApplicationId)).ConfigureAwait(false);
+                ("original", original.ApplicationId),
+                ("fc", original.AmountFc)).ConfigureAwait(false);
             await Sql.ExecuteAsync(
                 context.Connection,
                 context.Transaction,
-                "UPDATE fin.ap_document SET open_amount = open_amount + @a, version = version + 1 WHERE ap_doc_id = @d",
+                "UPDATE fin.ap_document SET open_amount = open_amount + @a, open_amount_fc = open_amount_fc + @fc, version = version + 1 WHERE ap_doc_id = @d",
                 cancellationToken,
                 ("a", original.Amount),
+                ("fc", original.AmountFc),
                 ("d", original.ApDocId)).ConfigureAwait(false);
         }
 

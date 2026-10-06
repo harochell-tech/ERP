@@ -139,7 +139,10 @@ public sealed class GetApAgingHandler : IQueryHandler<GetApAging>
 
 public sealed record GetPaymentProposal(Guid CompanyId, Guid SessionId, DateOnly DueUntil, Guid? SupplierId = null) : IQuery;
 
-public sealed record ProposalInvoice(Guid ApDocId, Guid SupplierInvoiceId, string SupplierFiscalNumber, DateOnly DocDate, DateOnly DueDate, decimal OriginalAmount, decimal OpenAmount);
+/// <summary>E-USD1-05-2: a USD payable shows its <see cref="Currency"/> and its USD balance; its peso amounts are at the invoice's rate.</summary>
+public sealed record ProposalInvoice(
+    Guid ApDocId, Guid SupplierInvoiceId, string SupplierFiscalNumber, DateOnly DocDate, DateOnly DueDate, decimal OriginalAmount, decimal OpenAmount, string Currency = "DOP",
+    decimal? OpenAmountUsd = null);
 
 /// <summary><see cref="Payability"/>: PAYABLE, HOLD_PENDING (until <see cref="PayableFrom"/>), REVIEW (a version waits for verification) or NONE.</summary>
 public sealed record ProposalSupplier(
@@ -153,7 +156,9 @@ public sealed class GetPaymentProposalHandler : IQueryHandler<GetPaymentProposal
 {
     public string QueryType => "Treasury.GetPaymentProposal";
 
-    private sealed record Row(Guid ApDocId, Guid InvoiceId, string Ncf, Guid SupplierId, string SupplierName, string SupplierStatus, DateOnly DocDate, DateOnly DueDate, decimal Original, decimal Open);
+    private sealed record Row(
+        Guid ApDocId, Guid InvoiceId, string Ncf, Guid SupplierId, string SupplierName, string SupplierStatus, DateOnly DocDate, DateOnly DueDate, decimal Original, decimal Open, string Currency,
+        decimal? OpenUsd);
 
     private sealed record Account(Guid PartyId, Guid? AccountId, string? BankCode, string? Number, DateTime? PayableFrom, bool Review);
 
@@ -165,14 +170,16 @@ public sealed class GetPaymentProposalHandler : IQueryHandler<GetPaymentProposal
             context.Connection,
             context.Transaction,
             """
-            SELECT d.ap_doc_id, i.source_id, i.doc_number, d.party_id, p.legal_name, p.status::text, d.doc_date, d.due_date, d.original_amount, d.open_amount
+            SELECT d.ap_doc_id, i.source_id, i.doc_number, d.party_id, p.legal_name, p.status::text, d.doc_date, d.due_date, d.original_amount, d.open_amount, d.currency, d.open_amount_fc
             FROM fin.ap_document d
             JOIN fin.ap_source i ON i.ap_doc_id = d.ap_doc_id AND i.accounting_status = 'POSTED'
             JOIN md.party p ON p.party_id = d.party_id
-            WHERE d.company_id = @c AND d.open_amount > 0 AND d.currency = 'DOP' AND d.due_date <= @until AND (CAST(@supplier AS uuid) IS NULL OR d.party_id = CAST(@supplier AS uuid))
+            WHERE d.company_id = @c AND d.open_amount > 0 AND d.due_date <= @until AND (CAST(@supplier AS uuid) IS NULL OR d.party_id = CAST(@supplier AS uuid))
             ORDER BY p.legal_name, d.party_id, d.due_date, d.ap_doc_id
             """,
-            r => new Row(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.Date(6), r.Date(7), r.GetDecimal(8), r.GetDecimal(9)),
+            r => new Row(
+                r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.Date(6), r.Date(7), r.GetDecimal(8), r.GetDecimal(9), r.GetString(10).Trim(),
+                r.NullableDecimal(11)),
             cancellationToken,
             ("c", context.CompanyId),
             ("until", query.DueUntil),
@@ -200,7 +207,7 @@ public sealed class GetPaymentProposalHandler : IQueryHandler<GetPaymentProposal
             return new ProposalSupplier(
                 g.Key.SupplierId, g.Key.SupplierName, g.Key.SupplierStatus, payability, a.AccountId, a.BankCode, a.Number is null ? null : AccountNumbers.Show(a.Number, full), a.PayableFrom,
                 g.Sum(r => r.Open),
-                g.Select(r => new ProposalInvoice(r.ApDocId, r.InvoiceId, r.Ncf, r.DocDate, r.DueDate, r.Original, r.Open)).ToList());
+                g.Select(r => new ProposalInvoice(r.ApDocId, r.InvoiceId, r.Ncf, r.DocDate, r.DueDate, r.Original, r.Open, r.Currency, r.OpenUsd)).ToList());
         }).ToList();
         return ApiJson.Serialize(new PaymentProposal(query.DueUntil, suppliers));
     }
@@ -302,7 +309,10 @@ public sealed record PaymentDetail(
     IReadOnlyList<PaymentApplicationView> Plan,
     IReadOnlyList<PaymentLineView> StatementLines,
     IReadOnlyList<StateChange> History,
-    string? BankAccountAlias);
+    string? BankAccountAlias,
+    string Currency = "DOP",
+    decimal? AmountUsd = null,
+    decimal? ExchangeRate = null);
 
 [RequiresPermission("payment:read")]
 public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
@@ -312,7 +322,7 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
     private sealed record Header(
         string PaymentNo, Guid SupplierId, string SupplierName, Guid BankAccountId, string BankCode, string AccountNumber, Guid PartyAccountId, string PartyBankCode,
         string PartyNumber, string PartyStatus, decimal Amount, DateOnly ValueDate, string? Reference, string Status, string? PreparedBy, string? ReleasedBy, Guid? PostingEventId, long Version,
-        string? Alias);
+        string? Alias, string Currency, decimal? AmountUsd, decimal? ExchangeRate);
 
     public async Task<string> HandleAsync(GetPayment query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -324,7 +334,7 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
             """
             SELECT p.payment_no, p.party_id, s.legal_name, p.bank_account_id, b.bank_code, b.account_number, v.party_bank_account_id, v.bank_code, v.account_number, v.status,
                    p.amount, p.value_date, p.bank_reference, p.status::text, coalesce(pu.display_name, pu.email), coalesce(ru.display_name, ru.email), p.posting_event_id, p.version,
-                   b.alias
+                   b.alias, p.currency, p.amount_fc, p.exchange_rate
             FROM fin.payment p
             JOIN md.party s ON s.party_id = p.party_id
             JOIN fin.bank_account b ON b.bank_account_id = p.bank_account_id
@@ -335,7 +345,8 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
             """,
             r => new Header(
                 r.GetString(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.GetGuid(6), r.GetString(7), r.GetString(8), r.GetString(9),
-                r.GetDecimal(10), r.Date(11), r.NullableString(12), r.GetString(13), r.NullableString(14), r.NullableString(15), r.NullableGuid(16), r.GetInt64(17), r.NullableString(18)),
+                r.GetDecimal(10), r.Date(11), r.NullableString(12), r.GetString(13), r.NullableString(14), r.NullableString(15), r.NullableGuid(16), r.GetInt64(17), r.NullableString(18),
+                r.GetString(19).Trim(), r.NullableDecimal(20), r.NullableDecimal(21)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.PaymentId)).ConfigureAwait(false)
@@ -389,7 +400,7 @@ public sealed class GetPaymentHandler : IQueryHandler<GetPayment>
         return ApiJson.Serialize(new PaymentDetail(
             query.PaymentId, h.PaymentNo, h.SupplierId, h.SupplierName, h.BankAccountId, h.BankCode, AccountNumbers.Show(h.AccountNumber, full), h.PartyAccountId, h.PartyBankCode,
             AccountNumbers.Show(h.PartyNumber, full), h.PartyStatus, h.Amount, h.ValueDate, h.Reference, h.Status, h.PreparedBy, h.ReleasedBy, h.PostingEventId, h.Version,
-            applications, plan, lines, history, h.Alias));
+            applications, plan, lines, history, h.Alias, h.Currency, h.AmountUsd, h.ExchangeRate));
     }
 }
 

@@ -1132,6 +1132,15 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-USD1-04-7 | USD-1 | The Controller reverses a posted settlement exactly; its documents are free for another one. An invoice or DUA in a live settlement cannot be reversed. |
 | E-USD1-04-8 | USD-1 | Settling received raw-material lines waits until raw material is imported (E-USD1-03-1); allocations are EXPENSE_LINE only. |
 | E-USD1-04-9 | USD-1 | The DUA in the 606 and IT-1 moves to USD1-06, after the accountant confirms how it is reported (X-1). |
+| E-USD1-05-1 | USD-1 | A bank account is registered in DOP or USD (`RegisterBankAccount.Currency`) with its own control account; a USD account's statements are in USD (USD1-05b). |
+| E-USD1-05-2 | USD-1 | A payment is of one supplier and one invoice currency; amounts applied to USD invoices are in USD; peso invoices are paid only from a peso account. |
+| E-USD1-05-3 | USD-1 | From a USD account the USD are valued at the approved rate of the value date; from a peso account at the bank's rate typed by Tesorería (`ExchangeRate`); the peso amount is USD × rate, rounded. |
+| E-USD1-05-4 | USD-1 | The payable is relieved at its carrying pesos (the invoice's rate) in proportion to the USD applied, the last USD taking the rest; the difference against the bank's pesos is realized exchange loss or gain (USD-07: 610,000.00 − 600,000.00 = 10,000.00 loss). |
+| E-USD1-05-5 | USD-1 | P-41 «Pago en USD» (DRAFT until the Controller approves it; also requires BANK-REC open): debit AP_FOREIGN with its USD, credit BANK (with USD from a USD account), FX_LOSS / FX_GAIN; exact reversal restores both currencies. PAY-APPL and the payment total check compare USD for USD payments. |
+| E-USD1-05-6 | USD-1 | A foreign supplier's bank account: SWIFT/BIC or bank name as its code, an account number or IBAN of 5–34 letters and digits, its holder; same verification and 72-hour hold. Local suppliers keep digits only. |
+| E-USD1-05-7 | USD-1 | Transfers between own accounts (buying or selling USD) at the bank's rate, prepared by Tesorería and released by someone else; debit the destination bank, credit the origin, no exchange difference at the purchase (USD1-05b). |
+| E-USD1-05-8 | USD-1 | USD statements are imported and matched by their USD amount; the real formats wait for the owner's bank samples (USD1-05b). |
+| E-USD1-05-9 | USD-1 | International transfer fees stay out of USD1-05; they are recorded as today (the bank's invoice or note as an expense). |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

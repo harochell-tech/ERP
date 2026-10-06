@@ -177,15 +177,15 @@ public sealed class ImportSettlementTests(PostgresFixture postgres)
             new RegisterCustomsDeclarationHandler());
         await h.RunAsync(new ReverseCustomsDeclaration(h.CompanyId, s.F.W.Controller, "d4-x", second.ResultRef, 1, "Duplicado"), new ReverseCustomsDeclarationHandler());
 
-        // Treasury's proposal lists the DGA's payable under the DUA's number, never the USD invoices (paid in USD, USD1-05).
+        // Treasury's proposal lists the DGA's payable under the DUA's number, and the USD invoices with their currency (E-USD1-05-2).
         var proposal = await h.QueryAsync(
             new Rochell.Treasury.Queries.GetPaymentProposal(h.CompanyId, await h.SessionWithRolesAsync("TESORERO"), Today(h).AddDays(60)),
             new Rochell.Treasury.Queries.GetPaymentProposalHandler());
 
         Assert.Equal((ImportErrors.DuaNumberUsed, ImportErrors.DuaPartyInvalid), (duplicate.Code, foreignParty.Code));
         Assert.Contains("DUA 10020-IM-2610-000123", proposal, StringComparison.Ordinal);
-        Assert.DoesNotContain("INV-2026-0147", proposal, StringComparison.Ordinal);
-        Assert.DoesNotContain("BL-778", proposal, StringComparison.Ordinal);
+        Assert.Contains("\"supplierFiscalNumber\":\"BL-778\"", proposal, StringComparison.Ordinal);
+        Assert.Contains("\"currency\":\"USD\"", proposal, StringComparison.Ordinal);
         Assert.Equal(
             "REVERSED|0.00|P39-DR-CLR,P39-DR-ITBIS,P39-CR-AP,P39-DR-CLR,P39-DR-ITBIS,P39-CR-AP",
             await h.ScalarAsync<string>(

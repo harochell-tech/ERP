@@ -38,7 +38,7 @@ internal static class PartyBankAccountRules
 
     public sealed record ReviewRow(Guid PartyId, int Version, string Status, Guid RequestedBy);
 
-    public sealed record SupplierRow(string Status, bool IsSupplier);
+    public sealed record SupplierRow(string Status, bool IsSupplier, bool Foreign = false);
 
     public sealed record VersionCounts(long Pending, int LastVersion);
 
@@ -79,7 +79,6 @@ public sealed class RequestPartyBankAccountHandler : ICommandHandler<RequestPart
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var bankCode = BankIdentifiers.BankCode(command.BankCode);
-        var accountNumber = BankIdentifiers.AccountNumber(command.AccountNumber);
         var holder = string.IsNullOrWhiteSpace(command.AccountHolder)
             ? throw new DomainException(MasterDataErrors.FieldRequired, "The account holder is required.")
             : command.AccountHolder.Trim();
@@ -88,8 +87,8 @@ public sealed class RequestPartyBankAccountHandler : ICommandHandler<RequestPart
         var supplier = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
-            "SELECT status::text, is_supplier FROM md.party WHERE party_id = @p AND company_id = @c",
-            r => new PartyBankAccountRules.SupplierRow(r.GetString(0), r.GetBoolean(1)),
+            "SELECT status::text, is_supplier, party_kind = 'FOREIGN' FROM md.party WHERE party_id = @p AND company_id = @c",
+            r => new PartyBankAccountRules.SupplierRow(r.GetString(0), r.GetBoolean(1), r.GetBoolean(2)),
             cancellationToken,
             ("p", command.PartyId),
             ("c", context.CompanyId)).ConfigureAwait(false);
@@ -102,6 +101,8 @@ public sealed class RequestPartyBankAccountHandler : ICommandHandler<RequestPart
         {
             throw new DomainException(PartyBankAccountErrors.SupplierNotActive, "Bank accounts are requested only for ACTIVE suppliers (E-VS2-02-4).");
         }
+
+        var accountNumber = BankIdentifiers.AccountNumber(command.AccountNumber, supplier.Foreign);
 
         var counts = await Reading.SingleOrDefaultAsync(
             context.Connection,
