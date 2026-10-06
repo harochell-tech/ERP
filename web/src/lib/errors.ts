@@ -389,6 +389,10 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   DEPRECIATION_NOT_LATEST: "Solo se deshace la depreciación del último mes registrado.",
   DEPRECIATION_RUN_NOT_FOUND: "Esa depreciación no existe.",
   ASSET_DISPOSAL_NOT_FOUND: "La baja no existe.",
+  ASSET_LOAD_FILE_INVALID: "El archivo no se pudo leer: debe ser CSV o Excel con las columnas Código, Descripción, Categoría, Planta, Fecha de compra, Costo y Depreciación acumulada.",
+  ASSET_LOAD_ROWS_INVALID: "Hay filas con errores; no se cargó nada. Revise la vista previa.",
+  ASSET_LOAD_CUTOFF_INVALID: "La fecha de corte es el último día de un mes ya terminado.",
+  ASSET_LOAD_NOT_FOUND: "La carga no existe.",
   ASSET_DISPOSAL_INVALID: "Revise la baja: fecha entre la compra y hoy, motivo de 3 a 300 caracteres y precio solo en una venta.",
   PLANT_NOT_FOUND: "La planta no existe.",
 };

@@ -371,7 +371,7 @@ public static class FixedAssetCards
     }
 
     /// <summary>E-AF1-01-6: AF-YYYY-NNNNNN per company and year, the next after the highest, under an advisory lock.</summary>
-    private static async Task<string> NextNumberAsync(CommandContext context, int year, CancellationToken cancellationToken)
+    internal static async Task<string> NextNumberAsync(CommandContext context, int year, CancellationToken cancellationToken)
     {
         var stem = string.Create(CultureInfo.InvariantCulture, $"AF-{year:D4}-");
         await Sql.ExecuteAsync(

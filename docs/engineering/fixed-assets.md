@@ -90,3 +90,28 @@ The posting engine takes the account of `FIXED_ASSET_COST` / `_ACCUMULATED` / `_
 leave them out.
 
 Tests: `tests/Rochell.Procurement.Tests/FixedAssetDepreciationTests.cs` (AF-05…08, with a `FakeClock` moved month by month).
+
+## AF1-04 — initial load and FA-GL (migration 0093, E-AF1-04-1…9)
+
+| Command / query | Permission | What it does |
+| --- | --- | --- |
+| `POST /fixed-assets/loads/preview` (`PreviewAssetLoad`) | `fixed_asset:manage` | CSV or Excel (the import reader) with Código, Descripción, Categoría, Planta, Fecha de compra, Costo, Depreciación acumulada, at a cut-off that is a month's last day: each row with months depreciated, life, residual and monthly amount, or its error. |
+| `PrepareAssetLoad` | `fixed_asset:manage` | DRAFT load; refused whole when one row has an error (`ASSET_LOAD_ROWS_INVALID`). |
+| `DiscardAssetLoad` | `fixed_asset:manage` | DRAFT → DISCARDED. |
+| `ApproveAssetLoad` | `fixed_asset:approve` (step-up) | Not the preparer; the rows judged again; a card IN_SERVICE per row (`OPENING`, AF-YYYY of the cut-off, the old code kept), P-46 on the cut-off: Dr cost (category) / Cr accumulated (class), Cr MIGRATION_CLEARING (book value). |
+| `ReverseAssetLoad` | `fixed_asset:approve` (step-up) | While no card was depreciated or disposed of since: the journal reversed, the load REVERSED, its cards CANCELLED. |
+| `GET /fixed-assets/loads` (`ListAssetLoads`) | `ledger:read` | The loads with rows, cost and accumulated. |
+
+Row rules (E-AF1-04-3/4): months depreciated = whole months from the month after the purchase to the cut-off (capped at the life); the
+purchase date is the service date, so depreciation continues the month after the cut-off. A row is refused when its category is not a
+fixed asset or has no approved class, the plant does not exist, the date is missing or after the cut-off, the accumulated exceeds cost −
+residual, the life ended with something left, or its code repeats in the file or on a live card. Dates: `AAAA-MM-DD`, `DD/MM/AAAA` or an
+Excel date.
+
+**FA-GL** (blocks FA-REC): per fixed-asset account, Σ cost of the cards awaiting service or in service = its balance
+(`FA_COST_DIFFERENCE`); per accumulated-depreciation account of a class, Σ their accumulated = its balance (`FA_ACCUMULATED_DIFFERENCE`);
+every ended month a card in service still had to depreciate (`FA_DEPRECIATION_MISSING`): a warning, an error (blocking FA-REC) for the
+cutoff's own month (E-AF1-04-8). The FA-REC close snapshot holds the cards by status and the fixed-asset accounts. 35 reconciliations;
+247 commands.
+
+Tests: `tests/Rochell.Procurement.Tests/FixedAssetLoadTests.cs` (AF-09, AF-11).

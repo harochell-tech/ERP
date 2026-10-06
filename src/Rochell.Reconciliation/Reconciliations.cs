@@ -29,7 +29,7 @@ public static class Reconciliations
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
          "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
          "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER",
-         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG", "CASH-SALE", "IMPORT-CLEARING", "FX-REVAL"];
+         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG", "CASH-SALE", "IMPORT-CLEARING", "FX-REVAL", "FA-GL"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -617,6 +617,47 @@ public static class Reconciliations
             FROM pur.customs_declaration c
             WHERE c.company_id = @c AND c.status = 'POSTED' AND c.duties_amount + c.other_amount > 0 AND c.dua_id NOT IN (SELECT document_id FROM settled)
               AND c.dua_date <= @cutoff AND @cutoff - c.dua_date > @idays) f
+            """,
+            null),
+        ["FA-GL"] = (
+            Findings + """
+            -- E-AF-10, E-AF1-04-7/8: per account, the live cards' cost against the fixed-asset accounts and their accumulated depreciation
+            -- against the classes' accounts; each ended month a card still had to depreciate (an error for the cutoff's own month).
+            WITH live AS (SELECT x.* FROM fa.asset x WHERE x.company_id = @c AND x.status IN ('AWAITING_SERVICE', 'IN_SERVICE')),
+                 cost_accounts AS (SELECT DISTINCT c.account_id FROM pur.expense_category c JOIN fin.account a ON a.account_id = c.account_id
+                                   WHERE c.company_id = @c AND c.goods_type_606 = '04' AND a.account_class = 'ASSET'),
+                 cost_cards AS (SELECT c.account_id, sum(x.cost) AS a FROM live x JOIN pur.expense_category c ON c.expense_category_id = x.expense_category_id GROUP BY c.account_id),
+                 cost_gl AS (SELECT account_id, sum(debit - credit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_id IN (SELECT account_id FROM cost_accounts) GROUP BY account_id),
+                 acc_accounts AS (SELECT DISTINCT accumulated_account_id AS account_id FROM fa.asset_class WHERE company_id = @c AND status IN ('ACTIVE', 'SUPERSEDED')),
+                 acc_cards AS (SELECT k.accumulated_account_id AS account_id, sum(x.accumulated) AS a FROM live x JOIN fa.asset_class k ON k.asset_class_id = x.asset_class_id
+                               GROUP BY k.accumulated_account_id),
+                 acc_gl AS (SELECT account_id, sum(credit - debit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_id IN (SELECT account_id FROM acc_accounts) GROUP BY account_id),
+                 due AS (SELECT x.asset_id, (date_trunc('month', x.in_service_on) + make_interval(months => 1 + x.months_depreciated))::date AS next,
+                                x.useful_life_months - x.months_depreciated AS left_months
+                         FROM live x
+                         WHERE x.status = 'IN_SERVICE' AND x.months_depreciated < x.useful_life_months
+                           AND x.cost - round(x.cost * x.residual_pct / 100, 2) - x.accumulated > 0),
+                 missing AS (SELECT gs::date AS m, count(*) AS n
+                             FROM due CROSS JOIN LATERAL generate_series(
+                               due.next,
+                               least(date_trunc('month', CAST(@cutoff AS date) + 1) - interval '1 month', due.next + make_interval(months => due.left_months - 1)),
+                               interval '1 month') AS gs
+                             GROUP BY gs)
+            SELECT 'account:' || a.code AS match_key, coalesce(cc.a, 0) AS value_a, coalesce(g.b, 0) AS value_b,
+                   'FA_COST_DIFFERENCE' AS classification, 'ERROR' AS severity, 'FA-REC' AS component
+            FROM cost_accounts ca JOIN fin.account a ON a.account_id = ca.account_id
+            LEFT JOIN cost_cards cc ON cc.account_id = ca.account_id LEFT JOIN cost_gl g ON g.account_id = ca.account_id
+            WHERE coalesce(cc.a, 0) <> coalesce(g.b, 0)
+            UNION ALL
+            SELECT 'account:' || a.code, coalesce(ac.a, 0), coalesce(g.b, 0), 'FA_ACCUMULATED_DIFFERENCE', 'ERROR', 'FA-REC'
+            FROM acc_accounts aa JOIN fin.account a ON a.account_id = aa.account_id
+            LEFT JOIN acc_cards ac ON ac.account_id = aa.account_id LEFT JOIN acc_gl g ON g.account_id = aa.account_id
+            WHERE coalesce(ac.a, 0) <> coalesce(g.b, 0)
+            UNION ALL
+            SELECT 'month:' || to_char(m.m, 'YYYY-MM'), m.n::numeric, NULL::numeric, 'FA_DEPRECIATION_MISSING',
+                   CASE WHEN m.m = date_trunc('month', CAST(@cutoff AS date)) THEN 'ERROR' ELSE 'WARNING' END,
+                   CASE WHEN m.m = date_trunc('month', CAST(@cutoff AS date)) THEN 'FA-REC' END
+            FROM missing m) f
             """,
             null),
         ["FX-REVAL"] = (

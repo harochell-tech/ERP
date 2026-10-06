@@ -6,6 +6,7 @@ using Rochell.FixedAssets.Cards;
 using Rochell.FixedAssets.Classes;
 using Rochell.FixedAssets.Depreciation;
 using Rochell.FixedAssets.Disposals;
+using Rochell.FixedAssets.Load;
 using Rochell.Finance.Configuration;
 using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Ledger;
@@ -168,6 +169,10 @@ public static class CommandEndpoints
         fixedAssets.MapCommand<PrepareAssetDisposal, PrepareAssetDisposalHandler>(); // AF1-03 (E-AF1-03-7…10)
         fixedAssets.MapCommand<CancelAssetDisposal, CancelAssetDisposalHandler>();
         fixedAssets.MapCommand<ApproveAssetDisposal, ApproveAssetDisposalHandler>();
+        fixedAssets.MapCommand<PrepareAssetLoad, PrepareAssetLoadHandler>(); // AF1-04 (E-AF1-04-1…6)
+        fixedAssets.MapCommand<DiscardAssetLoad, DiscardAssetLoadHandler>();
+        fixedAssets.MapCommand<ApproveAssetLoad, ApproveAssetLoadHandler>();
+        fixedAssets.MapCommand<ReverseAssetLoad, ReverseAssetLoadHandler>();
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapCommand<PrepareAccountRoleMap, PrepareAccountRoleMapHandler>();
@@ -405,6 +410,7 @@ public static class CommandEndpoints
         typeof(PrepareAssetClassHandler), typeof(ApproveAssetClassHandler), typeof(DiscardAssetClassHandler), typeof(PutFixedAssetInServiceHandler),
         typeof(TransferFixedAssetHandler), typeof(UpdateFixedAssetHandler), typeof(CreateCardsForPostedInvoicesHandler),
         typeof(PostDepreciationHandler), typeof(UndoDepreciationHandler), typeof(PrepareAssetDisposalHandler), typeof(CancelAssetDisposalHandler), typeof(ApproveAssetDisposalHandler),
+        typeof(PrepareAssetLoadHandler), typeof(DiscardAssetLoadHandler), typeof(ApproveAssetLoadHandler), typeof(ReverseAssetLoadHandler),
     ];
 
     /// <summary>"CreatePurchaseOrder" → "create-purchase-order".</summary>
