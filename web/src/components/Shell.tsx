@@ -68,7 +68,14 @@ export const NAV: readonly NavGroup[] = [
       { href: "/cobros/depositos/", label: "Depósitos", permission: "sales:read" },
     ],
   },
-  { title: "Compras", items: [{ href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" }] },
+  {
+    title: "Compras",
+    items: [
+      { href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" },
+      { href: "/compras/dua/", label: "DUA (aduana)", permission: "supplier_invoice:read" }, // USD1-07a (E-USD1-07-4)
+      { href: "/compras/liquidaciones/", label: "Liquidaciones de importación", permission: "supplier_invoice:read" },
+    ],
+  },
   {
     title: "Almacén",
     items: [
@@ -108,6 +115,7 @@ export const NAV: readonly NavGroup[] = [
     title: "Contabilidad",
     items: [
       { href: "/contabilidad/ajustes/", label: "Diario de ajustes", permission: "ledger:read" },
+      { href: "/contabilidad/tasas/", label: "Tasas de cambio", permission: "exchange_rate:read" }, // USD1-07a (E-USD1-07-1)
       { href: "/contabilidad/balanza/", label: "Balanza", permission: "ledger:read" },
       { href: "/contabilidad/mayor/", label: "Mayor", permission: "ledger:read" },
       { href: "/contabilidad/estados/", label: "Estados financieros", permission: "ledger:read" },

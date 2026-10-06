@@ -46005,6 +46005,29 @@
               "null",
               "string"
             ]
+          },
+          "exchangeRate": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "rateDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "totalDop": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -46053,6 +46076,12 @@
             "items": {
               "$ref": "#/components/schemas/ExpenseOrderLineInput"
             }
+          },
+          "currency": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false

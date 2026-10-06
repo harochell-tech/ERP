@@ -137,11 +137,11 @@ public static class QueryEndpoints
             .Describe<ReceiptCorrectionList>(nameof(ListReceiptCorrections));
         // E-GAS-05-6: a draft expense order priced with the taxes of its lines' types (POST: the lines travel in the body; read-only).
         procurement.MapPost("/expense-purchase-orders/preview", (HttpContext http, Guid companyId, PreviewExpensePurchaseOrderHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunBodyAsync<ExpenseOrderPreviewRequest, PreviewExpensePurchaseOrder>(http, (s, b) => new PreviewExpensePurchaseOrder(companyId, s, b.OrderDate, b.Lines), handler, ct))
+                => runner.RunBodyAsync<ExpenseOrderPreviewRequest, PreviewExpensePurchaseOrder>(http, (s, b) => new PreviewExpensePurchaseOrder(companyId, s, b.OrderDate, b.Lines, b.Currency ?? "DOP"), handler, ct))
             .Describe<ExpenseOrderPreview>(nameof(PreviewExpensePurchaseOrder))
             .Accepts<ExpenseOrderPreviewRequest>("application/json");
         procurement.MapPost("/expense-invoices/preview", (HttpContext http, Guid companyId, PreviewExpenseInvoiceHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunBodyAsync<ExpenseOrderPreviewRequest, PreviewExpenseInvoice>(http, (s, b) => new PreviewExpenseInvoice(companyId, s, b.OrderDate, b.Lines), handler, ct))
+                => runner.RunBodyAsync<ExpenseOrderPreviewRequest, PreviewExpenseInvoice>(http, (s, b) => new PreviewExpenseInvoice(companyId, s, b.OrderDate, b.Lines, b.Currency ?? "DOP"), handler, ct))
             .Describe<ExpenseOrderPreview>(nameof(PreviewExpenseInvoice))
             .Accepts<ExpenseOrderPreviewRequest>("application/json");
         // E-GAS-03-2: expense categories (master data).

@@ -21,7 +21,7 @@ const EVIDENCE_MIN = 20;
 // VS2-08 / E-UI-2: the supplier's record with its bank-account versions (E-VS2-01-3/4/8). The treasurer requests a new version
 // (step-up); someone else — the Controller — verifies it with evidence (step-up) or rejects it; the new account is payable 72 h
 // after verification. Numbers arrive masked unless the reader may see them (E-VS2-07-3).
-function RequestForm({ partyId, onDone }: { partyId: string; onDone: () => void }) {
+function RequestForm({ partyId, foreign, onDone }: { partyId: string; foreign: boolean; onDone: () => void }) {
   const request = useCommand(`request-party-bank:${partyId}`, "/api/v1/companies/{companyId}/master-data/request-party-bank-account");
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -57,11 +57,12 @@ function RequestForm({ partyId, onDone }: { partyId: string; onDone: () => void 
       }}
     >
       <h2>Solicitar cuenta nueva</h2>
-      <Field label="Banco (código)" required error={fe.errors.bankCode}>
+      <Field label={foreign ? "Banco (SWIFT/BIC o nombre)" : "Banco (código)"} required error={fe.errors.bankCode}>
         <input value={bankCode} onChange={(e) => setBankCode(e.target.value)} />
       </Field>
-      <Field label="Número de cuenta" required error={fe.errors.accountNumber}>
-        <input className="mono" inputMode="numeric" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+      {/* E-USD1-05-6: a foreign supplier's account may be an IBAN, with letters. */}
+      <Field label={foreign ? "Número de cuenta o IBAN" : "Número de cuenta"} required error={fe.errors.accountNumber}>
+        <input className="mono" inputMode={foreign ? "text" : "numeric"} value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
       </Field>
       <Field label="Titular" required error={fe.errors.accountHolder}>
         <input value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} />
@@ -120,7 +121,7 @@ function VerifyForm({ version, onDone }: { version: Version; onDone: () => void 
   );
 }
 
-function BankAccounts({ partyId }: { partyId: string }) {
+function BankAccounts({ partyId, foreign }: { partyId: string; foreign: boolean }) {
   const { companyId, can, isMine } = useSession();
   const { data, error, reload } = useLoad(
     () => query("/api/v1/companies/{companyId}/treasury/suppliers/{partyId}/bank-accounts", { path: { companyId, partyId } }),
@@ -146,7 +147,7 @@ function BankAccounts({ partyId }: { partyId: string }) {
         <p className="notice">El proveedor no tiene una cuenta verificada: no se le puede pagar.</p>
       )}
       {review && can("party_bank_account:verify") && !isMine(review.requestedBy) ? <VerifyForm version={review} onDone={reload} /> : null}
-      {!review && can("party_bank_account:request") ? <RequestForm partyId={partyId} onDone={reload} /> : null}
+      {!review && can("party_bank_account:request") ? <RequestForm partyId={partyId} foreign={foreign} onDone={reload} /> : null}
       <div className="table-wrap"><table>
         <thead>
           <tr>
@@ -299,7 +300,7 @@ function Supplier() {
       </div>
       <h2>Cuentas bancarias</h2>
       {can("bank:read") ? (
-        <BankAccounts partyId={supplier.supplierId} />
+        <BankAccounts partyId={supplier.supplierId} foreign={supplier.partyKind === "FOREIGN"} />
       ) : (
         <p className="muted" data-testid="bank-hidden">
           Por seguridad, los números de cuenta del proveedor solo los ven Tesorería, Contabilidad y Auditoría. Arriba puede ver si tiene una cuenta verificada para

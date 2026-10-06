@@ -72,6 +72,26 @@ const TASKS: readonly Task[] = [
     count: async (companyId) =>
       (await query("/api/v1/companies/{companyId}/procurement/expense-categories", { path: { companyId }, query: { status: "DRAFT" } })).items.length,
   },
+  // USD1-07a (E-USD1-07-1, E-USD1-02-6): the Controller approves the day's rate; Tesorería sees when today's is missing.
+  {
+    href: "/contabilidad/tasas/",
+    label: "Tasas de cambio por aprobar",
+    permission: "exchange_rate:approve",
+    countPermission: "exchange_rate:read",
+    count: async (companyId, _plantId, isMine) =>
+      (await query("/api/v1/companies/{companyId}/finance/exchange-rates", { path: { companyId } })).items.filter((r) => r.status === "DRAFT" && !isMine(r.preparedBy)).length,
+  },
+  {
+    href: "/contabilidad/tasas/",
+    label: "Falta la tasa del dólar de hoy",
+    permission: "exchange_rate:prepare",
+    countPermission: "exchange_rate:read",
+    count: async (companyId) =>
+      query("/api/v1/companies/{companyId}/finance/exchange-rates/for-date", { path: { companyId }, query: { date: todayInDominicanRepublic() } }).then(
+        () => 0,
+        () => 1,
+      ),
+  },
   { href: "/tesoreria/propuesta/", label: "Preparar pagos a proveedores", permission: "payment:prepare" },
   {
     href: "/tesoreria/pagos/?estado=PREPARED",

@@ -58,15 +58,74 @@ function CreateSupplier({ onDone }: { onDone: () => void }) {
   );
 }
 
+// USD1-07a (E-USD1-07-2, E-USD1-03-9): a foreign supplier — legal name, country (two letters) and its tax id abroad; no RNC.
+function CreateForeignSupplier({ onDone }: { onDone: () => void }) {
+  const create = useCommand("create-foreign-supplier", "/api/v1/companies/{companyId}/master-data/create-foreign-supplier");
+  const [legalName, setLegalName] = useState("");
+  const [country, setCountry] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const fe = useFieldErrors<"legalName" | "country">();
+  return (
+    <form
+      className="card"
+      noValidate
+      data-testid="foreign-supplier-form"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (
+          !fe.check({
+            legalName: legalName.trim() === "" && "Indique la razón social.",
+            country: !/^[A-Za-z]{2}$/.test(country.trim()) && "Indique el país con su código de 2 letras (US, CN, ES…).",
+          })
+        ) {
+          return;
+        }
+        const body = { legalName: legalName.trim(), country: country.trim().toUpperCase(), foreignTaxId: taxId.trim() || null };
+        if (await create.run(body, undefined, `Proveedor del exterior ${legalName.trim()} creado en borrador.`)) {
+          setLegalName("");
+          setCountry("");
+          setTaxId("");
+          onDone();
+        }
+      }}
+    >
+      <p className="muted">Sus órdenes y facturas son en dólares, sin NCF, ITBIS ni retenciones.</p>
+      <Field label="Razón social" required error={fe.errors.legalName}>
+        <input value={legalName} onChange={(e) => setLegalName(e.target.value)} />
+      </Field>
+      <Field label="País (código de 2 letras)" required error={fe.errors.country}>
+        <input value={country} maxLength={2} onChange={(e) => setCountry(e.target.value)} />
+      </Field>
+      <Field label="Identificación fiscal del exterior (opcional)">
+        <input value={taxId} maxLength={40} onChange={(e) => setTaxId(e.target.value)} />
+      </Field>
+      <div className="actions form-actions">
+        <button type="submit" className="primary" disabled={create.busy}>
+          Crear proveedor del exterior
+        </button>
+      </div>
+      <ErrorBox error={create.error} />
+    </form>
+  );
+}
+
 function SupplierRow({ supplier, onDone, selected, onSelect }: { supplier: Supplier; onDone: () => void; selected?: boolean; onSelect?: (on: boolean) => void }) {
   const { can } = useSession();
   const id = supplier.supplierId;
   const update = useCommand(`update-supplier:${id}`, "/api/v1/companies/{companyId}/master-data/update-supplier", `Proveedor ${supplier.legalName} actualizado.`);
+  const updateForeign = useCommand(
+    `update-foreign-supplier:${id}`,
+    "/api/v1/companies/{companyId}/master-data/update-foreign-supplier-draft",
+    `Proveedor ${supplier.legalName} actualizado.`,
+  );
+  const foreign = supplier.partyKind === "FOREIGN";
+  const [country, setCountry] = useState(supplier.country ?? "");
+  const [taxId, setTaxId] = useState(supplier.foreignTaxId ?? "");
   const activate = useCommand(`activate-supplier:${id}`, "/api/v1/companies/{companyId}/master-data/activate-supplier", `Proveedor ${supplier.legalName} activado.`);
   const [editing, setEditing] = useState(false);
   const [rnc, setRnc] = useState(supplier.rnc ?? "");
   const [legalName, setLegalName] = useState(supplier.legalName);
-  const busy = update.busy || activate.busy;
+  const busy = update.busy || updateForeign.busy || activate.busy;
 
   return (
     <tr>
@@ -78,7 +137,18 @@ function SupplierRow({ supplier, onDone, selected, onSelect }: { supplier: Suppl
         </td>
       ) : null}
       <td>
-        {editing ? <input aria-label="RNC" value={rnc} onChange={(e) => setRnc(e.target.value)} /> : (supplier.rnc ?? "—")}
+        {editing && foreign ? (
+          <>
+            <input aria-label="País" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value)} />
+            <input aria-label="Identificación fiscal del exterior" maxLength={40} value={taxId} onChange={(e) => setTaxId(e.target.value)} />
+          </>
+        ) : editing ? (
+          <input aria-label="RNC" value={rnc} onChange={(e) => setRnc(e.target.value)} />
+        ) : foreign ? (
+          <span title="Proveedor del exterior">{`${supplier.country ?? ""} · ${supplier.foreignTaxId ?? "sin identificación"}`}</span>
+        ) : (
+          (supplier.rnc ?? "—")
+        )}
       </td>
       <td className="wrap">
         {editing ? (
@@ -105,7 +175,16 @@ function SupplierRow({ supplier, onDone, selected, onSelect }: { supplier: Suppl
               type="button"
               disabled={busy}
               onClick={async () => {
-                if (await update.run({ partyId: id, expectedVersion: supplier.version, rnc: rnc.trim(), legalName: legalName.trim() })) {
+                const saved = foreign
+                  ? await updateForeign.run({
+                      partyId: id,
+                      expectedVersion: supplier.version,
+                      legalName: legalName.trim(),
+                      country: country.trim().toUpperCase(),
+                      foreignTaxId: taxId.trim() || null,
+                    })
+                  : await update.run({ partyId: id, expectedVersion: supplier.version, rnc: rnc.trim(), legalName: legalName.trim() });
+                if (saved) {
                   setEditing(false);
                   onDone();
                 }
@@ -132,7 +211,7 @@ function SupplierRow({ supplier, onDone, selected, onSelect }: { supplier: Suppl
           </>
         )}
         </div>
-        <ErrorBox error={update.error ?? activate.error} />
+        <ErrorBox error={update.error ?? updateForeign.error ?? activate.error} />
       </td>
     </tr>
   );
@@ -146,7 +225,7 @@ export default function Page() {
   );
 
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<"LOCAL" | "FOREIGN" | null>(null);
   const [importing, setImporting] = useState(false);
   const [onlyDrafts, setOnlyDrafts] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -166,17 +245,27 @@ export default function Page() {
     <>
       <h1>Proveedores</h1>
       {can("supplier:create") ? (
-        creating ? (
+        creating === "LOCAL" ? (
           <CreateSupplier
             onDone={() => {
-              setCreating(false);
+              setCreating(null);
+              reload();
+            }}
+          />
+        ) : creating === "FOREIGN" ? (
+          <CreateForeignSupplier
+            onDone={() => {
+              setCreating(null);
               reload();
             }}
           />
         ) : (
           <div className="actions">
-            <button type="button" className="primary" onClick={() => setCreating(true)}>
+            <button type="button" className="primary" onClick={() => setCreating("LOCAL")}>
               Nuevo proveedor
+            </button>
+            <button type="button" onClick={() => setCreating("FOREIGN")}>
+              Nuevo proveedor del exterior
             </button>
           </div>
         )

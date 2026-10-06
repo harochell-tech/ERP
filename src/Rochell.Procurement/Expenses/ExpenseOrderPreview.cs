@@ -1,3 +1,4 @@
+using Rochell.Finance.ExchangeRates;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Json;
@@ -11,14 +12,17 @@ namespace Rochell.Procurement.Expenses;
 /// E-GAS-05-6: a draft expense order priced while it is typed — net per line and the taxes of each line's type in force on
 /// <paramref name="OrderDate"/> — without writing anything. A tax type not in force leaves the taxes null with the reason.
 /// </summary>
-public sealed record PreviewExpensePurchaseOrder(Guid CompanyId, Guid SessionId, DateOnly OrderDate, IReadOnlyList<ExpenseOrderLineInput> Lines) : IQuery;
+/// <remarks>E-USD1-07-3: with <paramref name="Currency"/> USD the amounts are USD and the preview adds the rate of the date and the total in pesos.</remarks>
+public sealed record PreviewExpensePurchaseOrder(Guid CompanyId, Guid SessionId, DateOnly OrderDate, IReadOnlyList<ExpenseOrderLineInput> Lines, string Currency = "DOP") : IQuery;
 
 /// <summary>The HTTP body of the preview.</summary>
-public sealed record ExpenseOrderPreviewRequest(DateOnly OrderDate, IReadOnlyList<ExpenseOrderLineInput> Lines);
+public sealed record ExpenseOrderPreviewRequest(DateOnly OrderDate, IReadOnlyList<ExpenseOrderLineInput> Lines, string? Currency = null);
 
 public sealed record ExpenseOrderPreviewLine(int LineNo, decimal NetAmount, decimal? Taxes);
 
-public sealed record ExpenseOrderPreview(IReadOnlyList<ExpenseOrderPreviewLine> Lines, decimal NetTotal, decimal? TaxTotal, decimal? Total, string? TaxesUnavailableCode, string? TaxesUnavailableReason);
+public sealed record ExpenseOrderPreview(
+    IReadOnlyList<ExpenseOrderPreviewLine> Lines, decimal NetTotal, decimal? TaxTotal, decimal? Total, string? TaxesUnavailableCode, string? TaxesUnavailableReason,
+    decimal? ExchangeRate = null, DateOnly? RateDate = null, decimal? TotalDop = null);
 
 [RequiresPermission("purchase_order:create")]
 public sealed class PreviewExpensePurchaseOrderHandler : IQueryHandler<PreviewExpensePurchaseOrder>
@@ -52,9 +56,14 @@ public sealed class PreviewExpensePurchaseOrderHandler : IQueryHandler<PreviewEx
         var cents = new decimal(0, 0, 0, false, 2); // amounts as the API writes them: 2 decimals
         if (query.Lines.All(l => l.TaxTypeId is null))
         {
-            // E-USD1-03-3: a foreign supplier's lines are in USD without taxes.
+            // E-USD1-03-3: a foreign supplier's lines are in USD without taxes; E-USD1-07-3: with the rate of the date and the pesos.
             var usd = cents + valid.Sum(v => v.Net);
-            return ApiJson.Serialize(new ExpenseOrderPreview([.. valid.Select((v, i) => new ExpenseOrderPreviewLine(i + 1, cents + v.Net, cents))], usd, cents, usd, null, null));
+            var rate = string.Equals(query.Currency, "USD", StringComparison.OrdinalIgnoreCase)
+                ? await ExchangeRateBook.ForDateAsync(context.Connection, context.Transaction, context.CompanyId, "USD", query.OrderDate, cancellationToken).ConfigureAwait(false)
+                : null;
+            return ApiJson.Serialize(new ExpenseOrderPreview(
+                [.. valid.Select((v, i) => new ExpenseOrderPreviewLine(i + 1, cents + v.Net, cents))], usd, cents, usd, null, null, rate?.Rate, rate?.RateDate,
+                rate is null ? null : cents + ExchangeRateBook.ToPesos(usd, rate.Rate)));
         }
 
         var estimate = await TaxEngine.EstimateItbisAsync(
@@ -81,7 +90,7 @@ public sealed class PreviewExpensePurchaseOrderHandler : IQueryHandler<PreviewEx
 /// E-GAS-07-6: an expense invoice priced while it is typed (the same computation as the order's preview, on the invoice's date),
 /// for Cuentas por pagar (<c>supplier_invoice:register</c>).
 /// </summary>
-public sealed record PreviewExpenseInvoice(Guid CompanyId, Guid SessionId, DateOnly DocDate, IReadOnlyList<ExpenseOrderLineInput> Lines) : IQuery;
+public sealed record PreviewExpenseInvoice(Guid CompanyId, Guid SessionId, DateOnly DocDate, IReadOnlyList<ExpenseOrderLineInput> Lines, string Currency = "DOP") : IQuery;
 
 [RequiresPermission("supplier_invoice:register")]
 public sealed class PreviewExpenseInvoiceHandler : IQueryHandler<PreviewExpenseInvoice>
@@ -92,6 +101,6 @@ public sealed class PreviewExpenseInvoiceHandler : IQueryHandler<PreviewExpenseI
     {
         ArgumentNullException.ThrowIfNull(query);
         return new PreviewExpensePurchaseOrderHandler().HandleAsync(
-            new PreviewExpensePurchaseOrder(query.CompanyId, query.SessionId, query.DocDate, query.Lines), context, cancellationToken);
+            new PreviewExpensePurchaseOrder(query.CompanyId, query.SessionId, query.DocDate, query.Lines, query.Currency), context, cancellationToken);
     }
 }
