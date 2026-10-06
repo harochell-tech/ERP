@@ -57,12 +57,15 @@ public sealed class MasterDataSchemaTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Foreign_supplier_without_rnc_is_allowed_by_the_schema()
+    public async Task Foreign_supplier_without_rnc_is_allowed_by_the_schema_and_names_its_country()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
+        const string Columns = "party_id, company_id, party_kind, rnc, legal_name, is_supplier, status, rnc_validated_at, version, country";
 
         Assert.Null(await h.AdminExecuteAsync(
-            $"INSERT INTO md.party VALUES (gen_random_uuid(), '{h.CompanyId}', 'FOREIGN', NULL, 'Besser Company', true, 'DRAFT', NULL, 1)"));
+            $"INSERT INTO md.party ({Columns}) VALUES (gen_random_uuid(), '{h.CompanyId}', 'FOREIGN', NULL, 'Besser Company', true, 'DRAFT', NULL, 1, 'US')"));
+        Assert.Equal("23514", (await h.AdminExecuteAsync(
+            $"INSERT INTO md.party ({Columns}) VALUES (gen_random_uuid(), '{h.CompanyId}', 'FOREIGN', NULL, 'Sin país', true, 'DRAFT', NULL, 1, NULL)"))?.SqlState);
     }
 
     [Fact]

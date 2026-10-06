@@ -70,6 +70,8 @@ public static class CommandEndpoints
         masterData.MapCommand<UpdateCompanyLegalName, UpdateCompanyLegalNameHandler>();
         masterData.MapCommand<UpdatePlantName, UpdatePlantNameHandler>();
         masterData.MapCommand<CreateSupplier, CreateSupplierHandler>();
+        masterData.MapCommand<CreateForeignSupplier, CreateForeignSupplierHandler>(); // USD1-03 (E-USD1-03-9)
+        masterData.MapCommand<UpdateForeignSupplierDraft, UpdateForeignSupplierDraftHandler>();
         masterData.MapCommand<UpdateSupplier, UpdateSupplierHandler>();
         masterData.MapCommand<ActivateSupplier, ActivateSupplierHandler>();
         masterData.MapCommand<SetSupplierPaymentTerms, SetSupplierPaymentTermsHandler>();
@@ -316,7 +318,7 @@ public static class CommandEndpoints
     public static IReadOnlyList<Type> Handlers { get; } =
     [
         typeof(UpdateCompanyLegalNameHandler), typeof(UpdatePlantNameHandler),
-        typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler),
+        typeof(CreateForeignSupplierHandler), typeof(UpdateForeignSupplierDraftHandler), typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler),
         typeof(SetSupplierContactHandler), typeof(ImportSuppliersHandler), typeof(ActivateSuppliersHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler), typeof(CreateFreightItemHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),

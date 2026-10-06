@@ -57,7 +57,7 @@ public sealed class UsdImportSchemaTests(PostgresFixture postgres)
         await using var h = await TestHarness.CreateAsync(postgres);
         var p = await h.CreatePurchasingSetupAsync();
         var foreign = Guid.CreateVersion7();
-        await h.AdminRequireAsync($"INSERT INTO md.party VALUES ('{foreign}', '{h.CompanyId}', 'FOREIGN', NULL, 'Additives Corp. (USA)', true, 'ACTIVE', NULL, 1)");
+        await h.AdminRequireAsync($"INSERT INTO md.party (party_id, company_id, party_kind, rnc, legal_name, is_supplier, status, rnc_validated_at, version, country) VALUES ('{foreign}', '{h.CompanyId}', 'FOREIGN', NULL, 'Additives Corp. (USA)', true, 'ACTIVE', NULL, 1, 'US')");
         var user = await h.ScalarAsync<Guid>("SELECT user_id FROM iam.user ORDER BY user_id LIMIT 1");
         var poId = Guid.CreateVersion7();
         string Order(Guid party, string no, string currency) =>

@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Globalization;
 using System.Text.Json;
+using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Policies;
 using Rochell.Finance.Posting;
 using Rochell.Platform.Commands;
@@ -21,12 +22,16 @@ namespace Rochell.Procurement.Expenses;
 internal static class ExpenseInvoices
 {
     public const string P37 = "P-37";
+    public const string P38 = "P-38";
+    public const string Usd = "USD";
     public const string ApprovalThreshold = "expense_invoice_approval_threshold";
     private const decimal MaxQuantity = 999_999_999_999.999999m; // type-limit: numeric(18,6)
     private const decimal MaxUnitPrice = 9_999_999_999_999.999999m; // type-limit: numeric(19,6)
 
+    /// <summary>An expense line; a USD line (E-USD1-03-4) has no tax type and keeps its USD price and net besides the peso ones.</summary>
     public sealed record Line(
-        Guid Id, int LineNo, string Description, decimal Quantity, decimal UnitPrice, decimal Net, Guid TaxTypeId, Guid CategoryId, Guid AccountId, string Category, string Scope, Guid? PoLineId);
+        Guid Id, int LineNo, string Description, decimal Quantity, decimal UnitPrice, decimal Net, Guid? TaxTypeId, Guid CategoryId, Guid AccountId, string Category, string Scope, Guid? PoLineId,
+        decimal? UnitPriceFc = null, decimal? NetFc = null);
 
     public static async Task<IReadOnlyList<Line>> LinesAsync(CommandContext context, Guid siId, CancellationToken cancellationToken)
         => await Reading.ListAsync(
@@ -34,11 +39,12 @@ internal static class ExpenseInvoices
             context.Transaction,
             """
             SELECT l.si_line_id, l.line_no, l.description, l.qty, l.unit_price, l.net_amount, l.tax_rule_id, c.expense_category_id, c.account_id, c.code,
-                   CASE c.line_class WHEN 'SERVICE' THEN 'EXPENSE_SERVICE' ELSE 'EXPENSE_GOODS' END, l.po_line_id
+                   CASE c.line_class WHEN 'SERVICE' THEN 'EXPENSE_SERVICE' ELSE 'EXPENSE_GOODS' END, l.po_line_id, l.unit_price_fc, l.net_amount_fc
             FROM pur.supplier_invoice_line l JOIN pur.expense_category c ON c.expense_category_id = l.expense_category_id
             WHERE l.si_id = @s ORDER BY l.line_no
             """,
-            r => new Line(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), r.GetGuid(6), r.GetGuid(7), r.GetGuid(8), r.GetString(9), r.GetString(10), r.IsDBNull(11) ? null : r.GetGuid(11)),
+            r => new Line(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), r.IsDBNull(6) ? null : r.GetGuid(6), r.GetGuid(7), r.GetGuid(8), r.GetString(9), r.GetString(10), r.IsDBNull(11) ? null : r.GetGuid(11),
+                r.IsDBNull(12) ? null : r.GetDecimal(12), r.IsDBNull(13) ? null : r.GetDecimal(13)),
             cancellationToken,
             ("s", siId)).ConfigureAwait(false);
 
@@ -57,10 +63,13 @@ internal static class ExpenseInvoices
         }
 
         var threshold = policy.Decimal(ApprovalThreshold);
-        var estimate = await TaxEngine.EstimateItbisAsync(context.Connection, context.Transaction, context.CompanyId, header.DocDate, false, TaxLines(lines), cancellationToken).ConfigureAwait(false);
-        if (estimate.Total is not { } taxes)
+        var taxes = 0m;
+        if (header.Currency != Usd)
         {
-            throw new DomainException(estimate.UnavailableCode ?? TaxErrors.FiscalGateClosed, estimate.UnavailableReason ?? "The taxes of the invoice cannot be determined on its date.");
+            // E-USD1-03-3: a USD invoice has no taxes; its peso total at its rate is compared with the approval amount.
+            var estimate = await TaxEngine.EstimateItbisAsync(context.Connection, context.Transaction, context.CompanyId, header.DocDate, false, TaxLines(lines), cancellationToken).ConfigureAwait(false);
+            taxes = estimate.Total
+                ?? throw new DomainException(estimate.UnavailableCode ?? TaxErrors.FiscalGateClosed, estimate.UnavailableReason ?? "The taxes of the invoice cannot be determined on its date.");
         }
 
         var total = lines.Sum(l => l.Net) + taxes;
@@ -98,6 +107,11 @@ internal static class ExpenseInvoices
             {
                 throw new DomainException(ProcurementErrors.QtyExceedsAvailable, $"Line {line.LineNo} bills more than the order has still to bill ({open}); match the invoice again.");
             }
+        }
+
+        if (header.Currency == Usd)
+        {
+            return await PostForeignAsync(context, header, lines, engine, cancellationToken).ConfigureAwait(false);
         }
 
         var determination = await tax.DetermineAsync(
@@ -184,6 +198,88 @@ internal static class ExpenseInvoices
         });
     }
 
+    /// <summary>
+    /// E-USD1-03-5: P-38 and the USD AP document of a MATCHED foreign invoice — each line's peso net to its category's account (expense or
+    /// fixed asset), the peso total to AP_FOREIGN with its USD amount. No taxes and no withholding (E-USD-3, E-USD1-03-8).
+    /// </summary>
+    private static async Task<string> PostForeignAsync(CommandContext context, InvoiceHeader header, IReadOnlyList<Line> lines, PostingEngine engine, CancellationToken cancellationToken)
+    {
+        var rate = header.ExchangeRate!.Value;
+        var rateText = rate.ToString("0.0000", CultureInfo.InvariantCulture);
+        var totalUsd = lines.Sum(l => l.NetFc!.Value);
+        var payable = lines.Sum(l => l.Net);
+        var plant = header.PlantId!.Value;
+        var apDocId = context.Ids.NewId();
+        var occurredAt = context.Clock.UtcNow;
+        var inputs = new List<PostingLineInput>();
+        foreach (var line in lines)
+        {
+            inputs.Add(new PostingLineInput(
+                "P38-DR-EXP", "expense_net", line.Net, PlantId: plant, PartyId: header.PartyId, AccountId: line.AccountId,
+                Inputs: new Dictionary<string, string>
+                {
+                    ["number"] = header.FiscalNumber,
+                    ["category"] = line.Category,
+                    ["description"] = line.Description,
+                    ["amount_usd"] = Text(line.NetFc!.Value),
+                    ["rate"] = rateText,
+                    ["si_line_id"] = line.Id.ToString(),
+                }));
+        }
+
+        inputs.Add(new PostingLineInput(
+            "P38-CR-AP", "payable", payable, PartyId: header.PartyId, SubledgerRef: apDocId, AmountFc: totalUsd,
+            Inputs: new Dictionary<string, string> { ["number"] = header.FiscalNumber, ["amount_usd"] = Text(totalUsd), ["rate"] = rateText }));
+        var plan = await engine.PrepareAsync(context, new PostingRequest(P38, header.DocDate, occurredAt, inputs), cancellationToken).ConfigureAwait(false);
+
+        var version = header.Version + 1;
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(
+                "ForeignInvoicePosted",
+                1,
+                SupplierInvoiceStore.Aggregate,
+                header.Id,
+                version,
+                JsonSerializer.Serialize(new { siId = header.Id, apDocId, currency = Usd, exchangeRate = rateText, totalUsd = Text(totalUsd), payable = Text(payable) }),
+                Publish: true,
+                OccurredAt: occurredAt,
+                BusinessDate: header.DocDate),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE pur.supplier_invoice SET accounting_status = 'POSTED', posting_event_id = @e, version = @v WHERE si_id = @s",
+            cancellationToken,
+            ("e", eventId),
+            ("v", version),
+            ("s", header.Id)).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO fin.ap_document (ap_doc_id, company_id, party_id, doc_type, source_doc_id, doc_date, due_date, original_amount, open_amount, version,
+              currency, original_amount_fc, open_amount_fc)
+            SELECT @id, company_id, party_id, 'SUPPLIER_INVOICE', si_id, doc_date, due_date, @amount, @amount, 1, 'USD', @usd, @usd FROM pur.supplier_invoice WHERE si_id = @s
+            """,
+            cancellationToken,
+            ("id", apDocId),
+            ("amount", payable),
+            ("usd", totalUsd),
+            ("s", header.Id)).ConfigureAwait(false);
+        await BillOrderAsync(context, header, lines, eventId, +1, "Procurement.PostSupplierInvoice", cancellationToken).ConfigureAwait(false);
+        var journal = await engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new
+        {
+            supplierInvoiceId = header.Id,
+            accountingStatus = "POSTED",
+            apDocumentId = apDocId,
+            payable = Text(payable),
+            payableUsd = Text(totalUsd),
+            journals = new[] { journal.JournalId },
+            version,
+        });
+    }
+
     /// <summary>E-GAS-04-6: the exact reversal of the P-37 journal while the AP document has no applications; its NCF is free again.</summary>
     public static async Task<string> ReverseAsync(CommandContext context, InvoiceHeader header, string reason, PostingEngine engine, string commandType, CancellationToken cancellationToken)
     {
@@ -229,7 +325,11 @@ internal static class ExpenseInvoices
             context.Connection, context.Transaction, "UPDATE pur.supplier_invoice SET document_status = 'REVERSED', accounting_status = 'REVERSED', version = @v WHERE si_id = @s",
             cancellationToken, ("v", version), ("s", header.Id)).ConfigureAwait(false);
         await Sql.ExecuteAsync(
-            context.Connection, context.Transaction, "UPDATE fin.ap_document SET open_amount = 0, version = version + 1 WHERE ap_doc_id = @a", cancellationToken, ("a", apDocId)).ConfigureAwait(false);
+            context.Connection,
+            context.Transaction,
+            "UPDATE fin.ap_document SET open_amount = 0, open_amount_fc = CASE WHEN open_amount_fc IS NULL THEN NULL ELSE 0 END, version = version + 1 WHERE ap_doc_id = @a",
+            cancellationToken,
+            ("a", apDocId)).ConfigureAwait(false);
         var lines = await LinesAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
         await OrderLinesAsync(context, lines, cancellationToken).ConfigureAwait(false);
         await BillOrderAsync(context, header, lines, eventId, -1, commandType, cancellationToken).ConfigureAwait(false);
@@ -258,8 +358,9 @@ internal static class ExpenseInvoices
         {
             var po = order[line.PoLineId!.Value];
             var qtyDiff = line.Quantity - po.Open;
-            var priceDiff = line.UnitPrice - po.Price;
-            var amountDiff = decimal.Round(line.Quantity * priceDiff, 2, MidpointRounding.AwayFromZero);
+            // E-USD1-03-2: a USD order's prices are in USD; the difference in amount is valued in pesos at the invoice's rate.
+            var priceDiff = (line.UnitPriceFc ?? line.UnitPrice) - po.Price;
+            var amountDiff = decimal.Round(line.Quantity * priceDiff * (header.ExchangeRate ?? 1m), 2, MidpointRounding.AwayFromZero);
             var exceeds = qtyDiff > 0m;
             var priceOk = Math.Abs(priceDiff) <= po.Price * pricePct || Math.Abs(amountDiff) <= amountAbs;
             results.Add((line.Id, po.Open, qtyDiff, priceDiff, amountDiff, exceeds, !exceeds && priceOk));
@@ -400,23 +501,27 @@ internal static class ExpenseInvoices
         }
     }
 
-    /// <summary>An ACTIVE supplier; every category ACTIVE and every tax type in force on <paramref name="date"/> (E-GAS-02-4, E-GAS-02-7).</summary>
-    public static async Task RequireSupplierAndTypesAsync(
-        CommandContext context, Guid partyId, DateOnly date, IEnumerable<Guid> categoryIds, IEnumerable<Guid> taxTypeIds, CancellationToken cancellationToken)
+    /// <summary>
+    /// An ACTIVE supplier; every category ACTIVE and every tax type in force on <paramref name="date"/> (E-GAS-02-4, E-GAS-02-7). Returns the
+    /// documents' currency: USD for a foreign supplier, whose lines carry no tax type; DOP otherwise, every line with one (E-USD1-03-3).
+    /// </summary>
+    public static async Task<string> RequireSupplierAndTypesAsync(
+        CommandContext context, Guid partyId, DateOnly date, IEnumerable<Guid> categoryIds, IReadOnlyCollection<Guid?> taxTypeIds, CancellationToken cancellationToken)
     {
         var categories = categoryIds.Distinct().ToArray();
-        var types = taxTypeIds.Distinct().ToArray();
+        var types = taxTypeIds.OfType<Guid>().Distinct().ToArray();
         var found = (await Reading.ListAsync(
             context.Connection,
             context.Transaction,
             """
             SELECT coalesce((SELECT status = 'ACTIVE' AND is_supplier FROM md.party WHERE company_id = @c AND party_id = @p), false),
+                   coalesce((SELECT party_kind = 'FOREIGN' FROM md.party WHERE company_id = @c AND party_id = @p), false),
                    (SELECT count(*) FROM pur.expense_category WHERE company_id = @c AND expense_category_id = ANY(@cats) AND status = 'ACTIVE'),
                    (SELECT count(*) FROM tax.fiscal_rule r WHERE r.company_id = @c AND r.rule_id = ANY(@types) AND r.rule_kind = 'PURCHASE_TAX_TYPE'
                       AND EXISTS (SELECT 1 FROM tax.fiscal_rule_version v WHERE v.rule_id = r.rule_id AND v.status = 'ACTIVE' AND v.effective_from <= @d
                                     AND (v.effective_to IS NULL OR v.effective_to > @d)))
             """,
-            r => (Supplier: r.GetBoolean(0), Categories: r.GetInt64(1), Types: r.GetInt64(2)),
+            r => (Supplier: r.GetBoolean(0), Foreign: r.GetBoolean(1), Categories: r.GetInt64(2), Types: r.GetInt64(3)),
             cancellationToken,
             ("c", context.CompanyId),
             ("p", partyId),
@@ -433,10 +538,19 @@ internal static class ExpenseInvoices
             throw new DomainException(ExpenseErrors.CategoryNotFound, "Every line needs an ACTIVE expense category.");
         }
 
+        if (found.Foreign ? types.Length > 0 : taxTypeIds.Any(t => t is null))
+        {
+            throw new DomainException(
+                ExpenseErrors.TaxTypeCurrency,
+                found.Foreign ? "A foreign supplier's lines are in USD without tax type (E-USD1-03-3)." : "Every line needs a tax type (E-GAS-02-4).");
+        }
+
         if (found.Types != types.Length)
         {
             throw new DomainException(TaxErrors.FiscalGateClosed, $"Every line needs a tax type in force on {date:yyyy-MM-dd} (E-GAS-02-7).");
         }
+
+        return found.Foreign ? Usd : "DOP";
     }
 
     /// <summary>
@@ -482,7 +596,7 @@ internal static class ExpenseInvoices
             context.Connection,
             context.Transaction,
             "SELECT po_line_id, expense_category_id, tax_rule_id FROM pur.purchase_order_line WHERE po_id = @p",
-            r => (Id: r.GetGuid(0), Category: r.GetGuid(1), Tax: r.GetGuid(2)),
+            r => (Id: r.GetGuid(0), Category: r.GetGuid(1), Tax: r.IsDBNull(2) ? (Guid?)null : r.GetGuid(2)),
             cancellationToken,
             ("p", poId)).ConfigureAwait(false)).ToDictionary(l => l.Id);
         if (command.Lines.Any(l => l.PurchaseOrderLineId is not { } id || !lines.ContainsKey(id))
@@ -531,8 +645,17 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
-        var fiscalNumber = (command.SupplierFiscalNumber ?? string.Empty).Trim().ToUpperInvariant();
-        if (!SupplierInvoiceStore.FiscalNumberFormat().IsMatch(fiscalNumber))
+        var foreign = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT party_kind = 'FOREIGN' FROM md.party WHERE company_id = @c AND party_id = @p", r => r.GetBoolean(0), cancellationToken,
+            ("c", context.CompanyId), ("p", command.PartyId)).ConfigureAwait(false)).SingleOrDefault();
+        var fiscalNumber = (command.SupplierFiscalNumber ?? string.Empty).Trim();
+        if (foreign && fiscalNumber.Length is 0 or > 40)
+        {
+            throw new DomainException(ExpenseErrors.ForeignNumberInvalid, "The foreign supplier's invoice number has 1 to 40 characters (E-USD1-03-3).");
+        }
+
+        fiscalNumber = foreign ? fiscalNumber : fiscalNumber.ToUpperInvariant();
+        if (!foreign && !SupplierInvoiceStore.FiscalNumberFormat().IsMatch(fiscalNumber))
         {
             throw new DomainException(ProcurementErrors.FiscalNumberInvalid, "The supplier fiscal number must be an NCF (B + 10 digits) or an e-NCF (E + 12 digits).");
         }
@@ -567,8 +690,8 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
             ("p", command.PartyId),
             ("plant", command.PlantId),
             ("n", fiscalNumber)).ConfigureAwait(false)).Single();
-        await ExpenseInvoices.RequireSupplierAndTypesAsync(
-            context, command.PartyId, command.DocDate, command.Lines.Select(l => l.ExpenseCategoryId), command.Lines.Select(l => l.TaxTypeId), cancellationToken).ConfigureAwait(false);
+        var currency = await ExpenseInvoices.RequireSupplierAndTypesAsync(
+            context, command.PartyId, command.DocDate, command.Lines.Select(l => l.ExpenseCategoryId), [.. command.Lines.Select(l => l.TaxTypeId)], cancellationToken).ConfigureAwait(false);
         if (!checks.Plant)
         {
             throw new DomainException(ProcurementErrors.PlantMismatch, "The plant does not exist (E-GAS-01-8).");
@@ -581,7 +704,20 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
 
         await ExpenseInvoices.RequireOrderAsync(context, command, cancellationToken).ConfigureAwait(false);
 
-        var total = lines.Sum(l => l.Net);
+        // E-USD1-03-4: a USD invoice takes the rate of its date; each line's peso net is its USD net at that rate, and the rounding cent
+        // goes to the largest line so that the lines add up to the peso total.
+        decimal? rate = currency == ExpenseInvoices.Usd
+            ? (await ExchangeRateBook.ForDateAsync(context.Connection, context.Transaction, context.CompanyId, currency, command.DocDate, cancellationToken).ConfigureAwait(false)).Rate
+            : null;
+        var totalUsd = rate is null ? (decimal?)null : lines.Sum(l => l.Net);
+        var pesos = lines.Select(l => rate is { } r ? ExchangeRateBook.ToPesos(l.Net, r) : l.Net).ToList();
+        if (rate is { } x)
+        {
+            var largest = lines.Select((l, i) => (l.Net, i)).OrderByDescending(t => t.Net).ThenBy(t => t.i).First().i;
+            pesos[largest] += ExchangeRateBook.ToPesos(totalUsd!.Value, x) - pesos.Sum();
+        }
+
+        var total = pesos.Sum();
         var creator = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         var siId = context.ResultRef;
         var eventId = await context.AppendEventAsync(
@@ -602,6 +738,9 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
                     dueDate = command.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     totalAmount = ExpenseInvoices.Text(total),
                     printedTotal = command.PrintedTotal?.ToString(CultureInfo.InvariantCulture),
+                    currency,
+                    exchangeRate = rate?.ToString("0.0000", CultureInfo.InvariantCulture),
+                    totalAmountUsd = totalUsd is { } usd ? ExpenseInvoices.Text(usd) : null,
                 }),
                 Publish: false),
             cancellationToken).ConfigureAwait(false);
@@ -613,8 +752,8 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
                 context.Transaction,
                 """
                 INSERT INTO pur.supplier_invoice (si_id, company_id, party_id, supplier_fiscal_number, doc_date, due_date, document_status, accounting_status, total_amount, created_by, version,
-                  printed_total, doc_class, plant_id)
-                VALUES (@id, @c, @party, @ncf, @doc, @due, 'DRAFT', 'NOT_POSTED', @total, @by, 1, @printed, 'EXPENSE', @plant)
+                  printed_total, doc_class, plant_id, currency, exchange_rate, total_amount_fc)
+                VALUES (@id, @c, @party, @ncf, @doc, @due, 'DRAFT', 'NOT_POSTED', @total, @by, 1, @printed, 'EXPENSE', @plant, @currency, @rate, @usd)
                 """,
                 cancellationToken,
                 ("id", siId),
@@ -626,7 +765,10 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
                 ("total", total),
                 ("by", creator),
                 ("printed", command.PrintedTotal),
-                ("plant", command.PlantId)).ConfigureAwait(false);
+                ("plant", command.PlantId),
+                ("currency", currency),
+                ("rate", rate),
+                ("usd", totalUsd)).ConfigureAwait(false);
         }
         catch (DbException ex) when (ex.SqlState == SqlStates.UniqueViolation)
         {
@@ -639,8 +781,9 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO pur.supplier_invoice_line (si_line_id, company_id, si_id, line_no, line_kind, po_line_id, qty, unit_price, net_amount, description, expense_category_id, tax_rule_id)
-                VALUES (@id, @c, @si, @no, 'EXPENSE', @pol, @qty, @price, @net, @description, @category, @tax)
+                INSERT INTO pur.supplier_invoice_line (si_line_id, company_id, si_id, line_no, line_kind, po_line_id, qty, unit_price, net_amount, description, expense_category_id, tax_rule_id,
+                  unit_price_fc, net_amount_fc)
+                VALUES (@id, @c, @si, @no, 'EXPENSE', @pol, @qty, @price, @net, @description, @category, @tax, @price_fc, @net_fc)
                 """,
                 cancellationToken,
                 ("id", context.Ids.NewId()),
@@ -648,14 +791,25 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
                 ("si", siId),
                 ("no", i + 1),
                 ("qty", lines[i].Quantity),
-                ("price", lines[i].UnitPrice),
-                ("net", lines[i].Net),
+                ("price", rate is { } r ? decimal.Round(lines[i].UnitPrice * r, 6, MidpointRounding.AwayFromZero) : lines[i].UnitPrice),
+                ("net", pesos[i]),
+                ("price_fc", rate is null ? (decimal?)null : lines[i].UnitPrice),
+                ("net_fc", rate is null ? (decimal?)null : lines[i].Net),
                 ("description", lines[i].Description),
                 ("category", command.Lines[i].ExpenseCategoryId),
                 ("tax", command.Lines[i].TaxTypeId),
                 ("pol", command.Lines[i].PurchaseOrderLineId)).ConfigureAwait(false);
         }
 
-        return JsonSerializer.Serialize(new { supplierInvoiceId = siId, status = SupplierInvoiceStatus.Draft, totalAmount = ExpenseInvoices.Text(total), version = 1 });
+        return JsonSerializer.Serialize(new
+        {
+            supplierInvoiceId = siId,
+            status = SupplierInvoiceStatus.Draft,
+            totalAmount = ExpenseInvoices.Text(total),
+            currency,
+            exchangeRate = rate?.ToString("0.0000", CultureInfo.InvariantCulture),
+            totalAmountUsd = totalUsd is { } usdTotal ? ExpenseInvoices.Text(usdTotal) : null,
+            version = 1,
+        });
     }
 }

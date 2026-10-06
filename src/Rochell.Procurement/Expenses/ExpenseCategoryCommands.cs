@@ -34,6 +34,15 @@ public static class ExpenseErrors
 
     /// <summary>E-GAS-2: an ACTIVE expense account that is not a control account.</summary>
     public const string AccountNotExpense = "EXPENSE_ACCOUNT_INVALID";
+
+    /// <summary>E-USD1-03-1: a foreign supplier is bought from with expense orders and invoices only.</summary>
+    public const string ForeignSupplierExpensesOnly = "FOREIGN_SUPPLIER_EXPENSES_ONLY";
+
+    /// <summary>E-USD1-03-3: a line in USD carries no tax type; one in pesos always does.</summary>
+    public const string TaxTypeCurrency = "EXPENSE_TAX_TYPE_CURRENCY";
+
+    /// <summary>E-USD1-03-3: the foreign supplier's own invoice number, 1 to 40 characters.</summary>
+    public const string ForeignNumberInvalid = "FOREIGN_INVOICE_NUMBER_INVALID";
 }
 
 public static class ExpenseLineClasses

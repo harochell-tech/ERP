@@ -87,6 +87,9 @@ internal static partial class ExpenseCategories
 [RequiresPermission("expense_category:prepare")]
 public sealed class PrepareExpenseCategoryHandler : ICommandHandler<PrepareExpenseCategory>
 {
+    /// <summary>E-USD1-03-6: the 606 type of a category whose account is a fixed asset (DGII: «Gastos de activos fijos»).</summary>
+    internal const string FixedAssetType = "04";
+
     public string CommandType => "Procurement.PrepareExpenseCategory";
 
     public async Task<string> HandleAsync(PrepareExpenseCategory command, CommandContext context, CancellationToken cancellationToken)
@@ -108,9 +111,11 @@ public sealed class PrepareExpenseCategoryHandler : ICommandHandler<PrepareExpen
             cancellationToken,
             ("c", context.CompanyId),
             ("a", command.AccountId)).ConfigureAwait(false)).FirstOrDefault();
-        if (account is not { Control: false, Status: "ACTIVE", Class: "EXPENSE" })
+        if (account is not { Control: false, Status: "ACTIVE", Class: "EXPENSE" } && !(account is { Control: false, Status: "ACTIVE", Class: "ASSET" } && goodsType == FixedAssetType))
         {
-            throw new DomainException(ExpenseErrors.AccountNotExpense, "The account must be an ACTIVE expense account that is not a control account (E-GAS-2).");
+            throw new DomainException(
+                ExpenseErrors.AccountNotExpense,
+                "The account must be an ACTIVE expense account, or a fixed-asset account with 606 type 04, that is not a control account (E-GAS-2, E-USD1-03-6).");
         }
 
         var preparer = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
@@ -167,6 +172,18 @@ public sealed class UpdateExpenseCategoryDraftHandler : ICommandHandler<UpdateEx
         if (row.Status != "DRAFT")
         {
             throw new DomainException(ProcurementErrors.InvalidState, $"The category is {row.Status}: only a draft is corrected (E-GAS-01-3).");
+        }
+
+        var assetAccount = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT a.account_class = 'ASSET' FROM pur.expense_category c JOIN fin.account a ON a.account_id = c.account_id WHERE c.expense_category_id = @id",
+            r => !r.IsDBNull(0) && r.GetBoolean(0),
+            cancellationToken,
+            ("id", row.Id)).ConfigureAwait(false)).Single();
+        if (assetAccount && goodsType != PrepareExpenseCategoryHandler.FixedAssetType)
+        {
+            throw new DomainException(ExpenseErrors.CategoryInvalid, "A fixed-asset category keeps 606 type 04 (E-USD1-03-6).");
         }
 
         var version = row.Version + 1;

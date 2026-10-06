@@ -38,14 +38,14 @@ public static class Reconciliations
         ["AP-GL"] = (
             Findings + """
             WITH ap AS (SELECT party_id, sum(open_amount) AS a FROM fin.ap_document WHERE company_id = @c GROUP BY party_id),
-                 gl AS (SELECT party_id, sum(credit - debit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_role = 'AP_CONTROL' GROUP BY party_id)
+                 gl AS (SELECT party_id, sum(credit - debit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_role IN ('AP_CONTROL', 'AP_FOREIGN') GROUP BY party_id)
             SELECT coalesce(coalesce(ap.party_id, gl.party_id)::text, '(sin proveedor)') AS match_key, coalesce(a, 0) AS value_a, coalesce(b, 0) AS value_b,
                    'AP_GL_DIFFERENCE' AS classification, 'ERROR' AS severity, 'AP-REC' AS component
             FROM ap FULL JOIN gl ON gl.party_id = ap.party_id WHERE coalesce(a, 0) <> coalesce(b, 0)) f
             """,
             """
             SELECT (SELECT coalesce(sum(open_amount), 0) FROM fin.ap_document WHERE company_id = @c),
-                   (SELECT coalesce(sum(credit - debit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role = 'AP_CONTROL')
+                   (SELECT coalesce(sum(credit - debit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role IN ('AP_CONTROL', 'AP_FOREIGN'))
             """),
         ["INV-VALUE-GL"] = (
             Findings + """
