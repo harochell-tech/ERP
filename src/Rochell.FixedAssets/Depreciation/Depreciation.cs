@@ -45,26 +45,35 @@ internal static class DepreciationBook
     public static string MonthText(DateOnly month) => month.ToString("yyyy-MM", CultureInfo.InvariantCulture);
 
     /// <summary>E-AF1-03-2: the earliest month before <paramref name="month"/> that a card still had to depreciate, if any.</summary>
-    public static async Task<DateOnly?> SkippedMonthAsync(CommandContext context, DateOnly month, CancellationToken cancellationToken)
+    public static Task<DateOnly?> SkippedMonthAsync(CommandContext context, DateOnly month, CancellationToken cancellationToken)
+        => SkippedMonthAsync(context.Connection, context.Transaction, context.CompanyId, month, cancellationToken);
+
+    public static async Task<DateOnly?> SkippedMonthAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly month, CancellationToken cancellationToken)
         => (await Reading.ListAsync(
-            context.Connection,
-            context.Transaction,
+            connection,
+            transaction,
             $"""
             SELECT min({NextMonthSql}) FROM fa.asset x
             WHERE x.company_id = @c AND x.status = 'IN_SERVICE' AND x.months_depreciated < x.useful_life_months AND {RemainingSql} > 0 AND {NextMonthSql} < @m
             """,
             r => r.IsDBNull(0) ? (DateOnly?)null : r.Date(0),
             cancellationToken,
-            ("c", context.CompanyId),
+            ("c", companyId),
             ("m", month)).ConfigureAwait(false)).Single();
 
     /// <summary>E-AF1-03-3/4: each card due in <paramref name="month"/>, its amount and the plant in force on the month's last day.</summary>
-    public static async Task<IReadOnlyList<DepreciationLine>> LinesAsync(CommandContext context, DateOnly month, CancellationToken cancellationToken)
+    public static Task<IReadOnlyList<DepreciationLine>> LinesAsync(CommandContext context, DateOnly month, CancellationToken cancellationToken)
+        => LinesAsync(context.Connection, context.Transaction, context.CompanyId, month, forUpdate: true, cancellationToken);
+
+    public static async Task<IReadOnlyList<DepreciationLine>> LinesAsync(
+        System.Data.Common.DbConnection connection, System.Data.Common.DbTransaction? transaction, Guid companyId, DateOnly month, bool forUpdate,
+        CancellationToken cancellationToken)
     {
         var end = month.AddMonths(1).AddDays(-1);
         var due = await Reading.ListAsync(
-            context.Connection,
-            context.Transaction,
+            connection,
+            transaction,
             $"""
             SELECT x.asset_id, x.asset_no, x.description,
                    coalesce((SELECT m.plant_id FROM fa.asset_movement m JOIN core.domain_event e ON e.event_id = m.event_id
@@ -74,12 +83,12 @@ internal static class DepreciationBook
             FROM fa.asset x JOIN fa.asset_class k ON k.asset_class_id = x.asset_class_id
             WHERE x.company_id = @c AND x.status = 'IN_SERVICE' AND x.months_depreciated < x.useful_life_months AND {RemainingSql} > 0 AND {NextMonthSql} = @m
             ORDER BY x.asset_no
-            FOR UPDATE OF x
+            {(forUpdate ? "FOR UPDATE OF x" : string.Empty)}
             """,
             r => (Id: r.GetGuid(0), No: r.GetString(1), Description: r.GetString(2), Plant: r.GetGuid(3), Expense: r.GetGuid(4), Accumulated: r.GetGuid(5), Done: r.GetInt32(6),
                 Life: r.GetInt32(7), Remaining: r.GetDecimal(8), Version: r.GetInt64(9)),
             cancellationToken,
-            ("c", context.CompanyId),
+            ("c", companyId),
             ("m", month),
             ("end", end)).ConfigureAwait(false);
         return
@@ -307,6 +316,47 @@ public sealed class UndoDepreciationHandler : ICommandHandler<UndoDepreciation>
         await context.AppendStateAsync(DepreciationBook.Aggregate, command.RunId, "DOCUMENT", "POSTED", "UNDONE", CommandType, eventId, cancellationToken, reason).ConfigureAwait(false);
         var reversal = await _engine.WriteReversalAsync(context, plan, eventId, now, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { runId = command.RunId, status = "UNDONE", journals = new[] { reversal.JournalId }, version });
+    }
+}
+
+/// <summary>
+/// E-AF1-05-5: what posting <paramref name="Month"/> would do — each card due with its amount and plant — whether the month has ended, is
+/// already posted, or waits for an earlier month. Nothing is written. Also the Inicio counter (E-AF1-05-8).
+/// </summary>
+public sealed record PreviewDepreciation(Guid CompanyId, Guid SessionId, DateOnly Month) : IQuery;
+
+public sealed record DepreciationPreviewLine(Guid AssetId, string AssetNo, string Description, string PlantName, int MonthNumber, int UsefulLifeMonths, decimal Amount);
+
+public sealed record DepreciationPreview(
+    string Month, DateOnly LastDay, bool Ended, bool AlreadyPosted, string? SkippedMonth, decimal Total, IReadOnlyList<DepreciationPreviewLine> Lines);
+
+[RequiresPermission("ledger:read")]
+public sealed class PreviewDepreciationHandler : IQueryHandler<PreviewDepreciation>
+{
+    public string QueryType => "FixedAssets.PreviewDepreciation";
+
+    public async Task<string> HandleAsync(PreviewDepreciation query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var month = new DateOnly(query.Month.Year, query.Month.Month, 1);
+        var end = month.AddMonths(1).AddDays(-1);
+        var posted = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT 1 FROM fa.depreciation_run WHERE company_id = @c AND month = @m AND status = 'POSTED'", r => r.GetInt32(0),
+            cancellationToken, ("c", context.CompanyId), ("m", month)).ConfigureAwait(false)).Count > 0;
+        var skipped = await DepreciationBook.SkippedMonthAsync(context.Connection, context.Transaction, context.CompanyId, month, cancellationToken).ConfigureAwait(false);
+        var lines = await DepreciationBook.LinesAsync(context.Connection, context.Transaction, context.CompanyId, month, forUpdate: false, cancellationToken).ConfigureAwait(false);
+        var plants = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT plant_id, coalesce(name, code) FROM md.plant WHERE company_id = @c", r => (Id: r.GetGuid(0), Name: r.GetString(1)),
+            cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false)).ToDictionary(p => p.Id, p => p.Name);
+        return ApiJson.Serialize(new DepreciationPreview(
+            DepreciationBook.MonthText(month),
+            end,
+            end <= Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow),
+            posted,
+            skipped is { } m ? DepreciationBook.MonthText(m) : null,
+            lines.Sum(l => l.Amount),
+            [.. lines.Select(l => new DepreciationPreviewLine(l.AssetId, l.AssetNo, l.Description, plants.GetValueOrDefault(l.PlantId, "-"), l.Month, l.Life, l.Amount))]));
     }
 }
 

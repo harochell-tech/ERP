@@ -118,6 +118,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/contabilidad/ajustes/", label: "Diario de ajustes", permission: "ledger:read" },
       { href: "/contabilidad/tasas/", label: "Tasas de cambio", permission: "exchange_rate:read" }, // USD1-07a (E-USD1-07-1)
       { href: "/contabilidad/revaluacion/", label: "Revaluación de saldos en dólares", permission: "exchange_rate:read" }, // USD1-07b (E-USD1-07-6)
+      { href: "/contabilidad/activos/", label: "Activos fijos", permission: "ledger:read" }, // AF1-05 (E-AF1-05-1)
       { href: "/contabilidad/balanza/", label: "Balanza", permission: "ledger:read" },
       { href: "/contabilidad/mayor/", label: "Mayor", permission: "ledger:read" },
       { href: "/contabilidad/estados/", label: "Estados financieros", permission: "ledger:read" },

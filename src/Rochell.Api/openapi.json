@@ -37659,6 +37659,81 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/fixed-assets/depreciation-preview": {
+      "get": {
+        "tags": [
+          "FixedAssets"
+        ],
+        "operationId": "PreviewDepreciation",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepreciationPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/fixed-assets/disposals": {
       "get": {
         "tags": [
@@ -43396,6 +43471,9 @@
           "status",
           "preparedBy",
           "approvedBy",
+          "bookValue",
+          "gain",
+          "loss",
           "version"
         ],
         "type": "object",
@@ -43446,6 +43524,21 @@
               "null",
               "string"
             ]
+          },
+          "bookValue": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "gain": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "loss": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
           },
           "version": {
             "type": "integer",
@@ -48370,6 +48463,92 @@
         },
         "additionalProperties": false
       },
+      "DepreciationPreview": {
+        "required": [
+          "month",
+          "lastDay",
+          "ended",
+          "alreadyPosted",
+          "skippedMonth",
+          "total",
+          "lines"
+        ],
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "lastDay": {
+            "type": "string",
+            "format": "date"
+          },
+          "ended": {
+            "type": "boolean"
+          },
+          "alreadyPosted": {
+            "type": "boolean"
+          },
+          "skippedMonth": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "total": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepreciationPreviewLine"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "DepreciationPreviewLine": {
+        "required": [
+          "assetId",
+          "assetNo",
+          "description",
+          "plantName",
+          "monthNumber",
+          "usefulLifeMonths",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assetNo": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "plantName": {
+            "type": "string"
+          },
+          "monthNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "usefulLifeMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
       "DepreciationRunList": {
         "required": [
           "items"
@@ -50229,6 +50408,7 @@
           "bookValue",
           "monthsDepreciated",
           "usefulLifeMonths",
+          "externalCode",
           "version"
         ],
         "type": "object",
@@ -50302,6 +50482,12 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "externalCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "version": {
             "type": "integer",

@@ -43,6 +43,7 @@ internal static class DevSeed
         await SeedLedgerAsync(h);
         await ExpenseSeed.RunAsync(h, payments.Controller); // GAS1-07, after the accounts are classed
         await UsdSeed.RunAsync(h, payments.Controller); // USD1-07b
+        await FixedAssetSeed.RunAsync(h, payments.Controller, receiving.Purchasing.PlantId, payments.Invoicing.Clerk); // AF1-05
         var newcomer = await h.CreateUserAsync(); // UI-01: a user created with the CLI, no role yet
         var plantStorekeeper = await h.CreateUserAsync();
         await h.GrantAsync(h.CompanyId, plantStorekeeper, "ALMACENISTA", receiving.Purchasing.PlantId);

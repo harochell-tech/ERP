@@ -115,3 +115,16 @@ cutoff's own month (E-AF1-04-8). The FA-REC close snapshot holds the cards by st
 247 commands.
 
 Tests: `tests/Rochell.Procurement.Tests/FixedAssetLoadTests.cs` (AF-09, AF-11).
+
+## AF1-05 — screens, Inicio, E2E-AF1 (E-AF1-05-1…10)
+
+Server: `GET /fixed-assets/depreciation-preview?month=` (`PreviewDepreciation`, `ledger:read`: the cards due and their amounts, whether the
+month ended, is posted or waits for an earlier one); `ListAssetDisposals` carries the book value and the gain or loss as the card stands;
+`ListFixedAssets` the previous system's code.
+
+Screens (Contabilidad › Activos fijos, `web.md`): Activos, the card, Clases, Depreciación del mes, Bajas, Carga inicial; Inicio counters
+for the Contador (assets to put into service, the month's depreciation pending) and the Controller (classes, disposals and loads to approve).
+
+Acceptance: `docs/acceptance/af1.md`, `AcceptanceAf1TraceabilityTests`; E2E-AF1 over the API (`FixedAssetAcceptanceTests`, documents dated two
+months back so last month has ended) and Playwright `fixed-assets-journey.spec.ts` on the dev stack's `FixedAssetSeed` (an electric forklift
+bought two months ago, awaiting its class and service).

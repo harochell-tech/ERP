@@ -309,9 +309,10 @@ public sealed class ApproveAssetDisposalHandler : ICommandHandler<ApproveAssetDi
 /// <summary>E-AF-7: the disposals, by status when given, newest first.</summary>
 public sealed record ListAssetDisposals(Guid CompanyId, Guid SessionId, string? Status = null) : IQuery;
 
+/// <summary>E-AF1-05-6: <paramref name="BookValue"/>, <paramref name="Gain"/> and <paramref name="Loss"/> as the card stands (for a draft, what approving would post).</summary>
 public sealed record AssetDisposalView(
     Guid DisposalId, Guid AssetId, string AssetNo, string Description, string Kind, DateOnly DisposalDate, decimal? Price, string Reason, string Status, string? PreparedBy,
-    string? ApprovedBy, long Version);
+    string? ApprovedBy, decimal BookValue, decimal Gain, decimal Loss, long Version);
 
 public sealed record AssetDisposalList(IReadOnlyList<AssetDisposalView> Items);
 
@@ -334,7 +335,8 @@ public sealed class ListAssetDisposalsHandler : IQueryHandler<ListAssetDisposals
             context.Transaction,
             """
             SELECT d.disposal_id, d.asset_id, x.asset_no, x.description, d.kind, d.disposal_date, d.price::numeric(19,2), d.reason, d.status,
-                   coalesce(p.display_name, p.email), coalesce(a.display_name, a.email), d.version
+                   coalesce(p.display_name, p.email), coalesce(a.display_name, a.email), (x.cost - x.accumulated)::numeric(19,2),
+                   greatest(coalesce(d.price, 0) - (x.cost - x.accumulated), 0)::numeric(19,2), greatest((x.cost - x.accumulated) - coalesce(d.price, 0), 0)::numeric(19,2), d.version
             FROM fa.asset_disposal d
             JOIN fa.asset x ON x.asset_id = d.asset_id
             LEFT JOIN iam.user p ON p.user_id = d.prepared_by
@@ -344,7 +346,7 @@ public sealed class ListAssetDisposalsHandler : IQueryHandler<ListAssetDisposals
             """,
             r => new AssetDisposalView(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.Date(5), r.NullableDecimal(6), r.GetString(7), r.GetString(8), r.NullableString(9),
-                r.NullableString(10), r.GetInt64(11)),
+                r.NullableString(10), r.GetDecimal(11), r.GetDecimal(12), r.GetDecimal(13), r.GetInt64(14)),
             cancellationToken,
             ("c", context.CompanyId),
             ("s", query.Status)).ConfigureAwait(false);
