@@ -381,6 +381,15 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   FIXED_ASSET_DISPOSED: "El activo ya fue dado de baja.",
   FIXED_ASSET_COST_BELOW_DEPRECIATION: "Sin ese costo, el activo quedaría por debajo de lo que ya se depreció.",
   FIXED_ASSET_IN_SETTLEMENT: "Una factura de activo fijo se liquida como mercancía, no como costo de otra mercancía.",
+  FIXED_ASSET_DEPRECIATION_PENDING: "Primero deprecie el activo hasta el mes anterior a la baja.",
+  DEPRECIATION_MONTH_NOT_ENDED: "El mes se deprecia a partir de su último día.",
+  DEPRECIATION_ALREADY_POSTED: "Ese mes ya está depreciado; deshágalo para registrarlo de nuevo.",
+  DEPRECIATION_MONTH_SKIPPED: "Hay un mes anterior sin depreciar; los meses se deprecian en orden.",
+  DEPRECIATION_NOTHING: "Ningún activo en servicio se deprecia en ese mes.",
+  DEPRECIATION_NOT_LATEST: "Solo se deshace la depreciación del último mes registrado.",
+  DEPRECIATION_RUN_NOT_FOUND: "Esa depreciación no existe.",
+  ASSET_DISPOSAL_NOT_FOUND: "La baja no existe.",
+  ASSET_DISPOSAL_INVALID: "Revise la baja: fecha entre la compra y hoy, motivo de 3 a 300 caracteres y precio solo en una venta.",
   PLANT_NOT_FOUND: "La planta no existe.",
 };
 

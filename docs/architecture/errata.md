@@ -1189,6 +1189,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-AF1-02-8 | AF1-02 | A one-off command «Crear fichas de facturas ya contabilizadas» creates the missing cards of invoices posted before AF-1 with their settlements' cost, so the initial load does not count them twice. |
 | E-AF1-02-9 | AF1-02 | Queries: classes, cards (filters status, plant, class) and one card with its history; read with `ledger:read`. |
 | E-AF1-02-10 | AF1-02 | A settlement where an invoice whose line is a fixed asset appears as a cost of other goods is refused (`FIXED_ASSET_IN_SETTLEMENT`): a fixed-asset invoice is settled as goods, never as another line's cost. |
+| E-AF1-03-1 | AF1-03 | A month's depreciation is posted from its last day, dated that day; its period and FA-REC must be open. |
+| E-AF1-03-2 | AF1-03 | Months go in order: a month is refused while an earlier month with depreciable cards was not depreciated. |
+| E-AF1-03-3 | AF1-03 | Cards in service before the month's first day with months left: (cost − residual − accumulated) ÷ months left, 2 decimals, the last month exact; a card whose amount would be 0 is left out. |
+| E-AF1-03-4 | AF1-03 | One P-44 journal per month with a line per card: depreciation in the plant in force at the month's end, accumulated of its class (Explain shows each asset). |
+| E-AF1-03-5 | AF1-03 | Only the latest month is undone, while its period is open and none of its cards was disposed of since; the journal is reversed and the cards return to their previous accumulated. |
+| E-AF1-03-6 | AF1-03 | Posting and undoing depreciation and approving a disposal require step-up, like the FX revaluation. |
+| E-AF1-03-7 | AF1-03 | A card is depreciated up to the month before its disposal; the disposal's month is not depreciated; the disposal date is not in the future. |
+| E-AF1-03-8 | AF1-03 | No partial disposal: a card grouping several units is disposed of whole. |
+| E-AF1-03-9 | AF1-03 | P-45 leaves the price in «Venta de activos por cobrar»; until Sales invoices assets (and X-1 says whether it carries ITBIS), the Contador clears it with a manual adjustment against the collection. |
+| E-AF1-03-10 | AF1-03 | The Contador prepares the disposal (date, scrap or sale with price, reason) and may cancel the draft; the Controller approves it, which posts P-45 on the disposal date. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
