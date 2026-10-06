@@ -29,6 +29,7 @@ using Rochell.Tax.Authorizations;
 using Rochell.Tax.Reports;
 using Rochell.Treasury.Queries;
 using Rochell.Treasury.Statements;
+using Rochell.Treasury.Transfers;
 
 namespace Rochell.Api.Endpoints;
 
@@ -63,7 +64,7 @@ public static class QueryEndpoints
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
         typeof(ListFiscalSourcesHandler), typeof(ListFiscalRulesHandler), typeof(ListPurchaseTaxTypesHandler), typeof(ListFiscalAuthorizationsHandler), typeof(GetFiscalAuthorizationHandler), typeof(GetSalesOrderProformaHandler), typeof(GetReport606Handler), typeof(GetIt1SummaryHandler), typeof(GetIr17SummaryHandler), typeof(SuggestBankMatchesHandler), typeof(ListReceiptCandidatesHandler),
-        typeof(GetApAgingHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
+        typeof(GetApAgingHandler), typeof(ListBankTransfersHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler), typeof(ListDeliveryZonesHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
@@ -491,6 +492,9 @@ public static class QueryEndpoints
         treasury.MapGet("/payment-proposal", (HttpContext http, Guid companyId, DateOnly dueUntil, Guid? supplierId, GetPaymentProposalHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetPaymentProposal(companyId, s, dueUntil, supplierId), handler, ct))
             .Describe<PaymentProposal>(nameof(GetPaymentProposal));
+        treasury.MapGet("/bank-transfers", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListBankTransfersHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListBankTransfers(companyId, s, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<BankTransferList>(nameof(ListBankTransfers)); // USD1-05b (E-USD1-05b-1)
         treasury.MapGet("/payments", (HttpContext http, Guid companyId, string? status, Guid? supplierId, int? limit, int? offset, ListPaymentsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListPayments(companyId, s, status, supplierId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<PaymentList>(nameof(ListPayments));

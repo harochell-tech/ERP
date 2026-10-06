@@ -3,6 +3,9 @@ namespace Rochell.Treasury.Statements;
 public static class StatementErrors
 {
     public const string NotFound = "NOT_FOUND";
+
+    /// <summary>E-USD1-05b-5: charges and customer receipts, deposits and refunds are not taken from a USD account's statement.</summary>
+    public const string UsdAccountNotSupported = "BANK_LINE_USD_NOT_SUPPORTED";
     public const string VersionConflict = "VERSION_CONFLICT";
     public const string BankAccountNotActive = "BANK_ACCOUNT_NOT_ACTIVE";
     public const string FormatMissing = "BANK_FORMAT_MISSING";
