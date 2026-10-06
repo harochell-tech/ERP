@@ -26,7 +26,7 @@ public sealed class GetSetupStatusHandler : IQueryHandler<GetSetupStatus>
         rule_roles AS (
           SELECT DISTINCT l.line ->> 'account_role' AS role
           FROM fin.posting_rule_version v CROSS JOIN LATERAL jsonb_array_elements(v.definition -> 'lines') AS l (line), today
-          WHERE v.status = 'ACTIVE' AND (v.effective_to IS NULL OR v.effective_to > today.d) AND l.line ->> 'account_role' NOT IN ('MANUAL_ADJUSTMENT', 'PURCHASE_EXPENSE')),
+          WHERE v.status = 'ACTIVE' AND (v.effective_to IS NULL OR v.effective_to > today.d) AND l.line ->> 'account_role' NOT IN ('MANUAL_ADJUSTMENT', 'PURCHASE_EXPENSE', 'FIXED_ASSET_COST', 'FIXED_ASSET_ACCUMULATED', 'FIXED_ASSET_DEPRECIATION')),
         s AS (
           SELECT 1 AS n, 'COMPANY' AS code, 'EMPRESA' AS area, ARRAY[]::text[] AS missing, true AS started
           UNION ALL

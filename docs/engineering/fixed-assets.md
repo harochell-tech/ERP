@@ -68,3 +68,25 @@ status / plant / category), `GET /fixed-assets/assets/{assetId}` (`GetFixedAsset
 left to depreciate, months remaining, movements, history).
 
 Tests: `tests/Rochell.Procurement.Tests/FixedAssetCardTests.cs` (AF-01…04, AF-10).
+
+## AF1-03 — depreciation and disposals (E-AF1-03-1…11)
+
+| Command | Permission | What it does |
+| --- | --- | --- |
+| `PostDepreciation` | `fixed_asset:manage` (step-up) | Month (any day of it), from its last day, period and FA-REC open; months in order (`DEPRECIATION_MONTH_SKIPPED`); every IN_SERVICE card whose next month is this one: (cost − residual − accumulated) ÷ months left, 2 decimals, the last month exact. One P-44 journal on the month's last day with a line pair per card: depreciation of the class (plant in force on the last day) / accumulated of the class. |
+| `UndoDepreciation` | `fixed_asset:manage` (step-up) | Only the latest POSTED month, while its period is open and none of its cards was disposed of; reverses the journal on its date and restores the cards. |
+| `PrepareAssetDisposal` | `fixed_asset:manage` | SCRAP or SALE (price) of a whole card in service, dated between its purchase and today, depreciated up to the month before (`FIXED_ASSET_DEPRECIATION_PENDING`); one live disposal per card. |
+| `CancelAssetDisposal` | `fixed_asset:manage` | DRAFT → CANCELLED. |
+| `ApproveAssetDisposal` | `fixed_asset:approve` (step-up) | Not the preparer; checks the card again and posts P-45 on the disposal date: Dr accumulated (class), Dr «Venta de activos por cobrar» (price), Dr «Pérdida en baja de activos» / Cr cost (category), Cr «Ganancia en venta de activos»; the card is DISPOSED. |
+
+A card's next month to depreciate is the month after its service plus the months it already depreciated. Disposal is for cards in
+service only (E-AF1-03-11): one awaiting service is put into service first. «Venta de activos por cobrar» is cleared with a manual adjustment
+until Sales invoices assets (E-AF1-03-9, X-1). 243 commands.
+
+Queries (`ledger:read`): `GET /fixed-assets/depreciation-runs` (`ListDepreciationRuns`), `GET /fixed-assets/disposals` (`ListAssetDisposals`).
+
+The posting engine takes the account of `FIXED_ASSET_COST` / `_ACCUMULATED` / `_DEPRECIATION` lines from the command, like
+`PURCHASE_EXPENSE` (`PostingEngine.TakesDocumentAccount`, E-AF1-01-7 — part of the B-02 review); the role-map screens and the setup status
+leave them out.
+
+Tests: `tests/Rochell.Procurement.Tests/FixedAssetDepreciationTests.cs` (AF-05…08, with a `FakeClock` moved month by month).

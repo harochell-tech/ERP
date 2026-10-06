@@ -27,6 +27,13 @@ public sealed class PostingEngine
     /// <summary>E-GAS-2: the technical role whose account is the document's (an expense category's), never a role map.</summary>
     public const string DocumentAccountRole = "PURCHASE_EXPENSE";
 
+    /// <summary>
+    /// E-GAS-2, E-AF1-01-7: the technical roles whose account comes from the document — an expense category's account, a fixed asset's
+    /// category (cost) or class (accumulated depreciation, depreciation) — never from the role map.
+    /// </summary>
+    public static bool TakesDocumentAccount(string accountRole)
+        => accountRole is DocumentAccountRole or "FIXED_ASSET_COST" or "FIXED_ASSET_ACCUMULATED" or "FIXED_ASSET_DEPRECIATION";
+
     public async Task<PostingPlan> PrepareAsync(CommandContext context, PostingRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -53,7 +60,7 @@ public sealed class PostingEngine
             var category = input.ItemId is null ? null : await ItemCategoryAsync(context, input.ItemId.Value, cancellationToken).ConfigureAwait(false);
             var (accountId, mapId) = ruleLine.Subledger == BankSubledger
                 ? (await BankGlAccountAsync(context, input.SubledgerRef!.Value, cancellationToken).ConfigureAwait(false), (Guid?)null)
-                : ruleLine.AccountRole == DocumentAccountRole
+                : TakesDocumentAccount(ruleLine.AccountRole)
                     ? (await DocumentAccountAsync(context, input.AccountId!.Value, cancellationToken).ConfigureAwait(false), (Guid?)null)
                     : await ResolveAccountAsync(context, ruleLine.AccountRole, category, postingDate, cancellationToken).ConfigureAwait(false);
             lines.Add(new PlannedLine(input, ruleLine, accountId, mapId, category, ruleLine.IsDebit ? amount : 0, ruleLine.IsDebit ? 0 : amount));
@@ -132,9 +139,9 @@ public sealed class PostingEngine
                 inputs["policy_version_id"] = plan.RoundingPolicyVersionId;
             }
 
-            if (line.Rule.AccountRole == DocumentAccountRole)
+            if (TakesDocumentAccount(line.Rule.AccountRole))
             {
-                // E-GAS-2: the account comes from the document (its expense category), not from the role map.
+                // E-GAS-2, E-AF1-01-7: the account comes from the document (its expense category, a fixed asset's category or class), not from the role map.
                 inputs["gl_account_id"] = line.AccountId;
             }
 
@@ -334,9 +341,9 @@ public sealed class PostingEngine
             throw new InvalidOperationException($"Line {rule.Code}: subledger reference must be present exactly when the rule line has a subledger.");
         }
 
-        if ((rule.AccountRole == DocumentAccountRole) != (input.AccountId is not null))
+        if (TakesDocumentAccount(rule.AccountRole) != (input.AccountId is not null))
         {
-            throw new InvalidOperationException($"Line {rule.Code}: an account is given exactly when the rule line's role is {DocumentAccountRole}.");
+            throw new InvalidOperationException($"Line {rule.Code}: an account is given exactly when the rule line's role takes the document's account ({rule.AccountRole}).");
         }
     }
 
