@@ -139,6 +139,41 @@ function RefundActions({ line, refunds, onDone }: { line: Line; refunds: readonl
   );
 }
 
+// USD1-07b (E-USD1-07-5, E-USD1-05b-3): an UNMATCHED line against the RELEASED transfers between own accounts — the origin's DEBIT for
+// what left it, the destination's CREDIT for what entered it, in the account's currency. The transfer itself does not change.
+function TransferActions({ line, transfers, onDone }: { line: Line; transfers: readonly Schemas["BankTransferView"][]; onDone: () => void }) {
+  const { can } = useSession();
+  const match = useCommand(`match-transfer-line:${line.lineId}`, "/api/v1/companies/{companyId}/treasury/match-bank-line-to-transfer", "Línea del extracto conciliada.");
+  const candidates = transfers.filter((t) =>
+    line.direction === "DEBIT"
+      ? t.fromBankAccountId === line.bankAccountId && Number(t.fromAmount) === Number(line.amount)
+      : t.toBankAccountId === line.bankAccountId && Number(t.toAmount) === Number(line.amount),
+  );
+  if (candidates.length === 0 || !can("bank_line:match")) {
+    return null;
+  }
+  return (
+    <>
+      {candidates.map((t) => (
+        <button
+          key={t.transferId}
+          type="button"
+          className="primary"
+          disabled={match.busy}
+          onClick={async () => {
+            if (await match.run({ lineId: line.lineId, expectedLineVersion: line.version, transferId: t.transferId }, undefined, `Línea del extracto conciliada con la transferencia ${t.transferNo}.`)) {
+              onDone();
+            }
+          }}
+        >
+          Conciliar con transferencia {t.transferNo}
+        </button>
+      ))}
+      <ErrorBox error={match.error} />
+    </>
+  );
+}
+
 // VS2-08: BANK-GL of the account at the date (read-only, E-VS2-07-5) and the statement's lines. A match is always confirmed by a
 // person (E-VS2-05-6): the suggestion, or a payment picked by hand; a CREDIT line only as the return of a reversed payment
 // (E-VS2-05-10). The Controller recognizes charges (R-10) and unmatches with a reason.
@@ -148,6 +183,7 @@ function LineActions({
   released,
   reversed,
   refunds,
+  transfers,
   onDone,
 }: {
   line: Line;
@@ -155,6 +191,7 @@ function LineActions({
   released: PaymentSummary[];
   reversed: PaymentSummary[];
   refunds: readonly Schemas["RefundToMatch"][];
+  transfers: readonly Schemas["BankTransferView"][];
   onDone: () => void;
 }) {
   const { can } = useSession();
@@ -215,6 +252,7 @@ function LineActions({
         />
       ) : null}
       {line.status === "UNMATCHED" ? <RefundActions line={line} refunds={refunds} onDone={onDone} /> : null}
+      {line.status === "UNMATCHED" ? <TransferActions line={line} transfers={transfers} onDone={onDone} /> : null}
       {line.status === "UNMATCHED" ? <ReceiptActions line={line} onDone={onDone} /> : null}
       {line.status === "MATCHED" && can("bank_line:unmatch") ? (
         <ReasonAction
@@ -276,6 +314,10 @@ function Reconciliation() {
     [companyId],
   );
   const refunds = useLoad(allowed ? () => query("/api/v1/companies/{companyId}/treasury/refunds-to-match", { path: { companyId } }) : null, [companyId]);
+  const transfers = useLoad(
+    allowed && can("payment:read") ? () => query("/api/v1/companies/{companyId}/treasury/bank-transfers", { path: { companyId }, query: { status: "RELEASED", limit: 200 } }) : null,
+    [companyId],
+  );
   if (!allowed) {
     return <NoPermission />;
   }
@@ -454,6 +496,7 @@ function Reconciliation() {
                     released={released}
                     reversed={reversed}
                     refunds={(refunds.data?.items ?? []).filter((x) => x.bankAccountId === bank)}
+                    transfers={transfers.data?.items ?? []}
                     onDone={reloadAll}
                   />
                 </td>

@@ -22,6 +22,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [glAccountCode, setGlAccountCode] = useState("");
+  const [currency, setCurrency] = useState("DOP");
   const controls = (accounts?.items ?? []).filter((a) => a.isControl);
   const fe = useFieldErrors<"bankCode" | "accountNumber" | "glAccountCode">();
   return (
@@ -39,7 +40,7 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
         ) {
           return;
         }
-        if (await register.run({ bankCode: bankCode.trim(), accountNumber: accountNumber.trim(), glAccountCode }, undefined, `Cuenta bancaria ${bankAccountLabel({ bankCode: bankCode.trim(), accountNumber: accountNumber.trim() })} registrada.`)) {
+        if (await register.run({ bankCode: bankCode.trim(), accountNumber: accountNumber.trim(), glAccountCode, currency }, undefined, `Cuenta bancaria ${bankAccountLabel({ bankCode: bankCode.trim(), accountNumber: accountNumber.trim() })} registrada.`)) {
           setBankCode("");
           setAccountNumber("");
           setGlAccountCode("");
@@ -53,6 +54,13 @@ function RegisterForm({ onDone }: { onDone: () => void }) {
       </Field>
       <Field label="Número de cuenta" required error={fe.errors.accountNumber}>
         <input className="mono" inputMode="numeric" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+      </Field>
+      {/* USD1-07b (E-USD1-07-5, E-USD1-05-1): a USD account has its own control account; its statements are in USD. */}
+      <Field label="Moneda" required>
+        <select aria-label="Moneda de la cuenta" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+          <option value="DOP">Pesos (DOP)</option>
+          <option value="USD">Dólares (USD)</option>
+        </select>
       </Field>
       <Field label="Cuenta contable de control" required error={fe.errors.glAccountCode}>
         <select value={glAccountCode} onChange={(e) => setGlAccountCode(e.target.value)}>

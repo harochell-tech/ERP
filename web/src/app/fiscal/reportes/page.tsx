@@ -312,6 +312,13 @@ function It1View({ companyId, period }: { companyId: string; period: string }) {
                   <Money value={data.purchaseItbisToAdvance} />
                 </td>
               </tr>
+              {/* USD1-07b (E-USD1-06-5): the ITBIS paid at customs on the month's DUAs (not in the 606; the accountant confirms, X-1). */}
+              <tr>
+                <th>ITBIS pagado en importaciones (RD$) · {data.importDeclarations} DUA</th>
+                <td className="num">
+                  <Money value={data.importItbis} testId="it1-import-itbis" />
+                </td>
+              </tr>
             </tbody>
           </table></div>
           <h2>Retenciones que nos hicieron los clientes</h2>
