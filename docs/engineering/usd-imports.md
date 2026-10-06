@@ -145,3 +145,23 @@ Tests: `ForeignPaymentTests` (USD-07, partial payments from a USD account with a
   USD; transfer entries are OUTSTANDING_TRANSFER until their line is matched, and a transfer and its reversal in transit cancel.
 
 Tests: `BankTransferTests` (Reconciliation; USD-09). 229 commands.
+
+## USD1-06 — month-end revaluation and USD reconciliations (migration 0091; E-USD1-06-1…5)
+
+| Command / query | Permission | What it does |
+| --- | --- | --- |
+| `PostFxRevaluation` (any day of the month) | `fx_revaluation:post` (step-up) | P-43 on the last day, P-43R on the next; `fin.fx_revaluation` POSTED |
+| `UndoFxRevaluation` | `fx_revaluation:post` (step-up) | Reverses both journals on their dates; UNDONE |
+| `ListFxRevaluations` (GET `/finance/fx-revaluations`) | `exchange_rate:read` | |
+
+- **Balances** (`FxRevaluationBook.BalancesAsync`): as of the month's last day, from the ledger — per AP document its AP_FOREIGN pesos
+  (credit − debit, every line, so a previous revaluation and its reversal cancel) and USD (USD lines); per USD bank account its pesos and USD.
+  Difference = round(USD × rate) − pesos; payables up are a loss, banks up a gain; the net goes to FX_UNREALIZED. Revaluation lines are
+  pesos only (DOP, no `amount_fc`), so the USD balances never change.
+- **Reconciliations**: AP-GL adds `AP_USD_DIFFERENCE`; IMPORT-CLEARING (`IMPORT_CLEARING_DIFFERENCE` blocks AP-REC,
+  `IMPORT_SETTLEMENT_OVERDUE` warns after `import_settlement_alert_days`); FX-REVAL (`FX_REVALUATION_MISSING`, warning). BANK-GL of a USD
+  account ignores its peso-only revaluation lines.
+- **IT-1**: `GetIt1Summary` adds `importDeclarations` and `importItbis` (the month's POSTED DUAs).
+
+Tests: `FxRevaluationTests` (USD-08: 605,000.00 on the last day, back to 600,000.00 the next, the bank's 500.00 gain, undo and redo; USD-10:
+IMPORT-CLEARING and the IT-1). 231 commands.

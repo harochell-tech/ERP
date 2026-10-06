@@ -61,23 +61,23 @@ public sealed class CloseReadinessTests(PostgresFixture postgres)
 
         // The AP document loses 100.00 of its 10,620.00 (6 t × 1,500.00 + 18 % ITBIS): AP-GL (AP-REC) and PAY-APPL (no component) report errors.
         await Tamper(h, "UPDATE fin.ap_document SET open_amount = open_amount - 100");
-        await Verify(h, controller, "v1", endsOn, "AP-GL", "PAY-APPL", "ACC-EVIDENCE");
+        await Verify(h, controller, "v1", endsOn, "AP-GL", "PAY-APPL", "ACC-EVIDENCE", "IMPORT-CLEARING");
         var broken = await ReadinessAsync(h, controller, period);
         await Tamper(h, "UPDATE fin.ap_document SET open_amount = open_amount + 100");
-        await Verify(h, controller, "v2", endsOn, "AP-GL", "PAY-APPL", "ACC-EVIDENCE");
+        await Verify(h, controller, "v2", endsOn, "AP-GL", "PAY-APPL", "ACC-EVIDENCE", "IMPORT-CLEARING");
         var fixedUp = await ReadinessAsync(h, controller, period);
 
         Assert.True(before.GetProperty("ended").GetBoolean());
         Assert.True(before.GetProperty("sealed").GetBoolean()); // everything posted is dated this month
-        Assert.Equal("ACC-EVIDENCE:-,AP-GL:-,PAY-APPL:-", Blocking(Component(before, "AP-REC")));
+        Assert.Equal("ACC-EVIDENCE:-,AP-GL:-,IMPORT-CLEARING:-,PAY-APPL:-", Blocking(Component(before, "AP-REC")));
         Assert.False(Component(before, "AP-REC").GetProperty("ready").GetBoolean());
-        Assert.Equal("ACC-EVIDENCE:0,AP-GL:1,PAY-APPL:1", Blocking(Component(broken, "AP-REC")));
+        Assert.Equal("ACC-EVIDENCE:0,AP-GL:1,IMPORT-CLEARING:0,PAY-APPL:1", Blocking(Component(broken, "AP-REC")));
         Assert.False(Component(broken, "AP-REC").GetProperty("ready").GetBoolean());
         Assert.Equal("EXCEPTIONS", Component(broken, "AP-REC").GetProperty("reconciliations").EnumerateArray()
             .Single(r => r.GetProperty("reconCode").GetString() == "AP-GL").GetProperty("runStatus").GetString());
         Assert.Equal("Cuentas por pagar contra contabilidad", Component(broken, "AP-REC").GetProperty("reconciliations").EnumerateArray()
             .Single(r => r.GetProperty("reconCode").GetString() == "AP-GL").GetProperty("name").GetString());
-        Assert.Equal("ACC-EVIDENCE:0,AP-GL:0,PAY-APPL:0", Blocking(Component(fixedUp, "AP-REC")));
+        Assert.Equal("ACC-EVIDENCE:0,AP-GL:0,IMPORT-CLEARING:0,PAY-APPL:0", Blocking(Component(fixedUp, "AP-REC")));
         Assert.True(Component(fixedUp, "AP-REC").GetProperty("ready").GetBoolean());
         Assert.Equal("OPEN", Component(fixedUp, "AP-REC").GetProperty("status").GetString());
 

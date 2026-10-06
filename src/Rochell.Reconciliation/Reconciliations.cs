@@ -29,7 +29,7 @@ public static class Reconciliations
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
          "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
          "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER",
-         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG", "CASH-SALE"];
+         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG", "CASH-SALE", "IMPORT-CLEARING", "FX-REVAL"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -41,7 +41,14 @@ public static class Reconciliations
                  gl AS (SELECT party_id, sum(credit - debit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_role IN ('AP_CONTROL', 'AP_FOREIGN') GROUP BY party_id)
             SELECT coalesce(coalesce(ap.party_id, gl.party_id)::text, '(sin proveedor)') AS match_key, coalesce(a, 0) AS value_a, coalesce(b, 0) AS value_b,
                    'AP_GL_DIFFERENCE' AS classification, 'ERROR' AS severity, 'AP-REC' AS component
-            FROM ap FULL JOIN gl ON gl.party_id = ap.party_id WHERE coalesce(a, 0) <> coalesce(b, 0)) f
+            FROM ap FULL JOIN gl ON gl.party_id = ap.party_id WHERE coalesce(a, 0) <> coalesce(b, 0)
+            UNION ALL
+            -- E-USD1-06-4: each USD payable's open USD against the USD of its AP_FOREIGN lines.
+            SELECT 'ap_usd:' || d.ap_doc_id::text, d.open_amount_fc, coalesce(u.usd, 0), 'AP_USD_DIFFERENCE', 'ERROR', 'AP-REC'
+            FROM fin.ap_document d
+            LEFT JOIN (SELECT subledger_ref, sum(CASE WHEN currency = 'USD' THEN sign(credit - debit) * amount_fc ELSE 0 END) AS usd
+                       FROM fin.gl_entry WHERE company_id = @c AND account_role = 'AP_FOREIGN' GROUP BY subledger_ref) u ON u.subledger_ref = d.ap_doc_id
+            WHERE d.company_id = @c AND d.currency = 'USD' AND d.open_amount_fc <> coalesce(u.usd, 0)) f
             """,
             """
             SELECT (SELECT coalesce(sum(open_amount), 0) FROM fin.ap_document WHERE company_id = @c),
@@ -592,6 +599,41 @@ public static class Reconciliations
               AND @cutoff - r.receipt_date > @cdays) f
             """,
             null),
+        ["IMPORT-CLEARING"] = (
+            Findings + """
+            -- E-USD1-06-4: what «Importaciones por liquidar» holds per DUA (its IMPORT subledger) against its duties and other charges while no
+            -- POSTED settlement holds it, zero afterwards; and DUAs unsettled after import_settlement_alert_days.
+            WITH settled AS (SELECT d.document_id FROM pur.import_settlement_document d JOIN pur.import_settlement s ON s.settlement_id = d.settlement_id
+                             WHERE d.company_id = @c AND d.document_kind = 'CUSTOMS_DECLARATION' AND s.status = 'POSTED'),
+                 gl AS (SELECT subledger_ref AS dua_id, sum(debit - credit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_role = 'IMPORT_CLEARING' GROUP BY subledger_ref),
+                 due AS (SELECT c.dua_id, c.dua_no,
+                                CASE WHEN c.status = 'POSTED' AND c.dua_id NOT IN (SELECT document_id FROM settled) THEN c.duties_amount + c.other_amount ELSE 0 END AS a
+                         FROM pur.customs_declaration c WHERE c.company_id = @c)
+            SELECT 'DUA ' || coalesce(due.dua_no, gl.dua_id::text) AS match_key, coalesce(due.a, 0) AS value_a, coalesce(gl.b, 0) AS value_b,
+                   'IMPORT_CLEARING_DIFFERENCE' AS classification, 'ERROR' AS severity, 'AP-REC' AS component
+            FROM due FULL JOIN gl ON gl.dua_id = due.dua_id WHERE coalesce(due.a, 0) <> coalesce(gl.b, 0)
+            UNION ALL
+            SELECT 'DUA ' || c.dua_no, c.duties_amount + c.other_amount, (@cutoff - c.dua_date)::numeric, 'IMPORT_SETTLEMENT_OVERDUE', 'WARNING', NULL::text
+            FROM pur.customs_declaration c
+            WHERE c.company_id = @c AND c.status = 'POSTED' AND c.duties_amount + c.other_amount > 0 AND c.dua_id NOT IN (SELECT document_id FROM settled)
+              AND c.dua_date <= @cutoff AND @cutoff - c.dua_date > @idays) f
+            """,
+            null),
+        ["FX-REVAL"] = (
+            Findings + """
+            -- E-USD1-06-4: each month ended before the cutoff that closed with a USD payable or bank balance and has no POSTED revaluation.
+            WITH months AS (SELECT generate_series(date_trunc('month', min(posting_date)), date_trunc('month', CAST(@cutoff AS date)) - interval '1 month', interval '1 month')::date AS m
+                            FROM fin.gl_entry WHERE company_id = @c AND currency = 'USD')
+            SELECT 'month:' || to_char(m.m, 'YYYY-MM') AS match_key, open.n::numeric AS value_a, NULL::numeric AS value_b,
+                   'FX_REVALUATION_MISSING' AS classification, 'WARNING' AS severity, NULL::text AS component
+            FROM months m
+            CROSS JOIN LATERAL (SELECT count(*) AS n FROM (
+                SELECT subledger_ref FROM fin.gl_entry
+                WHERE company_id = @c AND currency = 'USD' AND account_role IN ('AP_FOREIGN', 'BANK') AND posting_date < (m.m + interval '1 month')::date
+                GROUP BY subledger_ref HAVING sum(sign(debit - credit) * amount_fc) <> 0) x) open
+            WHERE open.n > 0 AND NOT EXISTS (SELECT 1 FROM fin.fx_revaluation r WHERE r.company_id = @c AND r.month = m.m AND r.status = 'POSTED')) f
+            """,
+            null),
         ["EXEMPT-WITHOUT-AUTH"] = (
             Findings + """
             -- E-FIS1-04-2: an issued invoice without ITBIS that is not an e-CF 44, with an item the applied SALES_ITBIS rule taxes.
@@ -739,6 +781,21 @@ public static class Reconciliations
                 }
             }
 
+            int? importDays = null;
+            if (code == "IMPORT-CLEARING")
+            {
+                importDays = await PolicyIntegerAsync(context, asOf, "PURCHASING", "import_settlement_alert_days", cancellationToken).ConfigureAwait(false);
+
+                // E-USD1-06-4: without DUAs there is nothing to warn about, so the missing policy only fails a run that has some.
+                await using var duas = Sql.Command(
+                    context.Connection, context.Transaction, "SELECT EXISTS (SELECT 1 FROM pur.customs_declaration WHERE company_id = @c AND status = 'POSTED')", ("c", context.CompanyId));
+                if (importDays is null && await duas.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
+                {
+                    runs.Add(await StoreAsync(context, runId, code, asOf, cutoff, "FAILED", null, null, [], cancellationToken).ConfigureAwait(false));
+                    continue;
+                }
+            }
+
             int? cashDays = null;
             if (code == "CASH-SALE")
             {
@@ -772,6 +829,7 @@ public static class Reconciliations
                 ("tol", tolerance ?? 0m),
                 ("adays", alertDays ?? 0),
                 ("cdays", cashDays ?? 0),
+                ("idays", importDays ?? 0),
                 ("cutoff", cutoff ?? Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(asOf))))
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {

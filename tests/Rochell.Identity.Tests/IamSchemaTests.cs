@@ -22,7 +22,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["COMPRADOR"] = "exchange_rate:read,master_data:read,purchase_order:cancel,purchase_order:create,purchase_order:read,purchase_order:submit,rnc:read,supplier:create,supplier:import,supplier:update",
         ["CONTROLLER"] = "account:manage,account_role_map:approve,account_role_map:prepare,accounting_policy:approve,accounting_policy:prepare,audit:read,bank:read,bank_account:manage,"
             + "bank_account_number:read,bank_charge:recognize,bank_line:unmatch,company:manage,configuration:read,cost_collector:settle,customer_refund:release,customer_terms:approve,"
-            + "customer_withholding:reverse,delivery_zone:manage,exchange_rate:approve,exchange_rate:read,expense_category:approve,expense_category:prepare,fiscal_report:read,goods_receipt:read,goods_receipt:reverse,hash:verify,import_settlement:approve,invoice:void,item:activate,"
+            + "customer_withholding:reverse,delivery_zone:manage,exchange_rate:approve,exchange_rate:read,expense_category:approve,expense_category:prepare,fiscal_report:read,fx_revaluation:post,goods_receipt:read,goods_receipt:reverse,hash:verify,import_settlement:approve,invoice:void,item:activate,"
             + "journal:repost,"
             + "ledger:read,manual_journal:approve,master_data:read,match_exception:approve,opening_inventory:prepare,party_bank_account:verify,payment:read,"
             + "payment:release,payment:reverse,period:read,period_component:close,period_component:reopen,posting_rule:approve,price_list:prepare,production:read,"
@@ -30,7 +30,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             + "standard_cost:prepare,supplier:activate,supplier_invoice:read,supplier_invoice:reverse,valuation_residual:approve",
         ["DIRECTOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,fiscal_report:read,goods_receipt:read,hash:verify,iam:read,ledger:read,"
             + "master_data:read,payment:read,period:read,production:read,purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission
-        ["CONTADOR"] = "account_role_map:prepare,configuration:read,exchange_rate:prepare,exchange_rate:read,expense_category:prepare,fiscal_report:read,ledger:read,manual_journal:prepare,master_data:read,period:read,reconciliation:read", // E-FIN1-01-5, E-FIN1-04-2, E-UX4-13
+        ["CONTADOR"] = "account_role_map:prepare,configuration:read,exchange_rate:prepare,exchange_rate:read,expense_category:prepare,fiscal_report:read,fx_revaluation:post,ledger:read,manual_journal:prepare,master_data:read,period:read,reconciliation:read", // E-FIN1-01-5, E-FIN1-04-2, E-UX4-13
         ["CUENTAS_POR_PAGAR"] = "bank:read,exchange_rate:read,goods_receipt:read,import_settlement:prepare,master_data:read,payment:read,purchase_order:read,rnc:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_authorization:suspend,fiscal_authorization:verify,fiscal_report:read,fiscal_rule:activate,sales:read", // + E-FIS1-01-9
@@ -56,7 +56,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(135L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
+        Assert.Equal(136L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
         Assert.Equal(47L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + exchange rates and import settlements prepare ≠ approve (E-USD1-01-7) // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {

@@ -11,6 +11,7 @@ public static class PolicySetup
         ["po_approval_limit"] = "100000.00",
         ["po_approval_step_up_threshold"] = "50000.00",
         ["expense_invoice_approval_threshold"] = "25000.00", // GAS1-01 (E-GAS-01-9)
+        ["import_settlement_alert_days"] = "30", // USD1-06 (E-USD1-06-4)
     };
 
     public static readonly IReadOnlyDictionary<string, string> Inventory = new Dictionary<string, string>
