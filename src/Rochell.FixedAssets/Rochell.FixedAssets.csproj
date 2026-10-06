@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Rochell.FixedAssets</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Module rule (E-AF1-01-1): FixedAssets may use Platform, Finance (P-44 / P-45 / P-46) and MasterData; it reads invoice lines through SQL. -->
+    <ProjectReference Include="..\Rochell.Platform\Rochell.Platform.csproj" />
+    <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
+    <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
+  </ItemGroup>
+</Project>

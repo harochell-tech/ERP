@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Rochell.Api.Http;
 using Rochell.Audit;
+using Rochell.FixedAssets.Queries;
 using Rochell.Finance.Configuration;
 using Rochell.Finance.Explain;
 using Rochell.Finance.ExchangeRates;
@@ -60,6 +61,7 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
+        typeof(ListAssetClassesHandler), typeof(ListFixedAssetsHandler), typeof(GetFixedAssetHandler),
         typeof(ListExchangeRatesHandler), typeof(ListFxRevaluationsHandler), typeof(GetExchangeRateForDateHandler), typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
@@ -390,6 +392,21 @@ public static class QueryEndpoints
         sales.MapGet("/deposits/{depositId:guid}", (HttpContext http, Guid companyId, Guid depositId, GetDepositHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDeposit(companyId, s, depositId), handler, ct))
             .Describe<DepositDetail>(nameof(GetDeposit), notFound: true);
+
+        // AF1-02 (E-AF1-02-9): fixed-asset classes and cards (ledger:read).
+        var fixedAssets = company.MapGroup("/fixed-assets").WithTags("FixedAssets");
+        fixedAssets.MapGet("/classes", (HttpContext http, Guid companyId, string? status, ListAssetClassesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListAssetClasses(companyId, s, status), handler, ct))
+            .Describe<AssetClassList>(nameof(ListAssetClasses));
+        fixedAssets.MapGet(
+                "/assets",
+                (HttpContext http, Guid companyId, string? status, Guid? plantId, Guid? expenseCategoryId, int? limit, int? offset, ListFixedAssetsHandler handler, QueryRunner runner,
+                    CancellationToken ct)
+                => runner.RunAsync(http, s => new ListFixedAssets(companyId, s, status, plantId, expenseCategoryId, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<FixedAssetList>(nameof(ListFixedAssets));
+        fixedAssets.MapGet("/assets/{assetId:guid}", (HttpContext http, Guid companyId, Guid assetId, GetFixedAssetHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetFixedAsset(companyId, s, assetId), handler, ct))
+            .Describe<FixedAssetDetail>(nameof(GetFixedAsset), notFound: true);
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)

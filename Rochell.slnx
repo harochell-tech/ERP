@@ -12,6 +12,7 @@
     <Project Path="src/Rochell.Treasury/Rochell.Treasury.csproj" />
     <Project Path="src/Rochell.Sales/Rochell.Sales.csproj" />
     <Project Path="src/Rochell.Manufacturing/Rochell.Manufacturing.csproj" />
+    <Project Path="src/Rochell.FixedAssets/Rochell.FixedAssets.csproj" />
     <Project Path="src/Rochell.Migrations/Rochell.Migrations.csproj" />
     <Project Path="src/Rochell.Migrations.Cli/Rochell.Migrations.Cli.csproj" />
     <Project Path="src/Rochell.Api/Rochell.Api.csproj" />

@@ -11,5 +11,7 @@
     <ProjectReference Include="..\Rochell.Finance\Rochell.Finance.csproj" />
     <ProjectReference Include="..\Rochell.Inventory\Rochell.Inventory.csproj" />
     <ProjectReference Include="..\Rochell.Tax\Rochell.Tax.csproj" />
+    <!-- E-AF1-01-1: posting an invoice or a settlement creates and costs its fixed-asset cards in the same transaction. -->
+    <ProjectReference Include="..\Rochell.FixedAssets\Rochell.FixedAssets.csproj" />
   </ItemGroup>
 </Project>

@@ -35,3 +35,36 @@ FA-REC is OPEN in every existing period and in the periods `rochell-migrate` cre
 
 The module `Rochell.FixedAssets` (E-AF1-01-1: uses Finance and MasterData; Procurement may use it to create cards when it posts) arrives
 with its first commands in AF1-02.
+
+## AF1-02 — module, classes, cards (E-AF1-02-1…10)
+
+Module `Rochell.FixedAssets` (Finance and MasterData; Procurement uses it, E-AF1-01-1). API group `/fixed-assets`; 238 commands.
+
+| Command | Permission | What it does |
+| --- | --- | --- |
+| `PrepareAssetClass` | `fixed_asset:manage` | DRAFT class for a fixed-asset category: life 1…600 months, residual 0 to under 100 %, accumulated depreciation (ASSET) and depreciation (EXPENSE or COST) accounts; the next `class_version`; one draft per category. |
+| `ApproveAssetClass` | `fixed_asset:approve` (step-up) | Someone other than the preparer; the category's ACTIVE class becomes SUPERSEDED, the draft ACTIVE (E-AF1-01-3). |
+| `DiscardAssetClass` | `fixed_asset:manage` | DRAFT → DISCARDED. |
+| `PutFixedAssetInService` | `fixed_asset:manage` | Date not before the purchase, plant, who is in charge (1–120 characters); copies the ACTIVE class's life and residual (E-AF1-01-2/4, E-AF1-02-6). |
+| `TransferFixedAsset` | `fixed_asset:manage` | Another plant from a date after the last depreciated month, not before the last move and not after today; no journal (E-AF-9, E-AF1-02-5). |
+| `UpdateFixedAsset` | `fixed_asset:manage` | Description and who is in charge of a live card (E-AF1-02-7). |
+| `CreateCardsForPostedInvoices` | `fixed_asset:manage` | Cards for fixed-asset lines of invoices posted before AF-1, with their posted settlements' cost; idempotent (E-AF1-02-8). |
+
+`FixedAssetCards` is what Procurement calls inside its own transactions:
+
+- posting an expense invoice (P-37 or P-38) creates an AWAITING_SERVICE card `AF-YYYY-NNNNNN` per line whose category is a fixed asset
+  (606 type 04 on an asset account): cost = the line's peso net as posted (in USD, converted with the rounding cent), description from the
+  line, the invoice's plant, purchase date = the invoice date (E-AF-3, E-AF1-02-1/2);
+- reversing the invoice cancels its live cards, refused with `FIXED_ASSET_DEPRECIATED` / `FIXED_ASSET_DISPOSED` (E-AF1-02-4);
+- approving a settlement adds each goods line's share to its card (`COST_ADDED`); refused with `FIXED_ASSET_DISPOSED` for a disposed card
+  and `FIXED_ASSET_IN_SETTLEMENT` when a fixed-asset line is one of the settled costs (E-AF1-02-3/10);
+- reversing a settlement takes the cost back (`COST_REMOVED`), refused with `FIXED_ASSET_COST_BELOW_DEPRECIATION` when the card would
+  fall below what it already depreciated (E-AF1-02-4).
+
+Every card change is its own `FixedAsset` event caused by the document's event, with an `fa.asset_movement` row.
+
+Queries (`ledger:read`, E-AF1-02-9): `GET /fixed-assets/classes` (`ListAssetClasses`), `GET /fixed-assets/assets` (`ListFixedAssets`, filters
+status / plant / category), `GET /fixed-assets/assets/{assetId}` (`GetFixedAsset`: source invoice and supplier, class, residual value, what is
+left to depreciate, months remaining, movements, history).
+
+Tests: `tests/Rochell.Procurement.Tests/FixedAssetCardTests.cs` (AF-01…04, AF-10).

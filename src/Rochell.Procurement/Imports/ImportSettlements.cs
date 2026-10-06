@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Rochell.Finance.Posting;
+using Rochell.FixedAssets.Cards;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Time;
@@ -402,6 +403,7 @@ public sealed class ApproveImportSettlementHandler : ICommandHandler<ApproveImpo
             cancellationToken,
             ("s", header.Id)).ConfigureAwait(false);
         var gathered = await ImportSettlements.GatherAsync(context, header.PlantId, header.Id, documents, cancellationToken).ConfigureAwait(false);
+        await FixedAssetCards.RequireSettleableAsync(context, gathered.Goods.Select(g => g.LineId), gathered.Expenses.Select(e => e.LineId), cancellationToken).ConfigureAwait(false);
 
         var inputs = new List<PostingLineInput>();
         var allocation = gathered.Allocation.ToDictionary(a => a.LineId, a => a.Added);
@@ -463,6 +465,7 @@ public sealed class ApproveImportSettlementHandler : ICommandHandler<ApproveImpo
             ("v", version),
             ("s", header.Id)).ConfigureAwait(false);
         await context.AppendStateAsync(ImportSettlements.Aggregate, header.Id, "DOCUMENT", "DRAFT", "POSTED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        await FixedAssetCards.AddSettlementCostAsync(context, header.Id, header.Date, allocation, eventId, cancellationToken).ConfigureAwait(false); // E-AF-4
         var journal = await _engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new
         {
@@ -511,6 +514,7 @@ public sealed class ReverseImportSettlementHandler : ICommandHandler<ReverseImpo
             context.Connection, context.Transaction, "UPDATE pur.import_settlement SET status = 'REVERSED', accounting_status = 'REVERSED', version = @v WHERE settlement_id = @s",
             cancellationToken, ("v", version), ("s", header.Id)).ConfigureAwait(false);
         await context.AppendStateAsync(ImportSettlements.Aggregate, header.Id, "DOCUMENT", "POSTED", "REVERSED", CommandType, eventId, cancellationToken, reason).ConfigureAwait(false);
+        await FixedAssetCards.RemoveSettlementCostAsync(context, header.Id, eventId, cancellationToken).ConfigureAwait(false); // E-AF-4
         var reversal = await _engine.WriteReversalAsync(context, plan, eventId, occurredAt, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { settlementId = header.Id, status = "REVERSED", journals = new[] { reversal.JournalId }, version });
     }

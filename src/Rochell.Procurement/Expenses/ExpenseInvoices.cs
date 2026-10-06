@@ -4,6 +4,7 @@ using System.Text.Json;
 using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Policies;
 using Rochell.Finance.Posting;
+using Rochell.FixedAssets.Cards;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Time;
@@ -186,6 +187,7 @@ internal static class ExpenseInvoices
             ("amount", payable),
             ("s", header.Id)).ConfigureAwait(false);
         await BillOrderAsync(context, header, lines, eventId, +1, "Procurement.PostSupplierInvoice", cancellationToken).ConfigureAwait(false);
+        await FixedAssetCards.CreateForInvoiceAsync(context, header.Id, eventId, cancellationToken).ConfigureAwait(false); // E-AF-3
         var journal = await engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new
         {
@@ -267,6 +269,7 @@ internal static class ExpenseInvoices
             ("usd", totalUsd),
             ("s", header.Id)).ConfigureAwait(false);
         await BillOrderAsync(context, header, lines, eventId, +1, "Procurement.PostSupplierInvoice", cancellationToken).ConfigureAwait(false);
+        await FixedAssetCards.CreateForInvoiceAsync(context, header.Id, eventId, cancellationToken).ConfigureAwait(false); // E-AF-3
         var journal = await engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new
         {
@@ -336,6 +339,7 @@ internal static class ExpenseInvoices
         var lines = await LinesAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
         await OrderLinesAsync(context, lines, cancellationToken).ConfigureAwait(false);
         await BillOrderAsync(context, header, lines, eventId, -1, commandType, cancellationToken).ConfigureAwait(false);
+        await FixedAssetCards.CancelForInvoiceAsync(context, header.Id, eventId, commandType, reason, cancellationToken).ConfigureAwait(false); // E-AF1-02-4
         var reversal = await engine.WriteReversalAsync(context, plan, eventId, occurredAt, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { supplierInvoiceId = header.Id, status = SupplierInvoiceStatus.Reversed, journals = new[] { reversal.JournalId }, version });
     }

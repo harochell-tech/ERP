@@ -371,6 +371,17 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   WITHHOLDING_KIND_INVALID: "La retención debe ser de ITBIS o de ISR.",
   WITHHOLDING_EXCEEDS: "La retención supera el saldo pendiente de la factura o, si es de ITBIS, el ITBIS de la factura.",
   WITHHOLDING_CERTIFICATE_DUPLICATE: "Ese número de certificado de retención ya está registrado para este cliente.",
+  // AF-1: fixed assets.
+  ASSET_CLASS_NOT_FOUND: "La clase de activo no existe.",
+  ASSET_CLASS_INVALID: "Revise la clase: categoría de activo fijo, vida útil de 1 a 600 meses, residual de 0 a menos de 100 % y cuentas válidas.",
+  ASSET_CLASS_NOT_APPROVED: "La categoría del activo aún no tiene una clase aprobada (vida útil, residual y cuentas).",
+  FIXED_ASSET_NOT_FOUND: "El activo fijo no existe.",
+  FIXED_ASSET_INVALID: "Revise los datos del activo fijo.",
+  FIXED_ASSET_DEPRECIATED: "El activo ya tiene depreciación: dé de baja el activo en lugar de reversar la factura.",
+  FIXED_ASSET_DISPOSED: "El activo ya fue dado de baja.",
+  FIXED_ASSET_COST_BELOW_DEPRECIATION: "Sin ese costo, el activo quedaría por debajo de lo que ya se depreció.",
+  FIXED_ASSET_IN_SETTLEMENT: "Una factura de activo fijo se liquida como mercancía, no como costo de otra mercancía.",
+  PLANT_NOT_FOUND: "La planta no existe.",
 };
 
 export interface DescribedError {

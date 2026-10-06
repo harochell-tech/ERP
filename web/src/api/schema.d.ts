@@ -1324,6 +1324,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/fixed-assets/prepare-asset-class": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PrepareAssetClass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/fixed-assets/approve-asset-class": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ApproveAssetClass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/fixed-assets/discard-asset-class": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DiscardAssetClass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/fixed-assets/put-fixed-asset-in-service": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PutFixedAssetInService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/fixed-assets/transfer-fixed-asset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["TransferFixedAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/fixed-assets/update-fixed-asset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["UpdateFixedAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/fixed-assets/create-cards-for-posted-invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CreateCardsForPostedInvoices"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/finance/prepare-account-role-map": {
         parameters: {
             query?: never;
@@ -5244,6 +5356,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/fixed-assets/classes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListAssetClasses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/fixed-assets/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListFixedAssets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/fixed-assets/assets/{assetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetFixedAsset"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/finance/events/{sourceEventId}/journals": {
         parameters: {
             query?: never;
@@ -6241,6 +6401,12 @@ export interface components {
             /** Format: uuid */
             policyVersionId: string;
         };
+        ApproveAssetClass: {
+            /** Format: uuid */
+            assetClassId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         ApproveCredit: {
             /** Format: uuid */
             salesOrderId: string;
@@ -6448,6 +6614,37 @@ export interface components {
             /** Format: int32 */
             daysOverdue: number;
             bucket: string;
+        };
+        AssetClassList: {
+            items: components["schemas"]["AssetClassView"][];
+        };
+        AssetClassView: {
+            /** Format: uuid */
+            assetClassId: string;
+            /** Format: uuid */
+            expenseCategoryId: string;
+            categoryCode: string;
+            categoryName: string;
+            assetAccountCode: string;
+            /** Format: int32 */
+            classVersion: number;
+            /** Format: int32 */
+            usefulLifeMonths: number;
+            /** Format: decimal */
+            residualPct: string;
+            /** Format: uuid */
+            accumulatedAccountId: string;
+            accumulatedAccountCode: string;
+            accumulatedAccountName: string;
+            /** Format: uuid */
+            expenseAccountId: string;
+            expenseAccountCode: string;
+            expenseAccountName: string;
+            status: string;
+            preparedByName: null | string;
+            approvedByName: null | string;
+            /** Format: int64 */
+            version: number;
         };
         AttachAuthorizationDocument: {
             /** Format: uuid */
@@ -6985,6 +7182,7 @@ export interface components {
             accountClass: string;
             isControl: boolean;
         };
+        CreateCardsForPostedInvoices: Record<string, never>;
         CreateCashSale: {
             /** Format: uuid */
             plantId: string;
@@ -7718,6 +7916,12 @@ export interface components {
             /** Format: uuid */
             ruleVersionId: string;
         };
+        DiscardAssetClass: {
+            /** Format: uuid */
+            assetClassId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+        };
         DiscardExchangeRate: {
             /** Format: uuid */
             rateId: string;
@@ -8125,6 +8329,76 @@ export interface components {
             environment: string;
             /** Format: date-time */
             executedAt: string;
+        };
+        FixedAssetDetail: {
+            asset: components["schemas"]["FixedAssetSummary"];
+            sourceKind: string;
+            /** Format: uuid */
+            supplierInvoiceId: null | string;
+            invoiceNumber: null | string;
+            supplierName: null | string;
+            externalCode: null | string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: uuid */
+            assetClassId: null | string;
+            /** Format: decimal */
+            residualPct: null | string;
+            /** Format: decimal */
+            residualValue: null | string;
+            /** Format: decimal */
+            depreciable: null | string;
+            /** Format: int32 */
+            monthsRemaining: null | number;
+            movements: components["schemas"]["FixedAssetMovementView"][];
+            history: components["schemas"]["StateChange"][];
+        };
+        FixedAssetList: {
+            items: components["schemas"]["FixedAssetSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        FixedAssetMovementView: {
+            kind: string;
+            /** Format: date */
+            date: string;
+            /** Format: decimal */
+            amount: null | string;
+            plantName: null | string;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        FixedAssetSummary: {
+            /** Format: uuid */
+            assetId: string;
+            assetNo: string;
+            description: string;
+            /** Format: uuid */
+            expenseCategoryId: string;
+            categoryName: string;
+            /** Format: uuid */
+            plantId: string;
+            plantName: string;
+            status: string;
+            /** Format: date */
+            acquiredOn: string;
+            /** Format: date */
+            inServiceOn: null | string;
+            responsible: null | string;
+            /** Format: decimal */
+            cost: string;
+            /** Format: decimal */
+            accumulated: string;
+            /** Format: decimal */
+            bookValue: string;
+            /** Format: int32 */
+            monthsDepreciated: number;
+            /** Format: int32 */
+            usefulLifeMonths: null | number;
+            /** Format: int64 */
+            version: number;
         };
         FreightPriceLine: {
             /** Format: uuid */
@@ -9288,6 +9562,18 @@ export interface components {
             };
             justification: string;
         };
+        PrepareAssetClass: {
+            /** Format: uuid */
+            expenseCategoryId: string;
+            /** Format: int32 */
+            usefulLifeMonths: number;
+            /** Format: decimal */
+            residualPct: string;
+            /** Format: uuid */
+            accumulatedAccountId: string;
+            /** Format: uuid */
+            expenseAccountId: string;
+        };
         PrepareBankTransfer: {
             /** Format: uuid */
             fromBankAccountId: string;
@@ -9962,6 +10248,17 @@ export interface components {
             code: string;
             label: string;
             components: components["schemas"]["PurchaseTaxComponentView"][];
+        };
+        PutFixedAssetInService: {
+            /** Format: uuid */
+            assetId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: date */
+            inServiceOn: string;
+            /** Format: uuid */
+            plantId: string;
+            responsible: string;
         };
         QuoteDetail: {
             header: components["schemas"]["QuoteSummary"];
@@ -11833,6 +12130,16 @@ export interface components {
             email: string;
             roles: string[];
         };
+        TransferFixedAsset: {
+            /** Format: uuid */
+            assetId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            /** Format: uuid */
+            plantId: string;
+            /** Format: date */
+            effectiveOn: string;
+        };
         TrialBalance: {
             /** Format: date */
             from: string;
@@ -12022,6 +12329,14 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             lines: components["schemas"]["ExpenseOrderLineInput"][];
+        };
+        UpdateFixedAsset: {
+            /** Format: uuid */
+            assetId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            description: string;
+            responsible: null | string;
         };
         UpdateForeignSupplierDraft: {
             /** Format: uuid */
@@ -18054,6 +18369,538 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ApproveValuationResidualAdjustment"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PrepareAssetClass: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareAssetClass"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ApproveAssetClass: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveAssetClass"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscardAssetClass: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscardAssetClass"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PutFixedAssetInService: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutFixedAssetInService"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    TransferFixedAsset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferFixedAsset"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    UpdateFixedAsset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateFixedAsset"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CreateCardsForPostedInvoices: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCardsForPostedInvoices"];
             };
         };
         responses: {
@@ -34851,6 +35698,171 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DepositDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListAssetClasses: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetClassList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListFixedAssets: {
+        parameters: {
+            query?: {
+                status?: string;
+                plantId?: string;
+                expenseCategoryId?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixedAssetList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetFixedAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                assetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FixedAssetDetail"];
                 };
             };
             /** @description Bad Request */

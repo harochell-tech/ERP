@@ -1179,6 +1179,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-AF1-01-7 | AF1-01 | The asset, accumulated depreciation and depreciation expense accounts come from each card's category and class, as the expense account comes from the category today: technical roles FIXED_ASSET_COST / _ACCUMULATED / _DEPRECIATION, never mapped. A posting engine change: part of the B-02 review. |
 | E-AF1-01-8 | AF1-01 | Rules in DRAFT: P-44 depreciation, P-45 disposal or sale, P-46 initial load. Mapped roles: ASSET_SALE_RECEIVABLE «Venta de activos por cobrar», ASSET_DISPOSAL_GAIN «Ganancia en venta de activos», ASSET_DISPOSAL_LOSS «Pérdida en baja de activos». |
 | E-AF1-01-9 | AF1-01 | Close component FA-REC for depreciation, disposals and the initial load; an FA-GL difference blocks closing it. |
+| E-AF1-02-1 | AF1-02 | A card's cost is what its line posted to the asset account: the line's peso net (for USD, converted with its rounding cent); recoverable ITBIS is not part of it. |
+| E-AF1-02-2 | AF1-02 | A card takes the line's description, the invoice's plant and its date as the purchase date; the AF- year is the posting's. |
+| E-AF1-02-3 | AF1-02 | A settlement onto a disposed card is refused (`FIXED_ASSET_DISPOSED`). |
+| E-AF1-02-4 | AF1-02 | An invoice whose cards were depreciated is not reversed; without depreciation they are cancelled, even in service. A settlement's reversal takes its cost back; on a depreciating card the change is spread over the remaining months. |
+| E-AF1-02-5 | AF1-02 | A transfer's date is after the last depreciated month; each month's depreciation goes to the plant in force on its last day. |
+| E-AF1-02-6 | AF1-02 | Put into service: not before the purchase date; the class must be approved (E-AF1-01-4); who is in charge is free text (person or position). |
+| E-AF1-02-7 | AF1-02 | The Contador corrects a live card's description and who is in charge; its cost changes only through invoices, settlements and their reversals. |
+| E-AF1-02-8 | AF1-02 | A one-off command «Crear fichas de facturas ya contabilizadas» creates the missing cards of invoices posted before AF-1 with their settlements' cost, so the initial load does not count them twice. |
+| E-AF1-02-9 | AF1-02 | Queries: classes, cards (filters status, plant, class) and one card with its history; read with `ledger:read`. |
+| E-AF1-02-10 | AF1-02 | A settlement where an invoice whose line is a fixed asset appears as a cost of other goods is refused (`FIXED_ASSET_IN_SETTLEMENT`): a fixed-asset invoice is settled as goods, never as another line's cost. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

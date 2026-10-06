@@ -14,11 +14,12 @@ public sealed class ModuleBoundaryTests
 {
     private static readonly Dictionary<string, string[]> AllowedModuleDependencies = new(StringComparer.Ordinal)
     {
-        ["Procurement"] = ["Finance", "Inventory", "MasterData", "Tax"],
+        ["Procurement"] = ["Finance", "Inventory", "MasterData", "Tax", "FixedAssets"], // + FixedAssets (E-AF1-01-1)
         ["Audit"] = ["Finance", "Inventory"],
         ["Treasury"] = ["Finance", "MasterData"], // E-VS2-02-1
         ["Sales"] = ["Finance", "Inventory", "MasterData", "Tax"], // E-VS3-02-2
         ["Manufacturing"] = ["Finance", "Inventory", "MasterData"], // E-MFG1-02-1
+        ["FixedAssets"] = ["Finance", "MasterData"], // E-AF1-01-1
     };
 
     public static TheoryData<string> Modules() => new(Repo.Modules);
