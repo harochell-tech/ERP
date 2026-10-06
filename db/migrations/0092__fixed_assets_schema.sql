@@ -190,9 +190,12 @@ CREATE TABLE fa.asset (
   CONSTRAINT asset_source CHECK ((source_kind = 'INVOICE_LINE' AND si_line_id IS NOT NULL AND load_id IS NULL)
     OR (source_kind = 'OPENING' AND load_id IS NOT NULL AND si_line_id IS NULL AND external_code IS NOT NULL)),
   CONSTRAINT asset_status CHECK (status IN ('AWAITING_SERVICE', 'IN_SERVICE', 'DISPOSED', 'CANCELLED')),
-  -- In service (and after) a card carries its class version, life and residual; awaiting service it has none.
-  CONSTRAINT asset_service CHECK ((status IN ('IN_SERVICE', 'DISPOSED')) = (in_service_on IS NOT NULL AND asset_class_id IS NOT NULL AND useful_life_months IS NOT NULL
-    AND residual_pct IS NOT NULL) OR (status = 'CANCELLED' AND in_service_on IS NULL)),
+  -- In service (and after) a card carries its class version, life and residual; awaiting service it has none; a cancelled card keeps
+  -- whatever it had (E-AF1-02-4: a card in service without depreciation is cancelled with its invoice).
+  CONSTRAINT asset_service CHECK (CASE status
+    WHEN 'AWAITING_SERVICE' THEN in_service_on IS NULL AND asset_class_id IS NULL AND useful_life_months IS NULL AND residual_pct IS NULL
+    WHEN 'CANCELLED' THEN true
+    ELSE in_service_on IS NOT NULL AND asset_class_id IS NOT NULL AND useful_life_months IS NOT NULL AND residual_pct IS NOT NULL END),
   CONSTRAINT asset_responsible CHECK (responsible IS NULL OR length(btrim(responsible)) BETWEEN 1 AND 120),
   CONSTRAINT asset_amounts CHECK (cost >= 0 AND accumulated >= 0 AND accumulated <= cost AND months_depreciated >= 0
     AND (useful_life_months IS NULL OR months_depreciated <= useful_life_months)),
