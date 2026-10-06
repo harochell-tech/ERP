@@ -1199,6 +1199,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-AF1-03-8 | AF1-03 | No partial disposal: a card grouping several units is disposed of whole. |
 | E-AF1-03-9 | AF1-03 | P-45 leaves the price in «Venta de activos por cobrar»; until Sales invoices assets (and X-1 says whether it carries ITBIS), the Contador clears it with a manual adjustment against the collection. |
 | E-AF1-03-10 | AF1-03 | The Contador prepares the disposal (date, scrap or sale with price, reason) and may cancel the draft; the Controller approves it, which posts P-45 on the disposal date. |
+| E-AF1-03-11 | AF1-03 | Only a card in service is disposed of; one that arrived damaged is put into service and scrapped in the same month, without depreciation. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
