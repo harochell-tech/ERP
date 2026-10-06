@@ -11,6 +11,7 @@ import { allSuppliers } from "@/lib/paging";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // USD1-07a (E-USD1-07-4, E-USD1-04-1/2): Compras › DUA. Cuentas por pagar registers the customs declaration and it is posted at once:
 // duties and other charges to «Importaciones por liquidar», the ITBIS paid at customs recoverable, the total owed to the DGA. The
@@ -111,14 +112,12 @@ function RegisterDua({ onDone }: { onDone: () => void }) {
       }}
     >
       <Field label="DGA (proveedor)" required error={fe.errors.partyId}>
-        <select aria-label="DGA" value={v.partyId} onChange={(e) => set({ partyId: e.target.value })}>
-          <option value="">—</option>
-          {masters.data.suppliers.map((s) => (
-            <option key={s.supplierId} value={s.supplierId}>
-              {s.legalName}
-            </option>
-          ))}
-        </select>
+        <SearchSelect
+          aria-label="DGA"
+          value={v.partyId}
+          onChange={(partyId) => set({ partyId })}
+          options={masters.data.suppliers.map((s) => partyOption(s.supplierId, s.legalName, s.rnc, s.country))}
+        />
       </Field>
       <Field label="Planta" required error={fe.errors.plantId}>
         <select aria-label="Planta" value={v.plantId} onChange={(e) => set({ plantId: e.target.value })}>

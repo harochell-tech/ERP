@@ -1209,6 +1209,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-AF1-04-7 | AF1-04 | FA-GL, per account: the live cards' cost = the asset account; their accumulated = the accumulated depreciation account; a difference is an error that blocks FA-REC. |
 | E-AF1-04-8 | AF1-04 | An ended month with depreciation left to post is a warning, and an error blocking FA-REC when it is the month of the period being closed (the run's cutoff month). |
 | E-AF1-04-9 | AF1-04 | Closing FA-REC needs an FA-GL run of the period without errors, like the other components. |
+| E-UX5-1 | UX5-01 | Customers and suppliers are chosen in a picker you type into: the list filters on any part of the name or the RNC, ignoring accents and capitals; each option shows the legal name and the RNC (or the country when foreign). |
+| E-UX5-2 | UX5-01 | Keyboard: ↑ ↓ to move, Enter to choose, Escape to close; on a phone the keyboard opens and the list takes the screen's width; a «×» clears the choice. |
+| E-UX5-3 | UX5-01 | It replaces every customer and supplier selector, in forms and filters; new documents keep offering only the active ones, as today. |
+| E-UX5-4 | UX5-01 | The same picker is used for items, accounts and expense categories. |
+| E-UX5-5 | UX5-01 | Its own PR after AF1-04 and before the fixed-asset screens, which are born with it. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

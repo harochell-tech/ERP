@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { confirmAction, expectFits, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, pick, signIn, submit } from "./support";
 
 // VS#3 E2E-S1 through the UI (VS3-10b, E-VS3-10-10): the Vendedor creates the order (credit auto-approved), Despacho loads it on our
 // truck, weighs it out and records the POD, Facturación invoices it and records the e-CF, Cobros records the transfer and applies
@@ -39,12 +39,12 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   const seller = await signIn(browser, "Vendedor");
   await nav(seller, "Pedidos");
   await seller.getByRole("link", { name: "Nuevo pedido" }).click();
-  await seller.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
+  await pick(seller.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await seller.getByLabel("Término de entrega").selectOption("DELIVERED_OWN_TRANSPORT");
   await seller.getByLabel("Dirección de la obra").fill("Obra Punta Cana");
   // PRS-05: the company has zones, so an own-truck order chooses one; GENERAL has no freight to Higüey, the total stays.
   await seller.getByLabel("Zona de entrega").selectOption({ label: "Higüey" });
-  await seller.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
+  await pick(seller.getByLabel("Producto 1"), "BLOQUE-6", "BLOQUE-6 — Bloque de 6 pulgadas (un)");
   await seller.getByLabel("Cantidad 1").fill("100");
   // UX4-03 (V-11, E-UX4-3/4): the server prices the draft while it is typed — net per line, total, ITBIS 18 % — and the customer's
   // credit (limit 1,000,000.00) takes it.
@@ -163,7 +163,7 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   const cobros = await signIn(browser, "Cobros");
   await nav(cobros, "Recibos");
   await cobros.getByRole("link", { name: "Registrar cobro" }).click();
-  await cobros.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
+  await pick(cobros.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await cobros.getByLabel("Monto del cobro").fill("5900.00");
   await cobros.getByLabel("Cuenta bancaria").selectOption({ label: "TEST_BANK ••••4321" });
   await expect(cobros.getByTestId("suggestion-applied")).toHaveText("5,900.00");

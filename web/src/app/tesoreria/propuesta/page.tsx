@@ -11,6 +11,7 @@ import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { bankAccountLabel } from "@/lib/ux4a";
 import { activeShortcut, ALL_DUE, DUE_SHORTCUTS, dueUntilFor, laterDueText } from "@/lib/ux4a-tesoreria";
+import { SearchSelect } from "@/components/SearchSelect";
 
 type Supplier = Schemas["ProposalSupplier"];
 
@@ -236,13 +237,13 @@ export default function Page() {
         </Field>
         {data && data.suppliers.length > 0 ? (
           <Field label="Proveedor">
-            <select value={supplier?.supplierId ?? ""} onChange={(e) => setSupplierId(e.target.value)}>
-              {data.suppliers.map((s) => (
-                <option key={s.supplierId} value={s.supplierId}>
-                  {s.supplierName} — RD$ {formatDecimal(s.openAmount)}
-                </option>
-              ))}
-            </select>
+            <SearchSelect
+              aria-label="Proveedor"
+              value={supplier?.supplierId ?? ""}
+              onChange={setSupplierId}
+              clearable={false}
+              options={data.suppliers.map((s) => ({ value: s.supplierId, label: s.supplierName, hint: `RD$ ${formatDecimal(s.openAmount)}` }))}
+            />
           </Field>
         ) : null}
         {supplier ? (

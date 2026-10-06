@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { confirmAction, nav, signIn, submit } from "./support";
+import { confirmAction, nav, pick, signIn, submit } from "./support";
 
 // QUO1-04 (E-QUO1-04-9): a quote with a special price through the UI. The Vendedor quotes Constructora Uno 37 BLOQUE-6 at 45.00
 // (the list is 50.00) and submits it for price approval; the Aprobador de políticas sees it counted on Inicio and approves (step-up:
@@ -17,9 +17,9 @@ test("a quote with a special price approved, sent, printed and converted into an
   await seller.getByRole("link", { name: "Nueva cotización" }).click();
   // The list has a "Cliente" filter too: wait for the form before choosing the customer.
   await expect(seller.getByRole("heading", { name: "Nueva cotización" })).toBeVisible();
-  await seller.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
+  await pick(seller.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await seller.getByLabel("Referencia del cliente (opcional)").fill("Obra E2E cotización");
-  await seller.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
+  await pick(seller.getByLabel("Producto 1"), "BLOQUE-6", "BLOQUE-6 — Bloque de 6 pulgadas (un)");
   await expect(seller.getByTestId("list-price:1")).toHaveText("50.00");
   await seller.getByLabel("Cantidad 1").fill("37");
   await seller.getByLabel("Precio 1").fill("45.00");

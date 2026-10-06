@@ -59,3 +59,23 @@ export async function expectClickable(button: Locator): Promise<void> {
   await expect(button).toBeVisible();
   await button.click({ trial: true, timeout: 10_000 });
 }
+
+/**
+ * UX5-01 (E-UX5-1…4): chooses in a picker you type into — types `text` and clicks the first option containing `option` (or `text`).
+ * The input keeps the field's label, so `field` is the same getByLabel the journeys used with selectOption.
+ */
+export async function pick(field: Locator, text: string, option: string = text): Promise<void> {
+  await field.click();
+  await field.fill(text);
+  const list = field.page().locator(`[id="${await field.getAttribute("aria-controls")}"]`);
+  await list.getByRole("option").filter({ hasText: option }).first().click();
+  await expect(list).toHaveCount(0);
+}
+
+/** The first option a picker offers (the old selectOption({ index: 1 })). */
+export async function pickFirst(field: Locator): Promise<void> {
+  await field.click();
+  const list = field.page().locator(`[id="${await field.getAttribute("aria-controls")}"]`);
+  await list.getByRole("option").first().click();
+  await expect(list).toHaveCount(0);
+}

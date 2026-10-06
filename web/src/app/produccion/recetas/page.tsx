@@ -13,6 +13,7 @@ import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { curingHoursErrors, uomLabel } from "@/lib/ux4bProduction";
+import { SearchSelect } from "@/components/SearchSelect";
 
 // MFG1-07 (E-MFG1-07-4): the recipes of a plant — one per product and machine — prepared by the Supervisor de producción and
 // approved by the Gerente de planta (four eyes). Quantities stay decimal strings.
@@ -102,14 +103,12 @@ function PrepareRecipe({ plantId, onDone }: { plantId: string; onDone: (recipeVe
       </p>
       <div>
         <Field label="Producto" required error={fe.errors.itemId}>
-          <select aria-label="Producto" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
-            <option value="">Seleccione…</option>
-            {goods.map((g) => (
-              <option key={g.itemId} value={g.itemId}>
-                {itemLabel(g)}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Producto"
+            value={form.itemId}
+            onChange={(itemId) => setForm({ ...form, itemId })}
+            options={goods.map((g) => ({ value: g.itemId, label: itemLabel(g) }))}
+          />
         </Field>
         <Field label="Máquina" required error={fe.errors.machineId}>
           <select aria-label="Máquina" value={form.machineId} onChange={(e) => setForm({ ...form, machineId: e.target.value })}>
@@ -143,14 +142,12 @@ function PrepareRecipe({ plantId, onDone }: { plantId: string; onDone: (recipeVe
       {lines.map((line, index) => (
         <div key={index}>
           <Field label={`Material ${index + 1}`} required error={fe.errors[`line-${index}-material`]}>
-            <select aria-label={`Material ${index + 1}`} value={line.materialItemId} onChange={(e) => setLine(index, { materialItemId: e.target.value })}>
-              <option value="">Seleccione…</option>
-              {materials.map((m) => (
-                <option key={m.itemId} value={m.itemId}>
-                  {itemLabel(m)}
-                </option>
-              ))}
-            </select>
+            <SearchSelect
+              aria-label={`Material ${index + 1}`}
+              value={line.materialItemId}
+              onChange={(materialItemId) => setLine(index, { materialItemId })}
+              options={materials.map((m) => ({ value: m.itemId, label: itemLabel(m) }))}
+            />
           </Field>
           <Field label={`Cantidad por tanda ${index + 1}`} required error={fe.errors[`line-${index}-quantity`]} hint={line.materialItemId ? undefined : "Elija el material para ver su unidad."}>
             <SuffixInput

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { nav, signIn, submit } from "./support";
+import { nav, pick, pickFirst, signIn, submit } from "./support";
 
 // E-PR18b-10: buyer creates and submits a purchase order, the approver approves it, the storekeeper receives it —
 // every actor signs in through the (simulated) Google sign-in and works only through the UI.
@@ -9,10 +9,10 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   const buyer = await signIn(browser, "Comprador");
   await buyer.goto("/compras/ordenes/nueva/");
   await buyer.getByLabel("Planta de la orden").selectOption({ index: 1 });
-  await buyer.getByLabel("Proveedor").selectOption({ index: 1 });
+  await pickFirst(buyer.getByLabel("Proveedor"));
   // By code: the MFG-1 dev seed adds ADITIVO-P, which sorts first (MFG1-07).
   // UX4-02 (C-08): the description is not repeated when it equals the code.
-  await buyer.getByLabel("Artículo 1").selectOption({ label: "ARENA-LAVADA" });
+  await pick(buyer.getByLabel("Artículo 1"), "ARENA-LAVADA");
   await buyer.getByLabel("Cantidad 1").fill("40");
   await buyer.getByLabel("Precio 1").fill("1,000.00");
   // UX4-02 (C-09): the server's preview — the line's net and the net total (40 × 1,000.00), then the ITBIS or why it is missing.

@@ -748,3 +748,18 @@ statement; Cobros sends it.
   its USD invoice with the server's rate and pesos approved and posted, a DUA, and the settlement approved by the Controller. DevStack
   `UsdSeed` maps AP_FOREIGN, IMPORT_CLEARING and the FX accounts, approves P-38…P-43R and the category «Montacargas y equipos».
 - E2E-U1 over the API: `UsdAcceptanceTests`; acceptance matrix `docs/acceptance/usd1.md` (`AcceptanceUsd1TraceabilityTests`; USD-04 pending).
+
+## UX5-01 — pickers you type into (E-UX5-1…5)
+
+`components/SearchSelect.tsx` replaces the long `<select>` of customers, suppliers, items, accounts and expense categories: an input with
+`role="combobox"` that keeps the field's `aria-label`, a listbox below it filtered on every word typed (any part of the name, the hint or the
+keywords; accents and capitals ignored), ↑ ↓ / Enter / Escape, a «×» that clears it, and at most 60 options drawn («N más: siga
+escribiendo»). `partyOption` shows a customer or supplier with its RNC, or «Exterior · país». On a phone it takes the screen's width.
+
+Converted: Proveedor on purchase / expense orders, supplier and expense invoices, DUA (DGA), the payment proposal, the purchase-order
+filter and the trial balance; Cliente on orders, quotes (form and filter), cash-sale and order lines, receipts, the statement and fiscal
+authorizations (form and filter); Artículo / Producto lines on purchase orders, orders, quotes, cash sales and authorizations; Producto and
+Material on recipes and standard costs; Cuenta on adjustments and role maps; Cuenta de gasto on expense categories; Categoría on expense
+lines. Short lists (status, plant, bank account, machine, shift, units) stay `<select>`; the ledger keeps its own account search.
+
+Journeys choose with `pick(field, text, option?)` / `pickFirst(field)` (`e2e/support.ts`); unit tests: `tests/unit/searchSelect.test.ts`.

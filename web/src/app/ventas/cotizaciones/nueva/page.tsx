@@ -14,6 +14,7 @@ import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { allCustomers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // QUO1-04 (E-QUO1-04-3): create a quote, or edit it while DRAFT (quote:manage). Customers DRAFT or ACTIVE (only an ACTIVE one is
 // converted later); products of the price list in force, each line with its list price and an optional quoted price (empty = the
@@ -182,15 +183,16 @@ function QuoteForm() {
       <h1>{quote ? `Editar cotización ${quote.header.quoteNo}` : "Nueva cotización"}</h1>
       <div>
         <Field label="Cliente" required error={fe.errors.partyId}>
-          <select aria-label="Cliente" value={current.partyId} disabled={quote !== null} onChange={(e) => set({ partyId: e.target.value })}>
-            <option value="">Seleccione…</option>
-            {data.customers.map((c) => (
-              <option key={c.partyId} value={c.partyId}>
-                {c.legalName} {c.rnc ? `(${c.rnc})` : ""}
-                {c.customerStatus === "DRAFT" ? " — borrador" : ""}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Cliente"
+            value={current.partyId}
+            disabled={quote !== null}
+            onChange={(partyId) => set({ partyId })}
+            options={data.customers.map((c) => ({
+              ...partyOption(c.partyId, c.legalName, c.rnc),
+              hint: [c.rnc, c.customerStatus === "DRAFT" ? "borrador" : null].filter(Boolean).join(" · ") || null,
+            }))}
+          />
         </Field>
         <Field label="Planta" required error={fe.errors.plantId}>
           <select aria-label="Planta de la cotización" value={current.plantId} onChange={(e) => set({ plantId: e.target.value })}>
@@ -251,22 +253,16 @@ function QuoteForm() {
             return (
               <tr key={index}>
                 <td>
-                  <select
+                  <SearchSelect
                     aria-label={`Producto ${index + 1}`}
                     {...fieldAria(fe.errors[`line-${index}-item`], `quote-line-${index}-item`, true)}
                     value={line.itemId && line.uom ? `${line.itemId}|${line.uom}` : ""}
-                    onChange={(e) => {
-                      const [itemId = "", uom = ""] = e.target.value.split("|");
+                    onChange={(chosen) => {
+                      const [itemId = "", uom = ""] = chosen.split("|");
                       setLine(index, { itemId, uom });
                     }}
-                  >
-                    <option value="">Seleccione…</option>
-                    {data.prices.map((p) => (
-                      <option key={`${p.itemId}|${p.uom}`} value={`${p.itemId}|${p.uom}`}>
-                        {p.itemCode} — {p.itemDescription} ({p.uom})
-                      </option>
-                    ))}
-                  </select>
+                    options={data.prices.map((p) => ({ value: `${p.itemId}|${p.uom}`, label: `${p.itemCode} — ${p.itemDescription} (${p.uom})`, keywords: p.itemCode }))}
+                  />
                   <FieldMessage id={`quote-line-${index}-item`} error={fe.errors[`line-${index}-item`]} />
                 </td>
                 <td>{line.uom}</td>

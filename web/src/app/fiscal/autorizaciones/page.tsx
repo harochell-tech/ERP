@@ -12,6 +12,7 @@ import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { expiryText, expiryTone } from "@/lib/ux4a-auditoria";
 import { allCustomers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // FIS1-05 (E-FIS1-05-2): CONFOTUR fiscal authorizations by status and customer (sales:read). Crédito and Facturación register them
 // (fiscal_authorization:register); the Especialista fiscal expires those past their validity (fiscal_authorization:suspend, the same
@@ -108,14 +109,13 @@ function Authorizations() {
           </select>
         </Field>
         <Field label="Cliente">
-          <select aria-label="Cliente" value={partyId} onChange={(e) => go({ cliente: e.target.value })}>
-            <option value="">Todos</option>
-            {(customers.data?.items ?? []).map((c) => (
-              <option key={c.partyId} value={c.partyId}>
-                {c.legalName} {c.rnc ? `(${c.rnc})` : ""}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Cliente"
+            value={partyId}
+            onChange={(cliente) => go({ cliente })}
+            options={(customers.data?.items ?? []).map((c) => partyOption(c.partyId, c.legalName, c.rnc))}
+            placeholder="Todos"
+          />
         </Field>
       </div>
       {data === null ? (

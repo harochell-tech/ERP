@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { confirmAction, expectFits, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, pick, signIn, submit } from "./support";
 
 // CF1-05 (E2E-C1, E-CF1-05-1…13): a cash sale to the final consumer through the UI. Caja sells 100 blocks at 50.00 to María Pérez
 // (5,900.00 with ITBIS, below the identification amount), sends the sale to payment and collects it in two parts — 1,900.00 in cash
@@ -30,7 +30,7 @@ test("cash sale to a final consumer: collected, delivered and invoiced as a paid
   await caja.getByRole("link", { name: "Nueva venta de contado" }).click();
   await expect(caja.getByRole("heading", { name: "Nueva venta de contado" })).toBeVisible();
   await expect(caja.getByTestId("threshold-amount")).toHaveText("250,000.00");
-  await caja.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
+  await pick(caja.getByLabel("Producto 1"), "BLOQUE-6", "BLOQUE-6 — Bloque de 6 pulgadas (un)");
   await caja.getByLabel("Cantidad 1").fill("100");
   await expect(caja.getByTestId("preview-total")).toHaveText("5,900.00");
   await caja.getByLabel("Nombre del comprador").fill("María Pérez");

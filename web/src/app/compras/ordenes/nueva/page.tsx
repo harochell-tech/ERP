@@ -15,6 +15,7 @@ import { useLoad } from "@/lib/useQuery";
 import { previewQuery } from "@/lib/ux4a";
 import { itemLabel, previewKey, uomLabel } from "@/lib/ux4a-compras";
 import { allSuppliers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 interface Line {
   itemId: string;
@@ -223,14 +224,12 @@ export default function NewPurchaseOrder() {
           </select>
         </Field>
         <Field label="Proveedor" required error={fe.errors.partyId}>
-          <select aria-label="Proveedor" value={values.partyId} onChange={(e) => setValues({ ...values, partyId: e.target.value })}>
-            <option value="">—</option>
-            {data.suppliers.map((s) => (
-              <option key={s.supplierId} value={s.supplierId}>
-                {s.legalName}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Proveedor"
+            value={values.partyId}
+            onChange={(partyId) => setValues({ ...values, partyId })}
+            options={data.suppliers.map((s) => partyOption(s.supplierId, s.legalName, s.rnc, s.country))}
+          />
         </Field>
         <Field label="Fecha" required error={fe.errors.orderDate}>
           <input type="date" aria-label="Fecha de la orden" value={values.orderDate} onChange={(e) => setValues({ ...values, orderDate: e.target.value })} />
@@ -256,19 +255,13 @@ export default function NewPurchaseOrder() {
             return (
               <tr key={index}>
                 <td>
-                  <select
+                  <SearchSelect
                     aria-label={`Artículo ${index + 1}`}
                     {...fieldAria(lineError(index, "itemId"), id("itemId"), true)}
                     value={line.itemId}
-                    onChange={(e) => setLine(index, { itemId: e.target.value, uom: data.items.find((i) => i.itemId === e.target.value)?.baseUom ?? "" })}
-                  >
-                    <option value="">—</option>
-                    {data.items.map((i) => (
-                      <option key={i.itemId} value={i.itemId}>
-                        {itemLabel(i.code, i.description)}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(itemId) => setLine(index, { itemId, uom: data.items.find((i) => i.itemId === itemId)?.baseUom ?? "" })}
+                    options={data.items.map((i) => ({ value: i.itemId, label: itemLabel(i.code, i.description), keywords: i.code }))}
+                  />
                   <FieldMessage id={id("itemId")} error={lineError(index, "itemId")} />
                 </td>
                 <td>

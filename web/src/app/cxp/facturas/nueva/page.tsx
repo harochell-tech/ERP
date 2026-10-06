@@ -11,6 +11,7 @@ import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { allSuppliers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 interface Values {
   partyId: string;
@@ -114,14 +115,12 @@ export default function NewInvoice() {
       <h1>Registrar factura de proveedor</h1>
       <div>
         <Field label="Proveedor" required error={fe.errors.partyId}>
-          <select aria-label="Proveedor" value={values.partyId} onChange={(e) => setValues({ ...values, partyId: e.target.value, purchaseOrderId: "", lines: {} })}>
-            <option value="">—</option>
-            {suppliers.data.items.map((s) => (
-              <option key={s.supplierId} value={s.supplierId}>
-                {s.legalName}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Proveedor"
+            value={values.partyId}
+            onChange={(partyId) => setValues({ ...values, partyId, purchaseOrderId: "", lines: {} })}
+            options={suppliers.data.items.map((s) => partyOption(s.supplierId, s.legalName, s.rnc, s.country))}
+          />
         </Field>
         <Field label="Orden de compra" required error={fe.errors.purchaseOrderId}>
           <select aria-label="Orden de compra" value={values.purchaseOrderId} onChange={(e) => setValues({ ...values, purchaseOrderId: e.target.value, lines: {} })}>

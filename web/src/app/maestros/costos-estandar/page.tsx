@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { SearchSelect } from "@/components/SearchSelect";
 
 // VS3-10a (E-VS3-02-7): standard cost per finished good and valuation area — prepared by the Controller, approved by the Aprobador
 // de políticas (step-up). The products come from master data, the areas from the plants.
@@ -58,14 +59,12 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
       <h2>Opción 1 · Escribir el costo unitario</h2>
       <p className="muted">Para un producto sin receta activa, o cuando el costo viene de otro cálculo: escriba cuánto cuesta una unidad.</p>
       <Field label="Producto" required error={fe.errors.itemId}>
-        <select aria-label="Producto" value={form.itemId} onChange={(e) => setForm({ ...form, itemId: e.target.value })}>
-          <option value="">Seleccione…</option>
-          {data.goods.map((g) => (
-            <option key={g.itemId} value={g.itemId}>
-              {codeAndName(g.code, g.description)}
-            </option>
-          ))}
-        </select>
+        <SearchSelect
+          aria-label="Producto"
+          value={form.itemId}
+          onChange={(itemId) => setForm({ ...form, itemId })}
+          options={data.goods.map((g) => ({ value: g.itemId, label: codeAndName(g.code, g.description), keywords: g.code }))}
+        />
       </Field>
       <Field label="Planta" required error={fe.errors.valuationAreaId} hint="El costo vale para el inventario del producto en esa planta.">
         <select aria-label="Planta" value={form.valuationAreaId} onChange={(e) => setForm({ ...form, valuationAreaId: e.target.value })}>

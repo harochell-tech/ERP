@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { confirmAction, expectFits, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, pick, pickFirst, signIn, submit } from "./support";
 
 // USD1-07b (E2E-U1 screens, E-USD1-07-1…7): an import through the UI. Tesorería enters today's rate (60.00) and the Controller approves it
 // from Inicio; the Comprador registers a foreign supplier and the Controller activates it. Cuentas por pagar registers its invoice of a
@@ -49,14 +49,14 @@ test("rate, foreign supplier, USD invoice, DUA and import settlement (E2E-U1)", 
   const payables = await signIn(browser, "Cuentas por pagar");
   await payables.goto("/cxp/facturas/gasto/");
   await expect(payables.getByRole("heading", { name: "Registrar factura de gastos" })).toBeVisible();
-  await payables.getByLabel("Proveedor").selectOption({ label: supplier });
+  await pick(payables.getByLabel("Proveedor"), supplier);
   await expect(payables.getByTestId("foreign-invoice-note")).toBeVisible();
   await expect(payables.getByLabel("Tipo de impuesto 1")).toHaveCount(0);
   await payables.getByLabel("Planta").selectOption({ index: 1 });
   await payables.getByLabel("Número de la factura del proveedor").fill(invoiceNo);
   await payables.getByLabel("Vence").fill(today());
   await payables.getByLabel("Descripción 1").fill("Montacargas usado Toyota 8FGU25");
-  await payables.getByLabel("Categoría 1").selectOption({ label: "Montacargas y equipos" });
+  await pick(payables.getByLabel("Categoría 1"), "Montacargas y equipos");
   await payables.getByLabel("Cantidad 1").fill("1");
   await payables.getByLabel("Precio 1").fill("8000");
   await expect(payables.getByTestId("expense-preview-net")).toHaveText("8,000.00");
@@ -85,7 +85,7 @@ test("rate, foreign supplier, USD invoice, DUA and import settlement (E2E-U1)", 
   await nav(payables, "DUA (aduana)");
   await payables.getByRole("button", { name: "Registrar DUA" }).click();
   const dua = payables.getByTestId("dua-form");
-  await dua.getByLabel("DGA").selectOption({ index: 1 });
+  await pickFirst(dua.getByLabel("DGA"));
   await dua.getByLabel("Planta").selectOption({ index: 1 });
   await dua.getByLabel("Número del DUA").fill(duaNo);
   await dua.getByLabel("Valor CIF").fill("480000");
