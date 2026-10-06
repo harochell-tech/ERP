@@ -9,6 +9,7 @@ import { isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { type ExpenseLine, EMPTY_EXPENSE_LINE } from "@/lib/expenses";
 import { useLoad } from "@/lib/useQuery";
 import { previewQuery } from "@/lib/ux4a";
+import { SearchSelect } from "@/components/SearchSelect";
 
 // GAS1-07 (E-GAS-07-2/3): the lines of an expense order or invoice — what is bought, its category and tax type (lists of the
 // ACTIVE categories and of the types in force on the document's date), quantity and price — and the server's preview of the net and
@@ -178,20 +179,14 @@ export function ExpenseLinesEditor({
                   <FieldMessage id={`expense-line-${index}-description`} error={errors[`line-${index}-description`]} />
                 </td>
                 <td>
-                  <select
+                  <SearchSelect
                     aria-label={`Categoría ${index + 1}`}
                     disabled={fromOrder}
                     value={line.expenseCategoryId}
-                    onChange={(e) => set(index, { expenseCategoryId: e.target.value })}
+                    onChange={(expenseCategoryId) => set(index, { expenseCategoryId })}
                     {...fieldAria(errors[`line-${index}-category`], `expense-line-${index}-category`, true)}
-                  >
-                    <option value="">Seleccione…</option>
-                    {masters.categories.map((c) => (
-                      <option key={c.expenseCategoryId} value={c.expenseCategoryId}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={masters.categories.map((c) => ({ value: c.expenseCategoryId, label: c.name, keywords: c.code }))}
+                  />
                   <FieldMessage id={`expense-line-${index}-category`} error={errors[`line-${index}-category`]} />
                 </td>
                 {usd ? null : (

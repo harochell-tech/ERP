@@ -11,6 +11,7 @@ import { useLoad } from "@/lib/useQuery";
 import { bankAccountLabel } from "@/lib/ux4a";
 import { balanceCell } from "@/lib/ux4a-contabilidad";
 import { allSuppliers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 const PATH = "/api/v1/companies/{companyId}/finance/trial-balance";
 
@@ -67,14 +68,13 @@ export default function Page() {
         ) : null}
         {filters && filters.suppliers.length > 0 ? (
           <Field label="Proveedor">
-            <select aria-label="Proveedor" value={partyId} onChange={(e) => setPartyId(e.target.value)}>
-              <option value="">Todos</option>
-              {filters.suppliers.map((s) => (
-                <option key={s.supplierId} value={s.supplierId}>
-                  {s.legalName}
-                </option>
-              ))}
-            </select>
+            <SearchSelect
+              aria-label="Proveedor"
+              value={partyId}
+              onChange={setPartyId}
+              options={filters.suppliers.map((s) => partyOption(s.supplierId, s.legalName, s.rnc, s.country))}
+              placeholder="Todos"
+            />
           </Field>
         ) : null}
         {filters && filters.banks.length > 0 ? (

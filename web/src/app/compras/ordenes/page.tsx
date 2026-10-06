@@ -10,6 +10,7 @@ import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 import { pendingMyApproval } from "@/lib/ux4a-compras";
 import { allSuppliers } from "@/lib/paging";
+import { SearchSelect } from "@/components/SearchSelect";
 
 const STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"] as const;
 
@@ -81,14 +82,13 @@ function Orders() {
         </label>
         <label>
           Proveedor:{" "}
-          <select aria-label="Filtrar por proveedor" value={supplierId} onChange={(e) => router.push(listHref(status, e.target.value))}>
-            <option value="">Todos</option>
-            {supplierOptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Filtrar por proveedor"
+            value={supplierId}
+            onChange={(id) => router.push(listHref(status, id))}
+            options={supplierOptions.map((s) => ({ value: s.id, label: s.name }))}
+            placeholder="Todos"
+          />
         </label>
         {pendingCount !== null ? (
           <Link className="button" href={listHref("PENDING_APPROVAL", "")} data-testid="po-pending-mine">

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { confirmAction, expectFits, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, pick, signIn, submit } from "./support";
 
 // PRS-05 (E2E-PR1, E-PRS-05-1…7): a customer's own price list with freight, through the UI. The Controller creates «Resorts» —
 // BLOQUE-6 at 44.00 and its freight to Bávaro at 3.50 per block — and the Aprobador de políticas approves it; Crédito moves «Hotel
@@ -74,11 +74,11 @@ test("customer price list with freight, from the list to the invoice (E2E-PR1)",
   const seller = await signIn(browser, "Vendedor");
   await nav(seller, "Pedidos");
   await seller.getByRole("link", { name: "Nuevo pedido" }).click();
-  await seller.getByLabel("Cliente", { exact: true }).selectOption({ label: "Hotel Playa Bávaro (101000001)" });
+  await pick(seller.getByLabel("Cliente", { exact: true }), "Hotel Playa Bávaro");
   await seller.getByLabel("Término de entrega").selectOption("DELIVERED_OWN_TRANSPORT");
   await seller.getByLabel("Dirección de la obra").fill("Hotel Playa Bávaro, Punta Cana");
   await seller.getByLabel("Zona de entrega").selectOption({ label: "Bávaro" });
-  await seller.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
+  await pick(seller.getByLabel("Producto 1"), "BLOQUE-6", "BLOQUE-6 — Bloque de 6 pulgadas (un)");
   await seller.getByLabel("Cantidad 1").fill("100");
   await expect(seller.getByTestId("preview-line-net:1")).toHaveText("4,400.00");
   await expect(seller.getByTestId("preview-line-freight:1")).toContainText("350.00");

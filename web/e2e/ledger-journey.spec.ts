@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { confirmAction, nav, signIn } from "./support";
+import { confirmAction, nav, pick, signIn } from "./support";
 
 // FIN1-04 (E-FIN1-04-11): the Contador prepares and submits an adjustment, the Controller approves it, and the Contador sees a
 // balanced trial balance, downloads it as CSV and opens the statements — each actor signs in through the simulated Google sign-in.
@@ -16,9 +16,9 @@ test("an adjustment from the Contador to the trial balance and the statements", 
   await expect(contador.getByLabel("Referencia del soporte")).toHaveValue("factura-ede.pdf");
   await expect(contador.getByText(/ACR-TAX/)).toHaveCount(0);
   await expect(contador.getByTestId("totals-on-save")).toBeVisible();
-  await contador.getByLabel("Cuenta 1").selectOption({ label: "6200 — Energía eléctrica" });
+  await pick(contador.getByLabel("Cuenta 1"), "6200");
   await contador.getByLabel("Monto 1").fill("1,250.00");
-  await contador.getByLabel("Cuenta 2").selectOption({ label: "2200 — Gastos acumulados por pagar" });
+  await pick(contador.getByLabel("Cuenta 2"), "2200");
   await contador.getByLabel("Lado 2").selectOption("credit");
   await contador.getByLabel("Monto 2").fill("1250");
   await contador.getByRole("button", { name: "Guardar borrador" }).click();

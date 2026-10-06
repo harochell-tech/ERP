@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectFits, nav, signIn, submit } from "./support";
+import { expectFits, nav, pick, signIn, submit } from "./support";
 
 // MAIL-03 (E-MAIL-5, 6, 7, E-MAIL-01-4, 6, 8): documents by e-mail through the UI. The dev stack runs mail in Redirect mode with a
 // transport that only records, so nothing leaves. The Vendedor sends the seeded quote to the customer's saved e-mails (one
@@ -38,14 +38,14 @@ test("a quote and a statement of account sent by e-mail, redirected in a test en
 
   // The Vendedor reads the statement of account but is not offered to send it.
   await nav(seller, "Estado de cuenta");
-  await seller.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno" });
+  await pick(seller.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await expect(seller.getByTestId("statement-closing")).toBeVisible();
   await expect(seller.getByRole("button", { name: "Enviar estado de cuenta por correo" })).toHaveCount(0);
 
   // Cobros sends it to the saved e-mails.
   const cobros = await signIn(browser, "Cobros");
   await nav(cobros, "Estado de cuenta");
-  await cobros.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno" });
+  await pick(cobros.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await cobros.getByRole("button", { name: "Enviar estado de cuenta por correo" }).click();
   await submit(cobros, "Enviar correo");
   const sent = cobros.getByTestId("mail-history").first().locator("tbody tr").first();

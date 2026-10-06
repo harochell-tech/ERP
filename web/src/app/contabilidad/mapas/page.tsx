@@ -8,6 +8,7 @@ import { formatDate, todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { SearchSelect } from "@/components/SearchSelect";
 
 type RoleMap = Schemas["AccountRoleMapView"];
 type AccountRole = Schemas["AccountRoleView"];
@@ -84,14 +85,12 @@ function PrepareMap({ roles, accounts, onDone }: { roles: readonly AccountRole[]
         </select>
       </Field>
       <Field label="Cuenta" required error={fe.errors.accountId} hint={role ? (role.isControl ? "Rol de control: solo cuentas de control." : "Solo cuentas que no son de control.") : undefined}>
-        <select aria-label="Cuenta" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-          <option value="">Elegir…</option>
-          {offered.map((a) => (
-            <option key={a.accountId} value={a.accountId}>
-              {a.code} — {a.name}
-            </option>
-          ))}
-        </select>
+        <SearchSelect
+          aria-label="Cuenta"
+          value={accountId}
+          onChange={setAccountId}
+          options={offered.map((a) => ({ value: a.accountId, label: `${a.code} — ${a.name}` }))}
+        />
       </Field>
       <Field label="Vigente desde" required error={fe.errors.effectiveFrom}>
         <input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />

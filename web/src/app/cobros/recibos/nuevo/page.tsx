@@ -16,6 +16,7 @@ import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { bankAccountLabel, suggestionAmounts } from "@/lib/ux4bSales";
 import { allCustomers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // VS3-10b (E-VS3-10-7, E-VS3-07-2): a receipt from an ACTIVE customer. A transfer names our bank account (masked list, E-VS3-10-14)
 // and its value date; a cheque its bank, number and date; cash nothing else.
@@ -235,14 +236,12 @@ export default function Page() {
         }}
       >
         <Field label="Cliente" required error={fe.errors.partyId}>
-          <select aria-label="Cliente" value={values.partyId} onChange={set("partyId")}>
-            <option value="">Seleccione…</option>
-            {data.customers.map((c) => (
-              <option key={c.partyId} value={c.partyId}>
-                {c.legalName} ({c.rnc})
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Cliente"
+            value={values.partyId}
+            onChange={(value) => set("partyId")({ target: { value } })}
+            options={data.customers.map((c) => partyOption(c.partyId, c.legalName, c.rnc))}
+          />
         </Field>
         <Field label="Medio" required>
           <select aria-label="Medio de cobro" value={values.method} onChange={set("method")}>

@@ -13,6 +13,7 @@ import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { allCustomers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // VS3-10a (E-VS3-10-4): a DRAFT order — customer, plant, delivery term, site, lines of products of the price list in force. Prices
 // and totals are the server's; the screen never multiplies.
@@ -166,14 +167,13 @@ function OrderForm() {
       <h1>{order ? `Editar pedido ${order.header.orderNo}` : "Nuevo pedido de venta"}</h1>
       <div>
         <Field label="Cliente" required error={fe.errors.partyId}>
-          <select aria-label="Cliente" value={current.partyId} disabled={order !== null} onChange={(e) => set({ partyId: e.target.value })}>
-            <option value="">Seleccione…</option>
-            {data.customers.map((c) => (
-              <option key={c.partyId} value={c.partyId}>
-                {c.legalName} ({c.rnc})
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Cliente"
+            value={current.partyId}
+            disabled={order !== null}
+            onChange={(partyId) => set({ partyId })}
+            options={data.customers.map((c) => partyOption(c.partyId, c.legalName, c.rnc))}
+          />
         </Field>
         <Field label="Planta" required error={fe.errors.plantId}>
           <select aria-label="Planta del pedido" value={current.plantId} onChange={(e) => set({ plantId: e.target.value })}>
@@ -236,22 +236,16 @@ function OrderForm() {
             return (
               <tr key={index}>
                 <td>
-                  <select
+                  <SearchSelect
                     aria-label={`Producto ${index + 1}`}
                     {...fieldAria(fe.errors[`line-${index}-item`], `order-line-${index}-item`, true)}
                     value={line.itemId && line.uom ? `${line.itemId}|${line.uom}` : ""}
-                    onChange={(e) => {
-                      const [itemId = "", uom = ""] = e.target.value.split("|");
+                    onChange={(chosen) => {
+                      const [itemId = "", uom = ""] = chosen.split("|");
                       setLine(index, { itemId, uom });
                     }}
-                  >
-                    <option value="">Seleccione…</option>
-                    {data.prices.map((p) => (
-                      <option key={`${p.itemId}|${p.uom}`} value={`${p.itemId}|${p.uom}`}>
-                        {p.itemCode} — {p.itemDescription} ({p.uom})
-                      </option>
-                    ))}
-                  </select>
+                    options={data.prices.map((p) => ({ value: `${p.itemId}|${p.uom}`, label: `${p.itemCode} — ${p.itemDescription} (${p.uom})`, keywords: p.itemCode }))}
+                  />
                   <FieldMessage id={`order-line-${index}-item`} error={fe.errors[`line-${index}-item`]} />
                 </td>
                 <td>{line.uom}</td>

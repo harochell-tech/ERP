@@ -8,6 +8,7 @@ import { GOODS_TYPES } from "@/lib/fiscalReports";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { SearchSelect } from "@/components/SearchSelect";
 
 // GAS1-07 (E-GAS-07-1): Maestros › Categorías de gasto. Each category says which expense account a purchase goes to, its 606 type
 // and whether it is a service or a good. The Contador or Controller prepares; the Controller approves (several at once, with
@@ -158,19 +159,12 @@ export default function ExpenseCategories() {
           </Field>
           {draft.expenseCategoryId ? null : (
             <Field label="Cuenta de gasto o de activo fijo" required error={fe.errors.accountId}>
-              <select
+              <SearchSelect
                 aria-label="Cuenta de gasto"
                 value={draft.accountId}
-                onChange={(e) => setDraft({ ...draft, accountId: e.target.value, goodsType606: assetIds.has(e.target.value) ? "04" : draft.goodsType606 })}
-              >
-                <option value="">Seleccione…</option>
-                {expenseAccounts.map((a) => (
-                  <option key={a.accountId} value={a.accountId}>
-                    {a.code} {a.name}
-                    {assetIds.has(a.accountId) ? " (activo fijo)" : ""}
-                  </option>
-                ))}
-              </select>
+                onChange={(accountId) => setDraft({ ...draft, accountId, goodsType606: assetIds.has(accountId) ? "04" : draft.goodsType606 })}
+                options={expenseAccounts.map((a) => ({ value: a.accountId, label: `${a.code} ${a.name}`, hint: assetIds.has(a.accountId) ? "activo fijo" : null }))}
+              />
             </Field>
           )}
           <Field label="Tipo en el 606" required error={fe.errors.goodsType606}>

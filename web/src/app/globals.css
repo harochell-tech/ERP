@@ -295,3 +295,14 @@ dialog.lot-actions section h3 { margin: 0 0 8px; font-size: 15px; }
 fieldset { border: 1px solid #d5dbe3; border-radius: 8px; padding: 8px 12px; margin: 8px 0 12px; }
 fieldset legend { font-size: 13px; color: #55606e; padding: 0 4px; }
 label.check { display: block; margin: 4px 0; overflow-wrap: anywhere; }
+
+/* UX5-01 (E-UX5-1/2): the picker you type into. */
+.search-select { position: relative; display: inline-block; min-width: 260px; max-width: 100%; }
+.search-select input { width: 100%; padding-right: 28px; }
+.search-select-clear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; padding: 4px 6px; cursor: pointer; }
+.search-select-list { position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 2px); max-height: 320px; overflow-y: auto; margin: 0; padding: 4px 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); min-width: 100%; }
+.search-select-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; cursor: pointer; font-weight: 400; color: var(--fg); }
+.search-select-list li.is-active, .search-select-list li[aria-selected="true"] { background: var(--tone-progress-bg); }
+.search-select-hint { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.search-select-empty, .search-select-more { color: var(--muted); font-size: 12px; cursor: default; }
+@media (max-width: 900px) { .search-select { display: block; width: 100%; min-width: 0; } }

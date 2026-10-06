@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { confirmAction, expectFits, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, pick, pickFirst, signIn, submit } from "./support";
 
 // GAS1-07 (E2E-G1, E-GAS-07-1…8): an expense purchase through the UI. The Contador prepares a category; the Controller approves it
 // from the list (never the Contador). Cuentas por pagar registers a telephone bill without an order — 30,000.00 of type
@@ -22,7 +22,7 @@ test("expense category, telephone bill over the approval amount, posted and in t
   await nav(contador, "Categorías de gasto");
   await contador.getByRole("button", { name: "Nueva categoría" }).click();
   await contador.getByLabel("Nombre de la categoría").fill(categoryName);
-  await contador.getByLabel("Cuenta de gasto").selectOption({ label: "63300 Teléfono e internet" });
+  await pick(contador.getByLabel("Cuenta de gasto"), "63300");
   await contador.getByLabel("Tipo en el 606").selectOption("02");
   await contador.getByLabel("Servicio o bien").selectOption("SERVICE");
   await submit(contador, "Preparar");
@@ -46,12 +46,12 @@ test("expense category, telephone bill over the approval amount, posted and in t
   await payables.goto("/cxp/facturas/nueva/");
   await payables.getByRole("link", { name: "Factura de gastos (sin artículo registrado)" }).click();
   await expect(payables.getByRole("heading", { name: "Registrar factura de gastos" })).toBeVisible();
-  await payables.getByLabel("Proveedor").selectOption({ index: 1 });
+  await pickFirst(payables.getByLabel("Proveedor"));
   await payables.getByLabel("Planta").selectOption({ index: 1 });
   await payables.getByLabel("NCF").fill(ncf);
   await payables.getByLabel("Vence").fill(today());
   await payables.getByLabel("Descripción 1").fill("Factura de teléfono del mes");
-  await payables.getByLabel("Categoría 1").selectOption({ label: categoryName });
+  await pick(payables.getByLabel("Categoría 1"), categoryName);
   await payables.getByLabel("Tipo de impuesto 1").selectOption({ label: "Telecomunicaciones (ITBIS 18 % + ISC 10 % + CDT 2 %)" });
   await payables.getByLabel("Cantidad 1").fill("1");
   await payables.getByLabel("Precio 1").fill("30000");
@@ -101,9 +101,9 @@ test("expense purchase order approved and billed in part by an expense invoice (
   await buyer.goto("/compras/ordenes/nueva/");
   await buyer.getByRole("link", { name: "Orden de gastos (servicios y suministros)" }).click();
   await expect(buyer.getByRole("heading", { name: "Nueva orden de compra de gastos" })).toBeVisible();
-  await buyer.getByLabel("Proveedor").selectOption({ index: 1 });
+  await pickFirst(buyer.getByLabel("Proveedor"));
   await buyer.getByLabel("Descripción 1").fill("Mantenimiento de la mezcladora");
-  await buyer.getByLabel("Categoría 1").selectOption({ label: "Reparaciones" });
+  await pick(buyer.getByLabel("Categoría 1"), "Reparaciones");
   await buyer.getByLabel("Tipo de impuesto 1").selectOption({ label: "ITBIS 18 %" });
   await buyer.getByLabel("Cantidad 1").fill("10");
   await buyer.getByLabel("Precio 1").fill("1,000.00");
@@ -123,7 +123,7 @@ test("expense purchase order approved and billed in part by an expense invoice (
   // Cuentas por pagar bills 6 of the 10 against the order: category and tax type are the order's, no approval amount applies.
   const payables = await signIn(browser, "Cuentas por pagar");
   await payables.goto("/cxp/facturas/gasto/");
-  await payables.getByLabel("Proveedor").selectOption({ index: 1 });
+  await pickFirst(payables.getByLabel("Proveedor"));
   await payables.getByLabel("Orden de compra de gastos").selectOption({ label: poNo });
   await expect(payables.getByLabel("Categoría 1")).toBeDisabled();
   await expect(payables.getByLabel("Cantidad 1")).toHaveValue("10");

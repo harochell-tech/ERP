@@ -10,6 +10,7 @@ import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { allCustomers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // FIS1-05 (E-FIS1-05-3): register a CONFOTUR authorization, or edit it while DRAFT (fiscal_authorization:register). The scope is
 // product × sale unit with the authorized quantity and net, as typed from the DGII certificate; the server validates everything
@@ -227,14 +228,13 @@ function AuthorizationForm() {
       <p className="muted">Régimen CONFOTUR. Copie los datos del certificado de exención emitido por la DGII; el certificado se adjunta después, en la autorización.</p>
       <div>
         <Field label="Cliente" required error={fe.errors.partyId}>
-          <select aria-label="Cliente" value={current.partyId} disabled={authorization !== null} onChange={(e) => set({ partyId: e.target.value, salesOrderId: "", proformaIds: [] })}>
-            <option value="">—</option>
-            {data.customers.map((c) => (
-              <option key={c.partyId} value={c.partyId}>
-                {c.legalName} ({c.rnc})
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Cliente"
+            value={current.partyId}
+            disabled={authorization !== null}
+            onChange={(partyId) => set({ partyId, salesOrderId: "", proformaIds: [] })}
+            options={data.customers.map((c) => partyOption(c.partyId, c.legalName, c.rnc))}
+          />
         </Field>
         <Field label="Número de certificado" required error={fe.errors.certificateNo}>
           <input value={current.certificateNo} onChange={setText("certificateNo")} />
@@ -278,22 +278,16 @@ function AuthorizationForm() {
           {current.lines.map((line, index) => (
             <tr key={index}>
               <td>
-                <select
+                <SearchSelect
                   aria-label={`Producto ${index + 1}`}
                   {...fieldAria(lineError(index, "item"), `auth-line-${index}-item`, true)}
                   value={line.itemId && line.uom ? `${line.itemId}|${line.uom}` : ""}
-                  onChange={(e) => {
-                    const [itemId = "", uom = ""] = e.target.value.split("|");
+                  onChange={(chosen) => {
+                    const [itemId = "", uom = ""] = chosen.split("|");
                     setLine(index, { itemId, uom });
                   }}
-                >
-                  <option value="">—</option>
-                  {data.products.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  options={data.products.map(([value, label]) => ({ value, label }))}
+                />
                 <FieldMessage id={`auth-line-${index}-item`} error={lineError(index, "item")} />
               </td>
               <td>{line.uom}</td>

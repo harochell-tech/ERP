@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectFits, nav, signIn, submit } from "./support";
+import { expectFits, nav, pick, signIn, submit } from "./support";
 
 // E-B03-15-4 / UX2-02 (E-UX2-1…12): the configuration screens on a desktop and on a phone. The Controller prepares a version of
 // the PURCHASING policy typing a percentage and the policy approver (someone else) approves it seeing "en vigor → propuesta"; the
@@ -50,7 +50,7 @@ test("an account role map is prepared by the Contador and approved by the Contro
   // Roles read by their names everywhere.
   await expect(contador.getByRole("cell", { name: "Cargos y comisiones bancarias" }).first()).toBeVisible();
   await contador.getByLabel("Rol contable").selectOption({ label: "Cargos y comisiones bancarias" });
-  await contador.getByLabel("Cuenta", { exact: true }).selectOption({ label: "6105 — Cargos bancarios" });
+  await pick(contador.getByLabel("Cuenta", { exact: true }), "6105");
   await contador.getByLabel("Vigente desde").fill(`${nextYear()}-02-01`);
   await submit(contador, "Guardar borrador");
   await expect(contador.getByTestId("toast").first()).toContainText("guardado en borrador");

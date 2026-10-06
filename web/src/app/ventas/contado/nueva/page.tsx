@@ -14,6 +14,7 @@ import { useZones, ZoneField } from "@/components/ZoneField";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { SearchSelect } from "@/components/SearchSelect";
 
 // CF1-05 (E-CF1-05-2, E-CF1-05-6): step 1 of a cash sale — the products at the price list in force and, optional below the fiscal
 // rule's amount, who buys. Prices, ITBIS and totals are the server's (POST preview); the screen never multiplies.
@@ -226,22 +227,16 @@ function CashSaleForm() {
             return (
               <tr key={index}>
                 <td>
-                  <select
+                  <SearchSelect
                     aria-label={`Producto ${index + 1}`}
                     {...fieldAria(fe.errors[`line-${index}-item`], `cash-line-${index}-item`, true)}
                     value={line.itemId && line.uom ? `${line.itemId}|${line.uom}` : ""}
-                    onChange={(e) => {
-                      const [itemId = "", uom = ""] = e.target.value.split("|");
+                    onChange={(chosen) => {
+                      const [itemId = "", uom = ""] = chosen.split("|");
                       setLine(index, { itemId, uom });
                     }}
-                  >
-                    <option value="">Seleccione…</option>
-                    {data.prices.map((p) => (
-                      <option key={`${p.itemId}|${p.uom}`} value={`${p.itemId}|${p.uom}`}>
-                        {p.itemCode} — {p.itemDescription} ({p.uom})
-                      </option>
-                    ))}
-                  </select>
+                    options={data.prices.map((p) => ({ value: `${p.itemId}|${p.uom}`, label: `${p.itemCode} — ${p.itemDescription} (${p.uom})`, keywords: p.itemCode }))}
+                  />
                   <FieldMessage id={`cash-line-${index}-item`} error={fe.errors[`line-${index}-item`]} />
                 </td>
                 <td>{line.uom}</td>

@@ -13,6 +13,7 @@ import { allSuppliers } from "@/lib/paging";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // GAS1-07 (E-GAS-07-2): an expense invoice — electricity, telephone, repairs — with or without an expense order. Each line says
 // what was bought, its category and its tax type; the server prices it while it is typed. «Registrar y cotejar» registers it and
@@ -159,14 +160,12 @@ export default function NewExpenseInvoice() {
       </p>
       <div>
         <Field label="Proveedor" required error={fe.errors.partyId}>
-          <select aria-label="Proveedor" value={values.partyId} onChange={(e) => set({ partyId: e.target.value, purchaseOrderId: "", lines: [{ ...EMPTY_EXPENSE_LINE }] })}>
-            <option value="">—</option>
-            {base.data.suppliers.map((s) => (
-              <option key={s.supplierId} value={s.supplierId}>
-                {s.legalName}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Proveedor"
+            value={values.partyId}
+            onChange={(partyId) => set({ partyId, purchaseOrderId: "", lines: [{ ...EMPTY_EXPENSE_LINE }] })}
+            options={base.data.suppliers.map((s) => partyOption(s.supplierId, s.legalName, s.rnc, s.country))}
+          />
         </Field>
         <Field label="Orden de compra de gastos (opcional)">
           <select aria-label="Orden de compra de gastos" value={values.purchaseOrderId} onChange={(e) => void chooseOrder(e.target.value)}>

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { confirmAction, expectFits, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, pick, signIn, submit } from "./support";
 
 // FIS1b-07 (E2E-P1, E-FIS1b-01-14): the CONFOTUR proforma as a collection document, through the UI. The Vendedor marks an order
 // "exención en trámite, se cobra con ITBIS"; Despacho delivers it in two conduces and each issues its proforma (30 and 20 blocks at
@@ -63,8 +63,8 @@ test("proformas collected with ITBIS, certified, invoiced as one e-CF 44 and the
   const seller = await signIn(browser, "Vendedor");
   await nav(seller, "Pedidos");
   await seller.getByRole("link", { name: "Nuevo pedido" }).click();
-  await seller.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
-  await seller.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
+  await pick(seller.getByLabel("Cliente", { exact: true }), "Constructora Uno");
+  await pick(seller.getByLabel("Producto 1"), "BLOQUE-6", "BLOQUE-6 — Bloque de 6 pulgadas (un)");
   await seller.getByLabel("Cantidad 1").fill("50");
   await seller.getByLabel("Exención de ITBIS").selectOption("WITH_ITBIS");
   await submit(seller, "Crear pedido");
@@ -116,7 +116,7 @@ test("proformas collected with ITBIS, certified, invoiced as one e-CF 44 and the
   const cobros = await signIn(browser, "Cobros");
   await nav(cobros, "Recibos");
   await cobros.getByRole("link", { name: "Registrar cobro" }).click();
-  await cobros.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
+  await pick(cobros.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await expect(cobros.getByTestId("open-proformas-notice")).toContainText(firstNo);
   await cobros.getByLabel("Monto del cobro").fill("2950.00");
   await cobros.getByLabel("Cuenta bancaria").selectOption({ label: "TEST_BANK ••••4321" });
@@ -141,7 +141,7 @@ test("proformas collected with ITBIS, certified, invoiced as one e-CF 44 and the
   await billing.getByRole("link", { name: "Registrar autorización" }).click();
   // The list has its own "Cliente" filter: wait for the form before choosing the customer.
   await expect(billing.getByRole("heading", { name: "Registrar autorización fiscal" })).toBeVisible();
-  await billing.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
+  await pick(billing.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await billing.getByLabel("Número de certificado").fill(certificate);
   await billing.getByLabel("Emitido el").fill(dominicanNow().date);
   await billing.getByLabel("Vigente hasta").fill(dominicanNow(0, 180).date);
@@ -220,7 +220,7 @@ test("proformas collected with ITBIS, certified, invoiced as one e-CF 44 and the
 
   // The customer's statement of account tells it: receipt, invoice, refund; no proforma is left open.
   await nav(cobros, "Estado de cuenta");
-  await cobros.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno" });
+  await pick(cobros.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await expect(cobros.getByRole("cell", { name: "Devolución al cliente" })).toBeVisible();
   await expect(cobros.getByTestId("statement-proformas")).toHaveCount(0);
   await expectFits(cobros);

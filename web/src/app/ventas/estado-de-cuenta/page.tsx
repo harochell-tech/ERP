@@ -13,6 +13,7 @@ import { csvUrl, monthStart } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 import { allCustomers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // VS3-10b (E-VS3-09-3/4): a customer's statement of account from the ledger (it always agrees with AR-GL), with a CSV to send.
 // UX4-03 (V-19): and a print view for the customer (letter, without the menu), like the quote's.
@@ -39,14 +40,12 @@ function Statement() {
       <h1>Estado de cuenta del cliente</h1>
       <div className="inline-form">
         <Field label="Cliente">
-          <select aria-label="Cliente" value={customer} onChange={(e) => router.push(`/ventas/estado-de-cuenta/?cliente=${e.target.value}`)}>
-            <option value="">Seleccione…</option>
-            {(customers.data?.items ?? []).map((c) => (
-              <option key={c.partyId} value={c.partyId}>
-                {c.legalName}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Cliente"
+            value={customer}
+            onChange={(id) => router.push(`/ventas/estado-de-cuenta/?cliente=${id}`)}
+            options={(customers.data?.items ?? []).map((c) => partyOption(c.partyId, c.legalName, c.rnc))}
+          />
         </Field>
         <Field label="Desde">
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />

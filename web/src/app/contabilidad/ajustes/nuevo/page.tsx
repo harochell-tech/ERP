@@ -10,6 +10,7 @@ import { sha256Hex } from "@/lib/ledger";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { SearchSelect } from "@/components/SearchSelect";
 
 interface Line {
   accountId: string;
@@ -200,19 +201,13 @@ function AdjustmentForm() {
           {values.lines.map((line, index) => (
             <tr key={index}>
               <td>
-                <select
+                <SearchSelect
                   aria-label={`Cuenta ${index + 1}`}
                   value={line.accountId}
-                  onChange={(e) => setLine(index, { accountId: e.target.value })}
+                  onChange={(accountId) => setLine(index, { accountId })}
                   {...fieldAria(fe.errors[`line-${index}-account`], `line-${index}-account-message`, true)}
-                >
-                  <option value="">—</option>
-                  {data.accounts.map((a) => (
-                    <option key={a.accountId} value={a.accountId}>
-                      {a.code} — {a.name}
-                    </option>
-                  ))}
-                </select>
+                  options={data.accounts.map((a) => ({ value: a.accountId, label: `${a.code} — ${a.name}` }))}
+                />
                 <FieldMessage id={`line-${index}-account-message`} error={fe.errors[`line-${index}-account`]} />
               </td>
               <td>

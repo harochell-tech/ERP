@@ -12,6 +12,7 @@ import { QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quotes";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
 import { allCustomers } from "@/lib/paging";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // QUO1-04 (E-QUO1-04-2): sales quotations by status, customer and "solo vencidas" (sales:read); the Vendedor creates them
 // (quote:manage). A SENT quote past its validity reads "Vencida" (the server's flag); the totals are the server's.
@@ -81,14 +82,13 @@ function Quotes() {
           </select>
         </Field>
         <Field label="Cliente">
-          <select aria-label="Cliente" value={partyId} onChange={(e) => go({ cliente: e.target.value })}>
-            <option value="">Todos</option>
-            {(customers.data?.items ?? []).map((c) => (
-              <option key={c.partyId} value={c.partyId}>
-                {c.legalName} {c.rnc ? `(${c.rnc})` : ""}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Cliente"
+            value={partyId}
+            onChange={(cliente) => go({ cliente })}
+            options={(customers.data?.items ?? []).map((c) => partyOption(c.partyId, c.legalName, c.rnc))}
+            placeholder="Todos"
+          />
         </Field>
         <label className="field">
           <span>Solo vencidas</span>

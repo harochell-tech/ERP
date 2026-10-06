@@ -13,6 +13,7 @@ import { allSuppliers } from "@/lib/paging";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
+import { SearchSelect, partyOption } from "@/components/SearchSelect";
 
 // GAS1-07 (E-GAS-07-3): a purchase order of expenses — services and supplies that never go through the warehouse — approved as any
 // order; its invoices bill it and it closes once billed in full (E-GAS-05-4).
@@ -115,14 +116,12 @@ export default function NewExpenseOrder() {
           </select>
         </Field>
         <Field label="Proveedor" required error={fe.errors.partyId}>
-          <select aria-label="Proveedor" value={values.partyId} onChange={(e) => set({ partyId: e.target.value })}>
-            <option value="">—</option>
-            {base.data.suppliers.map((s) => (
-              <option key={s.supplierId} value={s.supplierId}>
-                {s.legalName}
-              </option>
-            ))}
-          </select>
+          <SearchSelect
+            aria-label="Proveedor"
+            value={values.partyId}
+            onChange={(partyId) => set({ partyId })}
+            options={base.data.suppliers.map((s) => partyOption(s.supplierId, s.legalName, s.rnc, s.country))}
+          />
         </Field>
         <Field label="Fecha" required>
           <input type="date" aria-label="Fecha de la orden" value={values.orderDate} onChange={(e) => set({ orderDate: e.target.value })} />

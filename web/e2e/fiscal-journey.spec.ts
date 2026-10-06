@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { confirmAction, nav, signIn } from "./support";
+import { confirmAction, nav, pick, signIn } from "./support";
 
 // FIS1-05 (E-FIS1-05-11): a CONFOTUR exempt sale through the UI. Facturación registers an authorization for Constructora Uno
 // (BLOQUE-6, 100 blocks / 5,000.00) with a unique certificate, attaches the DGII certificate and submits it; the Especialista fiscal
@@ -46,13 +46,13 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await nav(billing, "Autorizaciones fiscales");
   await billing.getByRole("link", { name: "Registrar autorización" }).click();
   await expect(billing.getByRole("heading", { name: "Registrar autorización fiscal" })).toBeVisible();
-  await billing.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
+  await pick(billing.getByLabel("Cliente", { exact: true }), "Constructora Uno");
   await billing.getByLabel("Número de certificado").fill(certificate);
   await billing.getByLabel("Emitido el").fill(dominicanNow().date);
   await billing.getByLabel("Vigente hasta").fill(dominicanNow(0, 180).date);
   await billing.getByLabel("Proyecto", { exact: true }).fill("Hotel Playa (E2E)");
   await billing.getByLabel("Resolución CONFOTUR").fill(`CONFOTUR-${stamp}`);
-  await billing.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
+  await pick(billing.getByLabel("Producto 1"), "BLOQUE-6", "BLOQUE-6 — Bloque de 6 pulgadas (un)");
   await billing.getByLabel("Cantidad 1").fill("100");
   await billing.getByLabel("Neto 1").fill("5000.00");
   await billing.getByRole("button", { name: "Registrar autorización" }).click();
@@ -81,8 +81,8 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   const seller = await signIn(browser, "Vendedor");
   await nav(seller, "Pedidos");
   await seller.getByRole("link", { name: "Nuevo pedido" }).click();
-  await seller.getByLabel("Cliente", { exact: true }).selectOption({ label: "Constructora Uno (131925332)" });
-  await seller.getByLabel("Producto 1").selectOption({ label: "BLOQUE-6 — Bloque de 6 pulgadas (un)" });
+  await pick(seller.getByLabel("Cliente", { exact: true }), "Constructora Uno");
+  await pick(seller.getByLabel("Producto 1"), "BLOQUE-6", "BLOQUE-6 — Bloque de 6 pulgadas (un)");
   await seller.getByLabel("Cantidad 1").fill("40");
   await seller.getByRole("button", { name: "Crear pedido" }).click();
   await expect(seller.getByTestId("order-total")).toHaveText("2,000.00");

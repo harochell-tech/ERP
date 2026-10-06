@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { confirmAction, expectFits, nav, signIn, submit } from "./support";
+import { confirmAction, expectFits, nav, pick, signIn, submit } from "./support";
 
 // MFG-1 through the UI (MFG1-07, E-MFG1-07-6): the Gerente de planta creates the machine and the shift, the Supervisor de producción
 // prepares the recipe and the Gerente approves it, the Controller prepares the standard cost from the recipe and the Aprobador de
@@ -46,7 +46,7 @@ test("a production day from the recipe to a released lot (MFG-1)", async ({ brow
   await nav(supervisor, "Recetas");
   await supervisor.getByRole("button", { name: "Preparar una receta nueva" }).click();
   await expect(supervisor.getByTestId("recipe-draft-notice")).toBeVisible();
-  await supervisor.getByLabel("Producto", { exact: true }).selectOption({ label: "ADOQUIN-H — Adoquín holandés (un)" });
+  await pick(supervisor.getByLabel("Producto", { exact: true }), "ADOQUIN-H");
   await supervisor.getByLabel("Máquina", { exact: true }).selectOption({ label: "BESSER-1 — Bloquera Besser 1" });
   await supervisor.getByLabel("Unidades por tanda").fill("150");
   await supervisor.getByLabel("Unidades por ciclo").fill("6");
@@ -63,7 +63,7 @@ test("a production day from the recipe to a released lot (MFG-1)", async ({ brow
     if (index > 0) {
       await supervisor.getByRole("button", { name: "Agregar material" }).click();
     }
-    await supervisor.getByLabel(`Material ${index + 1}`, { exact: true }).selectOption({ label: material });
+    await pick(supervisor.getByLabel(`Material ${index + 1}`, { exact: true }), material);
     await supervisor.getByLabel(`Cantidad por tanda ${index + 1}`).fill(qty);
   }
   await submit(supervisor, "Preparar receta");
