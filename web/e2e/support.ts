@@ -24,7 +24,14 @@ export async function nav(page: Page, label: string): Promise<void> {
     await toggle.click();
     await expect(page.getByRole("navigation", { name: "Menú principal" })).toBeVisible();
   }
-  await page.getByRole("navigation", { name: "Menú principal" }).getByRole("link", { name: label, exact: true }).click();
+  const menu = page.getByRole("navigation", { name: "Menú principal" });
+  const link = menu.getByRole("link", { name: label, exact: true });
+  // UX6-01 (E-UX6-1/2): the menu is an accordion — open the folded group holding the link first.
+  if (!(await link.isVisible())) {
+    const group = await menu.locator("ul", { has: page.locator(`a:text-is(${JSON.stringify(label)})`) }).first().getAttribute("id");
+    await menu.locator(`button[aria-controls="${group}"]`).click();
+  }
+  await link.click();
   await expectFits(page);
 }
 

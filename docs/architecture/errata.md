@@ -1224,6 +1224,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-UX5-3 | UX5-01 | It replaces every customer and supplier selector, in forms and filters; new documents keep offering only the active ones, as today. |
 | E-UX5-4 | UX5-01 | The same picker is used for items, accounts and expense categories. |
 | E-UX5-5 | UX5-01 | Its own PR after AF1-04 and before the fixed-asset screens, which are born with it. |
+| E-UX6-1 | UX6-01 | Every menu group is folded by default and opens with a click on its title; the group of the page shown opens by itself. |
+| E-UX6-2 | UX6-01 | The menu is an accordion: opening a group closes the one open; «Inicio» stays visible at the top. |
+| E-UX6-3 | UX6-01 | Folded groups are no longer remembered: the menu always starts compact. |
+| E-UX6-4 | UX6-01 | A web app manifest («Rochell Core», short name «Rochell», full screen, the brand colour), Android icons 192 / 512 and maskable, the iPhone icon 180 and the tab icon. |
+| E-UX6-5 | UX6-01 | The icon is the company's logo; until the owner sends it (SVG, or PNG ≥ 512 × 512 on a transparent background) an «R» monogram in the app's blue, replaced when it arrives. |
+| E-UX6-6 | UX6-01 | On phone screens fields use 16 px text so the iPhone does not zoom on focus; desktop unchanged. |
+| E-UX6-7 | UX6-01 | An automatic test opens every menu page at 360, 390 and 430 px and fails when a page is wider than the screen or a button or field is under 40 px high. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

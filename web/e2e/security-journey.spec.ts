@@ -21,8 +21,8 @@ test("a role requested by the security admin is approved by a second person", as
   await expect(approver.getByText("No hay solicitudes.")).toBeVisible();
 
   const employee = await signIn(browser, "Empleado nuevo (sin roles)");
-  await expect(employee.getByRole("link", { name: "Órdenes de compra" })).toBeVisible();
-  await expect(employee.getByRole("link", { name: "Usuarios y roles" })).toHaveCount(0);
+  await expect(employee.getByRole("navigation", { name: "Menú principal" }).locator("a", { hasText: "Órdenes de compra" })).toHaveCount(1); // E-UX6-1: in its folded group
+  await expect(employee.getByRole("navigation", { name: "Menú principal" }).locator("a", { hasText: "Usuarios y roles" })).toHaveCount(0); // E-UX6-1: in its folded group
 });
 
 test("the read-only audit and master screens open for their readers", async ({ browser }) => {
@@ -60,5 +60,5 @@ test("the read-only audit and master screens open for their readers", async ({ b
   await expect(auditor.getByText("no está disponible en este ambiente").or(auditor.getByTestId("chain-result"))).toBeVisible();
   await nav(auditor, "Respaldos diarios inalterables");
   await expect(auditor.getByRole("heading", { name: "Respaldos diarios inalterables" })).toBeVisible();
-  await expect(auditor.getByRole("link", { name: "Usuarios y roles" })).toBeVisible();
+  await expect(auditor.getByRole("navigation", { name: "Menú principal" }).locator("a", { hasText: "Usuarios y roles" })).toHaveCount(1); // E-UX6-1: in its folded group
 });

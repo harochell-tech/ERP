@@ -783,3 +783,15 @@ Journeys choose with `pick(field, text, option?)` / `pickFirst(field)` (`e2e/sup
 
 Inicio: «Activos por poner en servicio», «Depreciación del mes pendiente» (the preview of the last ended month), «Clases de activos por
 aprobar», «Bajas de activos por aprobar», «Cargas de activos por aprobar». Journey: `e2e/fixed-assets-journey.spec.ts` (desktop).
+
+## UX6-01 — compact menu, installable app, phone sizes (E-UX6-1…7)
+
+- Menu: an accordion — every group folded but the one holding the page shown (opened by itself) or the one last clicked; nothing is
+  remembered between visits. Journeys reach a folded item through `nav()`, which opens its group first.
+- Installable: `src/app/manifest.ts` (`/manifest.webmanifest`: «Rochell Core» / «Rochell», standalone, theme `#0b5cad`), Android icons
+  192 / 512 and maskable 512 in `public/icons/`, the iPhone icon `src/app/apple-icon.png` (180), the tab icon `src/app/icon.svg`, Apple web-app
+  metadata. All drawn by `scripts/icons.mjs` from the «R» monogram; with the company's logo, replace its `MARK` and rerun
+  `node scripts/icons.mjs`.
+- Phones: fields are 16 px under 900 px (no zoom on focus). `e2e/mobile-sweep.spec.ts` (phone project) opens every menu page of 15
+  accounts at 360, 390 and 430 px and fails on a page wider than the screen, a control off the screen outside a sideways-scrolling box,
+  a button or field under 40 px, or a field under 16 px.

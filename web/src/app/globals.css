@@ -120,6 +120,8 @@ pre { background: #f5f5f7; padding: 0.5rem; overflow-x: auto; }
   .app { grid-template-columns: 1fr; }
   .page { padding: 16px 16px 96px; max-width: 100vw; }
   .page h1 { font-size: 22px; overflow-wrap: anywhere; }
+  /* UX6-01 (E-UX6-6): under 16 px the iPhone zooms the page whenever a field takes the focus. */
+  input, select, textarea { font-size: 16px; }
 }
 .app-mobile { display: block; }
 .app-mobile .main { padding-top: 56px; }
