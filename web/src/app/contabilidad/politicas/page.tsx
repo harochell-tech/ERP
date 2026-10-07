@@ -64,7 +64,7 @@ function ParameterInput({ definition, value, onChange, ...fieldAria }: { definit
   return (
     <SuffixInput
       suffix={unit === "AMOUNT" ? "" : UNIT_SUFFIX[unit]}
-      inputMode={unit === "DAYS" || unit === "HOURS" ? "numeric" : "decimal"}
+      inputMode={unit === "DAYS" || unit === "HOURS" || unit === "MINUTES" ? "numeric" : "decimal"}
       placeholder={definition.example ?? undefined}
       value={value}
       onChange={onChange}

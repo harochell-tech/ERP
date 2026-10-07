@@ -16,6 +16,7 @@ public static class CsrfHeader
                 && !HttpMethods.IsGet(http.Request.Method)
                 && !HttpMethods.IsHead(http.Request.Method)
                 && !HttpMethods.IsOptions(http.Request.Method)
+                && !http.Request.Path.Equals(Rochell.Api.Ecf.EcfWebhook.Path, StringComparison.Ordinal) // E-VS4-02-5: its own secret header
                 && http.Request.Headers[Name] != Value)
             {
                 await ApiProblems.Problem(http, ApiErrors.CsrfHeaderRequired, $"State-changing requests must send the header {Name}: {Value}.")

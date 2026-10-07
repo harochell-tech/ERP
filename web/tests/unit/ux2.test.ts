@@ -120,6 +120,7 @@ describe("policy parameters by unit (E-UX2-1/2)", () => {
     expect(formatParameterValue(AMOUNT, "1.0000")).toBe("RD$ 1.00");
     expect(formatParameterValue(HOURS, "48")).toBe("48 horas");
     expect(formatParameterValue({ ...HOURS, unit: "DAYS" }, "1")).toBe("1 día");
+    expect(formatParameterValue({ ...HOURS, unit: "MINUTES" }, "30")).toBe("30 minutos");
     expect(formatParameterValue(OPTION, "A")).toBe("A");
     expect(formatParameterValue(PERCENT, null)).toBe("—");
   });
@@ -135,6 +136,7 @@ describe("policy parameters by unit (E-UX2-1/2)", () => {
     expect(validateParameter(AMOUNT, "1.00001")).toMatch(/monto/);
     expect(validateParameter(HOURS, "48")).toBeNull();
     expect(validateParameter(HOURS, "4.5")).toMatch(/entero de horas/);
+    expect(validateParameter({ ...HOURS, unit: "MINUTES" }, "4.5")).toMatch(/entero de minutos/);
     expect(validateParameter(OPTION, "B")).toBeNull();
     expect(validateParameter(OPTION, "")).toMatch(/^Elija/);
     expect(validateParameter(OPTION, "C")).toMatch(/opciones/);

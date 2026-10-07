@@ -403,6 +403,12 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   LOCATION_SYSTEM: "CURADO y TRANSITO son ubicaciones propias de la planta; se desactivan con la planta.",
   ASSET_DISPOSAL_INVALID: "Revise la baja: fecha entre la compra y hoy, motivo de 3 a 300 caracteres y precio solo en una venta.",
   PLANT_NOT_FOUND: "La planta no existe.",
+  ECF_SERIES_MISSING: "No hay un rango de e-NCF vigente para este tipo de comprobante; registre el que autorizó la DGII en Fiscal › Rangos e-NCF.",
+  ECF_SERIES_EXPIRED: "El rango de e-NCF de este tipo está vencido; registre el nuevo rango autorizado por la DGII.",
+  ECF_SERIES_INVALID: "Revise el rango: tipo 31, 32, 34 o 44, números de 1 a 9999999999, sin cruzarse con otro rango del mismo tipo.",
+  ECF_SERIES_NOT_FOUND: "El rango de e-NCF no existe.",
+  ECF_DOCUMENT_NOT_FOUND: "El e-CF no existe.",
+  ECF_GATEWAY_OFF: "El envío de e-CF está apagado en este ambiente.",
 };
 
 export interface DescribedError {

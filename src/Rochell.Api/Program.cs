@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 using Rochell.Api.Auth;
+using Rochell.Api.Ecf;
 using Rochell.Api.Endpoints;
 using Rochell.Api.Hosting;
 using Rochell.Api.Http;
@@ -16,6 +17,7 @@ using Rochell.Platform.Mail;
 using Rochell.Platform.Observability;
 using Rochell.Platform.Queries;
 using Rochell.Platform.Time;
+using Rochell.Tax.Ecf;
 
 // PR-18a (E-PR18-1…7): HTTP transport over the command and query pipelines. The host adds no business rules.
 var builder = WebApplication.CreateBuilder(args);
@@ -82,6 +84,38 @@ if (settings.Mail.Mode != MailMode.Off)
     services.AddSingleton<IMailTransport, SmtpMailTransport>();
     services.AddHttpClient<IPdfRenderer, GotenbergPdfRenderer>(client => client.Timeout = TimeSpan.FromSeconds(60));
     services.AddHostedService<MailService>();
+}
+
+// E-VS4-11, E-VS4-02-6: the e-CF gateway is Off unless configured; Sandbox / Production call Alanube with the server's token; Simulated
+// only where the environment is Development or Test.
+services.AddSingleton(settings.Ecf);
+switch (settings.Ecf.Mode)
+{
+    case EcfModes.Off:
+        services.AddSingleton<IEcfProvider>(OffEcfProvider.Instance);
+        break;
+    case EcfModes.Simulated:
+        if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment(RochellEnvironments.Test))
+        {
+            throw new InvalidOperationException("Ecf:Mode SIMULATED is only for Development and Test (E-VS4-02-6).");
+        }
+
+        services.AddSingleton<SimulatedEcfProvider>();
+        services.AddSingleton<IEcfProvider>(sp => sp.GetRequiredService<SimulatedEcfProvider>());
+        break;
+    case EcfModes.Sandbox or EcfModes.Production:
+        Required(settings.Ecf.BaseUrl, "Ecf:BaseUrl");
+        Required(settings.Ecf.Token, "Ecf:Token");
+        services.AddHttpClient<IEcfProvider, AlanubeProvider>(client => client.Timeout = settings.Ecf.CallTimeout + TimeSpan.FromSeconds(5));
+        break;
+    default:
+        throw new InvalidOperationException($"Ecf:Mode is OFF, SANDBOX, PRODUCTION or SIMULATED, not {settings.Ecf.Mode}.");
+}
+
+if (settings.Ecf.Enabled)
+{
+    services.AddSingleton<EcfService>();
+    services.AddHostedService(sp => sp.GetRequiredService<EcfService>());
 }
 
 // E-PR18-5: the sealer and the digest connect as rochell_sealer and are switched on by configuration.
@@ -155,6 +189,7 @@ app.MapGet("/api/v1/environment", () => Results.Json(new EnvironmentInfo(string.
     .WithSummary("E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name) and, E-MAIL-01-4, whether it sends mail (OFF, REDIRECT, LIVE). No sign-in needed.")
     .Produces<EnvironmentInfo>();
 var company = app.MapGroup("/api/v1/companies/{companyId:guid}");
+app.MapEcfWebhook();
 company.MapCommandEndpoints();
 company.MapQueryEndpoints();
 
