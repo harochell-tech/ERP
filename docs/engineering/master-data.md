@@ -69,3 +69,20 @@ existing queries read. Commands replace the list as a whole under the party's ro
 
 The host runs with invariant globalization: header matching folds Spanish accents itself instead of Unicode normalization.
 Load suppliers first, then customers (E-IMP-01-10). Real files never enter the repository (E-IMP-11).
+
+## PLT-01 — plants and locations from the screen (migration 0094, E-PLT-1…5)
+
+`Maestros › Plantas y ubicaciones` (company:manage, step-up; every change a `Plant` event):
+
+| Command | What it does |
+| --- | --- |
+| `CreatePlant` | Code 2–20 (capitals, digits, «-», «_»; never changes) and name; the valuation area with the same code; locations RECEPCION «Recepción de materiales», PATIO «Patio de producto terminado», CURADO (curing) and TRANSITO (transit). |
+| `CreateLocation` | Another location of a plant (code up to 30, name); CURADO / TRANSITO become the plant's curing / transit location. |
+| `RenameLocation` | A location's readable name. |
+| `SetPlantStatus` | INACTIVE only with no stock, no run IN_PROGRESS, no dispatch PLANNED…IN_TRANSIT, and another plant in use; back to ACTIVE any time. |
+| `SetLocationStatus` | INACTIVE only with no stock; never CURADO or TRANSITO (they go with the plant). |
+
+Plants and locations are never deleted (`md.plant_guard`, `md.location_guard`: only name and status change). `ListPlants` leaves the
+inactive ones out unless `includeInactive=true` (the plants screen); `ListSalesPlants` offers only active plants and locations. Machines
+and shifts stay in Producción › Máquinas y turnos; people per plant in Seguridad › Usuarios y roles. The CLI `create-plant` /
+`create-location` keep working. 252 commands. Tests: `PlantTests`, Playwright `plants-journey.spec.ts`.

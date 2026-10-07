@@ -83,7 +83,9 @@ public sealed class MasterDataSchemaTests(PostgresFixture postgres)
     }
 
     [Theory]
-    [InlineData("INSERT INTO md.plant (plant_id, company_id, code, valuation_area_id) VALUES (gen_random_uuid(), '{0}', 'P9', gen_random_uuid())")]
+    // E-PLT-1: the application creates plants through CreatePlant now; it still never recodes one nor deletes a location.
+    [InlineData("UPDATE md.plant SET code = 'P9'")]
+    [InlineData("DELETE FROM md.location")]
     [InlineData("INSERT INTO md.uom VALUES ('lb', 'MASS')")]
     [InlineData("UPDATE md.item SET description = 'x'")]
     [InlineData("DELETE FROM md.party")]

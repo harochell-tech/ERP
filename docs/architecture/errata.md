@@ -1231,6 +1231,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-UX6-5 | UX6-01 | The icon is the company's logo; until the owner sends it (SVG, or PNG ≥ 512 × 512 on a transparent background) an «R» monogram in the app's blue, replaced when it arrives. |
 | E-UX6-6 | UX6-01 | On phone screens fields use 16 px text so the iPhone does not zoom on focus; desktop unchanged. |
 | E-UX6-7 | UX6-01 | An automatic test opens every menu page at 360, 390 and 430 px and fails when a page is wider than the screen or a button or field is under 40 px high. |
+| E-PLT-1 | PLT-01 | On Maestros › Plantas y ubicaciones, «Nueva planta» with a code (2–20 capitals or digits, never changed) and a name; it creates its inventory valuation area, and dispatch, production and sales offer it at once. |
+| E-PLT-2 | PLT-01 | A new plant is born with RECEPCION (materials received), PATIO (finished goods to dispatch), CURADO (lots curing) and TRANSITO (dispatches on their way); more locations (code + name) are added to any plant on the same screen. |
+| E-PLT-3 | PLT-01 | Plants and locations are never deleted: «Desactivar» stops offering them in new documents, allowed only with no stock, no production run in progress and no dispatch pending; they can be reactivated. |
+| E-PLT-4 | PLT-01 | The permission that edits the company's data today (company:manage: Controller and Superadministrador), with step-up; the history keeps who did it. |
+| E-PLT-5 | PLT-01 | People per plant are assigned in Seguridad › Usuarios y roles, as today; machines and shifts in Producción › Máquinas y turnos. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

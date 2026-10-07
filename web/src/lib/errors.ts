@@ -393,6 +393,14 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   ASSET_LOAD_ROWS_INVALID: "Hay filas con errores; no se cargó nada. Revise la vista previa.",
   ASSET_LOAD_CUTOFF_INVALID: "La fecha de corte es el último día de un mes ya terminado.",
   ASSET_LOAD_NOT_FOUND: "La carga no existe.",
+  // PLT-01: plants and locations.
+  PLANT_CODE_INVALID: "El código tiene de 2 a 20 letras mayúsculas, dígitos, «-» o «_» (30 para una ubicación).",
+  PLANT_CODE_USED: "Ya existe una planta con ese código.",
+  PLANT_IN_USE: "La planta todavía tiene inventario, corridas en proceso o despachos en camino; no se puede desactivar.",
+  PLANT_LAST_ACTIVE: "Es la única planta en uso; no se puede desactivar.",
+  LOCATION_CODE_USED: "La planta ya tiene una ubicación con ese código.",
+  LOCATION_IN_USE: "La ubicación todavía tiene inventario; muévalo antes de desactivarla.",
+  LOCATION_SYSTEM: "CURADO y TRANSITO son ubicaciones propias de la planta; se desactivan con la planta.",
   ASSET_DISPOSAL_INVALID: "Revise la baja: fecha entre la compra y hoy, motivo de 3 a 300 caracteres y precio solo en una venta.",
   PLANT_NOT_FOUND: "La planta no existe.",
 };
