@@ -22,7 +22,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["COMPRADOR"] = "exchange_rate:read,master_data:read,purchase_order:cancel,purchase_order:create,purchase_order:read,purchase_order:submit,rnc:read,supplier:create,supplier:import,supplier:update",
         ["CONTROLLER"] = "account:manage,account_role_map:approve,account_role_map:prepare,accounting_policy:approve,accounting_policy:prepare,audit:read,bank:read,bank_account:manage,"
             + "bank_account_number:read,bank_charge:recognize,bank_line:unmatch,company:manage,configuration:read,cost_collector:settle,customer_refund:release,customer_terms:approve,"
-            + "customer_withholding:reverse,delivery_zone:manage,exchange_rate:approve,exchange_rate:read,expense_category:approve,expense_category:prepare,fiscal_report:read,fixed_asset:approve,fx_revaluation:post,goods_receipt:read,goods_receipt:reverse,hash:verify,import_settlement:approve,invoice:void,item:activate,"
+            + "customer_withholding:reverse,delivery_zone:manage,ecf_series:approve,exchange_rate:approve,exchange_rate:read,expense_category:approve,expense_category:prepare,fiscal_report:read,fixed_asset:approve,fx_revaluation:post,goods_receipt:read,goods_receipt:reverse,hash:verify,import_settlement:approve,invoice:void,item:activate,"
             + "journal:repost,"
             + "ledger:read,manual_journal:approve,master_data:read,match_exception:approve,opening_inventory:prepare,party_bank_account:verify,payment:read,"
             + "payment:release,payment:reverse,period:read,period_component:close,period_component:reopen,posting_rule:approve,price_list:prepare,production:read,"
@@ -33,7 +33,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["CONTADOR"] = "account_role_map:prepare,configuration:read,exchange_rate:prepare,exchange_rate:read,expense_category:prepare,fiscal_report:read,fixed_asset:manage,fx_revaluation:post,ledger:read,manual_journal:prepare,master_data:read,period:read,reconciliation:read", // E-FIN1-01-5, E-FIN1-04-2, E-UX4-13
         ["CUENTAS_POR_PAGAR"] = "bank:read,exchange_rate:read,goods_receipt:read,import_settlement:prepare,master_data:read,payment:read,purchase_order:read,rnc:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
-        ["ESPECIALISTA_FISCAL"] = "configuration:read,fiscal_authorization:suspend,fiscal_authorization:verify,fiscal_report:read,fiscal_rule:activate,sales:read", // + E-FIS1-01-9
+        ["ESPECIALISTA_FISCAL"] = "configuration:read,ecf:resolve,ecf_series:prepare,fiscal_authorization:suspend,fiscal_authorization:verify,fiscal_report:read,fiscal_rule:activate,sales:read", // + E-FIS1-01-9
         ["PROBADOR"] = "identity:act_as", // E-B03-14, TEST databases only
         ["PROCESO_DIARIO"] = "fiscal_authorization:suspend", // E-FIS1-04-7, the API's daily process only
         ["CARGA_CONFIGURACION"] = "account:manage,expense_category:prepare,fiscal_rule:configure,fiscal_rule_source:register", // E-CFG-1, E-GAS-03-4/7: the deployment CLI's configuration load only
@@ -42,7 +42,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["VENDEDOR"] = "cash_sale:create,customer:create,customer:import,customer:update,mail:retry,quote:email,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11
         ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,delivery_zone:manage,fiscal_authorization:register,rnc:read,sales:read,sales_order:close",
         ["DESPACHO"] = "delivery:email,delivery:manage,fleet:manage,mail:retry,sales:read", // + e-mail (E-MAIL-01-8)
-        ["FACTURACION"] = "credit_note:create,credit_note:issue,delivery:email,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,mail:retry,proforma:email,proforma:void,sales:read",
+        ["FACTURACION"] = "credit_note:create,credit_note:issue,delivery:email,ecf:resolve,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,mail:retry,proforma:email,proforma:void,sales:read",
         ["CAJA"] = "cash_sale:create,receipt:apply,receipt:record,sales:read", // E-CF1-11: sells for cash and records the payment
         ["COBROS"] = "customer_refund:prepare,customer_withholding:record,mail:retry,receipt:apply,receipt:deposit,receipt:record,sales:read,statement:email",
         ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
@@ -56,8 +56,8 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(138L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
-        Assert.Equal(48L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + fixed_asset:approve ≠ manage (E-AF-11) + exchange rates and import settlements prepare ≠ approve (E-USD1-01-7) // + import ≠ activate for suppliers and customers (E-IMP-01-5)
+        Assert.Equal(141L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
+        Assert.Equal(49L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + ecf_series:approve ≠ prepare (E-VS4-01-8); + fixed_asset:approve ≠ manage (E-AF-11) + exchange rates and import settlements prepare ≠ approve (E-USD1-01-7) // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {
             Assert.Equal(permissions, await h.ScalarAsync<string>(
