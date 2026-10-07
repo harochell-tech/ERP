@@ -131,12 +131,15 @@ public sealed class ListItemsHandler : IQueryHandler<ListItems>
     }
 }
 
-public sealed record ListPlants(Guid CompanyId, Guid SessionId, Guid? PlantId = null) : IPlantScopedQuery;
+/// <param name="IncludeInactive">E-PLT-3: inactive plants and locations are left out unless asked for (the plants screen asks).</param>
+public sealed record ListPlants(Guid CompanyId, Guid SessionId, Guid? PlantId = null, bool IncludeInactive = false) : IPlantScopedQuery;
 
-public sealed record LocationView(Guid LocationId, string Code);
+/// <param name="Name">E-PLT-2: the location's readable name.</param>
+public sealed record LocationView(Guid LocationId, string Code, string? Name = null, string Status = "ACTIVE");
 
 /// <param name="Name">E-UX1-01-4: the readable name, null until one is set.</param>
-public sealed record PlantView(Guid PlantId, string Code, Guid ValuationAreaId, string ValuationAreaCode, IReadOnlyList<LocationView> Locations, string? Name = null);
+public sealed record PlantView(
+    Guid PlantId, string Code, Guid ValuationAreaId, string ValuationAreaCode, IReadOnlyList<LocationView> Locations, string? Name = null, string Status = "ACTIVE");
 
 public sealed record PlantList(IReadOnlyList<PlantView> Items);
 
@@ -153,24 +156,26 @@ public sealed class ListPlantsHandler : IQueryHandler<ListPlants>
             context.Connection,
             context.Transaction,
             """
-            SELECT p.plant_id, p.code, p.valuation_area_id, va.code, p.name
+            SELECT p.plant_id, p.code, p.valuation_area_id, va.code, p.name, p.status
             FROM md.plant p
             JOIN md.valuation_area va ON va.valuation_area_id = p.valuation_area_id
-            WHERE p.company_id = @c AND (CAST(@plant AS uuid) IS NULL OR p.plant_id = CAST(@plant AS uuid))
+            WHERE p.company_id = @c AND (CAST(@plant AS uuid) IS NULL OR p.plant_id = CAST(@plant AS uuid)) AND (@all OR p.status = 'ACTIVE')
             ORDER BY p.code
             """,
-            r => new PlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), [], r.NullableString(4)),
+            r => new PlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), [], r.NullableString(4), r.GetString(5)),
             cancellationToken,
             ("c", context.CompanyId),
-            ("plant", query.PlantId)).ConfigureAwait(false);
+            ("plant", query.PlantId),
+            ("all", query.IncludeInactive)).ConfigureAwait(false);
 
         var locations = (await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT plant_id, location_id, code FROM md.location WHERE company_id = @c ORDER BY code",
-            r => (PlantId: r.GetGuid(0), View: new LocationView(r.GetGuid(1), r.GetString(2))),
+            "SELECT plant_id, location_id, code, name, status FROM md.location WHERE company_id = @c AND (@all OR status = 'ACTIVE') ORDER BY code",
+            r => (PlantId: r.GetGuid(0), View: new LocationView(r.GetGuid(1), r.GetString(2), r.NullableString(3), r.GetString(4))),
             cancellationToken,
-            ("c", context.CompanyId)).ConfigureAwait(false))
+            ("c", context.CompanyId),
+            ("all", query.IncludeInactive)).ConfigureAwait(false))
             .ToLookup(l => l.PlantId, l => l.View);
 
         return ApiJson.Serialize(new PlantList(plants.Select(p => p with { Locations = locations[p.PlantId].ToList() }).ToList()));

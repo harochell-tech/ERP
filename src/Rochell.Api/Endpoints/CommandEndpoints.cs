@@ -3,6 +3,7 @@ using Rochell.Api.Hosting;
 using Rochell.Api.Http;
 using Rochell.Audit;
 using Rochell.FixedAssets.Cards;
+using Rochell.MasterData.Plants;
 using Rochell.FixedAssets.Classes;
 using Rochell.FixedAssets.Depreciation;
 using Rochell.FixedAssets.Disposals;
@@ -89,6 +90,11 @@ public static class CommandEndpoints
         masterData.MapCommand<CreateFinishedGood, CreateFinishedGoodHandler>();
         masterData.MapCommand<CreateFreightItem, CreateFreightItemHandler>(); // PRS-03 (E-PRS-03-1)
         masterData.MapCommand<DefineUomConversion, DefineUomConversionHandler>();
+        masterData.MapCommand<CreatePlant, CreatePlantHandler>(); // PLT-01 (E-PLT-1…3)
+        masterData.MapCommand<CreateLocation, CreateLocationHandler>();
+        masterData.MapCommand<RenameLocation, RenameLocationHandler>();
+        masterData.MapCommand<SetPlantStatus, SetPlantStatusHandler>();
+        masterData.MapCommand<SetLocationStatus, SetLocationStatusHandler>();
         masterData.MapCommand<ActivateItem, ActivateItemHandler>();
         masterData.MapCommand<RequestPartyBankAccount, RequestPartyBankAccountHandler>();
         masterData.MapCommand<VerifyPartyBankAccount, VerifyPartyBankAccountHandler>();
@@ -362,6 +368,7 @@ public static class CommandEndpoints
         typeof(SetSupplierContactHandler), typeof(ImportSuppliersHandler), typeof(ActivateSuppliersHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler), typeof(CreateFreightItemHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
+        typeof(CreatePlantHandler), typeof(CreateLocationHandler), typeof(RenameLocationHandler), typeof(SetPlantStatusHandler), typeof(SetLocationStatusHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
         typeof(ReversePaymentHandler), typeof(PrepareBankTransferHandler), typeof(VoidBankTransferHandler), typeof(ReleaseBankTransferHandler),

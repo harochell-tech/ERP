@@ -94,8 +94,8 @@ public static class QueryEndpoints
         masterData.MapGet("/company", (HttpContext http, Guid companyId, GetCompanyHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetCompany(companyId, s), handler, ct))
             .Describe<CompanyView>(nameof(GetCompany));
-        masterData.MapGet("/plants", (HttpContext http, Guid companyId, Guid? plantId, ListPlantsHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunAsync(http, s => new ListPlants(companyId, s, plantId), handler, ct))
+        masterData.MapGet("/plants", (HttpContext http, Guid companyId, Guid? plantId, bool? includeInactive, ListPlantsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListPlants(companyId, s, plantId, includeInactive ?? false), handler, ct))
             .Describe<PlantList>(nameof(ListPlants));
         // E-UX3-11: the units of measure.
         masterData.MapGet("/uoms", (HttpContext http, Guid companyId, Guid? plantId, ListUomsHandler handler, QueryRunner runner, CancellationToken ct)
