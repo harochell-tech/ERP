@@ -227,24 +227,9 @@ export function screenTitle(pathname: string): string {
   return "Rochell Core";
 }
 
-const COLLAPSED_KEY = "rochell.menu.collapsed";
-
-function readCollapsed(): string[] {
-  try {
-    const raw = window.localStorage.getItem(COLLAPSED_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCollapsed(groups: string[]): void {
-  try {
-    window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(groups));
-  } catch {
-    // Private windows: the folded groups simply are not remembered.
-  }
+/** UX6-01 (E-UX6-1…3): the group holding the page shown, which the menu opens by itself. */
+function groupOf(pathname: string): string | null {
+  return NAV.find((g) => g.items.some((item) => isActive(pathname, item.href)))?.title ?? null;
 }
 
 const MOBILE_QUERY = "(max-width: 900px)";
@@ -302,14 +287,12 @@ function SideMenu({
   onClose: () => void;
   footer?: ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState<string[]>(() => (typeof window === "undefined" ? [] : readCollapsed()));
+  // UX6-01 (E-UX6-1…3): every group folded but one — the page's own, or the one last opened (an accordion); nothing remembered.
+  const [opened, setOpened] = useState<{ path: string; group: string | null }>(() => ({ path: pathname, group: groupOf(pathname) }));
+  const openGroup = opened.path === pathname ? opened.group : groupOf(pathname);
   const ref = useRef<HTMLElement>(null);
 
-  const toggle = (title: string) => {
-    const next = collapsed.includes(title) ? collapsed.filter((t) => t !== title) : [...collapsed, title];
-    setCollapsed(next);
-    writeCollapsed(next);
-  };
+  const toggle = (title: string) => setOpened({ path: pathname, group: openGroup === title ? null : title });
 
   // The open panel keeps the focus inside (Tab cycles), Escape closes it.
   useEffect(() => {
@@ -386,7 +369,7 @@ function SideMenu({
         if (items.length === 0) {
           return null;
         }
-        const folded = collapsed.includes(group.title);
+        const folded = openGroup !== group.title;
         const listId = `menu-group-${group.title.replace(/\W+/g, "-")}`;
         return (
           <div key={group.title} className="menu-group">
