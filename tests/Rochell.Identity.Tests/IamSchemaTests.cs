@@ -35,7 +35,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "configuration:read,ecf:resolve,ecf_series:prepare,fiscal_authorization:suspend,fiscal_authorization:verify,fiscal_report:read,fiscal_rule:activate,sales:read", // + E-FIS1-01-9
         ["PROBADOR"] = "identity:act_as", // E-B03-14, TEST databases only
-        ["PROCESO_DIARIO"] = "fiscal_authorization:suspend", // E-FIS1-04-7, the API's daily process only
+        ["PROCESO_DIARIO"] = "ecf:process,fiscal_authorization:suspend", // E-FIS1-04-7, E-VS4-02-1: the API's daily process only
         ["CARGA_CONFIGURACION"] = "account:manage,expense_category:prepare,fiscal_rule:configure,fiscal_rule_source:register", // E-CFG-1, E-GAS-03-4/7: the deployment CLI's configuration load only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
@@ -56,7 +56,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(141L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
+        Assert.Equal(142L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + ecf:process (E-VS4-02-1); + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
         Assert.Equal(49L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + ecf_series:approve ≠ prepare (E-VS4-01-8); + fixed_asset:approve ≠ manage (E-AF-11) + exchange rates and import settlements prepare ≠ approve (E-USD1-01-7) // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {

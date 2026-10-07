@@ -10,7 +10,7 @@ namespace Rochell.Finance.Policies;
 
 public sealed record ListAccountingPolicies(Guid CompanyId, Guid SessionId) : IQuery;
 
-/// <summary>E-UX2-2: <see cref="Label"/>, <see cref="Unit"/> (PERCENT, AMOUNT, DAYS, HOURS, OPTION), <see cref="Example"/> and <see cref="Affects"/> for the screens.</summary>
+/// <summary>E-UX2-2: <see cref="Label"/>, <see cref="Unit"/> (PERCENT, AMOUNT, DAYS, HOURS, MINUTES, OPTION), <see cref="Example"/> and <see cref="Affects"/> for the screens.</summary>
 public sealed record PolicyParameterDefinitionView(
     string ParamCode, string ValueType, decimal? MinValue, decimal? MaxValue, IReadOnlyList<string>? AllowedValues, string Description,
     string? Label = null, string? Unit = null, string? Example = null, string? Affects = null);

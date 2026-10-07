@@ -6,7 +6,7 @@ Wave 2 of the UX audit makes the configuration readable and guided. UX2-01 is th
 ## Readable catalogues (E-UX2-2, 5, 12)
 
 - `acc.accounting_policy.name` and, per parameter, `acc.policy_parameter_definition.label`, `unit` (PERCENT, AMOUNT, DAYS,
-  HOURS, OPTION), `example` (as shown on screen) and `affects`. The catalogues stay immutable: 0062 fills them with their
+  HOURS, OPTION; MINUTES since 0096), `example` (as shown on screen) and `affects`. The catalogues stay immutable: 0062 fills them with their
   triggers disabled for its own transaction. A migration that adds a parameter fills the four texts too
   (`ConfigurationUxTests.Every_policy_parameter_and_account_role_carries_its_screen_texts`).
 - `Finance.ListAccountingPolicies` returns the texts, the policy name and the roles holding `accounting_policy:prepare` /

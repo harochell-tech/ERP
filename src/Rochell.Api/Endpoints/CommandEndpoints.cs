@@ -49,6 +49,7 @@ using Rochell.Sales.Receipts;
 using Rochell.Sales.Refunds;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
+using Rochell.Tax.Ecf;
 using Rochell.Treasury.BankAccounts;
 using Rochell.Treasury.Payments;
 using Rochell.Treasury.Statements;
@@ -179,6 +180,15 @@ public static class CommandEndpoints
         fixedAssets.MapCommand<DiscardAssetLoad, DiscardAssetLoadHandler>();
         fixedAssets.MapCommand<ApproveAssetLoad, ApproveAssetLoadHandler>();
         fixedAssets.MapCommand<ReverseAssetLoad, ReverseAssetLoadHandler>();
+
+        // VS4-02 (E-VS4-1, E-VS4-02-1/5): e-NCF ranges; the worker's and the webhook's steps (ecf:process, the daily process only).
+        var ecf = company.MapGroup("/ecf").WithTags("Ecf");
+        ecf.MapCommand<PrepareEcfSeries, PrepareEcfSeriesHandler>();
+        ecf.MapCommand<ApproveEcfSeries, ApproveEcfSeriesHandler>();
+        ecf.MapCommand<DiscardEcfSeries, DiscardEcfSeriesHandler>();
+        ecf.MapCommand<CloseEcfSeries, CloseEcfSeriesHandler>();
+        ecf.MapCommand<AdvanceEcfDocument, AdvanceEcfDocumentHandler>();
+        ecf.MapCommand<NudgeEcfDocuments, NudgeEcfDocumentsHandler>();
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapCommand<PrepareAccountRoleMap, PrepareAccountRoleMapHandler>();
@@ -368,6 +378,8 @@ public static class CommandEndpoints
         typeof(SetSupplierContactHandler), typeof(ImportSuppliersHandler), typeof(ActivateSuppliersHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler), typeof(CreateFreightItemHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
+        typeof(PrepareEcfSeriesHandler), typeof(ApproveEcfSeriesHandler), typeof(DiscardEcfSeriesHandler), typeof(CloseEcfSeriesHandler), typeof(AdvanceEcfDocumentHandler),
+        typeof(NudgeEcfDocumentsHandler),
         typeof(CreatePlantHandler), typeof(CreateLocationHandler), typeof(RenameLocationHandler), typeof(SetPlantStatusHandler), typeof(SetLocationStatusHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),

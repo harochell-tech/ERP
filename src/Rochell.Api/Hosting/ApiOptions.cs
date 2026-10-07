@@ -43,6 +43,9 @@ public sealed class ApiOptions
 
     public MailSettings Mail { get; set; } = new();
 
+    /// <summary>E-VS4-11: the e-CF gateway (Off unless configured).</summary>
+    public Rochell.Tax.Ecf.EcfSettings Ecf { get; set; } = new();
+
     public ReverseProxySettings ReverseProxy { get; set; } = new();
 }
 

@@ -21,3 +21,51 @@ pair, and `ecf:resolve` (Especialista fiscal, Facturación) — 141 permissions,
 
 The gateway's mode (Off / Sandbox / Production), Alanube's URL and token and the webhook secret are server settings, never in the
 repository (E-VS4-01-7) — VS4-02.
+
+## VS4-02 — gateway, queue and status polling (migration 0096, E-VS4-02-1…7)
+
+**Ranges.** `PrepareEcfSeries` (Especialista fiscal: type, first and last number — the 10 digits after `E` + type —, due date,
+optional DGII authorization) → `ApproveEcfSeries` (Controller, step-up, not the preparer; closes the type's ACTIVE range) /
+`DiscardEcfSeries`; `CloseEcfSeries` (Controller) closes an ACTIVE range. `ListEcfSeries` shows each range with its next e-NCF and how
+many numbers are left.
+
+**Queue.** `EcfQueue.EnqueueAsync` is what Sales calls inside the command that issues an invoice or credit note (VS4-03): it locks the
+type's ACTIVE range, takes its next number (an exhausted range closes; none or an expired one refuses the issuance with
+`ECF_SERIES_MISSING` / `ECF_SERIES_EXPIRED`), builds the e-CF with the e-NCF and the range's due date, and inserts a PENDING
+`tax.ecf_document` with its SHA-256.
+
+**Steps.** `AdvanceEcfDocument` (permission `ecf:process`, the daily process only) takes one e-CF one move forward:
+
+| From | Alanube answers | To |
+| --- | --- | --- |
+| PENDING / UNKNOWN_OUTCOME / CONTINGENCY without Alanube's id | 201 | SUBMITTED (or the DGII answer at once) |
+| | duplicate with id (AP3011) | SUBMITTED, following that id |
+| | duplicate without id, or content refused (400) | REQUIRES_ACTION, with Alanube's code |
+| | nothing within 30 s, network error, 5xx | UNKNOWN_OUTCOME (or CONTINGENCY) |
+| SUBMITTED / CONTINGENCY with id | FINISHED + ACCEPTED / ACCEPTED_WITH_OBSERVATIONS | ACCEPTED / ACCEPTED_CONDITIONAL, then the signed files |
+| | FINISHED + REJECTED, or FAILED | REJECTED, reason «DGII: …» or «Alanube: …» |
+| | still in process | SUBMITTED, next query on the schedule |
+| | not found | REQUIRES_ACTION |
+| any non-final, 24 h after queued | — | REQUIRES_ACTION |
+
+Every call is a `tax.ecf_call` row (never the token). Every status change has its event and history row, and the source's
+`IEcfSourceUpdater` (Sales, VS4-03) is told inside the same transaction when the e-CF reaches an answer or needs attention.
+`ListDueEcfDocuments` lists the e-CF whose next query has come and the accepted ones still without both files.
+
+**Contingency.** `tax.ecf_gateway_state` counts consecutive failures per company. After REVENUE_ACCOUNTING `ecf_contingency_minutes`
+without a good answer, every e-CF in flight moves to CONTINGENCY (retried every 15 min); the first good answer ends it and returns them
+to the queue (PENDING, or SUBMITTED when Alanube holds them).
+
+**API.** `EcfService` runs every `Rochell:Ecf:Interval` (15 s) as PROCESO_DIARIO when the mode is not Off. `POST /api/v1/ecf/webhook`
+needs `X-Rochell-Ecf-Secret` and only runs `NudgeEcfDocuments` (brings the query forward). Settings, all server-side:
+
+| Setting | Values |
+| --- | --- |
+| `Rochell__Ecf__Mode` | `OFF` (default), `SANDBOX`, `PRODUCTION`, `SIMULATED` (Development / Test only) |
+| `Rochell__Ecf__BaseUrl` | `https://sandbox.alanube.co/dom/v1/` or `https://api.alanube.co/dom/v1/` |
+| `Rochell__Ecf__Token` | Alanube's token (a secret in the server's environment file) |
+| `Rochell__Ecf__WebhookSecret` | the value Alanube is configured to send in `X-Rochell-Ecf-Secret` |
+| `Rochell__Ecf__Interval`, `Rochell__Ecf__CallTimeout` | `00:00:15`, `00:00:30` |
+
+Endpoints: `ecf/prepare-ecf-series`, `approve-ecf-series`, `discard-ecf-series`, `close-ecf-series`, `advance-ecf-document`,
+`nudge-ecf-documents`; `GET ecf/series`, `GET ecf/due`. 258 commands, 142 permissions.

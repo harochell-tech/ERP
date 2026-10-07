@@ -30,6 +30,7 @@ using Rochell.Sales.Refunds;
 using Rochell.Sales.Zones;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
+using Rochell.Tax.Ecf;
 using Rochell.Tax.Reports;
 using Rochell.Treasury.Queries;
 using Rochell.Treasury.Statements;
@@ -64,7 +65,7 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
-        typeof(ListAssetClassesHandler), typeof(ListFixedAssetsHandler), typeof(GetFixedAssetHandler), typeof(ListDepreciationRunsHandler), typeof(PreviewDepreciationHandler), typeof(ListAssetDisposalsHandler), typeof(ListAssetLoadsHandler), typeof(PreviewAssetLoadHandler),
+        typeof(ListEcfSeriesHandler), typeof(ListDueEcfDocumentsHandler), typeof(ListAssetClassesHandler), typeof(ListFixedAssetsHandler), typeof(GetFixedAssetHandler), typeof(ListDepreciationRunsHandler), typeof(PreviewDepreciationHandler), typeof(ListAssetDisposalsHandler), typeof(ListAssetLoadsHandler), typeof(PreviewAssetLoadHandler),
         typeof(ListExchangeRatesHandler), typeof(ListFxRevaluationsHandler), typeof(GetExchangeRateForDateHandler), typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
@@ -426,6 +427,15 @@ public static class QueryEndpoints
                 => runner.RunBodyAsync<AssetLoadPreviewRequest, PreviewAssetLoad>(http, (s, b) => new PreviewAssetLoad(companyId, s, b.FileName, b.ContentBase64, b.CutoffDate), handler, ct))
             .Describe<AssetLoadPreview>(nameof(PreviewAssetLoad))
             .Accepts<AssetLoadPreviewRequest>("application/json");
+
+        // VS4-02: the e-NCF ranges and the queue due for a step.
+        var ecf = company.MapGroup("/ecf").WithTags("Ecf");
+        ecf.MapGet("/series", (HttpContext http, Guid companyId, ListEcfSeriesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListEcfSeries(companyId, s), handler, ct))
+            .Describe<EcfSeriesList>(nameof(ListEcfSeries));
+        ecf.MapGet("/due", (HttpContext http, Guid companyId, int? limit, ListDueEcfDocumentsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListDueEcfDocuments(companyId, s, limit ?? 50), handler, ct))
+            .Describe<DueEcfDocumentList>(nameof(ListDueEcfDocuments));
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)
