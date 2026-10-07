@@ -21,9 +21,9 @@ namespace Rochell.Sales.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class CashSaleInvoiceTests(PostgresFixture postgres)
 {
-    private sealed record World(ReceiptTests.World W, Guid Cashier, Guid Consumer);
+    internal sealed record World(ReceiptTests.World W, Guid Cashier, Guid Consumer);
 
-    private static async Task<World> WorldAsync(TestHarness h)
+    internal static async Task<World> WorldAsync(TestHarness h)
     {
         var w = await ReceiptTests.WorldAsync(h, 100m);
         var actors = await h.FiscalActorsAsync();
@@ -38,11 +38,11 @@ public sealed class CashSaleInvoiceTests(PostgresFixture postgres)
         return new World(w, cashier, await h.ScalarAsync<Guid>("SELECT party_id FROM md.party WHERE company_id = @c AND party_kind = 'CONSUMER'", ("c", h.CompanyId)));
     }
 
-    private static CreateCashSale Sale(TestHarness h, DeliveryTests.Setup s, Guid cashier, string key, decimal blocks, string? idKind = null, string? id = null)
+    internal static CreateCashSale Sale(TestHarness h, DeliveryTests.Setup s, Guid cashier, string key, decimal blocks, string? idKind = null, string? id = null)
         => new(h.CompanyId, cashier, key, s.Plant, DeliveryTerms.PickupAtPlant, null, null, [new SalesOrderLineInput(s.Block, "un", blocks)], "María Pérez", null, idKind, id);
 
     /// <summary>A sale of <paramref name="blocks"/> blocks paid in full by a transfer; returns the order, its line and the receipt.</summary>
-    private static async Task<(Guid Order, Guid Line, Guid Receipt)> PaidAsync(TestHarness h, World w, string key, decimal blocks, decimal toPay, string? idKind = null, string? id = null)
+    internal static async Task<(Guid Order, Guid Line, Guid Receipt)> PaidAsync(TestHarness h, World w, string key, decimal blocks, decimal toPay, string? idKind = null, string? id = null)
     {
         var order = (await h.RunAsync(Sale(h, w.W.S, w.Cashier, key, blocks, idKind, id), new CreateCashSaleHandler())).ResultRef;
         await h.RunAsync(new SubmitCashSaleForPayment(h.CompanyId, w.Cashier, key + "-pay", order, 1), new SubmitCashSaleForPaymentHandler());

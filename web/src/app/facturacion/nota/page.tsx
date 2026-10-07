@@ -58,6 +58,7 @@ function NoteDetail() {
     [companyId, id],
   );
   const issue = useCommand(`issue-credit-note:${id}`, "/api/v1/companies/{companyId}/sales/issue-credit-note", () => `Nota de crédito ${data?.header.creditNoteNo ?? ""} emitida y contabilizada.`);
+  const resend = useCommand(`resend-credit-note-ecf:${id}`, "/api/v1/companies/{companyId}/sales/resend-credit-note-ecf", () => `Nota de crédito ${data?.header.creditNoteNo ?? ""} enviada de nuevo con otro e-NCF.`);
   const record = useCommand(`record-credit-note-ecf:${id}`, "/api/v1/companies/{companyId}/sales/record-external-credit-note-document", () => `e-CF 34 registrado en la nota de crédito ${data?.header.creditNoteNo ?? ""}.`);
   if (!can("sales:read")) {
     return <NoPermission />;
@@ -150,6 +151,19 @@ function NoteDetail() {
           </tr>
         </tbody>
       </table></div>
+      {/* E-VS4-03-3: a rejected e-CF 34 is sent again with another e-NCF. */}
+      {h.fiscalStatus === "ECF_REJECTED" && can("credit_note:issue") ? (
+        <div className="actions">
+          <ConfirmAction
+            label="Reenviar e-CF"
+            stepUp
+            consequence="Se arma de nuevo el e-CF 34 y se envía con el siguiente e-NCF del rango; el número rechazado queda consumido."
+            busy={resend.busy}
+            onConfirm={async () => (await resend.run({ creditNoteId: h.creditNoteId, expectedVersion: h.version })) && reload()}
+          />
+          <ErrorBox error={resend.error} />
+        </div>
+      ) : null}
       {h.fiscalStatus === "PENDING_EXTERNAL" ? <NotePackage creditNoteId={h.creditNoteId} /> : null}
       {h.fiscalStatus === "PENDING_EXTERNAL" && can("fiscal_document:record") ? (
         <>

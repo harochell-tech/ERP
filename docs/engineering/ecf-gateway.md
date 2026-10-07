@@ -69,3 +69,35 @@ needs `X-Rochell-Ecf-Secret` and only runs `NudgeEcfDocuments` (brings the query
 
 Endpoints: `ecf/prepare-ecf-series`, `approve-ecf-series`, `discard-ecf-series`, `close-ecf-series`, `advance-ecf-document`,
 `nudge-ecf-documents`; `GET ecf/series`, `GET ecf/due`. 258 commands, 142 permissions.
+
+## VS4-03 — e-CF from invoices and credit notes (migration 0097, E-VS4-03-1…11)
+
+**Channel.** `IssueInvoice` and `IssueCreditNote` send through the gateway when the deployment's `EcfSwitch` is on (mode not Off)
+and the document's e-CF type has an ACTIVE range (`EcfQueue.UsesGatewayAsync`); the document is then `ECF_SENDING` and its e-CF is
+queued in the same transaction (the result carries `ecfNumber`). Otherwise it is `PENDING_EXTERNAL` as before (manual channel).
+
+**Issuer.** `md.company` gains `address` (required by Alanube, ≤ 100), `trade_name`, `phone` (809-555-1234) and `email`, set by
+`UpdateCompanyContact` (company:manage, step-up) on Configuración › Empresa; without an address the gateway refuses with
+`ECF_ISSUER_INCOMPLETE`.
+
+**Payload** (`Rochell.Sales/Ecf/EcfPayloads.cs`):
+
+| Part | From |
+| --- | --- |
+| `idDoc` | e-NCF; `sequenceDueDate` = the range's due date (not on 32 / 34); `taxAmountIndicator` 0 when there is ITBIS (not on 44); `incomeType` 1; `paymentType` 2 with `paymentDeadline` and `paymentTerm` («30 días») when due after the invoice date, else 1; `paymentFormsTable`: credit → form 4, cash → the receipts applied to the invoice (cash 1, cheque / transfer 2). 34: `creditNoteIndicator` (1 after 30 days), `incomeType`, `paymentType` |
+| `sender` | RNC, legal name (cut to 150), trade name, address, phone, e-mail, `internalInvoiceNumber` (FA- / NC-), `stampDate` |
+| `buyer` | 31 / 44: the customer's RNC and legal name; 32: only an identified buyer (cédula / RNC, or a passport as `foreignIdentifier`); never the e-mail. 44: `additionalInformation` «CONFOTUR certificación …» |
+| `itemDetails` | per line: internal item code, billing indicator 1 (the sales ITBIS rate) or 4 (exempt, every 44 line), good 1 / service 2 (freight and SERVICE items), DGII unit code, quantity (≤ 2 decimals, else `ECF_PAYLOAD_INVALID`), unit price (4 decimals), amount. 34: the credited invoice line — its quantity and price when credited whole, else 1 × the credited amount |
+| `totals` | `totalTaxedAmount` / `i1AmountTaxed`, `exemptAmount`, `itbisS1` (rate × 100), `itbisTotal` / `itbis1Total` = Core's ITBIS, `totalAmount` |
+| `informationReference` (34) | the invoice's e-NCF and date, code 1 (the note credits the whole invoice) or 3, the reason cut to 90 |
+| `config.pdf.note` (44) | «Exento de ITBIS por CONFOTUR, certificación …» |
+
+Before queueing, the lines are checked against the document (net, ITBIS, total to the cent; one ITBIS rate; 44 all exempt) —
+`ECF_PAYLOAD_INVALID` otherwise.
+
+**Answers.** `InvoiceEcfUpdater` / `CreditNoteEcfUpdater` (registered in the API for the worker) move the document from
+`ECF_SENDING` / `ECF_ACTION`: accepted → `ECF_ACCEPTED` with the e-NCF on the document; rejected → `ECF_REJECTED`; needs attention →
+`ECF_ACTION`, each with an event (`InvoiceFiscalStatusChanged`, `CreditNoteFiscalStatusChanged`). A rejected document is sent again by
+`ResendInvoiceEcf` / `ResendCreditNoteEcf` (invoice:issue / credit_note:issue, step-up): a new attempt with the next e-NCF, built from
+the current customer and company data. `VoidUnfiscalizedInvoice` also voids a rejected invoice. Credit notes are offered on
+`ECF_ACCEPTED` invoices too. FISC-DOC counts `ECF_SENDING`, `ECF_REJECTED` and `ECF_ACTION` as not fiscalized. 261 commands.

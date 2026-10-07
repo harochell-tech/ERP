@@ -44,4 +44,26 @@ public sealed class CompanyTests(PostgresFixture postgres)
         Assert.Equal((MasterDataErrors.FieldRequired, AuthorizationErrors.NotAuthorized, MasterDataErrors.NotFound), (blank.Code, notAllowed.Code, noPlant.Code));
         Assert.Equal(SqlStates.RaiseException, rnc?.SqlState);
     }
+
+    /// <summary>E-VS4-03-2: the e-CF issuer's address, trade name, phone and e-mail.</summary>
+    [Fact]
+    public async Task The_controller_sets_the_issuer_address_and_contact_and_bad_values_are_refused()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var controller = await h.SessionWithRolesAsync("CONTROLLER");
+
+        var noAddress = await Assert.ThrowsAsync<DomainException>(
+            () => h.RunAsync(new UpdateCompanyContact(h.CompanyId, controller, "k-0", " ", null, null, null), new UpdateCompanyContactHandler()));
+        var badPhone = await Assert.ThrowsAsync<DomainException>(
+            () => h.RunAsync(new UpdateCompanyContact(h.CompanyId, controller, "k-1", "Higüey", null, "8095540000", null), new UpdateCompanyContactHandler()));
+        await h.RunAsync(
+            new UpdateCompanyContact(h.CompanyId, controller, "k-2", " Carretera Higüey–La Romana km 3 ", "Block Rochell", "809-554-0000", "Industrias@Rochell.com.do"),
+            new UpdateCompanyContactHandler());
+        var company = JsonDocument.Parse(await h.QueryAsync(new GetCompany(h.CompanyId, controller), new GetCompanyHandler())).RootElement;
+
+        Assert.Equal((MasterDataErrors.FieldRequired, MasterDataErrors.FieldRequired), (noAddress.Code, badPhone.Code));
+        Assert.Equal(("Carretera Higüey–La Romana km 3", "Block Rochell", "809-554-0000", "industrias@rochell.com.do"), (company.GetProperty("address").GetString(),
+            company.GetProperty("tradeName").GetString(), company.GetProperty("phone").GetString(), company.GetProperty("email").GetString()));
+        Assert.Equal(1L, await h.ScalarAsync<long>("SELECT count(*) FROM core.domain_event WHERE event_type = 'CompanyContactChanged'"));
+    }
 }

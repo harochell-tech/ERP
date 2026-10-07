@@ -409,6 +409,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   ECF_SERIES_NOT_FOUND: "El rango de e-NCF no existe.",
   ECF_DOCUMENT_NOT_FOUND: "El e-CF no existe.",
   ECF_GATEWAY_OFF: "El envío de e-CF está apagado en este ambiente.",
+  ECF_ISSUER_INCOMPLETE: "Falta la dirección de la empresa para emitir e-CF: complétela en Configuración › Empresa.",
+  ECF_PAYLOAD_INVALID: "El e-CF no se puede armar con los datos de este documento; revise el detalle técnico.",
 };
 
 export interface DescribedError {

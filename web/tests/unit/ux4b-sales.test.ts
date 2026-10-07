@@ -179,6 +179,8 @@ describe("proforma, credit note and lots (V-20, V-31, V-27)", () => {
     expect(creditNoteOffered("CONFIRMED", "ACCEPTED_EXTERNAL")).toBe(true);
     expect(creditNoteOffered("PARTIALLY_PAID", "ACCEPTED_EXTERNAL")).toBe(true);
     expect(creditNoteOffered("PAID", "ACCEPTED_EXTERNAL")).toBe(false);
+    expect(creditNoteOffered("CONFIRMED", "ECF_ACCEPTED")).toBe(true); // VS4-03: accepted through the gateway
+    expect(creditNoteOffered("CONFIRMED", "ECF_SENDING")).toBe(false);
     expect(creditNoteOffered("CONFIRMED", "PENDING_EXTERNAL")).toBe(false);
   });
   it("reads a delivery lot", () => {

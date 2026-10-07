@@ -11,18 +11,32 @@ namespace Rochell.MasterData.Company;
 
 public sealed record UpdateCompanyLegalName(Guid CompanyId, Guid SessionId, string IdempotencyKey, string LegalName) : ICommand;
 
+/// <summary>E-VS4-03-2: the e-CF issuer's address (required to issue through Alanube), trade name, phone (809-555-1234) and e-mail.</summary>
+public sealed record UpdateCompanyContact(Guid CompanyId, Guid SessionId, string IdempotencyKey, string Address, string? TradeName, string? Phone, string? Email) : ICommand;
+
 public sealed record UpdatePlantName(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PlantId, string Name) : ICommand;
 
 public sealed record GetCompany(Guid CompanyId, Guid SessionId) : IQuery;
 
 public sealed record CompanyPlantView(Guid PlantId, string Code, string? Name);
 
-public sealed record CompanyView(Guid CompanyId, string Rnc, string LegalName, IReadOnlyList<CompanyPlantView> Plants);
+public sealed record CompanyView(
+    Guid CompanyId, string Rnc, string LegalName, IReadOnlyList<CompanyPlantView> Plants, string? Address = null, string? TradeName = null, string? Phone = null, string? Email = null);
 
 internal static class CompanyRules
 {
     public const int LegalNameMax = 200;
     public const int PlantNameMax = 100;
+    public const int AddressMax = 100;
+    public const int TradeNameMax = 150;
+    public const int EmailMax = 80;
+    public const int PhoneMax = 12;
+
+    public static string? Optional(string? value, int max, string what)
+    {
+        var trimmed = (value ?? string.Empty).Trim();
+        return trimmed.Length == 0 ? null : trimmed.Length > max ? throw new DomainException(MasterDataErrors.FieldRequired, $"The {what} has at most {max} characters.") : trimmed;
+    }
 
     public static string Required(string? value, int max, string what)
     {
@@ -78,6 +92,58 @@ public sealed class UpdateCompanyLegalNameHandler : ICommandHandler<UpdateCompan
 }
 
 [RequiresPermission("company:manage", StepUp = true)]
+public sealed class UpdateCompanyContactHandler : ICommandHandler<UpdateCompanyContact>
+{
+    public string CommandType => "MasterData.UpdateCompanyContact";
+
+    public async Task<string> HandleAsync(UpdateCompanyContact command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var address = CompanyRules.Required(command.Address, CompanyRules.AddressMax, "address");
+        var tradeName = CompanyRules.Optional(command.TradeName, CompanyRules.TradeNameMax, "trade name");
+        var phone = CompanyRules.Optional(command.Phone, CompanyRules.PhoneMax, "phone");
+        if (phone is not null && !System.Text.RegularExpressions.Regex.IsMatch(phone, "^[0-9]{3}-[0-9]{3}-[0-9]{4}$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)))
+        {
+            throw new DomainException(MasterDataErrors.FieldRequired, "The phone is written 809-555-1234.");
+        }
+
+        var email = CompanyRules.Optional(command.Email, CompanyRules.EmailMax, "e-mail")?.ToLowerInvariant();
+        if (email is not null && !System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)))
+        {
+            throw new DomainException(MasterDataErrors.FieldRequired, "The e-mail is not valid.");
+        }
+
+        await using (var read = Sql.Command(context.Connection, context.Transaction, "SELECT 1 FROM md.company WHERE company_id = @c FOR UPDATE", ("c", context.CompanyId)))
+        {
+            await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await context.AppendEventAsync(
+            new EventDraft(
+                "CompanyContactChanged",
+                1,
+                "Company",
+                context.CompanyId,
+                await CompanyRules.NextVersionAsync(context, "Company", context.CompanyId, cancellationToken).ConfigureAwait(false),
+                JsonSerializer.Serialize(new { companyId = context.CompanyId, address, tradeName, phone, email }),
+                Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            "UPDATE md.company SET address = @a, trade_name = @t, phone = @p, email = @e WHERE company_id = @c",
+            cancellationToken,
+            ("a", address),
+            ("t", (object?)tradeName ?? DBNull.Value),
+            ("p", (object?)phone ?? DBNull.Value),
+            ("e", (object?)email ?? DBNull.Value),
+            ("c", context.CompanyId)).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { companyId = context.CompanyId, address, tradeName, phone, email });
+    }
+}
+
+[RequiresPermission("company:manage", StepUp = true)]
 public sealed class UpdatePlantNameHandler : ICommandHandler<UpdatePlantName>
 {
     public string CommandType => "MasterData.UpdatePlantName";
@@ -129,8 +195,8 @@ public sealed class GetCompanyHandler : IQueryHandler<GetCompany>
         var company = (await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT rnc, legal_name FROM md.company WHERE company_id = @c",
-            r => (Rnc: r.GetString(0), LegalName: r.GetString(1)),
+            "SELECT rnc, legal_name, address, trade_name, phone, email FROM md.company WHERE company_id = @c",
+            r => (Rnc: r.GetString(0), LegalName: r.GetString(1), Address: r.NullableString(2), TradeName: r.NullableString(3), Phone: r.NullableString(4), Email: r.NullableString(5)),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false)).Single();
         var plants = await Reading.ListAsync(
@@ -140,6 +206,6 @@ public sealed class GetCompanyHandler : IQueryHandler<GetCompany>
             r => new CompanyPlantView(r.GetGuid(0), r.GetString(1), r.NullableString(2)),
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new CompanyView(context.CompanyId, company.Rnc, company.LegalName, plants));
+        return ApiJson.Serialize(new CompanyView(context.CompanyId, company.Rnc, company.LegalName, plants, company.Address, company.TradeName, company.Phone, company.Email));
     }
 }

@@ -179,7 +179,7 @@ export function proformaWatermark(orderStatus: string | null | undefined): strin
 
 /** V-31: a credit note is offered only on an invoice with its e-CF accepted and something still open (not fully paid). */
 export function creditNoteOffered(commercialStatus: string, fiscalStatus: string): boolean {
-  return fiscalStatus === "ACCEPTED_EXTERNAL" && (commercialStatus === "CONFIRMED" || commercialStatus === "PARTIALLY_PAID");
+  return (fiscalStatus === "ACCEPTED_EXTERNAL" || fiscalStatus === "ECF_ACCEPTED") && (commercialStatus === "CONFIRMED" || commercialStatus === "PARTIALLY_PAID");
 }
 
 /** V-27: a delivery lot in words: "Lote L-0001: 100 (sale de CURADO)" — the quantity in the product's base unit. */
