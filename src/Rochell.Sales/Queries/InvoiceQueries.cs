@@ -83,7 +83,40 @@ public sealed record InvoiceWithholdingView(Guid WithholdingId, string Kind, dec
 
 public sealed record InvoiceDetail(
     InvoiceSummary Header, string? VoidReason, string? IssuedBy, Guid? PostingEventId, IReadOnlyList<InvoiceLineView> Lines, ExternalFiscalRecordView? FiscalRecord, IReadOnlyList<StateChange> History,
-    IReadOnlyList<CreditNoteSummary> CreditNotes, IReadOnlyList<CreditableLine> Creditable, IReadOnlyList<InvoiceWithholdingView> Withholdings);
+    IReadOnlyList<CreditNoteSummary> CreditNotes, IReadOnlyList<CreditableLine> Creditable, IReadOnlyList<InvoiceWithholdingView> Withholdings, EcfStampView? Ecf = null,
+    DocumentIssuer? Issuer = null);
+
+/// <summary>E-VS4-04-4: who issues the printed invoice (Configuración › Empresa).</summary>
+public sealed record DocumentIssuer(string Rnc, string LegalName, string? TradeName, string? Address, string? Phone, string? Email);
+
+/// <summary>E-VS4-04-4: the document's latest e-CF attempt — status, e-NCF, security code, signature date and the DGII stamp (QR) URL.</summary>
+public sealed record EcfStampView(Guid DocumentId, string Status, string Encf, int AttemptNo, string? SecurityCode, DateTime? SignatureDate, string? StampUrl, string? Reason, long Version);
+
+internal static class EcfStamps
+{
+    public static async Task<EcfStampView?> LatestAsync(QueryContext context, Guid sourceId, CancellationToken cancellationToken)
+        => (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT document_id, status, encf, attempt_no, security_code, signature_date, stamp_url, reason, version
+            FROM tax.ecf_document WHERE company_id = @c AND source_id = @s ORDER BY attempt_no DESC LIMIT 1
+            """,
+            r => new EcfStampView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetInt32(3), r.NullableString(4), r.IsDBNull(5) ? null : r.Utc(5), r.NullableString(6),
+                r.NullableString(7), r.GetInt64(8)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("s", sourceId)).ConfigureAwait(false)).SingleOrDefault();
+
+    public static async Task<DocumentIssuer> IssuerAsync(QueryContext context, CancellationToken cancellationToken)
+        => (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT rnc, legal_name, trade_name, address, phone, email FROM md.company WHERE company_id = @c",
+            r => new DocumentIssuer(r.GetString(0), r.GetString(1), r.NullableString(2), r.NullableString(3), r.NullableString(4), r.NullableString(5)),
+            cancellationToken,
+            ("c", context.CompanyId)).ConfigureAwait(false)).Single();
+}
 
 internal static class InvoiceLines
 {
@@ -165,7 +198,9 @@ public sealed class GetInvoiceHandler : IQueryHandler<GetInvoice>
             r => new InvoiceWithholdingView(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.Date(3), r.GetString(4), r.GetString(5), r.NullableString(6), r.GetInt64(7)),
             cancellationToken,
             ("i", query.InvoiceId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new InvoiceDetail(header, extra.VoidReason, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, notes, creditable, withholdings));
+        var ecf = await EcfStamps.LatestAsync(context, query.InvoiceId, cancellationToken).ConfigureAwait(false);
+        return ApiJson.Serialize(new InvoiceDetail(header, extra.VoidReason, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, notes, creditable, withholdings, ecf,
+            await EcfStamps.IssuerAsync(context, cancellationToken).ConfigureAwait(false)));
     }
 }
 

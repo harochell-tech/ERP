@@ -101,3 +101,27 @@ Before queueing, the lines are checked against the document (net, ITBIS, total t
 `ResendInvoiceEcf` / `ResendCreditNoteEcf` (invoice:issue / credit_note:issue, step-up): a new attempt with the next e-NCF, built from
 the current customer and company data. `VoidUnfiscalizedInvoice` also voids a rejected invoice. Credit notes are offered on
 `ECF_ACCEPTED` invoices too. FISC-DOC counts `ECF_SENDING`, `ECF_REJECTED` and `ECF_ACTION` as not fiscalized. 261 commands.
+
+## VS4-04 — screens, inbox, QR, contract test (E-VS4-04-1…8)
+
+**Server.** `ResolveEcfDocument` (ecf:resolve, step-up) for an e-CF in REQUIRES_ACTION: `IN_ALANUBE` with Alanube's id → SUBMITTED and
+queried again; `NOT_ISSUED` → REJECTED with the reason «No emitido (anular el e-NCF ante la DGII): …», its document told (ECF_REJECTED:
+resend or void). Queries (sales:read): `ListEcfDocuments` (status, search by e-NCF / document / customer, paging), `GetEcfDocument`
+(answer, calls, files, other attempts), `GetEcfFile` (base64), `GetEcfAlerts` (requiring attention, rejected still open, sending,
+contingency since, ACTIVE ranges with `ecf_range_alert_pct` or less left or within `ecf_range_alert_days` of their due date).
+`GetInvoice` / `GetCreditNote` carry `ecf` (the latest attempt: status, e-NCF, security code, signature date, stamp URL, reason);
+`GetInvoice` carries `issuer` (Configuración › Empresa). 262 commands.
+
+**Screens.** Fiscal › Rangos e-NCF (register, approve, discard, close); Fiscal › e-CF (inbox with filters) and its detail (resolve,
+calls, XML / PDF download, other attempts, the DGII answer); the e-CF block on invoice and credit note with the QR drawn in the
+browser from the stamp URL (`qrcode-generator`, no external service); Facturación › Factura › Imprimir (letter, issuer, customer,
+lines, totals, e-NCF, security code, signature date, QR; «SIN VALIDEZ FISCAL» until accepted, «ANULADA» when voided); Inicio
+counters (e-CF requiring attention, rejected, ranges running out) and the red contingency notice (also on Fiscal › e-CF).
+Playwright: `e2e/ecf-journey.spec.ts`.
+
+**Server settings** (`staging.md`): `ECF_MODE` / `ECF_BASE_URL` in the GitHub Environment; the token and the webhook secret in
+`secrets/ecf/alanube-token` and `secrets/ecf/webhook-secret` on the server (`Rochell:Ecf:TokenFile`, `WebhookSecretFile`).
+
+**Contract test.** `rochell-migrate ecf-contract-test <settings.json> <report.jsonl>` (`EcfContractTest`, sandbox URLs only) runs
+CT-01, 03, 05, 06, 07, 08, 12, 13 and 14 and writes one JSON line per request with Alanube's raw answer (never the token); the
+results and the manual cases go to `docs/acceptance/vs4-contract-test.md`, signed by the owner (N-01).

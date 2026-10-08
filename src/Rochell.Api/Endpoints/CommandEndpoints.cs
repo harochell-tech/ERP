@@ -191,6 +191,7 @@ public static class CommandEndpoints
         ecf.MapCommand<CloseEcfSeries, CloseEcfSeriesHandler>();
         ecf.MapCommand<AdvanceEcfDocument, AdvanceEcfDocumentHandler>();
         ecf.MapCommand<NudgeEcfDocuments, NudgeEcfDocumentsHandler>();
+        ecf.MapCommand<ResolveEcfDocument, ResolveEcfDocumentHandler>();
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapCommand<PrepareAccountRoleMap, PrepareAccountRoleMapHandler>();
@@ -383,7 +384,7 @@ public static class CommandEndpoints
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(PrepareEcfSeriesHandler), typeof(ApproveEcfSeriesHandler), typeof(DiscardEcfSeriesHandler), typeof(CloseEcfSeriesHandler), typeof(AdvanceEcfDocumentHandler),
-        typeof(NudgeEcfDocumentsHandler),
+        typeof(NudgeEcfDocumentsHandler), typeof(ResolveEcfDocumentHandler),
         typeof(CreatePlantHandler), typeof(CreateLocationHandler), typeof(RenameLocationHandler), typeof(SetPlantStatusHandler), typeof(SetLocationStatusHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),

@@ -410,6 +410,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   ECF_DOCUMENT_NOT_FOUND: "El e-CF no existe.",
   ECF_GATEWAY_OFF: "El envío de e-CF está apagado en este ambiente.",
   ECF_ISSUER_INCOMPLETE: "Falta la dirección de la empresa para emitir e-CF: complétela en Configuración › Empresa.",
+  ECF_RESOLUTION_INVALID: "Revise la resolución: el id de Alanube (letras y números) y qué verificó, de 10 a 300 caracteres.",
   ECF_PAYLOAD_INVALID: "El e-CF no se puede armar con los datos de este documento; revise el detalle técnico.",
 };
 

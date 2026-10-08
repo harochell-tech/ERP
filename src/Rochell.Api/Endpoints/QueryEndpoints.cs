@@ -65,7 +65,7 @@ public static class QueryEndpoints
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
-        typeof(ListEcfSeriesHandler), typeof(ListDueEcfDocumentsHandler), typeof(ListAssetClassesHandler), typeof(ListFixedAssetsHandler), typeof(GetFixedAssetHandler), typeof(ListDepreciationRunsHandler), typeof(PreviewDepreciationHandler), typeof(ListAssetDisposalsHandler), typeof(ListAssetLoadsHandler), typeof(PreviewAssetLoadHandler),
+        typeof(ListEcfSeriesHandler), typeof(ListDueEcfDocumentsHandler), typeof(ListEcfDocumentsHandler), typeof(GetEcfDocumentHandler), typeof(GetEcfFileHandler), typeof(GetEcfAlertsHandler), typeof(ListAssetClassesHandler), typeof(ListFixedAssetsHandler), typeof(GetFixedAssetHandler), typeof(ListDepreciationRunsHandler), typeof(PreviewDepreciationHandler), typeof(ListAssetDisposalsHandler), typeof(ListAssetLoadsHandler), typeof(PreviewAssetLoadHandler),
         typeof(ListExchangeRatesHandler), typeof(ListFxRevaluationsHandler), typeof(GetExchangeRateForDateHandler), typeof(ListAccountsHandler), typeof(ListAccountRolesHandler), typeof(ListAccountRoleMapsHandler), typeof(ListPostingRulesHandler), typeof(ListAccountingPoliciesHandler),
         typeof(ListManualJournalsHandler), typeof(GetManualJournalHandler), typeof(GetTrialBalanceHandler), typeof(GetAccountLedgerHandler),
         typeof(GetBalanceSheetHandler), typeof(GetIncomeStatementHandler), typeof(ListReportStructuresHandler), typeof(GetReportStructureHandler),
@@ -436,6 +436,19 @@ public static class QueryEndpoints
         ecf.MapGet("/due", (HttpContext http, Guid companyId, int? limit, ListDueEcfDocumentsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListDueEcfDocuments(companyId, s, limit ?? 50), handler, ct))
             .Describe<DueEcfDocumentList>(nameof(ListDueEcfDocuments));
+        // VS4-04 (E-VS4-04-2/6): the inbox, one e-CF with its calls and files, a signed file, the alerts for Inicio.
+        ecf.MapGet("/documents", (HttpContext http, Guid companyId, string? status, string? search, int? limit, int? offset, ListEcfDocumentsHandler handler, QueryRunner runner,
+                CancellationToken ct) => runner.RunAsync(http, s => new ListEcfDocuments(companyId, s, status, search, limit ?? 50, offset ?? 0), handler, ct))
+            .Describe<EcfDocumentList>(nameof(ListEcfDocuments));
+        ecf.MapGet("/documents/{documentId:guid}", (HttpContext http, Guid companyId, Guid documentId, GetEcfDocumentHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetEcfDocument(companyId, s, documentId), handler, ct))
+            .Describe<EcfDocumentDetail>(nameof(GetEcfDocument));
+        ecf.MapGet("/files/{fileId:guid}", (HttpContext http, Guid companyId, Guid fileId, GetEcfFileHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetEcfFile(companyId, s, fileId), handler, ct))
+            .Describe<EcfFileContent>(nameof(GetEcfFile));
+        ecf.MapGet("/alerts", (HttpContext http, Guid companyId, GetEcfAlertsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetEcfAlerts(companyId, s), handler, ct))
+            .Describe<EcfAlerts>(nameof(GetEcfAlerts));
 
         var finance = company.MapGroup("/finance").WithTags("Finance");
         finance.MapGet("/events/{sourceEventId:guid}/journals", (HttpContext http, Guid companyId, Guid sourceEventId, ListEventJournalsHandler handler, QueryRunner runner, CancellationToken ct)

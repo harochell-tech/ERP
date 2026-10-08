@@ -65,10 +65,17 @@ services:
       Rochell__Mail__RendererUrl: http://pdf:3000
       Rochell__Mail__Smtp__Host: ${MAIL_SMTP_HOST:-smtp-relay.gmail.com}
       Rochell__Mail__Smtp__LocalDomain: ${MAIL_EHLO_NAME:-staging.industriasrochell.com.do}
+      # E-VS4-11, E-VS4-04-7: the e-CF gateway. OFF until ECF_MODE (SANDBOX, later PRODUCTION) and ECF_BASE_URL are set; the token
+      # and the webhook secret are files the owner writes on the server in secrets/ecf (never in the .env or the repository).
+      Rochell__Ecf__Mode: ${ECF_MODE:-OFF}
+      Rochell__Ecf__BaseUrl: ${ECF_BASE_URL:-}
+      Rochell__Ecf__TokenFile: /run/secrets/ecf/alanube-token
+      Rochell__Ecf__WebhookSecretFile: /run/secrets/ecf/webhook-secret
     volumes:
       - dpkeys:/var/lib/rochell/keys
       - ./secrets/digest-signing.pem:/run/secrets/digest-signing.pem:ro
       - ./secrets/digest-public.pem:/run/secrets/digest-public.pem:ro
+      - ./secrets/ecf:/run/secrets/ecf:ro
     depends_on:
       postgres: { condition: service_healthy }
     networks: [internal, edge]

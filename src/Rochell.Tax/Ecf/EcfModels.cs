@@ -15,6 +15,12 @@ public sealed class EcfSettings
     /// <summary>Alanube's Bearer token — a server secret.</summary>
     public string? Token { get; set; }
 
+    /// <summary>E-VS4-04-7: a file on the server holding the token (read when <see cref="Token"/> is not set).</summary>
+    public string? TokenFile { get; set; }
+
+    /// <summary>A file on the server holding the webhook secret (read when it exists and <see cref="WebhookSecret"/> is not set).</summary>
+    public string? WebhookSecretFile { get; set; }
+
     /// <summary>E-VS4-02-5: the secret Alanube sends in <see cref="EcfModes.WebhookHeader"/> with each webhook.</summary>
     public string? WebhookSecret { get; set; }
 
@@ -69,6 +75,7 @@ public static class EcfErrors
     public const string ApproverIsPreparer = "APPROVER_IS_CREATOR";
     public const string IssuerIncomplete = "ECF_ISSUER_INCOMPLETE";
     public const string PayloadInvalid = "ECF_PAYLOAD_INVALID";
+    public const string ResolutionInvalid = "ECF_RESOLUTION_INVALID";
 }
 
 /// <summary>What a provider answered to an issuance.</summary>

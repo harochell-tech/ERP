@@ -243,6 +243,64 @@ public sealed class EcfGatewayTests(PostgresFixture postgres)
         Assert.Equal(AuthorizationErrors.NotAuthorized, denied.Code);
     }
 
+    [Fact]
+    public async Task An_eCF_needing_attention_is_resolved_as_held_by_Alanube_or_as_never_issued()
+    {
+        var w = await World.CreateAsync(postgres);
+        var h = w.H;
+        await w.ActiveSeriesAsync("31", 1, 10);
+        var held = await w.QueueAsync("31", "q1", "[SIM:INVALID]");
+        var lost = await w.QueueAsync("31", "q2", "[SIM:INVALID]");
+        await w.AdvanceAsync(held.DocumentId);
+        await w.AdvanceAsync(lost.DocumentId);
+
+        var shortNote = await Assert.ThrowsAsync<DomainException>(() => w.ResolveAsync(held.DocumentId, EcfResolutions.InAlanube, "01ABC", "corto"));
+        var inAlanube = await w.ResolveAsync(held.DocumentId, EcfResolutions.InAlanube, "01abcdefghij", "Aparece en el portal de Alanube como registrado");
+        var notIssued = await w.ResolveAsync(lost.DocumentId, EcfResolutions.NotIssued, null, "No aparece en Alanube ni en la DGII");
+        var again = await Assert.ThrowsAsync<DomainException>(() => w.ResolveAsync(lost.DocumentId, EcfResolutions.NotIssued, null, "Segunda vez sobre el mismo e-CF"));
+
+        Assert.Equal(EcfErrors.ResolutionInvalid, shortNote.Code);
+        Assert.Equal("SUBMITTED", inAlanube.GetProperty("status").GetString());
+        Assert.Equal("01ABCDEFGHIJ", await h.ScalarAsync<string>("SELECT provider_id FROM tax.ecf_document WHERE document_id = @d", ("d", held.DocumentId)));
+        Assert.Contains(held.DocumentId, await w.DueAsync());
+        Assert.Equal("REJECTED", notIssued.GetProperty("status").GetString());
+        Assert.StartsWith(EcfResolutions.NotIssuedPrefix, await h.ScalarAsync<string>("SELECT reason FROM tax.ecf_document WHERE document_id = @d", ("d", lost.DocumentId)));
+        Assert.Equal(EcfErrors.InvalidState, again.Code);
+        Assert.Equal("REQUIRES_ACTION,REQUIRES_ACTION,REJECTED", string.Join(',', w.Updater.Seen.Select(x => x.Status)));
+    }
+
+    [Fact]
+    public async Task The_inbox_lists_by_status_shows_the_calls_and_files_and_Inicio_counts_attention_and_ranges_running_out()
+    {
+        var w = await World.CreateAsync(postgres);
+        var h = w.H;
+        await h.CreateActivePolicyAsync("REVENUE_ACCOUNTING", new Dictionary<string, string> { ["ecf_range_alert_pct"] = "0.5", ["ecf_range_alert_days"] = "30" });
+        await w.ActiveSeriesAsync("31", 41, 42);
+        var accepted = await w.QueueAsync("31", "q1");
+        await w.AdvanceAsync(accepted.DocumentId);
+        await w.AdvanceAsync(accepted.DocumentId);
+        await w.ActiveSeriesAsync("32", 1, 100);
+        var invalid = await w.QueueAsync("32", "q2", "[SIM:INVALID]");
+        await w.AdvanceAsync(invalid.DocumentId);
+
+        var attention = JsonDocument.Parse(await h.QueryAsync(new ListEcfDocuments(h.CompanyId, w.Specialist, "REQUIRES_ACTION"), new ListEcfDocumentsHandler())).RootElement;
+        var all = JsonDocument.Parse(await h.QueryAsync(new ListEcfDocuments(h.CompanyId, w.Specialist, Search: "E31"), new ListEcfDocumentsHandler())).RootElement;
+        var detail = JsonDocument.Parse(await h.QueryAsync(new GetEcfDocument(h.CompanyId, w.Specialist, accepted.DocumentId), new GetEcfDocumentHandler())).RootElement;
+        var xml = detail.GetProperty("files").EnumerateArray().Single(f => f.GetProperty("kind").GetString() == "XML").GetProperty("fileId").GetGuid();
+        var file = JsonDocument.Parse(await h.QueryAsync(new GetEcfFile(h.CompanyId, w.Specialist, xml), new GetEcfFileHandler())).RootElement;
+        var alerts = JsonDocument.Parse(await h.QueryAsync(new GetEcfAlerts(h.CompanyId, w.Specialist), new GetEcfAlertsHandler())).RootElement;
+
+        Assert.Equal((1, invalid.Encf), (attention.GetProperty("total").GetInt32(), attention.GetProperty("items")[0].GetProperty("encf").GetString()));
+        Assert.Equal((1, "ACCEPTED"), (all.GetProperty("total").GetInt32(), all.GetProperty("items")[0].GetProperty("status").GetString()));
+        Assert.Equal("SUBMIT,QUERY,QUERY,DOWNLOAD,DOWNLOAD", string.Join(',', detail.GetProperty("calls").EnumerateArray().Select(c => c.GetProperty("operation").GetString())));
+        Assert.NotNull(detail.GetProperty("securityCode").GetString());
+        Assert.Equal(("E310000000041.xml", "simulated https://simulated.invalid/E310000000041.xml"), (file.GetProperty("fileName").GetString(),
+            System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(file.GetProperty("contentBase64").GetString()!))));
+        Assert.Equal((1, 0, false), (alerts.GetProperty("requiresAction").GetInt32(), alerts.GetProperty("rejected").GetInt32(), alerts.GetProperty("inContingency").GetBoolean()));
+        var range = Assert.Single(alerts.GetProperty("ranges").EnumerateArray());
+        Assert.Equal(("31", 1L, true), (range.GetProperty("ecfType").GetString(), range.GetProperty("remaining").GetInt64(), range.GetProperty("low").GetBoolean()));
+    }
+
     private static JsonElement Json(CommandResult result) => JsonDocument.Parse(result.ResultPayload).RootElement;
 
     private sealed class World
@@ -301,6 +359,15 @@ public sealed class EcfGatewayTests(PostgresFixture postgres)
             var session = await ServiceAsync();
             var result = await H.RunAsync(new AdvanceEcfDocument(H.CompanyId, session, $"adv-{Interlocked.Increment(ref _keys)}", document), new AdvanceEcfDocumentHandler(Provider, [Updater]));
             return Json(result).GetProperty("outcome").GetString()!.Split(',')[0];
+        }
+
+        public async Task<JsonElement> ResolveAsync(Guid document, string resolution, string? providerId, string note, long? version = null)
+        {
+            var current = version ?? await H.ScalarAsync<long>("SELECT version FROM tax.ecf_document WHERE document_id = @d", ("d", document));
+            var result = await H.RunAsync(
+                new ResolveEcfDocument(H.CompanyId, Specialist, $"res-{Interlocked.Increment(ref _keys)}", document, current, resolution, providerId, note),
+                new ResolveEcfDocumentHandler([Updater]));
+            return Json(result);
         }
 
         public async Task<List<Guid>> DueAsync()

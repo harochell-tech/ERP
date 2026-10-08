@@ -7,6 +7,7 @@ import { query } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
 import { SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
+import { EcfStampBlock } from "@/components/EcfGateway";
 import { AccountingStatus, ConfirmAction, ErrorBox, Money, NoPermission, StatusBadge } from "@/components/ui";
 import { formatDecimal, formatPercent } from "@/lib/decimal";
 import { formatDate, formatDateTime } from "@/lib/labels";
@@ -151,6 +152,7 @@ function NoteDetail() {
           </tr>
         </tbody>
       </table></div>
+      <EcfStampBlock ecf={data.ecf} />
       {/* E-VS4-03-3: a rejected e-CF 34 is sent again with another e-NCF. */}
       {h.fiscalStatus === "ECF_REJECTED" && can("credit_note:issue") ? (
         <div className="actions">

@@ -7,6 +7,7 @@ import { query, type Schemas } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
 import { MoneyText, SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
+import { EcfStampBlock } from "@/components/EcfGateway";
 import { AccountingStatus, ConfirmAction, ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { invoiceEncfPrefix } from "@/lib/authorizations";
 import { formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
@@ -470,6 +471,13 @@ function InvoiceDetail() {
             onSubmit={async (v) => (await record.run({ invoiceId: h.invoiceId, expectedVersion: h.version, ...v })) && reload()}
           />
         </>
+      ) : null}
+      {/* VS4-04 (E-VS4-04-4): the e-CF through Alanube — e-NCF, security code, signature date and the DGII stamp's QR. */}
+      <EcfStampBlock ecf={data.ecf} />
+      {issued ? (
+        <p className="actions">
+          <Link href={`/facturacion/factura/imprimir/?id=${h.invoiceId}`}>Imprimir factura</Link>
+        </p>
       ) : null}
       {data.fiscalRecord ? (
         <p>

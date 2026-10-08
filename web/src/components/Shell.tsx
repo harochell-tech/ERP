@@ -129,6 +129,8 @@ export const NAV: readonly NavGroup[] = [
     title: "Fiscal",
     items: [
       { href: "/fiscal/autorizaciones/", label: "Autorizaciones fiscales", permission: "sales:read" }, // FIS1-05 (E-FIS1-05-1)
+      { href: "/fiscal/ecf/", label: "e-CF", permission: "sales:read" }, // VS4-04 (E-VS4-04-2)
+      { href: "/fiscal/rangos/", label: "Rangos e-NCF", permission: "fiscal_report:read" }, // VS4-04 (E-VS4-04-1)
       { href: "/fiscal/reportes/", label: "Reportes fiscales", permission: "fiscal_report:read" }, // FIS2-03 (E-FIS2-03-1)
     ],
   },

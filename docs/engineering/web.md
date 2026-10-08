@@ -795,3 +795,15 @@ aprobar», «Bajas de activos por aprobar», «Cargas de activos por aprobar». 
 - Phones: fields are 16 px under 900 px (no zoom on focus). `e2e/mobile-sweep.spec.ts` (phone project) opens every menu page of 15
   accounts at 360, 390 and 430 px and fails on a page wider than the screen, a control off the screen outside a sideways-scrolling box,
   a button or field under 40 px, or a field under 16 px.
+
+## VS4-03 / VS4-04 — e-CF screens (E-VS4-03-2/3, E-VS4-04-1…6)
+
+- Configuración › Empresa: *Datos del emisor de e-CF* (address required, trade name, phone 809-555-1234, e-mail), `UpdateCompanyContact`.
+- Factura / Nota de crédito: fiscal statuses `ECF_SENDING` «e-CF en envío», `ECF_ACCEPTED`, `ECF_REJECTED`, `ECF_ACTION`; **Reenviar
+  e-CF** on a rejected one; **Anular** also on a rejected invoice; the e-CF block (`components/EcfGateway.tsx`) with e-NCF, security
+  code, signature date and the QR (`lib/ecf.ts` → `qrcode-generator`, drawn as SVG); «Imprimir factura» →
+  `/facturacion/factura/imprimir/` with the watermark «SIN VALIDEZ FISCAL» until accepted.
+- Fiscal › Rangos e-NCF (`/fiscal/rangos/`), Fiscal › e-CF (`/fiscal/ecf/`, filters in the URL: `estado`, `buscar`) and its detail
+  (`/fiscal/ecf/detalle/?id=`) with *Resolver* (ecf:resolve) and the XML / PDF downloads.
+- Inicio: «e-CF que requieren atención», «e-CF rechazados por reenviar o anular», «Rangos e-NCF por agotarse o vencer», and the red
+  contingency notice (`EcfContingencyNotice`). Journey: `e2e/ecf-journey.spec.ts` (the dev stack's gateway is Off).

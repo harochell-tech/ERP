@@ -15,6 +15,7 @@ using Rochell.Platform.Hosting;
 //        rochell-migrate import-account-map <company-rnc> <map.csv>                       (DRAFT maps; role,category,account_code,effective_from)
 //        rochell-migrate open-periods <company-rnc> <year>                                (E-PR05-3)
 //        rochell-migrate import-rnc-registry <DGII_RNC.zip|.txt> [source-date yyyy-MM-dd]  (E-RNC-1/2; replaces the DGII registry)
+//        rochell-migrate ecf-contract-test <settings.json> <report.jsonl>                 (E-VS4-04-8; Alanube's sandbox only)
 // Environment: DOTNET_ENVIRONMENT = Development | Test | Staging
 // Connection:  ConnectionStrings:Rochell (appsettings.Development.json or env var ConnectionStrings__Rochell).
 //              Must use the deployment role (schema owner), never the application role.
@@ -628,8 +629,28 @@ try
                 return 0;
             }
 
+        case "ecf-contract-test":
+            {
+                // E-VS4-04-8: CT-01, 03, 05, 06, 07, 08, 12, 13, 14 against Alanube's sandbox; one JSON line per request, never the token.
+                if (args.Length != 3 || !File.Exists(args[1]))
+                {
+                    await Console.Error.WriteLineAsync("Usage: rochell-migrate ecf-contract-test <settings.json> <report.jsonl>");
+                    return 1;
+                }
+
+                var settings = System.Text.Json.JsonSerializer.Deserialize<Rochell.Tax.Ecf.EcfContractSettings>(
+                    await File.ReadAllTextAsync(args[1]), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))
+                    ?? throw new InvalidOperationException("The settings file is empty.");
+                settings.Validate();
+                using var http = Rochell.Tax.Ecf.EcfContractTest.Client(settings);
+                await using var report = new StreamWriter(args[2], append: false);
+                var requests = await new Rochell.Tax.Ecf.EcfContractTest(http, settings, report).RunAsync(CancellationToken.None);
+                Console.WriteLine($"Contract test: {requests} request(s) to {settings.BaseUrl}; answers in {args[2]}.");
+                return 0;
+            }
+
         default:
-            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|create-synthetic-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods|load-fiscal-rules|load-chart|load-expense-categories|import-rnc-registry>");
+            await Console.Error.WriteLineAsync("Usage: rochell-migrate <migrate|verify|status|init-environment|create-company|create-user|create-synthetic-user|grant-role|create-plant|create-location|import-accounts|import-account-map|open-periods|load-fiscal-rules|load-chart|load-expense-categories|import-rnc-registry|ecf-contract-test>");
             return 1;
     }
 }

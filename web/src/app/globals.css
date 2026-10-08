@@ -81,6 +81,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* Forms and actions. */
 .error { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-line); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
 .notice { background: #eef3fa; color: #0a3d73; border-radius: 8px; padding: 12px 14px; margin: 12px 0; font-size: 14px; }
+.notice.error { background: var(--tone-error-bg); color: var(--tone-error-fg); } /* VS4-04: the e-CF contingency */
+.ecf-stamp { display: flex; gap: 24px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.ecf-print { display: flex; gap: 16px; align-items: center; margin: 16px 0; font-size: 13px; }
 input, select, textarea { font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid #c9c7c0; border-radius: 8px; background: #fff; min-height: 40px; box-sizing: border-box; }
 button, .button { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 16px; min-height: 40px; border-radius: 8px; border: 1px solid #c9c7c0; background: #fff; color: var(--fg); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; box-sizing: border-box; }
 button.primary, .button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
