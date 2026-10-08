@@ -12,6 +12,7 @@ using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
 using Rochell.Identity.Queries;
+using Rochell.Manufacturing.Portal;
 using Rochell.Manufacturing.Queries;
 using Rochell.MasterData.Company;
 using Rochell.MasterData.Import;
@@ -73,7 +74,7 @@ public static class QueryEndpoints
         typeof(GetApAgingHandler), typeof(ListBankTransfersHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler), typeof(ListDeliveryZonesHandler),
-        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
+        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(GetPortalSetupHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
@@ -214,6 +215,9 @@ public static class QueryEndpoints
         manufacturing.MapGet("/runs", (HttpContext http, Guid companyId, Guid? plantId, DateOnly? businessDate, string? status, int? limit, int? offset, ListProductionRunsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListProductionRuns(companyId, s, plantId, businessDate, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<ProductionRunList>(nameof(ListProductionRuns));
+        manufacturing.MapGet("/portal", (HttpContext http, Guid companyId, GetPortalSetupHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetPortalSetup(companyId, s), handler, ct))
+            .Describe<PortalSetupView>(nameof(GetPortalSetup));
         manufacturing.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetProductionRunHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetProductionRun(companyId, s, runId), handler, ct))
             .Describe<ProductionRunDetail>(nameof(GetProductionRun), notFound: true);
