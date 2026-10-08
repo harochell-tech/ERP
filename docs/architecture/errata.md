@@ -1312,6 +1312,8 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG2-01-4 | MFG2-01 | Portal shift 1 / 2 of each machine pairs with a Core shift; the shift's date is the portal's (a shift crossing midnight belongs to the day it started). |
 | E-MFG2-01-5 | MFG2-01 | The batch plant posts at each shift's close a JSON with date, shift number, batches and materials (code, quantity, unit); a second post of the same shift replaces the first. |
 | E-MFG2-01-6 | MFG2-01 | Every portal reading and batch-plant post is kept, never deleted, with its time, to audit where each figure of a summary came from. |
+| E-MFG2-01-7 | MFG2-01 | The plant manager pairs the portal on Producción › Portal (new permission `portal:manage`); the Supervisor and the plant manager see it and the connection's state. |
+| E-MFG2-01-8 | MFG2-01 | Until the batch plant's consumption arrives a draft carries the recipe's theoretical consumption, marked «sin consumo de dosificadora», and is never posted; the real one replaces it. For planta1 (offline batch plant) the Supervisor types the real one. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |

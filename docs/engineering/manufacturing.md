@@ -111,3 +111,23 @@ the recipe 22.34 + 5.90 = 28.24, run of yesterday, summary, posting, release). S
 
 `ProductionPropertyTests` (INV-M) and `ProductionConcurrencyTests` (MFG-10 and the other races) in `Rochell.Manufacturing.Tests`;
 workflow `inv-m` for long runs; the acceptance matrix `docs/acceptance/mfg1.md` is complete. MFG-1 is code-complete.
+
+## MFG2-01 — portal schema (migration 0099, E-MFG2-01-1…8)
+
+Baseline `docs/architecture/mfg2/frozen-baseline-mfg2.md` (E-MFG2-1…14); the portal's side lives in `harochell-tech/portal`
+(`data/exportar.php`, `data/consumo.php`, maintenance windows).
+
+| Table | What it holds |
+| --- | --- |
+| `mfg.portal_machine` | Portal machine code (`planta2`) → Core machine and its batch plant (`dosificadora2`; NULL = offline, consumption typed, E-MFG2-11) |
+| `mfg.portal_mould` | Portal mould (`4`, `6`, `8`) → finished good |
+| `mfg.portal_shift` | Portal shift number → Core shift (E-MFG2-13, E-MFG2-01-4) |
+| `mfg.portal_material` | Batch plant + material code (`CEMENTO`) → item, unit and the location it is issued from (E-MFG2-01-3) |
+| `mfg.portal_reading` | A machine's shift as read (window, closed, cycles, without mould, maintenance cycles, dead minutes, first / last cycle, moulds as JSON, SHA-256); append-only, a row only when it changed (E-MFG2-01-6) |
+| `mfg.portal_consumption` | A batch plant's post for a shift (the portal's id, batches, materials as JSON); append-only, the highest portal id of a shift counts (E-MFG2-01-5) |
+
+`mfg.shift_summary` gains `source` (MANUAL / PORTAL, written once, PORTAL names its `portal_reading_id`), `edited_by` (a person
+changed the draft: the portal no longer replaces it, E-MFG2-01-2), `consumption_source` (MANUAL / BATCH_PLANT with its
+`portal_consumption_id` / PENDING — the recipe's theoretical as a placeholder, never posted: a CHECK, E-MFG2-8, E-MFG2-01-8) and
+`consumption_reason` (10–300 characters, a typed consumption on an online batch plant). Permission `portal:manage` (plant manager,
+E-MFG2-01-7); PROCESO_DIARIO gains `shift_summary:record` and `production_run:manage` (E-MFG2-6) — 144 permissions.
