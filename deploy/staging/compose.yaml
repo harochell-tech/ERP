@@ -74,12 +74,21 @@ services:
       # MFG2-02 (E-MFG2-1): the machines' portal, read every 15 min once PORTAL_URL is set; Core's key is the file secrets/portal/core-token.
       Rochell__Portal__BaseUrl: ${PORTAL_URL:-}
       Rochell__Portal__TokenFile: /run/secrets/portal/core-token
+      # ENT1-02 (E-ENT-1/5): the drivers' page. Off until secrets/deliveries/link-key exists; the photos go to the private bucket
+      # EVIDENCE_BUCKET with its own key (secrets/deliveries/evidence-key-id and evidence-key), never in the .env.
+      Rochell__Deliveries__LinkKeyFile: /run/secrets/deliveries/link-key
+      Rochell__Deliveries__Evidence__Bucket: ${EVIDENCE_BUCKET:-}
+      Rochell__Deliveries__Evidence__Region: ${WORM_REGION:?}
+      Rochell__Deliveries__Evidence__ServiceUrl: ${WORM_ENDPOINT:?}
+      Rochell__Deliveries__Evidence__AccessKeyIdFile: /run/secrets/deliveries/evidence-key-id
+      Rochell__Deliveries__Evidence__SecretAccessKeyFile: /run/secrets/deliveries/evidence-key
     volumes:
       - dpkeys:/var/lib/rochell/keys
       - ./secrets/digest-signing.pem:/run/secrets/digest-signing.pem:ro
       - ./secrets/digest-public.pem:/run/secrets/digest-public.pem:ro
       - ./secrets/ecf:/run/secrets/ecf:ro
       - ./secrets/portal:/run/secrets/portal:ro
+      - ./secrets/deliveries:/run/secrets/deliveries:ro
     depends_on:
       postgres: { condition: service_healthy }
     networks: [internal, edge]

@@ -306,6 +306,10 @@ public static class CommandEndpoints
         sales.MapCommand<ConfirmLoaded, ConfirmLoadedHandler>();
         sales.MapCommand<RecordGateOut, RecordGateOutHandler>();
         sales.MapCommand<RecordPod, RecordPodHandler>();
+        sales.MapCommand<SetDriverPin, SetDriverPinHandler>(); // ENT1-02 (E-ENT-2, E-ENT1-01-1)
+        sales.MapCommand<ReopenDeliveryLink, ReopenDeliveryLinkHandler>();
+        sales.MapCommand<VerifyDriverPin, VerifyDriverPinHandler>(); // the service identity's; the drivers' page uses /api/v1/public/deliveries
+        sales.MapCommand<ConfirmDeliveryByDriver, ConfirmDeliveryByDriverHandler>();
         sales.MapCommand<RecordReturnTrip, RecordReturnTripHandler>();
         sales.MapCommand<CancelDelivery, CancelDeliveryHandler>();
         sales.MapCommand<CloseShortSalesOrder, CloseShortSalesOrderHandler>();
@@ -428,7 +432,8 @@ public static class CommandEndpoints
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),
         typeof(CreateQuoteHandler), typeof(UpdateDraftQuoteHandler), typeof(SubmitQuoteForApprovalHandler), typeof(ApproveQuotePricesHandler), typeof(ReturnQuoteToDraftHandler),
         typeof(SendQuoteHandler), typeof(MarkQuoteLostHandler), typeof(CancelQuoteHandler), typeof(CopyQuoteHandler), typeof(ConvertQuoteHandler),
-        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
+        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(SetDriverPinHandler), typeof(ReopenDeliveryLinkHandler), typeof(VerifyDriverPinHandler),
+        typeof(ConfirmDeliveryByDriverHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(CreateInvoiceFromProformasHandler), typeof(VoidProformaHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(ResendInvoiceEcfHandler), typeof(ResendCreditNoteEcfHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),

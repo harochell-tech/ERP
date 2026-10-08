@@ -149,6 +149,19 @@ try
                 load.Parameters.AddWithValue("id", Guid.CreateVersion7());
                 load.Parameters.AddWithValue("company", companyId);
                 await load.ExecuteNonQueryAsync();
+
+                // E-ENT1-01-5: and the delivery confirmation of the drivers' QR page.
+                await using var confirm = new NpgsqlCommand(
+                    """
+                    INSERT INTO iam.role_assignment (assignment_id, company_id, user_id, role_id, plant_id, valid_from, granted_by)
+                    SELECT @id, @company, '00000000-0000-7000-8000-00000000d004', role_id, NULL, now(), '00000000-0000-7000-8000-00000000d001'
+                    FROM iam.role WHERE code = 'CONFIRMACION_ENTREGA'
+                    """,
+                    connection,
+                    transaction);
+                confirm.Parameters.AddWithValue("id", Guid.CreateVersion7());
+                confirm.Parameters.AddWithValue("company", companyId);
+                await confirm.ExecuteNonQueryAsync();
                 await transaction.CommitAsync();
 
                 Console.WriteLine($"Company {args[1]} created: {companyId}.");

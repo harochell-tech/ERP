@@ -310,3 +310,26 @@ sudo chmod 400 /opt/rochell-staging/secrets/portal/core-token
 ```
 
 Then `deploy-staging`. Producción › Portal shows the last good read, the last failure and what could not be imported.
+
+## Drivers' page (ENT-1, E-ENT-1/5, E-ENT1-01-2)
+
+Off until both pieces exist; the API refuses to start with the link key but no evidence bucket.
+
+1. In Backblaze (B2 Cloud Storage), a **private** bucket without Object Lock, e.g. `rochell-staging-evidencias`, and an Application
+   Key limited to that bucket (read and write). Nothing is sent by chat.
+2. On the server:
+
+```
+sudo mkdir -p /opt/rochell-staging/secrets/deliveries
+openssl rand -base64 32 | sudo tee /opt/rochell-staging/secrets/deliveries/link-key >/dev/null
+sudo nano /opt/rochell-staging/secrets/deliveries/evidence-key-id
+sudo nano /opt/rochell-staging/secrets/deliveries/evidence-key
+sudo chown -R 1654:1654 /opt/rochell-staging/secrets/deliveries
+sudo chmod 500 /opt/rochell-staging/secrets/deliveries
+sudo chmod 400 /opt/rochell-staging/secrets/deliveries/*
+```
+
+3. The variable `EVIDENCE_BUCKET` of the GitHub Environment `staging`, then `deploy-staging`.
+
+Changing `link-key` invalidates every printed QR (Dispatch reopens the links of the deliveries in transit). The page lives at
+`/entrega/?c=…&d=…&g=…&k=…`; its API under `/api/v1/public/deliveries`.

@@ -1,7 +1,9 @@
+using System.Globalization;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Json;
 using Rochell.Platform.Queries;
+using Rochell.Sales.Deliveries;
 
 namespace Rochell.Sales.Queries;
 
@@ -89,9 +91,18 @@ public sealed record PodView(string ReceivedByName, DateTime ReceivedAt, string 
 
 public sealed record ControlAssessmentView(string TriggerPoint, string Result, Guid? PolicyVersionId, DateTime AssessedAt);
 
+/// <summary>ENT1-02 (E-ENT-1/2): the driver's link — its generation, state (EXPIRED once past its date) and failed PIN tries.</summary>
+public sealed record DriverLinkView(int Generation, string Status, DateTime ExpiresAt, int FailedAttempts);
+
+/// <summary>ENT1-02 (E-ENT-3, E-ENT1-01-7/10): what the driver confirmed; <paramref name="CompletedByPod"/> once a POD cites it.</summary>
+public sealed record DriverConfirmationView(
+    Guid ConfirmationId, string ReceiverName, string? ReceiverNationalId, string Outcome, string? Note, DateTime ConfirmedAt, DateTime? PhoneAt, DateTime ServerAt,
+    decimal? Latitude, decimal? Longitude, decimal? AccuracyM, string EvidenceKind, string EvidenceSha256, bool CompletedByPod);
+
 public sealed record DeliveryDetail(
     DeliverySummary Header, string? VehiclePlate, string? DriverName, string? CustomerVehiclePlate, string? CustomerDriverName, decimal? GrossKg, decimal? TareKg, string? WeighTicketRef,
-    string? ExceptionReason, string? CancelReason, IReadOnlyList<DeliveryLineView> Lines, PodView? Pod, IReadOnlyList<ControlAssessmentView> Assessments, IReadOnlyList<StateChange> History);
+    string? ExceptionReason, string? CancelReason, IReadOnlyList<DeliveryLineView> Lines, PodView? Pod, IReadOnlyList<ControlAssessmentView> Assessments, IReadOnlyList<StateChange> History,
+    DriverLinkView? DriverLink = null, DriverConfirmationView? DriverConfirmation = null);
 
 [RequiresPermission("sales:read")]
 public sealed class GetDeliveryHandler : IQueryHandler<GetDelivery>
@@ -159,9 +170,31 @@ public sealed class GetDeliveryHandler : IQueryHandler<GetDelivery>
             cancellationToken,
             ("d", query.DeliveryId)).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "Delivery", query.DeliveryId, cancellationToken).ConfigureAwait(false);
+        var now = context.Clock.UtcNow;
+        var link = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT generation, status, expires_at, failed_attempts FROM log.delivery_link WHERE delivery_id = @d",
+            r => new DriverLinkView(r.GetInt32(0), r.GetString(1) == "ACTIVE" && r.GetFieldValue<DateTime>(2) <= now ? "EXPIRED" : r.GetString(1), r.GetFieldValue<DateTime>(2), r.GetInt32(3)),
+            cancellationToken,
+            ("d", query.DeliveryId)).ConfigureAwait(false);
+        var confirmation = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT c.confirmation_id, c.receiver_name, c.receiver_national_id, c.outcome, c.note, c.confirmed_at, c.phone_at, c.server_at, c.latitude, c.longitude, c.accuracy_m,
+                   c.evidence_kind, encode(c.evidence_sha256, 'hex'), EXISTS (SELECT 1 FROM log.pod p WHERE p.driver_confirmation_id = c.confirmation_id)
+            FROM log.driver_confirmation c WHERE c.delivery_id = @d ORDER BY c.generation DESC LIMIT 1
+            """,
+            r => new DriverConfirmationView(
+                r.GetGuid(0), r.GetString(1), r.NullableString(2), r.GetString(3), r.NullableString(4), r.GetFieldValue<DateTime>(5), r.IsDBNull(6) ? null : r.GetFieldValue<DateTime>(6),
+                r.GetFieldValue<DateTime>(7), r.IsDBNull(8) ? null : r.GetDecimal(8), r.IsDBNull(9) ? null : r.GetDecimal(9), r.IsDBNull(10) ? null : r.GetDecimal(10), r.GetString(11),
+                r.GetString(12), r.GetBoolean(13)),
+            cancellationToken,
+            ("d", query.DeliveryId)).ConfigureAwait(false);
         return ApiJson.Serialize(new DeliveryDetail(
             header, extra.Plate, extra.Driver, extra.CustomerPlate, extra.CustomerDriver, extra.Gross, extra.Tare, extra.Ticket, extra.Exception, extra.Cancel,
-            lines.Select(l => l with { Lots = lots.Where(x => x.Line == l.DeliveryLineId).Select(x => x.Lot).ToList() }).ToList(), pod, assessments, history));
+            lines.Select(l => l with { Lots = lots.Where(x => x.Line == l.DeliveryLineId).Select(x => x.Lot).ToList() }).ToList(), pod, assessments, history, link, confirmation));
     }
 }
 
@@ -185,12 +218,14 @@ public sealed record DeliveryPrint(
     string IssuerName, string IssuerRnc, string CustomerName, string CustomerRnc, string? SiteAddress, string PlantCode, string? PlantName,
     string DeliveryNo, string OrderNo, DateOnly OrderDate, DateOnly? PlannedOn, string Status, string DeliveryTermCode, DateTime? GateOutAt,
     string? VehiclePlate, string? DriverName, string? CustomerVehiclePlate, string? CustomerDriverName, decimal? GrossKg, decimal? TareKg, decimal? NetKg,
-    string? WeighTicketRef, IReadOnlyList<DeliveryPrintLine> Lines, string? ReceivedByName, DateTime? ReceivedAt, string? VehicleFleetCode);
+    string? WeighTicketRef, IReadOnlyList<DeliveryPrintLine> Lines, string? ReceivedByName, DateTime? ReceivedAt, string? VehicleFleetCode, string? DriverLinkPath = null);
 
 [RequiresPermission("sales:read")]
-public sealed class GetDeliveryPrintHandler : IQueryHandler<GetDeliveryPrint>
+public sealed class GetDeliveryPrintHandler(DriverLinkKey? key = null) : IQueryHandler<GetDeliveryPrint>
 {
     public string QueryType => "Sales.GetDeliveryPrint";
+
+    private sealed record LinkGeneration(int Generation);
 
     public async Task<string> HandleAsync(GetDeliveryPrint query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -253,6 +288,16 @@ public sealed class GetDeliveryPrintHandler : IQueryHandler<GetDeliveryPrint>
                 r.GetInt32(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetDecimal(5), r.GetDecimal(6), r.GetDecimal(7), lots[r.GetGuid(0)].ToList(), r.NullableString(8)),
             cancellationToken,
             ("d", query.DeliveryId)).ConfigureAwait(false);
-        return ApiJson.Serialize(print with { Lines = lines });
+        // E-ENT-1/8: the driver's QR while the delivery is in transit and its link usable — the page path with the link's HMAC.
+        var link = key is null ? null : await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT k.generation FROM log.delivery_link k JOIN log.delivery d ON d.delivery_id = k.delivery_id WHERE k.delivery_id = @d AND k.status = 'ACTIVE' AND d.status = 'IN_TRANSIT'",
+            r => new LinkGeneration(r.GetInt32(0)),
+            cancellationToken,
+            ("d", query.DeliveryId)).ConfigureAwait(false);
+        var path = link is null ? null
+            : string.Create(CultureInfo.InvariantCulture, $"/entrega/?c={context.CompanyId:N}&d={query.DeliveryId:N}&g={link.Generation}&k={key!.Mac(context.CompanyId, query.DeliveryId, link.Generation)}");
+        return ApiJson.Serialize(print with { Lines = lines, DriverLinkPath = path });
     }
 }

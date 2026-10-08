@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 using Rochell.Api.Auth;
+using Rochell.Api.Deliveries;
 using Rochell.Api.Ecf;
 using Rochell.Api.Endpoints;
 using Rochell.Api.Hosting;
@@ -148,6 +149,29 @@ else
     services.AddSingleton<IPortalSource, NoPortalSource>();
 }
 
+// ENT1-02 (E-ENT-1/5, E-ENT1-01-2): the drivers' page. Off without the link key; with it, the evidence store is required — the private
+// B2 bucket (its key id and secret as files on the server), or a folder in Development and Test.
+var linkKey = settings.Deliveries.LinkKey
+    ?? (!string.IsNullOrWhiteSpace(settings.Deliveries.LinkKeyFile) && File.Exists(settings.Deliveries.LinkKeyFile) ? File.ReadAllText(settings.Deliveries.LinkKeyFile).Trim() : null);
+if (!string.IsNullOrWhiteSpace(linkKey))
+{
+    services.AddSingleton(new Rochell.Sales.Deliveries.DriverLinkKey(Convert.FromBase64String(linkKey)));
+    if (!string.IsNullOrWhiteSpace(settings.Deliveries.Evidence.Bucket))
+    {
+        Required(settings.Deliveries.Evidence.AccessKeyIdFile, "Deliveries:Evidence:AccessKeyIdFile");
+        Required(settings.Deliveries.Evidence.SecretAccessKeyFile, "Deliveries:Evidence:SecretAccessKeyFile");
+        services.AddSingleton<Rochell.Platform.Files.IEvidenceStore>(_ => Rochell.Api.Deliveries.S3EvidenceStore.Create(settings.Deliveries.Evidence));
+    }
+    else if (!string.IsNullOrWhiteSpace(settings.Deliveries.EvidenceRoot) && (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment(RochellEnvironments.Test)))
+    {
+        services.AddSingleton<Rochell.Platform.Files.IEvidenceStore>(new Rochell.Api.Deliveries.FileSystemEvidenceStore(settings.Deliveries.EvidenceRoot));
+    }
+    else
+    {
+        throw new InvalidOperationException("Deliveries:LinkKey is set but no evidence store: configure Deliveries:Evidence (B2) or, in Development / Test, Deliveries:EvidenceRoot.");
+    }
+}
+
 // E-PR18-5: the sealer and the digest connect as rochell_sealer and are switched on by configuration.
 if (settings.Sealer.Enabled || settings.Digest.Enabled)
 {
@@ -220,6 +244,7 @@ app.MapGet("/api/v1/environment", () => Results.Json(new EnvironmentInfo(string.
     .Produces<EnvironmentInfo>();
 var company = app.MapGroup("/api/v1/companies/{companyId:guid}");
 app.MapEcfWebhook();
+app.MapDriverPages(); // ENT1-02
 company.MapCommandEndpoints();
 company.MapQueryEndpoints();
 

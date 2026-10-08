@@ -30,6 +30,9 @@ public static class IdentityConstants
     /// <summary>E-CFG-1: the configuration load of the deployment CLI (role CARGA_CONFIGURACION): it prepares fiscal sources and rules, never activates.</summary>
     public static readonly Guid ConfigurationLoadUserId = Guid.Parse("00000000-0000-7000-8000-00000000d003");
 
+    /// <summary>E-ENT1-01-5: the delivery confirmation of the drivers' QR page (role CONFIRMACION_ENTREGA): it records full receipts only.</summary>
+    public static readonly Guid DeliveryConfirmationUserId = Guid.Parse("00000000-0000-7000-8000-00000000d004");
+
     public const string AuthMethodOidcGoogle = "OIDC_GOOGLE";
 
     public const string AuthMethodService = "SERVICE";

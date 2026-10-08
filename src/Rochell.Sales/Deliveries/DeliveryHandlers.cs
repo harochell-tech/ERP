@@ -709,6 +709,11 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
         var proforma = atGate
             ? await Proformas.Proformas.IssueOnDeliveryAsync(context, CommandType, row.SalesOrderId, command.DeliveryId, row.DeliveryNo, party.Value, businessDate, reached, cancellationToken).ConfigureAwait(false)
             : null;
+        if (row.Term == DeliveryTerms.DeliveredOwnTransport)
+        {
+            await DriverLinks.CreateAsync(context, command.DeliveryId, cancellationToken).ConfigureAwait(false); // E-ENT-1: the driver's QR
+        }
+
         return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = to, controlTransferred = atGate, version, proformaId = proforma?.ProformaId, proformaNo = proforma?.ProformaNo });
     }
 }
@@ -752,7 +757,15 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
 
     public string CommandType => "Sales.RecordPod";
 
-    public async Task<string> HandleAsync(RecordPod command, CommandContext context, CancellationToken cancellationToken)
+    public Task<string> HandleAsync(RecordPod command, CommandContext context, CancellationToken cancellationToken)
+        => RecordAsync(command, context, CommandType, null, cancellationToken);
+
+    /// <summary>
+    /// The POD itself, for Dispatch and for a driver's full confirmation (ENT1-02, E-ENT-4). <paramref name="driverConfirmationId"/>
+    /// names the driver's confirmation it comes from; without it, a confirmation with differences the driver left is linked, and a
+    /// still open driver link is annulled (E-ENT1-01-9/10).
+    /// </summary>
+    internal async Task<string> RecordAsync(RecordPod command, CommandContext context, string commandType, Guid? driverConfirmationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
@@ -864,8 +877,8 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO log.pod (pod_id, company_id, delivery_id, received_by_name, received_at, evidence_ref, evidence_sha256, recorded_event_id)
-            VALUES (@id, @c, @d, @by, @at, @ref, @hash, @e)
+            INSERT INTO log.pod (pod_id, company_id, delivery_id, received_by_name, received_at, evidence_ref, evidence_sha256, recorded_event_id, driver_confirmation_id)
+            VALUES (@id, @c, @d, @by, @at, @ref, @hash, @e, @dc)
             """,
             cancellationToken,
             ("id", context.Ids.NewId()),
@@ -875,7 +888,8 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
             ("at", command.ReceivedAt),
             ("ref", evidenceRef),
             ("hash", evidenceHash),
-            ("e", pod)).ConfigureAwait(false);
+            ("e", pod),
+            ("dc", driverConfirmationId ?? await DriverLinks.CloseForPodAsync(context, command.DeliveryId, cancellationToken).ConfigureAwait(false))).ConfigureAwait(false);
         await Deliveries.InsertAssessmentAsync(
             context, command.DeliveryId, row, "POD", pod, posting.Revenue.PolicyVersionId,
             new { term = row.Term, controlTransfersAt = row.Control, presentation = posting.Revenue.Text(Deliveries.Presentation), receivedBy }, cancellationToken).ConfigureAwait(false);
@@ -883,8 +897,8 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
         await Sql.ExecuteAsync(
             context.Connection, context.Transaction, "UPDATE log.delivery SET status = @s, exception_reason = @r, version = @v WHERE delivery_id = @d", cancellationToken,
             ("s", to), ("r", exceptions ? reason : null), ("v", version), ("d", command.DeliveryId)).ConfigureAwait(false);
-        await context.AppendStateAsync(Deliveries.Aggregate, command.DeliveryId, "DOCUMENT", "IN_TRANSIT", to, CommandType, pod, cancellationToken, exceptions ? reason : null).ConfigureAwait(false);
-        await Orders.Orders.AddDeliveredAsync(context, order, row.SalesOrderId, delivered, CommandType, cancellationToken).ConfigureAwait(false);
+        await context.AppendStateAsync(Deliveries.Aggregate, command.DeliveryId, "DOCUMENT", "IN_TRANSIT", to, commandType, pod, cancellationToken, exceptions ? reason : null).ConfigureAwait(false);
+        await Orders.Orders.AddDeliveredAsync(context, order, row.SalesOrderId, delivered, commandType, cancellationToken).ConfigureAwait(false);
         await posting.WriteAsync(_engine, context, "P-16", control, businessDate, occurredAt, postingDate, cancellationToken).ConfigureAwait(false);
         if (returnedEvent is { } re)
         {
@@ -898,7 +912,7 @@ public sealed class RecordPodHandler : ICommandHandler<RecordPod>
 
         // E-FIS1b-01-2: the proforma of a site delivery carries the day the customer received it.
         var proforma = await Proformas.Proformas.IssueOnDeliveryAsync(
-            context, CommandType, row.SalesOrderId, command.DeliveryId, row.DeliveryNo, party.Value, BusinessCalendar.DefaultBusinessDate(command.ReceivedAt), reached, cancellationToken).ConfigureAwait(false);
+            context, commandType, row.SalesOrderId, command.DeliveryId, row.DeliveryNo, party.Value, BusinessCalendar.DefaultBusinessDate(command.ReceivedAt), reached, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = to, version, proformaId = proforma?.ProformaId, proformaNo = proforma?.ProformaNo });
     }
 }
@@ -946,6 +960,7 @@ public sealed class RecordReturnTripHandler : ICommandHandler<RecordReturnTrip>
             ("r", reason), ("v", version), ("d", command.DeliveryId)).ConfigureAwait(false);
         await context.AppendStateAsync(Deliveries.Aggregate, command.DeliveryId, "DOCUMENT", "IN_TRANSIT", "RETURNED", CommandType, returned, cancellationToken, reason).ConfigureAwait(false);
         await posting.WriteAsync(_engine, context, "P-15R", returned, businessDate, occurredAt, postingDate, cancellationToken).ConfigureAwait(false);
+        await DriverLinks.CloseForPodAsync(context, command.DeliveryId, cancellationToken).ConfigureAwait(false); // the driver's link ends with the trip
         return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = "RETURNED", version });
     }
 }

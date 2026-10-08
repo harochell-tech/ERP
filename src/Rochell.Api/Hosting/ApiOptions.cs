@@ -49,6 +49,9 @@ public sealed class ApiOptions
     /// <summary>MFG2-02: the machines' portal (Off without a BaseUrl).</summary>
     public Rochell.Manufacturing.Portal.PortalSettings Portal { get; set; } = new();
 
+    /// <summary>ENT1-02: the drivers' page (Off without a link key).</summary>
+    public Rochell.Api.Deliveries.DeliveriesSettings Deliveries { get; set; } = new();
+
     public ReverseProxySettings ReverseProxy { get; set; } = new();
 }
 
