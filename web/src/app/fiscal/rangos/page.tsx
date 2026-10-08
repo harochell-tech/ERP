@@ -88,6 +88,7 @@ export default function Page() {
   const approve = useCommand("approve-ecf-series", "/api/v1/companies/{companyId}/ecf/approve-ecf-series", () => "Rango aprobado: es el vigente de su tipo.");
   const discard = useCommand("discard-ecf-series", "/api/v1/companies/{companyId}/ecf/discard-ecf-series", () => "Rango descartado.");
   const close = useCommand("close-ecf-series", "/api/v1/companies/{companyId}/ecf/close-ecf-series", () => "Rango cerrado.");
+  const cancel = useCommand("cancel-unused-ecf-numbers", "/api/v1/companies/{companyId}/ecf/cancel-unused-ecf-numbers", () => "Anulación registrada en Alanube; la DGII la confirma en su portal.");
   if (!allowed) {
     return <NoPermission />;
   }
@@ -136,7 +137,7 @@ export default function Page() {
                 <td className="mono">{s.from}</td>
                 <td className="mono">{s.to}</td>
                 <td className="mono">{s.status === "ACTIVE" ? s.next : "—"}</td>
-                <td className="num">{s.status === "ACTIVE" || s.status === "DRAFT" ? s.remaining : "—"}</td>
+                <td className="num">{s.status === "CANCELLED" || s.status === "DISCARDED" ? "—" : s.remaining}</td>
                 <td>{formatDate(s.validUntil)}</td>
                 <td>
                   <StatusBadge status={s.status === "ACTIVE" ? "ACTIVE" : s.status === "DRAFT" ? "PENDING_APPROVAL" : "INACTIVE"} label={SERIES_STATUSES[s.status] ?? s.status} />
@@ -173,13 +174,24 @@ export default function Page() {
                       onConfirm={async () => (await close.run({ seriesId: s.seriesId, expectedVersion: s.version })) && reload()}
                     />
                   ) : null}
+                  {/* E-VS4-12, ECF-10: the numbers a closed range will never use are annulled with the DGII through Alanube. */}
+                  {s.status === "CLOSED" && can("ecf_series:approve") ? (
+                    <ConfirmAction
+                      label="Anular números sin usar"
+                      danger
+                      stepUp
+                      busy={cancel.busy}
+                      consequence={`Se pide a la DGII, por Alanube, anular los ${s.remaining} números que este rango no usó y los e-NCF marcados como no emitidos. No se puede deshacer.`}
+                      onConfirm={async () => (await cancel.run({ seriesId: s.seriesId, expectedVersion: s.version })) && reload()}
+                    />
+                  ) : null}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <ErrorBox error={approve.error ?? discard.error ?? close.error} />
+      <ErrorBox error={approve.error ?? discard.error ?? close.error ?? cancel.error} />
     </>
   );
 }

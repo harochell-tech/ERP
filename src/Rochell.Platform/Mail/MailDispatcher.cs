@@ -25,7 +25,7 @@ public enum MailMode
 public sealed record MailDelivery(MailMode Mode, string? RedirectTo, string? ArchiveBcc, int MaxAttempts = 5);
 
 /// <summary>What the transport sends: the envelope recipients, the text and the one PDF attached.</summary>
-public sealed record MailEnvelope(IReadOnlyList<string> To, string? Bcc, string Subject, string BodyText, string FileName, byte[] Pdf);
+public sealed record MailEnvelope(IReadOnlyList<string> To, string? Bcc, string Subject, string BodyText, string FileName, byte[] Pdf, MailAttachment? Extra = null);
 
 public interface IMailTransport
 {
@@ -71,7 +71,8 @@ public sealed class MailDispatcher
         }
     }
 
-    private sealed record Claimed(Guid MailId, IReadOnlyList<string> Recipients, string Subject, string BodyText, string FileName, string Html, byte[]? Pdf, int Attempts);
+    private sealed record Claimed(
+        Guid MailId, IReadOnlyList<string> Recipients, string Subject, string BodyText, string FileName, string Html, byte[]? Pdf, int Attempts, MailAttachment? Extra);
 
     /// <summary>One pass over every company: up to <paramref name="batchSize"/> due messages each. Returns how many were sent.</summary>
     public async Task<int> DispatchPendingAsync(int batchSize = 20, CancellationToken cancellationToken = default)
@@ -117,14 +118,15 @@ public sealed class MailDispatcher
             connection,
             transaction,
             """
-            SELECT mail_id, recipients, subject, body_text, file_name, html, pdf, attempts
+            SELECT mail_id, recipients, subject, body_text, file_name, html, pdf, attempts, attachment_name, attachment, attachment_type
             FROM core.mail_message
             WHERE company_id = @c AND status = 'QUEUED' AND next_attempt_at <= @now
             ORDER BY next_attempt_at, requested_at, mail_id
             LIMIT 1
             FOR UPDATE SKIP LOCKED
             """,
-            r => new Claimed(r.GetGuid(0), r.GetFieldValue<string[]>(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.IsDBNull(6) ? null : r.GetFieldValue<byte[]>(6), r.GetInt32(7)),
+            r => new Claimed(r.GetGuid(0), r.GetFieldValue<string[]>(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.IsDBNull(6) ? null : r.GetFieldValue<byte[]>(6), r.GetInt32(7),
+                r.IsDBNull(8) ? null : new MailAttachment(r.GetString(8), r.GetFieldValue<byte[]>(9), r.GetString(10))),
             cancellationToken,
             ("c", companyId),
             ("now", now)).ConfigureAwait(false);
@@ -228,7 +230,7 @@ public sealed class MailDispatcher
     {
         if (_delivery.Mode == MailMode.Live)
         {
-            return new MailEnvelope(message.Recipients, string.IsNullOrWhiteSpace(_delivery.ArchiveBcc) ? null : _delivery.ArchiveBcc, message.Subject, message.BodyText, message.FileName, pdf);
+            return new MailEnvelope(message.Recipients, string.IsNullOrWhiteSpace(_delivery.ArchiveBcc) ? null : _delivery.ArchiveBcc, message.Subject, message.BodyText, message.FileName, pdf, message.Extra);
         }
 
         var others = message.Recipients.Count - 1;
@@ -239,6 +241,7 @@ public sealed class MailDispatcher
             $"[Redirigido — para: {intended}] {message.Subject}",
             $"Correo redirigido: no se envió al cliente. Destinatarios originales: {string.Join(", ", message.Recipients)}\n\n{message.BodyText}",
             message.FileName,
-            pdf);
+            pdf,
+            message.Extra);
     }
 }

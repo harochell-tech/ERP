@@ -9,5 +9,6 @@
     <ProjectReference Include="..\Rochell.Inventory\Rochell.Inventory.csproj" />
     <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
     <ProjectReference Include="..\Rochell.Tax\Rochell.Tax.csproj" />
+    <PackageReference Include="QRCoder" />
   </ItemGroup>
 </Project>

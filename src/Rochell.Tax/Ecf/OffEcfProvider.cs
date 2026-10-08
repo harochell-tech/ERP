@@ -16,5 +16,7 @@ public sealed class OffEcfProvider : IEcfProvider
 
     public Task<byte[]?> DownloadAsync(string url, CancellationToken cancellationToken) => throw Off();
 
+    public Task<SubmitOutcome> CancelAsync(JsonObject payload, CancellationToken cancellationToken) => throw Off();
+
     private static DomainException Off() => new(EcfErrors.GatewayOff, "The e-CF gateway is Off in this environment (E-VS4-11).");
 }

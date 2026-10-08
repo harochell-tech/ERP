@@ -76,6 +76,7 @@ public static class EcfErrors
     public const string IssuerIncomplete = "ECF_ISSUER_INCOMPLETE";
     public const string PayloadInvalid = "ECF_PAYLOAD_INVALID";
     public const string ResolutionInvalid = "ECF_RESOLUTION_INVALID";
+    public const string CancelFailed = "ECF_CANCEL_FAILED";
 }
 
 /// <summary>What a provider answered to an issuance.</summary>
@@ -131,6 +132,9 @@ public interface IEcfProvider
     Task<QueryOutcome> QueryAsync(string ecfType, string providerId, CancellationToken cancellationToken);
 
     Task<byte[]?> DownloadAsync(string url, CancellationToken cancellationToken);
+
+    /// <summary>E-VS4-12: annuls unused e-NCF ranges with the DGII.</summary>
+    Task<SubmitOutcome> CancelAsync(JsonObject payload, CancellationToken cancellationToken);
 }
 
 /// <summary>

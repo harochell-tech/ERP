@@ -9,7 +9,7 @@ namespace Rochell.Tax.Ecf;
 /// E-VS4-02-6: Alanube simulated, for the tests and the dev stack only (mode SIMULATED; never staging or production). It numbers nothing
 /// and keeps its documents in memory by e-NCF. The case comes from a marker anywhere in the payload's text:
 /// <list type="bullet">
-/// <item>none — registered, accepted at the first status query;</item>
+/// <item>none — registered, accepted at the first status query (an e-CF 32: in the same response, as Alanube's synchronous flow);</item>
 /// <item><c>[SIM:REJECT]</c> — the DGII rejects it;</item>
 /// <item><c>[SIM:OBSERVED]</c> — accepted with observations;</item>
 /// <item><c>[SIM:TIMEOUT]</c> — the first issuance registers it but answers nothing (the outcome is unknown); sending it again answers «in process with id»;</item>
@@ -72,9 +72,21 @@ public sealed class SimulatedEcfProvider : IEcfProvider
         var id = NewId();
         _byEncf[encf] = new Entry { Id = id, Encf = encf, Scenario = scenario };
         _encfById[id] = encf;
-        return Task.FromResult(scenario == "TIMEOUT"
-            ? new SubmitOutcome(SubmitKind.Transient, null, null, null, null, "Simulated: no answer within the call timeout.")
-            : new SubmitOutcome(SubmitKind.Registered, 201, id, Document(id, "REGISTERED", null, encf), null, null));
+        if (scenario == "TIMEOUT")
+        {
+            return Task.FromResult(new SubmitOutcome(SubmitKind.Transient, null, null, null, null, "Simulated: no answer within the call timeout."));
+        }
+
+        // E-VS4 ECF-02: an e-CF 32 is answered in the same response (Alanube's synchronous consumer flow), unless it is slow.
+        var synchronous = ecfType == "32" && scenario is "ACCEPT" or "REJECT" or "OBSERVED";
+        if (synchronous)
+        {
+            EntryOf(id).Queries = 1;
+        }
+
+        return Task.FromResult(new SubmitOutcome(
+            SubmitKind.Registered, 201, id,
+            synchronous ? Final(id, scenario, encf) : Document(id, "REGISTERED", null, encf), null, null));
     }
 
     public Task<QueryOutcome> QueryAsync(string ecfType, string providerId, CancellationToken cancellationToken)
@@ -90,14 +102,23 @@ public sealed class SimulatedEcfProvider : IEcfProvider
         }
 
         entry.Queries++;
-        var document = entry.Scenario switch
-        {
-            "REJECT" => Document(entry.Id, "FINISHED", "REJECTED", encf),
-            "OBSERVED" => Document(entry.Id, "FINISHED", "ACCEPTED_WITH_OBSERVATIONS", encf),
-            "SLOW" when entry.Queries < 3 => Document(entry.Id, "WAITING_RESPONSE", null, encf),
-            _ => Document(entry.Id, "FINISHED", "ACCEPTED", encf),
-        };
+        var document = entry.Scenario == "SLOW" && entry.Queries < 3 ? Document(entry.Id, "WAITING_RESPONSE", null, encf) : Final(entry.Id, entry.Scenario, encf);
         return Task.FromResult(new QueryOutcome(QueryKind.Found, 200, document, null, null));
+    }
+
+    /// <summary>The cancellations received, for the tests.</summary>
+    public List<JsonObject> Cancellations { get; } = [];
+
+    public Task<SubmitOutcome> CancelAsync(JsonObject payload, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        if (Down)
+        {
+            return Task.FromResult(new SubmitOutcome(SubmitKind.Transient, null, null, null, null, "Simulated: Alanube does not answer."));
+        }
+
+        Cancellations.Add((JsonObject)payload.DeepClone());
+        return Task.FromResult(new SubmitOutcome(SubmitKind.Registered, 201, NewId(), null, null, null));
     }
 
     public Task<byte[]?> DownloadAsync(string url, CancellationToken cancellationToken)
@@ -109,6 +130,15 @@ public sealed class SimulatedEcfProvider : IEcfProvider
         var n = Interlocked.Increment(ref _sequence);
         return ("01SIM" + n.ToString("D21", CultureInfo.InvariantCulture)).ToUpperInvariant();
     }
+
+    private Entry EntryOf(string id) => _byEncf[_encfById[id]];
+
+    private static ProviderDocument Final(string id, string scenario, string encf) => scenario switch
+    {
+        "REJECT" => Document(id, "FINISHED", "REJECTED", encf),
+        "OBSERVED" => Document(id, "FINISHED", "ACCEPTED_WITH_OBSERVATIONS", encf),
+        _ => Document(id, "FINISHED", "ACCEPTED", encf),
+    };
 
     private static ProviderDocument Document(string id, string status, string? legal, string encf)
     {

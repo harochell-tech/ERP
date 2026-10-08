@@ -21,6 +21,7 @@ public sealed class EcfGatewayApiTests(PostgresFixture postgres)
         ["Rochell:Ecf:Interval"] = "01:00:00",
     };
 
+    [Trait("AcceptanceVs4", "ECF-07")]
     [Fact]
     public async Task The_webhook_counts_only_with_the_secret_header_and_needs_no_CSRF_header()
     {

@@ -266,6 +266,16 @@ export function QuoteMail({ quoteId, quoteNo, blocked }: { quoteId: string; quot
   );
 }
 
+/** VS4-05 (E-VS4-05-1): an invoice whose e-CF the DGII accepted — the PDF with the QR and the signed XML. */
+export function InvoiceMail({ invoiceId, invoiceNo, blocked }: { invoiceId: string; invoiceNo: string; blocked: string | null }) {
+  const { can } = useSession();
+  const send = useCommand(`mail-invoice:${invoiceId}`, "/api/v1/companies/{companyId}/sales/send-invoice-by-email", `Factura ${invoiceNo} puesta en cola para envío por correo.`);
+  return (
+    <MailPanel documentType="INVOICE" documentId={invoiceId} what={`la factura ${invoiceNo} (PDF con el QR y el XML firmado)`} canSend={can("invoice:email")} blocked={blocked} busy={send.busy} error={send.error}
+      send={async (recipients, message) => (await send.run({ invoiceId, recipients, message })) !== undefined} />
+  );
+}
+
 export function ProformaMail({ proformaId, proformaNo, blocked }: { proformaId: string; proformaNo: string; blocked: string | null }) {
   const { can } = useSession();
   const send = useCommand(`mail-proforma:${proformaId}`, "/api/v1/companies/{companyId}/sales/send-proforma-by-email", `Proforma ${proformaNo} puesta en cola para envío por correo.`);

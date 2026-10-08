@@ -85,6 +85,9 @@ public sealed class AdvanceEcfDocumentHandler(IEcfProvider provider, IEnumerable
 
     private sealed class Step(CommandContext context, IEcfProvider provider, IEnumerable<IEcfSourceUpdater> updaters, EcfRow row, string commandType, CancellationToken ct)
     {
+        /// <summary>Alanube's id, once known — set by the submission of this very step.</summary>
+        private string? _providerId = row.ProviderId;
+
         /// <summary>The row's current status and version: a contingency switch during the step moves it too.</summary>
         private async Task<(string Status, long Version)> CurrentAsync()
             => (await Reading.ListAsync(
@@ -100,7 +103,8 @@ public sealed class AdvanceEcfDocumentHandler(IEcfProvider provider, IEnumerable
                 case SubmitKind.Registered:
                     await CallAsync("SUBMIT", result.HttpStatus, "OK", null, null, watch).ConfigureAwait(false);
                     await Health.SucceededAsync(context, updaters, commandType, ct).ConfigureAwait(false);
-                    await UpdateAsync("provider_id = @pid", ("pid", result.ProviderId!)).ConfigureAwait(false);
+                    _providerId = result.ProviderId!;
+                    await UpdateAsync("provider_id = @pid", ("pid", _providerId)).ConfigureAwait(false);
                     return result.Document?.LegalStatus is not null
                         ? await AnswerAsync(result.Document).ConfigureAwait(false)
                         : await ScheduleAsync(EcfStatuses.Submitted, 1).ConfigureAwait(false);
@@ -108,7 +112,8 @@ public sealed class AdvanceEcfDocumentHandler(IEcfProvider provider, IEnumerable
                     // E-VS4-4: Alanube already holds this e-NCF — the earlier send that gave no answer; follow that one.
                     await CallAsync("SUBMIT", result.HttpStatus, "REJECTED", result.Code, result.Message, watch).ConfigureAwait(false);
                     await Health.SucceededAsync(context, updaters, commandType, ct).ConfigureAwait(false);
-                    await UpdateAsync("provider_id = @pid", ("pid", result.ProviderId)).ConfigureAwait(false);
+                    _providerId = result.ProviderId;
+                    await UpdateAsync("provider_id = @pid", ("pid", _providerId)).ConfigureAwait(false);
                     return await ScheduleAsync(EcfStatuses.Submitted, 1).ConfigureAwait(false);
                 case SubmitKind.Duplicate:
                     await CallAsync("SUBMIT", result.HttpStatus, "REJECTED", result.Code, result.Message, watch).ConfigureAwait(false);
@@ -129,7 +134,7 @@ public sealed class AdvanceEcfDocumentHandler(IEcfProvider provider, IEnumerable
         public async Task<string> QueryAsync()
         {
             var watch = Stopwatch.StartNew();
-            var result = await provider.QueryAsync(row.EcfType, row.ProviderId!, ct).ConfigureAwait(false);
+            var result = await provider.QueryAsync(row.EcfType, _providerId!, ct).ConfigureAwait(false);
             switch (result.Kind)
             {
                 case QueryKind.Found:
@@ -153,7 +158,7 @@ public sealed class AdvanceEcfDocumentHandler(IEcfProvider provider, IEnumerable
         public async Task<string> FetchFilesAsync()
         {
             var watch = Stopwatch.StartNew();
-            var result = await provider.QueryAsync(row.EcfType, row.ProviderId!, ct).ConfigureAwait(false);
+            var result = await provider.QueryAsync(row.EcfType, _providerId!, ct).ConfigureAwait(false);
             await CallAsync("QUERY", result.HttpStatus, result.Kind == QueryKind.Found ? "OK" : "ERROR", result.Code, result.Message, watch).ConfigureAwait(false);
             if (result.Document is null)
             {

@@ -125,3 +125,15 @@ Playwright: `e2e/ecf-journey.spec.ts`.
 **Contract test.** `rochell-migrate ecf-contract-test <settings.json> <report.jsonl>` (`EcfContractTest`, sandbox URLs only) runs
 CT-01, 03, 05, 06, 07, 08, 12, 13 and 14 and writes one JSON line per request with Alanube's raw answer (never the token); the
 results and the manual cases go to `docs/acceptance/vs4-contract-test.md`, signed by the owner (N-01).
+
+## VS4-05 — invoices by e-mail, annulment, acceptance (migration 0098, E-VS4-05-1…6)
+
+- `SendInvoiceByEmail` (`invoice:email`, Facturación and Cobros): only an invoice whose e-CF the DGII accepted; Core's PDF
+  (`DocumentHtml.Invoice`, the QR as a PNG from `QRCoder`) and Alanube's signed XML as a second attachment
+  (`core.mail_message.attachment*`, written once). Manual, never on acceptance.
+- `CancelUnusedEcfNumbers` (Controller, step-up, E-VS4-12 / ECF-10): a CLOSED range's unused tail and the e-NCF resolved as never
+  issued go to Alanube's `POST /cancellations`; the range becomes CANCELLED (`cancelled_from` / `cancelled_to`), the call is kept.
+- The simulated Alanube answers an e-CF 32 in the same response (ECF-02) and records cancellations.
+- Dev stack: gateway SIMULATED, polled every second; the company holds PROCESO_DIARIO like `create-company` gives it.
+- Acceptance matrix `docs/acceptance/vs4.md` (ECF-01…10, E2E-ECF) and the order for Production (staging becomes production on
+  2026-11-01). 264 commands, 143 permissions.
