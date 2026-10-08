@@ -376,6 +376,7 @@ public static class CommandEndpoints
         manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.UpdateMaintenanceTask, Rochell.Manufacturing.Maintenance.UpdateMaintenanceTaskHandler>();
         manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatus, Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatusHandler>();
         manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.RecordMaintenanceDone, Rochell.Manufacturing.Maintenance.RecordMaintenanceDoneHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.PublishMaintenanceTasks, Rochell.Manufacturing.Maintenance.PublishMaintenanceTasksHandler>(); // MFG3-05, the daily process
         manufacturing.MapCommand<SyncPortalShift, SyncPortalShiftHandler>();
         // MFG2-03 (E-MFG2-3, E-MFG2-01-7): Producción › Portal pairings.
         manufacturing.MapCommand<SetPortalMachine, SetPortalMachineHandler>();
@@ -458,7 +459,7 @@ public static class CommandEndpoints
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),
         typeof(ImportPortalDataHandler), typeof(SetIdealCycleHandler), typeof(Rochell.Manufacturing.Maintenance.DefineMaintenanceTaskHandler),
         typeof(Rochell.Manufacturing.Maintenance.UpdateMaintenanceTaskHandler), typeof(Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatusHandler),
-        typeof(Rochell.Manufacturing.Maintenance.RecordMaintenanceDoneHandler), typeof(SyncPortalShiftHandler), typeof(SetPortalMachineHandler), typeof(SetPortalMouldHandler), typeof(SetPortalShiftHandler),
+        typeof(Rochell.Manufacturing.Maintenance.RecordMaintenanceDoneHandler), typeof(Rochell.Manufacturing.Maintenance.PublishMaintenanceTasksHandler), typeof(SyncPortalShiftHandler), typeof(SetPortalMachineHandler), typeof(SetPortalMouldHandler), typeof(SetPortalShiftHandler),
         typeof(SetPortalMaterialHandler), typeof(RemovePortalPairingHandler),
         typeof(StartProductionRunHandler), typeof(CancelProductionRunHandler), typeof(RecordShiftSummaryHandler), typeof(PostShiftSummaryHandler), typeof(ReverseShiftSummaryHandler),
         typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler), typeof(SettleCostCollectorHandler),

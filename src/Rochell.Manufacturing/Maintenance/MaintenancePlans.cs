@@ -386,3 +386,40 @@ internal static class PortalMaintenanceDone
             ("id", context.Ids.NewId()), ("c", context.CompanyId), ("t", task.Value), ("at", endsAt.Value), ("pid", portalId), ("now", context.Clock.UtcNow)).ConfigureAwait(false);
     }
 }
+
+/// <summary>MFG3-05 (E-MFG3-9/10): after each read, the portal gets the ACTIVE tasks with their state (its push notices follow).</summary>
+public sealed record PublishMaintenanceTasks(Guid CompanyId, Guid SessionId, string IdempotencyKey) : ICommand;
+
+[RequiresPermission("shift_summary:record")]
+public sealed class PublishMaintenanceTasksHandler(Portal.IPortalSource source) : ICommandHandler<PublishMaintenanceTasks>
+{
+    public string CommandType => "Manufacturing.PublishMaintenanceTasks";
+
+    public async Task<string> HandleAsync(PublishMaintenanceTasks command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var list = JsonSerializer.Deserialize<MaintenanceTaskList>(
+            await new ListMaintenanceTasksHandler().HandleAsync(
+                new ListMaintenanceTasks(context.CompanyId, context.SessionId), new QueryContext(context.Connection, context.Transaction, context.CompanyId, context.SessionId, context.Clock),
+                cancellationToken).ConfigureAwait(false),
+            ApiJson.Options)!;
+        var machines = await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT machine_id, portal_code FROM mfg.portal_machine WHERE company_id = @c", r => (Machine: r.GetGuid(0), Code: r.GetString(1)),
+            cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false);
+        var tasks = list.Items
+            .Where(t => t.Status == "ACTIVE" && machines.Any(m => m.Machine == t.MachineId))
+            .Select(t => new Portal.PortalTaskOut(
+                t.Code, machines.First(m => m.Machine == t.MachineId).Code, t.Name, t.State, t.Since.ToString("#,##0.##", CultureInfo.InvariantCulture), t.Every, t.FrequencyKind))
+            .ToList();
+        try
+        {
+            await source.PublishTasksAsync(tasks, cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Serialize(new { ok = true, tasks = tasks.Count });
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            return JsonSerializer.Serialize(new { ok = false, tasks = tasks.Count, error = ex.Message });
+        }
+    }
+}

@@ -22,7 +22,16 @@ public sealed class MaintenancePlanTests(PostgresFixture postgres)
     {
         public PortalExport Export { get; set; } = export;
 
+        public List<PortalTaskOut> Published { get; } = [];
+
         public Task<PortalExport> FetchAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) => Task.FromResult(Export);
+
+        public Task PublishTasksAsync(IReadOnlyList<PortalTaskOut> tasks, CancellationToken cancellationToken)
+        {
+            Published.Clear();
+            Published.AddRange(tasks);
+            return Task.CompletedTask;
+        }
     }
 
     private static PortalShift Shift(string d, int cycles) =>
@@ -59,6 +68,7 @@ public sealed class MaintenancePlanTests(PostgresFixture postgres)
         var service = await h.Sessions.StartServiceSessionAsync(IdentityConstants.DailyProcessUserId);
         await h.RunAsync(new ImportPortalData(h.CompanyId, service, "i1", s.Today, s.Today.AddDays(2)), new ImportPortalDataHandler(portal));
         var dueSoon = await TaskAsync(h, s.Supervisor, "ZAPATAS");
+        await h.RunAsync(new PublishMaintenanceTasks(h.CompanyId, service, "pub"), new PublishMaintenanceTasksHandler(portal)); // MFG3-05
 
         // The mechanic closes a maintenance window naming the task in the portal.
         portal.Export = portal.Export with { Maintenance = [new PortalMaintenance(9, "planta2", $"{d2} 12:00:00", $"{d2} 12:30:00", "Cambio de zapatas", "zapatas")] };
@@ -70,6 +80,8 @@ public sealed class MaintenancePlanTests(PostgresFixture postgres)
 
         Assert.Equal(AuthorizationErrors.NotAuthorized, supervisor.Code);
         Assert.Equal(MaintenanceErrors.TaskInvalid, duplicate.Code);
+        Assert.Equal("ENGRASE:planta2:OK:0:10:RUNNING_HOURS,ZAPATAS:planta2:POR_VENCER:190:200:CYCLES",
+            string.Join(',', portal.Published.Select(t => $"{t.Code}:{t.Machine}:{t.State}:{t.Since}:{t.Every}:{t.Unit}")));
         Assert.Equal(("190", "0.95", "POR_VENCER"), (dueSoon.GetProperty("since").GetString(), dueSoon.GetProperty("used").GetString(), dueSoon.GetProperty("state").GetString()));
         Assert.Equal(1L, await h.ScalarAsync<long>("SELECT count(*) FROM mfg.maintenance_done WHERE source = 'PORTAL'")); // once, though read twice
         Assert.Equal("PORTAL", restarted.GetProperty("done")[0].GetProperty("source").GetString());

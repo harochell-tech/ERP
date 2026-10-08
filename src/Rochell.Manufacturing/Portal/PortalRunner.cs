@@ -63,6 +63,15 @@ public static class PortalRunner
             warnings.AddRange(result.Warnings);
         }
 
+        // MFG3-05 (E-MFG3-9/10): the portal's Mantenimientos lists Core's tasks with their state; a failure only warns.
+        var published = JsonDocument.Parse((await pipeline.ExecuteAsync(
+            new Maintenance.PublishMaintenanceTasks(companyId, sessionId, $"portal:{pass}:tasks"), new Maintenance.PublishMaintenanceTasksHandler(source), Guid.CreateVersion7(), cancellationToken)
+            .ConfigureAwait(false)).ResultPayload).RootElement;
+        if (!published.GetProperty("ok").GetBoolean())
+        {
+            warnings.Add($"No se pudieron enviar las tareas de mantenimiento al portal: {published.GetProperty("error").GetString()}");
+        }
+
         return new PassResult(true, imported.Readings, imported.Posts, written, opened, warnings.Distinct().ToList(), null);
     }
 
