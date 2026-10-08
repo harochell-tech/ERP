@@ -1330,6 +1330,21 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-LAB1-8 | LAB-1 | Pavers (ASTM C936, no mould in the portal) are out of LAB-1 v1; the per-item requirements are left ready to include them later. |
 | E-LAB1-9 | LAB-1 | Permissions (two segments, as the permission code format requires): `lab_test:record` (lab technician, new role LABORATORIO, and CALIDAD), `fg_lot:final_release` and `lab_spec:manage` (CALIDAD), `lab:read` for the queries. CALIDAD signs the certificate. SoD: recording a shift summary ≠ final release. |
 | E-LAB1-10 | LAB-1 | While an item has no 28-day requirement the verdict is «Sin requisito»: it neither blocks nor allows `FINAL_RELEASED`. |
+| E-LAB1-01-1 | LAB1-01 | The lab's code lives in `Rochell.Manufacturing` (`Quality/`) with its own schema `qa`; the module graph does not change. The recall will read `log.delivery_line_lot` through read-only SQL, as FixedAssets reads invoice lines (E-AF1-01-1). |
+| E-LAB1-01-2 | LAB1-01 | Per-item requirements are saved in one step by CALIDAD (`lab_spec:manage`, step-up). Every change is a new version; an evaluation keeps the version it was judged with. |
+| E-LAB1-01-3 | LAB1-01 | The lab's parameters (maximum CV, minimum specimens, age that counts as 28 days, lots for an own age factor, kg/cm² → MPa, age factors, density classes and absorption limits, equipment data) live in `qa`, managed by CALIDAD with a history of who changed what; they are not accounting policies. They start with the validated Excel's values. |
+| E-LAB1-01-4 | LAB1-01 | Posting a run never fails for a missing lot prefix or machine short code: the lot is born without `field_code` and a notice shows it. Completing the prefix or the short code assigns the code to the lots that were waiting for it, including the ones that already exist. |
+| E-LAB1-01-5 | LAB1-01 | `field_code` carries the run's business date (the day the shift started). It is unique among live lots: the lot of a run redone after a reversal reuses the VOIDED lot's code. |
+| E-LAB1-01-6 | LAB1-01 | A break date before the lot's production date is refused. The same day (age 0) is accepted, flagged, and never enters an estimate (as E-LAB1-6). |
+| E-LAB1-01-7 | LAB1-01 | Tests are recorded on a lot in any status but VOIDED: a blocked or fully dispatched lot can still be tested. |
+| E-LAB1-01-8 | LAB1-01 | A compression test stores its inputs, whether nominal measures were used, and the gross area and gross strength computed when recorded (6 decimals). MPa and net-area strength are computed when shown. Screens show 2 decimals. |
+| E-LAB1-01-9 | LAB1-01 | A test is never edited: it is voided with a reason and step-up, and recorded again. The voided one stays visible and does not count. |
+| E-LAB1-01-10 | LAB1-01 | The technician of a test is the session's user; no name is typed. |
+| E-LAB1-01-11 | LAB1-01 | Block condition is a fixed list (Seco al aire, Húmedo, Saturado); failure type is a configurable table seeded with the Excel's seven. Both are optional on a test. |
+| E-LAB1-01-12 | LAB1-01 | An absorption test is refused unless Ws > Wi, Ws ≥ Wd and Wd > 0. |
+| E-LAB1-01-13 | LAB1-01 | The four permissions of E-LAB1-9 and the role LABORATORIO are seeded in LAB1-01, although `FinalReleaseLot` arrives in LAB1-02. `lab:read`: Laboratorio, Calidad, Gerente de planta, Supervisor de producción, Director, Auditor. |
+| E-LAB1-01-14 | LAB1-01 | New menu group «Calidad»: Laboratorio (phone screen: the lot is chosen by field code, several specimens of one date are entered, the server shows the strength before saving), Requisitos por ítem and Parámetros. It needs a connection; no offline mode in this version. |
+| E-LAB1-01-15 | LAB1-01 | `qa.legacy_lot` and the import of the history go in LAB1-04's migration, not in LAB1-01's. |
 
 Implementation rules derived from the above (no architectural change):
 
