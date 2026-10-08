@@ -142,4 +142,11 @@ test("the driver confirms from the conduce's QR, and differences go to Despacho 
   await dispatch.getByRole("button", { name: "Registrar entrega al cliente" }).click();
   await expect(dispatch.getByTestId("delivery-status")).toHaveText("Entregado con excepciones");
   await expect(dispatch.getByTestId("driver-confirmation")).toContainText("entrega al cliente registrada");
+
+  // ENT1-04: the board lists the day's driver confirmations, the full one and the one with differences.
+  await nav(dispatch, "Tablero de despacho");
+  const today = dispatch.getByTestId("board-driver-today");
+  await expect(today.getByRole("heading")).toHaveText("Confirmadas por el chofer hoy (2)");
+  await expect(today.getByRole("row", { name: /Completa/ })).toHaveCount(1);
+  await expect(today.getByRole("row", { name: /Capataz Luis.*Con diferencias/ })).toHaveCount(1);
 });

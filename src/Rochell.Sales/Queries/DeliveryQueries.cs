@@ -15,11 +15,12 @@ namespace Rochell.Sales.Queries;
 /// </summary>
 public sealed record ListDeliveries(
     Guid CompanyId, Guid SessionId, string? Status = null, Guid? SalesOrderId = null, int Limit = 50, int Offset = 0, Guid? PartyId = null, DateOnly? From = null, DateOnly? To = null,
-    Guid? VehicleId = null, Guid? DriverId = null, bool DriverReportedDifferences = false) : IQuery;
+    Guid? VehicleId = null, Guid? DriverId = null, bool DriverReportedDifferences = false, DateOnly? DriverConfirmedOn = null) : IQuery;
 
+/// <remarks>ENT1-04: <c>DriverOutcome</c> FULL / DIFFERENCES, the receiver and the time of the driver's latest confirmation, if any.</remarks>
 public sealed record DeliverySummary(
     Guid DeliveryId, string DeliveryNo, Guid SalesOrderId, string OrderNo, string CustomerName, string PlantCode, string DeliveryTermCode, string ControlTransfersAt, string Status,
-    DateTime? GateOutAt, long Version, string? FleetCode, string? DriverName);
+    DateTime? GateOutAt, long Version, string? FleetCode, string? DriverName, string? DriverOutcome = null, string? DriverReceiver = null, DateTime? DriverConfirmedAt = null);
 
 public sealed record DeliveryList(IReadOnlyList<DeliverySummary> Items, int Limit, int Offset);
 
@@ -28,8 +29,11 @@ internal static class DeliveryReading
     public const string Select = """
         SELECT d.delivery_id, d.delivery_no, d.sales_order_id, o.order_no, p.legal_name, pl.code, d.delivery_term_code, d.control_transfers_at, d.status, d.gate_out_at, d.version,
                (SELECT v.fleet_code FROM log.vehicle v WHERE v.vehicle_id = d.vehicle_id),
-               coalesce((SELECT dr.full_name FROM log.driver dr WHERE dr.driver_id = d.driver_id), d.customer_driver_name)
+               coalesce((SELECT dr.full_name FROM log.driver dr WHERE dr.driver_id = d.driver_id), d.customer_driver_name),
+               dc.outcome, dc.receiver_name, dc.confirmed_at
         FROM log.delivery d
+        LEFT JOIN LATERAL (SELECT c.outcome, c.receiver_name, c.confirmed_at FROM log.driver_confirmation c WHERE c.company_id = d.company_id AND c.delivery_id = d.delivery_id
+                           ORDER BY c.generation DESC LIMIT 1) dc ON true
         JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id
         JOIN md.party p ON p.party_id = o.party_id
         JOIN md.plant pl ON pl.plant_id = d.plant_id
@@ -37,7 +41,8 @@ internal static class DeliveryReading
 
     public static DeliverySummary Map(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetString(7), r.GetString(8),
-            r.IsDBNull(9) ? null : r.GetFieldValue<DateTime>(9), r.GetInt64(10), r.NullableString(11), r.NullableString(12));
+            r.IsDBNull(9) ? null : r.GetFieldValue<DateTime>(9), r.GetInt64(10), r.NullableString(11), r.NullableString(12), r.NullableString(13), r.NullableString(14),
+            r.IsDBNull(15) ? null : r.GetFieldValue<DateTime>(15));
 }
 
 [RequiresPermission("sales:read")]
@@ -57,6 +62,7 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
              WHERE d.company_id = @c AND (CAST(@s AS text) IS NULL OR d.status = CAST(@s AS text)) AND (CAST(@o AS uuid) IS NULL OR d.sales_order_id = CAST(@o AS uuid))
               AND (CAST(@p AS uuid) IS NULL OR o.party_id = CAST(@p AS uuid))
               AND (CAST(@veh AS uuid) IS NULL OR d.vehicle_id = CAST(@veh AS uuid)) AND (CAST(@drv AS uuid) IS NULL OR d.driver_id = CAST(@drv AS uuid))
+              AND (CAST(@dco AS date) IS NULL OR (dc.confirmed_at AT TIME ZONE 'America/Santo_Domingo')::date = CAST(@dco AS date))
               AND (NOT @diff OR (d.status = 'IN_TRANSIT' AND EXISTS (
                      SELECT 1 FROM log.driver_confirmation c WHERE c.company_id = d.company_id AND c.delivery_id = d.delivery_id AND c.outcome = 'DIFFERENCES')))
               AND ((CAST(@from AS date) IS NULL AND CAST(@to AS date) IS NULL) OR coalesce((d.gate_out_at AT TIME ZONE 'America/Santo_Domingo')::date,
@@ -74,6 +80,7 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
             ("veh", query.VehicleId),
             ("drv", query.DriverId),
             ("diff", query.DriverReportedDifferences),
+            ("dco", query.DriverConfirmedOn),
             ("from", query.From),
             ("to", query.To),
             ("limit", query.Limit),

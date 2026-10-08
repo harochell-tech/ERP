@@ -40953,6 +40953,14 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "driverConfirmedOn",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
           }
         ],
         "responses": {
@@ -54568,6 +54576,25 @@
               "null",
               "string"
             ]
+          },
+          "driverOutcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "driverReceiver": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "driverConfirmedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         },
         "additionalProperties": false
