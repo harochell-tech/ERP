@@ -218,3 +218,13 @@ Migration 0104:
   missing ideal cycles and stoppages without a reason); Máquinas y turnos gains «Ciclo ideal»; Producción › Mantenimiento preventivo
   (`/produccion/mantenimiento/`: tasks with their state, define, mark done, deactivate). Inicio: overdue and due-soon maintenance
   (`maintenance_plan:manage`) and the week's stoppages without a reason. Journey: `e2e/maintenance-journey.spec.ts`.
+
+## MFG3-05 — Core's tasks in the portal (E-MFG3-9/10; portal MFG3-00b)
+
+- After every read, `PortalRunner` runs `PublishMaintenanceTasks` (`shift_summary:record`, the daily process): the ACTIVE tasks of
+  paired machines — code, portal machine, name, state, what has gone, every, unit — go to the portal's `data/planes.php`
+  (`IPortalSource.PublishTasksAsync`, header X-Core-Token); a failure is a warning of the pass. 285 commands.
+- Portal (harochell-tech/portal, MFG3-00b): `inc/tareas.php` creates `tareas_mantenimiento` and `mantenimientos.tarea` on first use;
+  `data/planes.php` replaces the list and sends a push to users with the Mantenimiento (or admin) role when a task becomes «Por
+  vencer» or «Vencida»; Mantenimientos lists the tasks and asks which one was done when a window ends; the export carries `tarea`,
+  which Core reads back as the task done.
