@@ -35,7 +35,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             + "supplier_invoice:register,supplier_invoice:void",
         ["ESPECIALISTA_FISCAL"] = "configuration:read,ecf:resolve,ecf_series:prepare,fiscal_authorization:suspend,fiscal_authorization:verify,fiscal_report:read,fiscal_rule:activate,sales:read", // + E-FIS1-01-9
         ["PROBADOR"] = "identity:act_as", // E-B03-14, TEST databases only
-        ["PROCESO_DIARIO"] = "ecf:process,fiscal_authorization:suspend", // E-FIS1-04-7, E-VS4-02-1: the API's daily process only
+        ["PROCESO_DIARIO"] = "ecf:process,fiscal_authorization:suspend,production_run:manage,shift_summary:record", // E-FIS1-04-7, E-VS4-02-1: the API's daily process only
         ["CARGA_CONFIGURACION"] = "account:manage,expense_category:prepare,fiscal_rule:configure,fiscal_rule_source:register", // E-CFG-1, E-GAS-03-4/7: the deployment CLI's configuration load only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
@@ -46,7 +46,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["CAJA"] = "cash_sale:create,receipt:apply,receipt:record,sales:read", // E-CF1-11: sells for cash and records the payment
         ["COBROS"] = "customer_refund:prepare,customer_withholding:record,invoice:email,mail:retry,receipt:apply,receipt:deposit,receipt:record,sales:read,statement:email",
         ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
-        ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,production:read,production_master:manage,recipe:approve,shift_summary:post",
+        ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,portal:manage,production:read,production_master:manage,recipe:approve,shift_summary:post",
         ["CALIDAD"] = "fg_lot:release,master_data:read,production:read",
         ["TESORERO"] = "bank:read,bank_line:match,bank_statement:import,exchange_rate:prepare,exchange_rate:read,party_bank_account:request,payment:prepare,payment:read,payment:void,receipt:bounce", // VS#2 §7
     };
@@ -56,7 +56,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(143L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + invoice:email (E-VS4-05-2); + ecf:process (E-VS4-02-1); + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
+        Assert.Equal(144L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + portal:manage (E-MFG2-01-7); + invoice:email (E-VS4-05-2); + ecf:process (E-VS4-02-1); + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
         Assert.Equal(49L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + ecf_series:approve ≠ prepare (E-VS4-01-8); + fixed_asset:approve ≠ manage (E-AF-11) + exchange rates and import settlements prepare ≠ approve (E-USD1-01-7) // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {

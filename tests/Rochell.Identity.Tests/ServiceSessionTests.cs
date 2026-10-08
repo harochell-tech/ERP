@@ -25,7 +25,7 @@ public sealed class ServiceSessionTests(PostgresFixture postgres)
 
         Assert.Equal(SqlStates.RaiseException, (toPerson as PostgresException)?.SqlState);
         Assert.Equal(SqlStates.RaiseException, (otherRole as PostgresException)?.SqlState);
-        Assert.Equal("ecf:process,fiscal_authorization:suspend", await h.ScalarAsync<string>( // + E-VS4-02-1
+        Assert.Equal("ecf:process,fiscal_authorization:suspend,production_run:manage,shift_summary:record", await h.ScalarAsync<string>( // + E-VS4-02-1, E-MFG2-6
             "SELECT string_agg(permission_code, ',' ORDER BY permission_code) FROM iam.role r JOIN iam.role_permission USING (role_id) WHERE r.code = 'PROCESO_DIARIO'"));
     }
 
