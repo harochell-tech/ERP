@@ -24,6 +24,7 @@ using Rochell.Procurement.Imports;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Customers;
+using Rochell.Sales.Deliveries;
 using Rochell.Sales.Mail;
 using Rochell.Sales.Proformas;
 using Rochell.Sales.Queries;
@@ -76,7 +77,7 @@ public static class QueryEndpoints
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler), typeof(ListDeliveryZonesHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(GetPortalSetupHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
-        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
+        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler), typeof(GetDriverEvidenceHandler), typeof(GetDriverDeliveryHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
@@ -367,6 +368,13 @@ public static class QueryEndpoints
         sales.MapGet("/deliveries/{deliveryId:guid}/print", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryPrintHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDeliveryPrint(companyId, s, deliveryId), handler, ct))
             .Describe<DeliveryPrint>(nameof(GetDeliveryPrint), notFound: true);
+        // ENT1-02 (E-ENT-5): the driver's photo or signature; and the drivers' page view, for the service identity (the page itself uses /api/v1/public/deliveries).
+        sales.MapGet("/deliveries/{deliveryId:guid}/driver-evidence", (HttpContext http, Guid companyId, Guid deliveryId, GetDriverEvidenceHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetDriverEvidence(companyId, s, deliveryId), handler, ct))
+            .Describe<DriverEvidenceContent>(nameof(GetDriverEvidence), notFound: true);
+        sales.MapGet("/driver-deliveries/{deliveryId:guid}", (HttpContext http, Guid companyId, Guid deliveryId, int g, string k, GetDriverDeliveryHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetDriverDelivery(companyId, s, deliveryId, g, k), handler, ct))
+            .Describe<DriverDeliveryView>(nameof(GetDriverDelivery));
         sales.MapGet("/invoices", (HttpContext http, Guid companyId, string? commercialStatus, string? fiscalStatus, Guid? partyId, int? limit, int? offset, bool? openOnly, ListInvoicesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListInvoices(companyId, s, commercialStatus, fiscalStatus, partyId, limit ?? DefaultLimit, offset ?? 0, openOnly ?? false), handler, ct))
             .Describe<InvoiceList>(nameof(ListInvoices));

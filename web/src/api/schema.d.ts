@@ -3357,6 +3357,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/set-driver-pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetDriverPin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/reopen-delivery-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReopenDeliveryLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/verify-driver-pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VerifyDriverPin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/confirm-delivery-by-driver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ConfirmDeliveryByDriver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/record-return-trip": {
         parameters: {
             query?: never;
@@ -5741,6 +5805,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/deliveries/{deliveryId}/driver-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetDriverEvidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/driver-deliveries/{deliveryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetDriverDelivery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/invoices": {
         parameters: {
             query?: never;
@@ -6877,6 +6973,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/deliveries/{companyId}/{deliveryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** E-ENT-1: what the driver's page shows of a delivery (no prices) and the link's state. No sign-in; the link's HMAC is the key. */
+        get: operations["GetDriverDeliveryPublic"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/deliveries/{companyId}/{deliveryId}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** E-ENT-2: checks the driver's PIN before the photo. Every try is kept; 5 wrong lock the link. */
+        post: operations["VerifyDriverPinPublic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/deliveries/{companyId}/{deliveryId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** E-ENT-3/4: the driver's confirmation (multipart, with the photo or signature). FULL records the POD; DIFFERENCES waits for Dispatch. */
+        post: operations["ConfirmDeliveryPublic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7970,6 +8117,10 @@ export interface components {
             /** Format: uuid */
             salesOrderId: string;
         };
+        ConfirmDeliveryByDriver: {
+            access: components["schemas"]["DriverLinkAccess"];
+            report: components["schemas"]["DriverReport"];
+        };
         ConfirmLoaded: {
             /** Format: uuid */
             deliveryId: string;
@@ -8623,6 +8774,8 @@ export interface components {
             pod: null | components["schemas"]["PodView"];
             assessments: components["schemas"]["ControlAssessmentView"][];
             history: components["schemas"]["StateChange"][];
+            driverLink?: null | components["schemas"]["DriverLinkView"];
+            driverConfirmation?: null | components["schemas"]["DriverConfirmationView"];
         };
         DeliveryLineView: {
             /** Format: uuid */
@@ -8702,6 +8855,7 @@ export interface components {
             /** Format: date-time */
             receivedAt: null | string;
             vehicleFleetCode: null | string;
+            driverLinkPath?: null | string;
         };
         DeliveryPrintLine: {
             /** Format: int32 */
@@ -8905,8 +9059,92 @@ export interface components {
             fileName: string;
             hasPdf: boolean;
         };
+        DriverAccessResult: {
+            state: string;
+            /** Format: int32 */
+            remaining: number;
+        };
+        DriverConfirmationView: {
+            /** Format: uuid */
+            confirmationId: string;
+            receiverName: string;
+            receiverNationalId: null | string;
+            outcome: string;
+            note: null | string;
+            /** Format: date-time */
+            confirmedAt: string;
+            /** Format: date-time */
+            phoneAt: null | string;
+            /** Format: date-time */
+            serverAt: string;
+            /** Format: decimal */
+            latitude: null | string;
+            /** Format: decimal */
+            longitude: null | string;
+            /** Format: decimal */
+            accuracyM: null | string;
+            evidenceKind: string;
+            evidenceSha256: string;
+            completedByPod: boolean;
+        };
+        DriverDeliveryLine: {
+            itemCode: string;
+            description: string;
+            quantity: string;
+            uom: string;
+        };
+        DriverDeliveryView: {
+            state: string;
+            deliveryNo: null | string;
+            customer: null | string;
+            site: null | string;
+            driver: null | string;
+            vehicle: null | string;
+            lines: components["schemas"]["DriverDeliveryLine"][];
+            recordedOutcome: null | string;
+        };
+        DriverEvidenceContent: {
+            contentType: string;
+            contentBase64: string;
+            sha256: string;
+        };
+        DriverLinkAccess: {
+            /** Format: uuid */
+            deliveryId: string;
+            /** Format: int32 */
+            generation: number;
+            mac: string;
+            pin: string;
+            clientAddress: string;
+        };
+        DriverLinkView: {
+            /** Format: int32 */
+            generation: number;
+            status: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: int32 */
+            failedAttempts: number;
+        };
         DriverList: {
             items: components["schemas"]["DriverView"][];
+        };
+        DriverReport: {
+            receiverName: string;
+            receiverNationalId: null | string;
+            outcome: string;
+            note: null | string;
+            /** Format: date-time */
+            phoneAt: null | string;
+            /** Format: decimal */
+            latitude: null | string;
+            /** Format: decimal */
+            longitude: null | string;
+            /** Format: decimal */
+            accuracyM: null | string;
+            evidenceKind: string;
+            evidenceRef: string;
+            evidenceSha256: string;
         };
         DriverView: {
             /** Format: uuid */
@@ -10521,6 +10759,12 @@ export interface components {
             endsOn: string;
             components: components["schemas"]["ComponentStateView"][];
             reopenRequests: components["schemas"]["ReopenRequestView"][];
+        };
+        PinRequest: {
+            /** Format: int32 */
+            generation: number;
+            mac: string;
+            pin: string;
         };
         PlanDelivery: {
             /** Format: uuid */
@@ -12253,6 +12497,10 @@ export interface components {
             expectedVersion: number;
             name: string;
         };
+        ReopenDeliveryLink: {
+            /** Format: uuid */
+            deliveryId: string;
+        };
         ReopenRequestView: {
             /** Format: uuid */
             requestId: string;
@@ -12940,6 +13188,11 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             alias: null | string;
+        };
+        SetDriverPin: {
+            /** Format: uuid */
+            driverId: string;
+            pin: string;
         };
         SetLocationStatus: {
             /** Format: uuid */
@@ -13808,6 +14061,9 @@ export interface components {
             authorizationId: string;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        VerifyDriverPin: {
+            access: components["schemas"]["DriverLinkAccess"];
         };
         VerifyHashChain: Record<string, never>;
         VerifyPartyBankAccount: {
@@ -29357,6 +29613,310 @@ export interface operations {
             };
         };
     };
+    SetDriverPin: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetDriverPin"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ReopenDeliveryLink: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenDeliveryLink"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VerifyDriverPin: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyDriverPin"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ConfirmDeliveryByDriver: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmDeliveryByDriver"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RecordReturnTrip: {
         parameters: {
             query?: never;
@@ -39014,6 +39574,118 @@ export interface operations {
             };
         };
     };
+    GetDriverEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverEvidenceContent"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetDriverDelivery: {
+        parameters: {
+            query: {
+                g: number;
+                k: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverDeliveryView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListInvoices: {
         parameters: {
             query?: {
@@ -42805,6 +43477,116 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
+            };
+        };
+    };
+    GetDriverDeliveryPublic: {
+        parameters: {
+            query: {
+                g: number;
+                k: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverDeliveryView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    VerifyDriverPinPublic: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverAccessResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ConfirmDeliveryPublic: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverAccessResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

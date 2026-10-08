@@ -14,10 +14,10 @@ namespace Rochell.Sales.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class DriverConfirmationSchemaTests(PostgresFixture postgres)
 {
-    private static string Link(Guid company, Guid delivery, string status = "ACTIVE", int failed = 0) =>
+    private static string Link(Guid company, Guid delivery) =>
         $"""
         INSERT INTO log.delivery_link (company_id, delivery_id, generation, status, expires_at, failed_attempts, created_at, version)
-        VALUES ('{company}', '{delivery}', 1, '{status}', now() + interval '7 days', {failed}, now(), 1)
+        VALUES ('{company}', '{delivery}', 1, 'ACTIVE', now() + interval '7 days', 0, now(), 1)
         """;
 
     private static string Confirmation(Guid company, Guid delivery, Guid driver, Guid evt, string outcome, string? note, string phoneAt, string confirmedAt) =>
@@ -55,8 +55,8 @@ public sealed class DriverConfirmationSchemaTests(PostgresFixture postgres)
         var (delivery, _) = await DeliveryTests.DispatchAsync(h, s, order, line, 600m, own: true, "d");
         var evt = await h.ScalarAsync<Guid>("SELECT event_id FROM core.domain_event WHERE company_id = @c ORDER BY recorded_at DESC LIMIT 1", ("c", h.CompanyId));
 
-        var lockedEarly = await TryAsync(h, Link(h.CompanyId, delivery, "LOCKED", 3));
-        Assert.Null(await TryAsync(h, Link(h.CompanyId, delivery)));
+        var lockedEarly = await TryAsync(h, "UPDATE log.delivery_link SET status = 'LOCKED', failed_attempts = 3");
+        var second = await TryAsync(h, Link(h.CompanyId, delivery)); // gate out already opened the delivery's one link
         var silentDifferences = await TryAsync(h, Confirmation(h.CompanyId, delivery, s.Driver, evt, "DIFFERENCES", null, "NULL", "now()"));
         var phoneAhead = await TryAsync(h, Confirmation(h.CompanyId, delivery, s.Driver, evt, "FULL", null, "now() + interval '1 hour'", "now() + interval '1 hour'"));
         Assert.Null(await TryAsync(h, Confirmation(h.CompanyId, delivery, s.Driver, evt, "FULL", null, "now() - interval '3 minutes'", "now() - interval '3 minutes'")));
@@ -64,6 +64,7 @@ public sealed class DriverConfirmationSchemaTests(PostgresFixture postgres)
         var changed = await TryAsync(h, "UPDATE log.driver_confirmation SET receiver_name = 'Otro'");
 
         Assert.Equal(SqlStates.CheckViolation, lockedEarly?.SqlState); // LOCKED only after 5 failed PINs
+        Assert.Equal(SqlStates.UniqueViolation, second?.SqlState);
         Assert.Equal(SqlStates.CheckViolation, silentDifferences?.SqlState); // differences say what happened
         Assert.Equal(SqlStates.CheckViolation, phoneAhead?.SqlState); // E-ENT1-01-6: at most 5 minutes ahead of the server
         Assert.Equal(SqlStates.UniqueViolation, twice?.SqlState); // one confirmation per link generation
