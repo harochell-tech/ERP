@@ -209,3 +209,12 @@ Migration 0104:
   of its interval (`used`), the state OK / POR_VENCER (≥ 90 %) / VENCIDA (≥ 100 %) / INACTIVE, the last five done (local time), and
   the counts `dueSoon` / `overdue` for Inicio.
 - Publishing the task list to the portal and its push notices come with the portal's MFG3-00b.
+
+## MFG3-04 — efficiency and maintenance screens (E-MFG3-4…10)
+
+- `ListIdealCycles` (`production:read`, `GET …/manufacturing/ideal-cycles`): every ideal cycle and which is in force today.
+- Web: Producción › Eficiencia (`/produccion/eficiencia/`: per machine and per shift — availability, performance, quality, overall
+  efficiency as percentages moved from the server's ratios, stoppage minutes by reason, lost blocks and their cost; notices for
+  missing ideal cycles and stoppages without a reason); Máquinas y turnos gains «Ciclo ideal»; Producción › Mantenimiento preventivo
+  (`/produccion/mantenimiento/`: tasks with their state, define, mark done, deactivate). Inicio: overdue and due-soon maintenance
+  (`maintenance_plan:manage`) and the week's stoppages without a reason. Journey: `e2e/maintenance-journey.spec.ts`.

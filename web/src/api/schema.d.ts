@@ -5293,6 +5293,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/manufacturing/ideal-cycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListIdealCycles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/manufacturing/maintenance-tasks": {
         parameters: {
             query?: never;
@@ -10132,6 +10148,22 @@ export interface components {
             occurredAt: string;
             /** Format: int64 */
             version: number;
+        };
+        IdealCycleList: {
+            items: components["schemas"]["IdealCycleView"][];
+        };
+        IdealCycleView: {
+            /** Format: uuid */
+            machineId: string;
+            machineCode: string;
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            /** Format: date */
+            validFrom: string;
+            /** Format: decimal */
+            seconds: string;
+            inForce: boolean;
         };
         ImportBankStatement: {
             /** Format: uuid */
@@ -38479,6 +38511,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MachineEfficiency"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListIdealCycles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdealCycleList"];
                 };
             };
             /** @description Bad Request */

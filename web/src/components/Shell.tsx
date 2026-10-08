@@ -93,6 +93,8 @@ export const NAV: readonly NavGroup[] = [
       { href: "/produccion/recetas/", label: "Recetas", permission: "production:read" },
       { href: "/produccion/maquinas/", label: "Máquinas y turnos", permission: "production:read" },
       { href: "/produccion/portal/", label: "Portal de máquinas", permission: "production:read" }, // MFG2-03
+      { href: "/produccion/eficiencia/", label: "Eficiencia", permission: "production:read" }, // MFG3-04
+      { href: "/produccion/mantenimiento/", label: "Mantenimiento preventivo", permission: "production:read" },
       { href: "/produccion/costos/", label: "Costos de producción", permission: "production:read" },
     ],
   },

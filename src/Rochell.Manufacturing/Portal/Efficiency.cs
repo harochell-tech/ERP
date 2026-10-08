@@ -308,3 +308,37 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
     private static IReadOnlyList<StoppageReasonView> Reasons(Dictionary<string, (int Count, decimal Minutes)> reasons)
         => [.. reasons.OrderByDescending(r => r.Value.Minutes).Select(r => new StoppageReasonView(r.Key, r.Value.Count, Round(r.Value.Minutes)))];
 }
+
+/// <summary>E-MFG3-5: the ideal cycles in force today per machine and product, with when they started and the earlier ones.</summary>
+public sealed record ListIdealCycles(Guid CompanyId, Guid SessionId) : IQuery;
+
+public sealed record IdealCycleView(Guid MachineId, string MachineCode, Guid ItemId, string ItemCode, DateOnly ValidFrom, decimal Seconds, bool InForce);
+
+public sealed record IdealCycleList(IReadOnlyList<IdealCycleView> Items);
+
+[RequiresPermission("production:read")]
+public sealed class ListIdealCyclesHandler : IQueryHandler<ListIdealCycles>
+{
+    public string QueryType => "Manufacturing.ListIdealCycles";
+
+    public async Task<string> HandleAsync(ListIdealCycles query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var today = BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT c.machine_id, m.code, c.item_id, i.code, c.valid_from, c.seconds,
+                   c.valid_from = (SELECT max(x.valid_from) FROM mfg.ideal_cycle x WHERE x.company_id = c.company_id AND x.machine_id = c.machine_id AND x.item_id = c.item_id
+                                   AND x.valid_from <= @today)
+            FROM mfg.ideal_cycle c JOIN md.machine m ON m.machine_id = c.machine_id JOIN md.item i ON i.item_id = c.item_id
+            WHERE c.company_id = @c ORDER BY m.code, i.code, c.valid_from DESC
+            """,
+            r => new IdealCycleView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.Date(4), r.GetDecimal(5), r.GetBoolean(6)),
+            cancellationToken,
+            ("c", context.CompanyId), ("today", today)).ConfigureAwait(false);
+        return ApiJson.Serialize(new IdealCycleList(items));
+    }
+}
