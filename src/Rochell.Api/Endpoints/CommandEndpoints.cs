@@ -307,6 +307,10 @@ public static class CommandEndpoints
         sales.MapCommand<RecordGateOut, RecordGateOutHandler>();
         sales.MapCommand<RecordPod, RecordPodHandler>();
         sales.MapCommand<SetDriverPin, SetDriverPinHandler>(); // ENT1-02 (E-ENT-2, E-ENT1-01-1)
+        sales.MapCommand<Rochell.Sales.Printing.SavePrintFormatDraft, Rochell.Sales.Printing.SavePrintFormatDraftHandler>(); // PRT-02 (E-PRT-02-1…7)
+        sales.MapCommand<Rochell.Sales.Printing.ActivatePrintFormat, Rochell.Sales.Printing.ActivatePrintFormatHandler>();
+        sales.MapCommand<Rochell.Sales.Printing.RestorePrintFormat, Rochell.Sales.Printing.RestorePrintFormatHandler>();
+        sales.MapCommand<Rochell.Sales.Printing.SetCompanyLogo, Rochell.Sales.Printing.SetCompanyLogoHandler>();
         sales.MapCommand<ReopenDeliveryLink, ReopenDeliveryLinkHandler>();
         sales.MapCommand<VerifyDriverPin, VerifyDriverPinHandler>(); // the service identity's; the drivers' page uses /api/v1/public/deliveries
         sales.MapCommand<ConfirmDeliveryByDriver, ConfirmDeliveryByDriverHandler>();
@@ -367,6 +371,11 @@ public static class CommandEndpoints
         manufacturing.MapCommand<StartProductionRun, StartProductionRunHandler>();
         // MFG2-02 (E-MFG2-1/6): the daily process's steps reading the machines' portal.
         manufacturing.MapCommand<ImportPortalData, ImportPortalDataHandler>();
+        manufacturing.MapCommand<SetIdealCycle, SetIdealCycleHandler>(); // MFG3-02 (E-MFG3-5)
+        manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.DefineMaintenanceTask, Rochell.Manufacturing.Maintenance.DefineMaintenanceTaskHandler>(); // MFG3-03 (E-MFG3-8…10)
+        manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.UpdateMaintenanceTask, Rochell.Manufacturing.Maintenance.UpdateMaintenanceTaskHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatus, Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatusHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.RecordMaintenanceDone, Rochell.Manufacturing.Maintenance.RecordMaintenanceDoneHandler>();
         manufacturing.MapCommand<SyncPortalShift, SyncPortalShiftHandler>();
         // MFG2-03 (E-MFG2-3, E-MFG2-01-7): Producción › Portal pairings.
         manufacturing.MapCommand<SetPortalMachine, SetPortalMachineHandler>();
@@ -432,7 +441,8 @@ public static class CommandEndpoints
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),
         typeof(CreateQuoteHandler), typeof(UpdateDraftQuoteHandler), typeof(SubmitQuoteForApprovalHandler), typeof(ApproveQuotePricesHandler), typeof(ReturnQuoteToDraftHandler),
         typeof(SendQuoteHandler), typeof(MarkQuoteLostHandler), typeof(CancelQuoteHandler), typeof(CopyQuoteHandler), typeof(ConvertQuoteHandler),
-        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(SetDriverPinHandler), typeof(ReopenDeliveryLinkHandler), typeof(VerifyDriverPinHandler),
+        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(SetDriverPinHandler), typeof(Rochell.Sales.Printing.SavePrintFormatDraftHandler), typeof(Rochell.Sales.Printing.ActivatePrintFormatHandler),
+        typeof(Rochell.Sales.Printing.RestorePrintFormatHandler), typeof(Rochell.Sales.Printing.SetCompanyLogoHandler), typeof(ReopenDeliveryLinkHandler), typeof(VerifyDriverPinHandler),
         typeof(ConfirmDeliveryByDriverHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(CreateInvoiceFromProformasHandler), typeof(VoidProformaHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(ResendInvoiceEcfHandler), typeof(ResendCreditNoteEcfHandler),
@@ -446,7 +456,9 @@ public static class CommandEndpoints
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),
-        typeof(ImportPortalDataHandler), typeof(SyncPortalShiftHandler), typeof(SetPortalMachineHandler), typeof(SetPortalMouldHandler), typeof(SetPortalShiftHandler),
+        typeof(ImportPortalDataHandler), typeof(SetIdealCycleHandler), typeof(Rochell.Manufacturing.Maintenance.DefineMaintenanceTaskHandler),
+        typeof(Rochell.Manufacturing.Maintenance.UpdateMaintenanceTaskHandler), typeof(Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatusHandler),
+        typeof(Rochell.Manufacturing.Maintenance.RecordMaintenanceDoneHandler), typeof(SyncPortalShiftHandler), typeof(SetPortalMachineHandler), typeof(SetPortalMouldHandler), typeof(SetPortalShiftHandler),
         typeof(SetPortalMaterialHandler), typeof(RemovePortalPairingHandler),
         typeof(StartProductionRunHandler), typeof(CancelProductionRunHandler), typeof(RecordShiftSummaryHandler), typeof(PostShiftSummaryHandler), typeof(ReverseShiftSummaryHandler),
         typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler), typeof(SettleCostCollectorHandler),

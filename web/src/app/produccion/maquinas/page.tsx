@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
+import { IdealCycles } from "@/components/Efficiency";
 import { PlantSelect, useChosenPlant, usePlants } from "@/components/Production";
 import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
 import { ConfirmAction, ErrorBox, Field, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
@@ -330,6 +331,8 @@ export default function Page() {
               </tbody>
             </table></div>
           )}
+          {/* MFG3-04 (E-MFG3-5, E-MFG3-01-2) */}
+          <IdealCycles machines={data.machines} />
         </>
       )}
     </>

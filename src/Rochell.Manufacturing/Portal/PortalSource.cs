@@ -27,10 +27,41 @@ public sealed class PortalSettings
     public bool Enabled => !string.IsNullOrWhiteSpace(BaseUrl);
 }
 
+/// <remarks>MFG3-00 adds stoppages, maintenance windows and daily reports; an older portal leaves them out (null).</remarks>
 public sealed record PortalExport(
     [property: JsonPropertyName("generado_en")] string GeneratedAt,
     [property: JsonPropertyName("turnos")] IReadOnlyList<PortalShift> Shifts,
-    [property: JsonPropertyName("consumos")] IReadOnlyList<PortalPost> Posts);
+    [property: JsonPropertyName("consumos")] IReadOnlyList<PortalPost> Posts,
+    [property: JsonPropertyName("paros")] IReadOnlyList<PortalStoppage>? Stoppages = null,
+    [property: JsonPropertyName("mantenimientos")] IReadOnlyList<PortalMaintenance>? Maintenance = null,
+    [property: JsonPropertyName("reportes")] IReadOnlyList<PortalDailyReport>? Reports = null);
+
+/// <summary>MFG3-00 (E-MFG3-3): a stoppage as the portal recorded it; the end and the reason arrive later.</summary>
+public sealed record PortalStoppage(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("planta")] string Machine,
+    [property: JsonPropertyName("inicio")] string Start,
+    [property: JsonPropertyName("fin")] string? End,
+    [property: JsonPropertyName("duracion_segundos")] int? Seconds,
+    [property: JsonPropertyName("razon")] string? Reason,
+    [property: JsonPropertyName("detalle")] string? Detail);
+
+/// <summary>MFG3-00 (E-MFG3-3/9): a maintenance window; <see cref="Task"/> names the Core task it did (MFG3-03).</summary>
+public sealed record PortalMaintenance(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("planta")] string Machine,
+    [property: JsonPropertyName("desde")] string From,
+    [property: JsonPropertyName("hasta")] string? To,
+    [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("tarea")] string? Task = null);
+
+/// <summary>MFG3-00 (E-MFG3-2, E-MFG3-00-3): the day's broken blocks and the next day's good blocks confirmed after curing, per size.</summary>
+public sealed record PortalDailyReport(
+    [property: JsonPropertyName("planta")] string Machine,
+    [property: JsonPropertyName("fecha")] string Date,
+    [property: JsonPropertyName("rechazos")] int? Broken,
+    [property: JsonPropertyName("confirmado_curado")] IReadOnlyDictionary<string, int>? CuredGood,
+    [property: JsonPropertyName("actualizado_en")] string? UpdatedAt);
 
 public sealed record PortalShift(
     [property: JsonPropertyName("planta")] string Machine,

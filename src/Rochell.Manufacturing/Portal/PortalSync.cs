@@ -199,6 +199,51 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
             }
         }
 
+        // E-MFG3-2, E-MFG3-01-4: the daily report's broken blocks of a machine with a single shift that day, split among its products by
+        // units (the last takes the remainder); with two shifts they are split by hand in Core.
+        var broken = new Dictionary<Guid, decimal>();
+        foreach (var machine in targets.Select(t => t.Machine).DistinctBy(m => m.Code))
+        {
+            var reported = (await Reading.ListAsync(
+                context.Connection,
+                context.Transaction,
+                "SELECT broken_units FROM mfg.portal_daily_report WHERE company_id = @c AND portal_code = @p AND report_date = @d ORDER BY fetched_at DESC LIMIT 1",
+                r => r.IsDBNull(0) ? (int?)null : r.GetInt32(0),
+                cancellationToken,
+                ("c", context.CompanyId),
+                ("p", machine.Code),
+                ("d", command.Date)).ConfigureAwait(false)).SingleOrDefault();
+            if (reported is not { } units || units == 0)
+            {
+                continue;
+            }
+
+            var shifts = await MfgSql.ScalarAsync<long>(
+                context, "SELECT count(DISTINCT shift_no) FROM mfg.portal_reading WHERE company_id = @c AND portal_code = @p AND shift_date = @d", cancellationToken,
+                ("c", context.CompanyId), ("p", machine.Code), ("d", command.Date)).ConfigureAwait(false);
+            var own = targets.Where(t => t.Machine.Code == machine.Code).ToList();
+            var produced = own.Sum(t => t.Units);
+            if (shifts > 1)
+            {
+                warnings.Add($"{machine.Code} ({command.Date:yyyy-MM-dd}): {units} rotos del reporte con dos turnos ese día; repártalos a mano en Core.");
+                continue;
+            }
+
+            if (units >= produced)
+            {
+                warnings.Add($"{machine.Code} ({command.Date:yyyy-MM-dd}): el reporte dice {units} rotos, más que los {produced} bloques del día; no se pasan al borrador.");
+                continue;
+            }
+
+            var left = (decimal)units;
+            for (var k = 0; k < own.Count; k++)
+            {
+                var share = k == own.Count - 1 ? left : decimal.Round(units * own[k].Units / produced, 0, MidpointRounding.AwayFromZero);
+                left -= share;
+                broken[own[k].Run.RunId] = share;
+            }
+        }
+
         // The drafts.
         var written = 0;
         var unchanged = 0;
@@ -259,18 +304,19 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
                 continue;
             }
 
+            var fresh = broken.GetValueOrDefault(t.Run.RunId);
             var provenance = new SummaryProvenance(
                 "PORTAL", t.ReadingId, null, splitOk ? "BATCH_PLANT" : "PENDING", null, splitOk ? post!.Value.Id : null);
             if (live is { Status: "DRAFT" } && current is not null && current.ReadingId == t.ReadingId && current.ConsumptionSource == provenance.ConsumptionSource
-                && current.ConsumptionId == provenance.ConsumptionId && live.Batches == batches && live.GoodUnits == t.Units
+                && current.ConsumptionId == provenance.ConsumptionId && live.Batches == batches && live.GoodUnits == t.Units - fresh && live.FreshScrap == fresh
                 && await ShiftSummaryWriter.SameConsumptionAsync(context, t.Run.RunId, consumption, cancellationToken).ConfigureAwait(false))
             {
                 unchanged++;
                 continue;
             }
 
-            // Scrap is the Supervisor's: a draft a person changed is never refreshed (above), so a portal draft has none.
-            await ShiftSummaryWriter.WriteAsync(context, t.Run, batches, t.Units, 0m, 0m, consumption, provenance, CommandType, cancellationToken, context.Ids.NewId())
+            // Scrap: the report's broken blocks (above); a draft a person changed is never refreshed, so theirs stays.
+            await ShiftSummaryWriter.WriteAsync(context, t.Run, batches, t.Units - fresh, 0m, fresh, consumption, provenance, CommandType, cancellationToken, context.Ids.NewId())
                 .ConfigureAwait(false);
             written++;
         }

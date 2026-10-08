@@ -242,6 +242,33 @@ const TASKS: readonly Task[] = [
       return portal.warnings.length + portal.unpairedMachines.length + (portal.lastError ? 1 : 0);
     },
   },
+  // MFG3-04 (E-MFG3-7/10): preventive maintenance overdue and due soon; the week's stoppages without a reason.
+  {
+    href: "/produccion/mantenimiento/",
+    label: "Mantenimientos vencidos",
+    permission: "maintenance_plan:manage",
+    countPermission: "production:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/maintenance-tasks", { path: { companyId } })).overdue,
+  },
+  {
+    href: "/produccion/mantenimiento/?por-vencer=1",
+    label: "Mantenimientos por vencer",
+    permission: "maintenance_plan:manage",
+    countPermission: "production:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/maintenance-tasks", { path: { companyId } })).dueSoon,
+  },
+  {
+    href: "/produccion/eficiencia/",
+    label: "Paros sin razón esta semana",
+    permission: "production:read",
+    count: async (companyId) => {
+      const to = todayInDominicanRepublic();
+      const d = new Date(`${to}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - 6);
+      return (await query("/api/v1/companies/{companyId}/manufacturing/efficiency", { path: { companyId }, query: { from: d.toISOString().slice(0, 10), to } }))
+        .stoppagesWithoutReason;
+    },
+  },
   // VS4-04 (E-VS4-04-1/6): e-CF needing attention, rejected ones to resend or void, ranges running out or expiring.
   {
     href: "/fiscal/ecf/?estado=REQUIRES_ACTION",

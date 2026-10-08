@@ -145,6 +145,77 @@ public sealed class ImportPortalDataHandler(IPortalSource source) : ICommandHand
             posts += inserted;
         }
 
+        // MFG3-02 (E-MFG3-3, E-MFG3-01-1): each new version of a paired machine's stoppages, maintenance windows and daily reports.
+        var pairedCodes = machines.Select(m => m.Code).ToHashSet(StringComparer.Ordinal);
+        var extras = 0;
+        foreach (var stop in export.Stoppages ?? [])
+        {
+            var code = stop.Machine.Trim().ToLowerInvariant();
+            if (pairedCodes.Contains(code))
+            {
+                extras += await Sql.ExecuteAsync(
+                    context.Connection,
+                    context.Transaction,
+                    """
+                    INSERT INTO mfg.portal_stoppage (stoppage_row_id, company_id, portal_id, portal_code, started_at, ended_at, duration_seconds, reason, detail, content_sha256, fetched_at)
+                    VALUES (@id, @c, @pid, @p, @start, @end, @secs, @reason, @detail, @sha, @at) ON CONFLICT (company_id, portal_id, content_sha256) DO NOTHING
+                    """,
+                    cancellationToken,
+                    ("id", context.Ids.NewId()), ("c", context.CompanyId), ("pid", stop.Id), ("p", code), ("start", PortalTime.Parse(stop.Start)),
+                    ("end", stop.End is null ? DBNull.Value : PortalTime.Parse(stop.End)), ("secs", (object?)stop.Seconds ?? DBNull.Value), ("reason", (object?)stop.Reason ?? DBNull.Value),
+                    ("detail", (object?)stop.Detail ?? DBNull.Value), ("sha", SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(stop, PortalJson.Options))), ("at", now)).ConfigureAwait(false);
+            }
+        }
+
+        foreach (var window in export.Maintenance ?? [])
+        {
+            var code = window.Machine.Trim().ToLowerInvariant();
+            if (pairedCodes.Contains(code))
+            {
+                extras += await Sql.ExecuteAsync(
+                    context.Connection,
+                    context.Transaction,
+                    """
+                    INSERT INTO mfg.portal_maintenance (maintenance_row_id, company_id, portal_id, portal_code, starts_at, ends_at, reason, task_ref, content_sha256, fetched_at)
+                    VALUES (@id, @c, @pid, @p, @from, @to, @reason, @task, @sha, @at) ON CONFLICT (company_id, portal_id, content_sha256) DO NOTHING
+                    """,
+                    cancellationToken,
+                    ("id", context.Ids.NewId()), ("c", context.CompanyId), ("pid", window.Id), ("p", code), ("from", PortalTime.Parse(window.From)),
+                    ("to", window.To is null ? DBNull.Value : PortalTime.Parse(window.To)), ("reason", window.Reason), ("task", (object?)window.Task ?? DBNull.Value),
+                    ("sha", SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(window, PortalJson.Options))), ("at", now)).ConfigureAwait(false);
+                await Maintenance.PortalMaintenanceDone.RecordAsync(
+                    context, code, window.Id, window.Task, window.To is null ? null : PortalTime.Parse(window.To), cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        foreach (var report in export.Reports ?? [])
+        {
+            var code = report.Machine.Trim().ToLowerInvariant();
+            if (!pairedCodes.Contains(code))
+            {
+                continue;
+            }
+
+            var inserted = await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                INSERT INTO mfg.portal_daily_report (report_row_id, company_id, portal_code, report_date, broken_units, cured_good, updated_in_portal, content_sha256, fetched_at)
+                VALUES (@id, @c, @p, @d, @broken, CAST(@cured AS jsonb), @upd, @sha, @at) ON CONFLICT (company_id, portal_code, report_date, content_sha256) DO NOTHING
+                """,
+                cancellationToken,
+                ("id", context.Ids.NewId()), ("c", context.CompanyId), ("p", code), ("d", PortalTime.Day(report.Date)), ("broken", (object?)report.Broken ?? DBNull.Value),
+                ("cured", report.CuredGood is null ? DBNull.Value : JsonSerializer.Serialize(report.CuredGood)), ("upd", (object?)report.UpdatedAt ?? DBNull.Value),
+                ("sha", SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(report, PortalJson.Options))), ("at", now)).ConfigureAwait(false);
+            extras += inserted;
+            if (inserted > 0)
+            {
+                // E-MFG3-01-4: a new report brings the machine's day up to date (its broken blocks on the draft).
+                var machine = machines.First(m => m.Code == code);
+                groups.Add(new PortalGroup(PortalTime.Day(report.Date), 1, machine.BatchPlant ?? code));
+            }
+        }
+
         await SyncState.SucceededAsync(context, warnings, cancellationToken).ConfigureAwait(false);
         var ordered = groups.OrderBy(g => g.Date).ThenBy(g => g.ShiftNo).ThenBy(g => g.Group, StringComparer.Ordinal).ToList();
         return JsonSerializer.Serialize(new PortalImportResult(true, readings, posts, ordered, warnings, null), PortalJson.Options);
