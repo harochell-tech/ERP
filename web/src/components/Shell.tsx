@@ -99,6 +99,15 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
   {
+    // LAB1-01 (E-LAB1-01-14)
+    title: "Calidad",
+    items: [
+      { href: "/calidad/laboratorio/", label: "Laboratorio", permission: "lab:read" },
+      { href: "/calidad/requisitos/", label: "Requisitos por ítem", permission: "lab:read" },
+      { href: "/calidad/parametros/", label: "Parámetros", permission: "lab:read" },
+    ],
+  },
+  {
     title: "Cuentas por pagar",
     items: [
       { href: "/cxp/facturas/", label: "Facturas de proveedor", permission: "supplier_invoice:read" },

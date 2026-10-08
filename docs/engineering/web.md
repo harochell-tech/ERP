@@ -175,6 +175,10 @@ The other flows are covered at the API level (`tests/Rochell.Api.Tests`, includi
 Menu group **Producción**; see `docs/engineering/manufacturing.md` (MFG1-07). Every select inside a `Field` carries an `aria-label`,
 so `getByLabel(…, { exact: true })` finds it whatever option is selected.
 
+Menu group **Calidad** (LAB1-01, E-LAB1-01-14): Laboratorio (`/calidad/laboratorio/`, a phone screen: the server's preview shows each
+specimen's strength before saving), Requisitos por ítem and Parámetros; see `docs/engineering/quality-lab.md`. Helpers in
+`src/lib/lab.ts` (`tests/unit/lab.test.ts`); journeys `e2e/lab-journey.spec.ts` and the end of `e2e/production-journey.spec.ts`.
+
 ## FIS1-05 — fiscal authorization screens (E-FIS1-05-1…12)
 
 Menu **Fiscal** adds Autorizaciones fiscales (`sales:read`, so Crédito, Facturación and the Especialista fiscal see it); see

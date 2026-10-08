@@ -265,17 +265,22 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
         var endDate = info.EndsAt <= info.StartsAt ? run.BusinessDate.AddDays(1) : run.BusinessDate;
         var curingFrom = Platform.Time.BusinessCalendar.DayUtcRange(endDate).StartUtc + info.EndsAt.ToTimeSpan(); // no DST in the Dominican Republic
         var releasableAt = curingFrom.AddHours(info.MinCuringHours);
+
+        // E-LAB1-1, E-LAB1-01-4: the field code, when the item has its lot prefix and the machine its short code; the lot waits otherwise.
+        await MfgSql.LockAsync(context, "lot-field-codes", cancellationToken).ConfigureAwait(false);
+        var fieldCode = await Quality.FieldCodes.ForRunAsync(context, run.RunId, cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(
             context.Connection,
             context.Transaction,
-            "INSERT INTO mfg.fg_lot (lot_id, company_id, summary_id, run_id, curing_from, releasable_at, status, version) VALUES (@l, @c, @s, @r, @from, @at, 'CURING', 1)",
+            "INSERT INTO mfg.fg_lot (lot_id, company_id, summary_id, run_id, curing_from, releasable_at, status, version, field_code) VALUES (@l, @c, @s, @r, @from, @at, 'CURING', 1, @field)",
             cancellationToken,
             ("l", lotId),
             ("c", context.CompanyId),
             ("s", summary.SummaryId),
             ("r", run.RunId),
             ("from", curingFrom),
-            ("at", releasableAt)).ConfigureAwait(false);
+            ("at", releasableAt),
+            ("field", fieldCode)).ConfigureAwait(false);
         await context.AppendStateAsync(Runs.LotAggregate, lotId, "DOCUMENT", null, "CURING", CommandType, receiptEvent, cancellationToken).ConfigureAwait(false);
 
         // E-MFG1-6: ⌈units ÷ units per rack⌉ racks, the last one with the remainder.
@@ -304,6 +309,7 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
             version,
             lotId,
             lotCode,
+            fieldCode,
             racks,
             consumptionValue = Runs.Money(consumptionValue),
             standardValue = Runs.Money(standardValue),

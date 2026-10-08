@@ -55,5 +55,6 @@ internal static class MfgSeed
         await h.SessionWithRolesAsync("GERENTE_PLANTA");
         await h.SessionWithRolesAsync("SUPERVISOR_PRODUCCION");
         await h.SessionWithRolesAsync("CALIDAD");
+        await h.SessionWithRolesAsync("LABORATORIO"); // LAB1-01
     }
 }

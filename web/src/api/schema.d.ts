@@ -4653,6 +4653,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/manufacturing/set-item-spec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetItemSpec"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/set-lab-parameter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetLabParameter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/define-failure-type": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DefineFailureType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/set-failure-type-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetFailureTypeStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/set-machine-short-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetMachineShortCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/record-compression-tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RecordCompressionTests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/void-compression-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoidCompressionTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/record-absorption-tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RecordAbsorptionTests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/void-absorption-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VoidAbsorptionTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/identity/request-role-assignment": {
         parameters: {
             query?: never;
@@ -5335,6 +5479,86 @@ export interface paths {
         get: operations["ListMaintenanceTasks"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/lab/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListLabLots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/lab/lots/{lotId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetLabLot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/lab/item-specs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListItemSpecs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/lab/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetLabSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/lab/compression-tests/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PreviewCompressionTests"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7300,6 +7524,58 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AbsorptionBlock: {
+            /** Format: decimal */
+            wsKg: string;
+            /** Format: decimal */
+            wiKg: string;
+            /** Format: decimal */
+            wdKg: string;
+            notes?: null | string;
+        };
+        AbsorptionSummary: {
+            /** Format: int32 */
+            blocks: number;
+            /** Format: decimal */
+            absorptionKgm3: string;
+            /** Format: decimal */
+            absorptionFraction: string;
+            /** Format: decimal */
+            densityKgm3: string;
+            densityClass: string;
+            /** Format: decimal */
+            absorptionLimitKgm3: string;
+            aboveLimit: boolean;
+        };
+        AbsorptionTestView: {
+            /** Format: uuid */
+            testId: string;
+            /** Format: date */
+            testDate: string;
+            /** Format: decimal */
+            wsKg: string;
+            /** Format: decimal */
+            wiKg: string;
+            /** Format: decimal */
+            wdKg: string;
+            /** Format: decimal */
+            absorptionKgm3: string;
+            /** Format: decimal */
+            absorptionFraction: string;
+            /** Format: decimal */
+            densityKgm3: string;
+            densityClass: string;
+            /** Format: decimal */
+            absorptionLimitKgm3: string;
+            guide: string;
+            notes: null | string;
+            testedBy: string;
+            /** Format: date-time */
+            recordedAt: string;
+            status: string;
+            voidReason: null | string;
+            voidedBy: null | string;
+        };
         AccountLedger: {
             /** Format: uuid */
             accountId: string;
@@ -8390,6 +8666,77 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        CompressionPreview: {
+            /** Format: int32 */
+            ageDays: number;
+            ageZero: boolean;
+            lines: components["schemas"]["CompressionPreviewLine"][];
+        };
+        CompressionPreviewLine: {
+            /** Format: int32 */
+            line: number;
+            nominalUsed: null | boolean;
+            /** Format: decimal */
+            grossAreaCm2: null | string;
+            /** Format: decimal */
+            strengthKgcm2: null | string;
+            /** Format: decimal */
+            strengthMpa: null | string;
+            error: null | string;
+        };
+        CompressionSpecimen: {
+            /** Format: decimal */
+            loadKg: string;
+            /** Format: decimal */
+            widthCm?: null | string;
+            /** Format: decimal */
+            heightCm?: null | string;
+            /** Format: decimal */
+            lengthCm?: null | string;
+            /** Format: decimal */
+            weightKg?: null | string;
+            blockCondition?: null | string;
+            failureType?: null | string;
+            notes?: null | string;
+        };
+        CompressionTestView: {
+            /** Format: uuid */
+            testId: string;
+            /** Format: date */
+            breakDate: string;
+            /** Format: int32 */
+            ageDays: number;
+            ageZero: boolean;
+            /** Format: decimal */
+            widthCm: string;
+            /** Format: decimal */
+            heightCm: string;
+            /** Format: decimal */
+            lengthCm: string;
+            nominalUsed: boolean;
+            /** Format: decimal */
+            weightKg: null | string;
+            /** Format: decimal */
+            loadKg: string;
+            /** Format: decimal */
+            grossAreaCm2: string;
+            /** Format: decimal */
+            strengthKgcm2: string;
+            /** Format: decimal */
+            strengthMpa: string;
+            /** Format: decimal */
+            netStrengthKgcm2: null | string;
+            blockCondition: null | string;
+            failureType: null | string;
+            failureTypeName: null | string;
+            notes: null | string;
+            testedBy: string;
+            /** Format: date-time */
+            recordedAt: string;
+            status: string;
+            voidReason: null | string;
+            voidedBy: null | string;
+        };
         ConfigureFiscalRuleVersion: {
             ruleCode: string;
             ruleKind: string;
@@ -9022,6 +9369,10 @@ export interface components {
             vehicleId: string;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        DefineFailureType: {
+            code: string;
+            name: string;
         };
         DefineMaintenanceTask: {
             /** Format: uuid */
@@ -9723,6 +10074,12 @@ export interface components {
             evidenceRef: string;
             evidenceSha256: string;
             recordedBy: null | string;
+        };
+        FailureTypeView: {
+            code: string;
+            name: string;
+            status: string;
+            shared: boolean;
         };
         FgLotList: {
             items: components["schemas"]["FgLotSummary"][];
@@ -10493,6 +10850,33 @@ export interface components {
             /** Format: int32 */
             offset: number;
         };
+        ItemSpecList: {
+            items: components["schemas"]["ItemSpecView"][];
+        };
+        ItemSpecView: {
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemDescription: string;
+            /** Format: int32 */
+            version: null | number;
+            lotPrefix: null | string;
+            /** Format: decimal */
+            nominalWidthCm: null | string;
+            /** Format: decimal */
+            nominalHeightCm: null | string;
+            /** Format: decimal */
+            nominalLengthCm: null | string;
+            /** Format: decimal */
+            netAreaFraction: null | string;
+            /** Format: decimal */
+            minAvg28d: null | string;
+            /** Format: decimal */
+            minIndividual28d: null | string;
+            setBy: null | string;
+            /** Format: date-time */
+            setAt: null | string;
+        };
         ItemView: {
             /** Format: uuid */
             itemId: string;
@@ -10534,6 +10918,77 @@ export interface components {
             offset: number;
         };
         JsonElement: unknown;
+        LabLotDetail: {
+            lot: components["schemas"]["LabLotView"];
+            spec: null | components["schemas"]["ItemSpecView"];
+            compression: components["schemas"]["CompressionTestView"][];
+            absorption: components["schemas"]["AbsorptionTestView"][];
+            absorptionSummary: null | components["schemas"]["AbsorptionSummary"];
+        };
+        LabLotList: {
+            items: components["schemas"]["LabLotView"][];
+            /** Format: int32 */
+            withoutFieldCode: number;
+        };
+        LabLotView: {
+            /** Format: uuid */
+            lotId: string;
+            /** Format: uuid */
+            plantId: string;
+            fieldCode: null | string;
+            lotCode: string;
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemDescription: string;
+            machineCode: string;
+            machineShortCode: null | string;
+            shiftCode: string;
+            /** Format: date */
+            productionDate: string;
+            status: string;
+            fieldCodeWaitsFor: null | string;
+            /** Format: int32 */
+            compressionTests: number;
+            /** Format: int32 */
+            absorptionTests: number;
+            /** Format: date */
+            lastBreakDate: null | string;
+        };
+        LabParameterChange: {
+            code: string;
+            name: string;
+            value: string;
+            setBy: string;
+            /** Format: date-time */
+            setAt: string;
+        };
+        LabParameterView: {
+            code: string;
+            name: string;
+            kind: string;
+            /** Format: decimal */
+            number: null | string;
+            text: null | string;
+            /** Format: decimal */
+            defaultNumber: null | string;
+            defaultText: null | string;
+            /** Format: decimal */
+            min: null | string;
+            /** Format: decimal */
+            max: null | string;
+            whole: boolean;
+            own: boolean;
+            setBy: null | string;
+            /** Format: date-time */
+            setAt: null | string;
+        };
+        LabSettings: {
+            parameters: components["schemas"]["LabParameterView"][];
+            history: components["schemas"]["LabParameterChange"][];
+            failureTypes: components["schemas"]["FailureTypeView"][];
+            blockConditions: string[];
+        };
         LatestReconciliationRun: {
             reconCode: string;
             name: string;
@@ -10676,6 +11131,7 @@ export interface components {
             status: string;
             /** Format: int64 */
             version: number;
+            shortCode?: null | string;
         };
         MaintenanceDoneView: {
             doneAt: string;
@@ -11527,6 +11983,13 @@ export interface components {
             applications: components["schemas"]["PaymentApplication"][];
             /** Format: decimal */
             exchangeRate?: null | string;
+        };
+        PreviewCompressionRequest: {
+            /** Format: uuid */
+            lotId: string;
+            /** Format: date */
+            breakDate: string;
+            specimens: components["schemas"]["CompressionSpecimen"][];
         };
         PriceListDetail: {
             header: components["schemas"]["PriceListSummary"];
@@ -12623,6 +13086,24 @@ export interface components {
             sideALabel: null | string;
             sideBLabel: null | string;
         };
+        RecordAbsorptionTests: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            lotId: string;
+            /** Format: date */
+            testDate: string;
+            blocks: components["schemas"]["AbsorptionBlock"][];
+        };
+        RecordCompressionTests: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            lotId: string;
+            /** Format: date */
+            breakDate: string;
+            specimens: components["schemas"]["CompressionSpecimen"][];
+        };
         RecordCustomerWithholding: {
             /** Format: uuid */
             invoiceId: string;
@@ -13695,6 +14176,10 @@ export interface components {
             driverId: string;
             pin: string;
         };
+        SetFailureTypeStatus: {
+            code: string;
+            status: string;
+        };
         SetIdealCycle: {
             /** Format: uuid */
             machineId: string;
@@ -13705,10 +14190,42 @@ export interface components {
             /** Format: decimal */
             seconds: string;
         };
+        SetItemSpec: {
+            /** Format: uuid */
+            itemId: string;
+            lotPrefix: string;
+            /** Format: decimal */
+            nominalWidthCm: string;
+            /** Format: decimal */
+            nominalHeightCm: string;
+            /** Format: decimal */
+            nominalLengthCm: string;
+            /** Format: decimal */
+            netAreaFraction?: null | string;
+            /** Format: decimal */
+            minAvg28d?: null | string;
+            /** Format: decimal */
+            minIndividual28d?: null | string;
+        };
+        SetLabParameter: {
+            code: string;
+            /** Format: decimal */
+            number?: null | string;
+            text?: null | string;
+        };
         SetLocationStatus: {
             /** Format: uuid */
             locationId: string;
             active: boolean;
+        };
+        SetMachineShortCode: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            machineId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            shortCode: string;
         };
         SetMachineStatus: {
             /** Format: uuid */
@@ -14643,11 +15160,25 @@ export interface components {
             partyBankAccountId: string;
             evidence: string;
         };
+        VoidAbsorptionTest: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            testId: string;
+            reason: string;
+        };
         VoidBankTransfer: {
             /** Format: uuid */
             transferId: string;
             /** Format: int64 */
             expectedVersion: number;
+            reason: string;
+        };
+        VoidCompressionTest: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            testId: string;
             reason: string;
         };
         VoidCustomerRefund: {
@@ -36341,6 +36872,690 @@ export interface operations {
             };
         };
     };
+    SetItemSpec: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetItemSpec"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SetLabParameter: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetLabParameter"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DefineFailureType: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefineFailureType"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SetFailureTypeStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetFailureTypeStatus"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SetMachineShortCode: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMachineShortCode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RecordCompressionTests: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordCompressionTests"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VoidCompressionTest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidCompressionTest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RecordAbsorptionTests: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordAbsorptionTests"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    VoidAbsorptionTest: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidAbsorptionTest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RequestRoleAssignment: {
         parameters: {
             query?: never;
@@ -38728,6 +39943,280 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListLabLots: {
+        parameters: {
+            query?: {
+                search?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabLotList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetLabLot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                lotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabLotDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListItemSpecs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemSpecList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetLabSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabSettings"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PreviewCompressionTests: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewCompressionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompressionPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
