@@ -41,6 +41,7 @@ public sealed class EcfGatewayTests(PostgresFixture postgres)
         Assert.Equal(100, active.GetProperty("remaining").GetInt64());
     }
 
+    [Trait("AcceptanceVs4", "ECF-09")]
     [Fact]
     public async Task Each_issuance_takes_the_next_eNCF_and_the_last_one_closes_the_range()
     {
@@ -118,6 +119,7 @@ public sealed class EcfGatewayTests(PostgresFixture postgres)
         Assert.DoesNotContain(doc.DocumentId, await w.DueAsync());
     }
 
+    [Trait("AcceptanceVs4", "ECF-06")]
     [Fact]
     public async Task An_unknown_outcome_is_resolved_with_the_same_eNCF_and_never_a_second_one()
     {
@@ -157,6 +159,7 @@ public sealed class EcfGatewayTests(PostgresFixture postgres)
         Assert.Equal("REQUIRES_ACTION", Assert.Single(w.Updater.Seen).Status);
     }
 
+    [Trait("AcceptanceVs4", "ECF-08")]
     [Fact]
     public async Task Without_answers_past_the_policy_minutes_the_queue_goes_into_contingency_and_comes_back_by_itself()
     {
@@ -292,13 +295,43 @@ public sealed class EcfGatewayTests(PostgresFixture postgres)
 
         Assert.Equal((1, invalid.Encf), (attention.GetProperty("total").GetInt32(), attention.GetProperty("items")[0].GetProperty("encf").GetString()));
         Assert.Equal((1, "ACCEPTED"), (all.GetProperty("total").GetInt32(), all.GetProperty("items")[0].GetProperty("status").GetString()));
-        Assert.Equal("SUBMIT,QUERY,QUERY,DOWNLOAD,DOWNLOAD", string.Join(',', detail.GetProperty("calls").EnumerateArray().Select(c => c.GetProperty("operation").GetString())));
+        // Calls of the same instant (the fake clock) come in any order.
+        Assert.Equal("DOWNLOAD,DOWNLOAD,QUERY,QUERY,SUBMIT", string.Join(',', detail.GetProperty("calls").EnumerateArray().Select(c => c.GetProperty("operation").GetString()).Order()));
         Assert.NotNull(detail.GetProperty("securityCode").GetString());
         Assert.Equal(("E310000000041.xml", "simulated https://simulated.invalid/E310000000041.xml"), (file.GetProperty("fileName").GetString(),
             System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(file.GetProperty("contentBase64").GetString()!))));
         Assert.Equal((1, 0, false), (alerts.GetProperty("requiresAction").GetInt32(), alerts.GetProperty("rejected").GetInt32(), alerts.GetProperty("inContingency").GetBoolean()));
         var range = Assert.Single(alerts.GetProperty("ranges").EnumerateArray());
         Assert.Equal(("31", 1L, true), (range.GetProperty("ecfType").GetString(), range.GetProperty("remaining").GetInt64(), range.GetProperty("low").GetBoolean()));
+    }
+
+    [Trait("AcceptanceVs4", "ECF-10")]
+    [Fact]
+    public async Task ECF10_the_Controller_annuls_through_Alanube_the_unused_tail_of_a_closed_range_and_the_numbers_never_issued()
+    {
+        var w = await World.CreateAsync(postgres);
+        var h = w.H;
+        var series = await w.ActiveSeriesAsync("31", 1, 10);
+        await w.QueueAsync("31", "q1");
+        var lost = await w.QueueAsync("31", "q2", "[SIM:INVALID]");
+        await w.AdvanceAsync(lost.DocumentId);
+        await w.ResolveAsync(lost.DocumentId, EcfResolutions.NotIssued, null, "No aparece en Alanube ni en la DGII");
+        var version = await h.ScalarAsync<long>("SELECT version FROM tax.ecf_series WHERE series_id = @s", ("s", series));
+        var active = await Assert.ThrowsAsync<DomainException>(
+            () => h.RunAsync(new CancelUnusedEcfNumbers(h.CompanyId, w.Controller, "c0", series, version), new CancelUnusedEcfNumbersHandler(w.Provider)));
+        await h.RunAsync(new CloseEcfSeries(h.CompanyId, w.Controller, "close", series, version), new CloseEcfSeriesHandler());
+
+        var cancelled = Json(await h.RunAsync(new CancelUnusedEcfNumbers(h.CompanyId, w.Controller, "c1", series, version + 1), new CancelUnusedEcfNumbersHandler(w.Provider)));
+
+        Assert.Equal(EcfErrors.InvalidState, active.Code);
+        Assert.Equal(("CANCELLED", 9), (cancelled.GetProperty("status").GetString(), cancelled.GetProperty("quantity").GetInt32()));
+        var sent = Assert.Single(w.Provider.Cancellations);
+        Assert.Equal(9, sent["header"]!["cancelledEncfQuantity"]!.GetValue<long>());
+        Assert.Equal(
+            "E310000000002-E310000000002,E310000000003-E310000000010",
+            string.Join(',', sent["cancellations"]![0]!["rangeCancelledEnfc"]!.AsArray().Select(r => $"{r!["encfFrom"]}-{r["encfUntil"]}")));
+        Assert.Equal("3:10", await h.ScalarAsync<string>("SELECT cancelled_from || ':' || cancelled_to FROM tax.ecf_series WHERE series_id = @s", ("s", series)));
+        Assert.Equal("CANCEL", await h.ScalarAsync<string>("SELECT operation FROM tax.ecf_call WHERE series_id = @s", ("s", series)));
     }
 
     private static JsonElement Json(CommandResult result) => JsonDocument.Parse(result.ResultPayload).RootElement;

@@ -29,6 +29,10 @@ public sealed class SmtpMailTransport(MailSettings settings) : IMailTransport
         message.Subject = envelope.Subject;
         var body = new BodyBuilder { TextBody = envelope.BodyText };
         body.Attachments.Add(envelope.FileName, envelope.Pdf, new ContentType("application", "pdf"));
+        if (envelope.Extra is { } extra)
+        {
+            body.Attachments.Add(extra.Name, extra.Content, ContentType.Parse(extra.ContentType));
+        }
         message.Body = body.ToMessageBody();
 
         var smtp = settings.Smtp;

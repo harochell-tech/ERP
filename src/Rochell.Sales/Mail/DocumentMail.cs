@@ -25,6 +25,9 @@ public static class DocumentMailErrors
 /// <summary>E-MAIL-6: sends a quote already sent or converted, and not expired, as a PDF to the recipients given (E-MAIL-5).</summary>
 public sealed record SendQuoteByEmail(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid QuoteId, IReadOnlyList<string> Recipients, string? Message = null) : ICommand;
 
+/// <summary>VS4-05 (E-VS4-05-1): sends an invoice the DGII accepted (ECF_ACCEPTED): Core's PDF with the QR and Alanube's signed XML.</summary>
+public sealed record SendInvoiceByEmail(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid InvoiceId, IReadOnlyList<string> Recipients, string? Message = null) : ICommand;
+
 /// <summary>Sends a proforma that is not voided.</summary>
 public sealed record SendProformaByEmail(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ProformaId, IReadOnlyList<string> Recipients, string? Message = null) : ICommand;
 
@@ -69,7 +72,7 @@ internal static partial class DocumentMail
     /// </summary>
     public static async Task<string> QueueAsync(
         CommandContext context, MailSwitch? mail, string documentType, Guid documentId, string documentNo, Guid partyId, IReadOnlyList<string> recipients, string? message, string subject,
-        string lead, string issuerName, string fileName, string html, CancellationToken cancellationToken)
+        string lead, string issuerName, string fileName, string html, CancellationToken cancellationToken, MailAttachment? extra = null)
     {
         if (mail is { Enabled: false })
         {
@@ -102,7 +105,7 @@ internal static partial class DocumentMail
                 JsonSerializer.Serialize(new { mailId = id, documentType, documentId, documentNo, recipients = to, subject }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
-        await MailOutbox.EnqueueAsync(context, id, new MailDraft(documentType, documentId, documentNo, partyId, to, subject, body, fileName, html), eventId, sender.UserId, cancellationToken).ConfigureAwait(false);
+        await MailOutbox.EnqueueAsync(context, id, new MailDraft(documentType, documentId, documentNo, partyId, to, subject, body, fileName, html, extra), eventId, sender.UserId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { mailId = id, status = "QUEUED", recipients = to.Count });
     }
 
@@ -135,6 +138,41 @@ public sealed class SendQuoteByEmailHandler(MailSwitch? mail = null) : ICommandH
             context, mail, "QUOTE", command.QuoteId, quote.QuoteNo, party!.Value, command.Recipients, command.Message, $"Cotización {quote.QuoteNo} — {quote.IssuerName}",
             $"Adjuntamos la cotización {quote.QuoteNo}, válida hasta el {DocumentHtml.Date(quote.ValidUntil)}.", quote.IssuerName, DocumentMail.FileName(quote.QuoteNo), DocumentHtml.Quote(quote),
             cancellationToken).ConfigureAwait(false);
+    }
+}
+
+[RequiresPermission("invoice:email")]
+public sealed class SendInvoiceByEmailHandler(MailSwitch? mail = null) : ICommandHandler<SendInvoiceByEmail>
+{
+    public string CommandType => "Sales.SendInvoiceByEmail";
+
+    public async Task<string> HandleAsync(SendInvoiceByEmail command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var invoice = await DocumentMail.ReadAsync<GetInvoice, InvoiceDetail>(context, new GetInvoiceHandler(), new GetInvoice(context.CompanyId, context.SessionId, command.InvoiceId), cancellationToken)
+            .ConfigureAwait(false);
+        var h = invoice.Header;
+        if (h.FiscalStatus != "ECF_ACCEPTED" || h.CommercialStatus == "VOIDED" || invoice.Ecf is not { Status: "ACCEPTED" or "ACCEPTED_CONDITIONAL" } ecf)
+        {
+            throw new DomainException(DocumentMailErrors.NotSendable, $"Invoice {h.InvoiceNo} has no e-CF accepted by the DGII: it is e-mailed once accepted (E-VS4-05-1).");
+        }
+
+        var package = await DocumentMail.ReadAsync<GetInvoiceFiscalPackage, InvoiceFiscalPackage>(
+            context, new GetInvoiceFiscalPackageHandler(), new GetInvoiceFiscalPackage(context.CompanyId, context.SessionId, command.InvoiceId), cancellationToken).ConfigureAwait(false);
+        var xml = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT content FROM tax.ecf_file WHERE document_id = @d AND kind = 'XML'", r => r.GetFieldValue<byte[]>(0), cancellationToken,
+            ("d", ecf.DocumentId)).ConfigureAwait(false)).SingleOrDefault();
+        if (xml is null)
+        {
+            throw new DomainException(DocumentMailErrors.NotSendable, $"The signed XML of {ecf.Encf} has not been downloaded from Alanube yet; try again in a few minutes.");
+        }
+
+        var issuerName = invoice.Issuer!.TradeName ?? invoice.Issuer.LegalName;
+        return await DocumentMail.QueueAsync(
+            context, mail, "INVOICE", command.InvoiceId, h.InvoiceNo, h.PartyId, command.Recipients, command.Message, $"Factura {ecf.Encf} — {issuerName}",
+            $"Adjuntamos la factura electrónica {ecf.Encf} ({h.InvoiceNo}) en PDF y su XML firmado.", issuerName, DocumentMail.FileName(ecf.Encf), DocumentHtml.Invoice(invoice, package),
+            cancellationToken, new MailAttachment($"{ecf.Encf}.xml", xml, "application/xml")).ConfigureAwait(false);
     }
 }
 

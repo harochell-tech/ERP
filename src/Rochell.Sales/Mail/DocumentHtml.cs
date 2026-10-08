@@ -154,6 +154,59 @@ public static class DocumentHtml
         return Close(html.Signature("Firma del suplidor", "Sello del suplidor", boxes: false));
     }
 
+    /// <summary>
+    /// VS4-05 (E-VS4-05-1): the invoice accepted by the DGII — issuer, customer, lines, totals, the e-NCF, the security code, the
+    /// signature date and the QR of the DGII stamp (a PNG inside the HTML: no external resource).
+    /// </summary>
+    public static string Invoice(InvoiceDetail d, InvoiceFiscalPackage package)
+    {
+        ArgumentNullException.ThrowIfNull(d);
+        ArgumentNullException.ThrowIfNull(package);
+        var h = d.Header;
+        var ecf = d.Ecf!;
+        var issuer = d.Issuer!;
+        var html = Open(
+            $"Factura {ecf.Encf}", new Issuer(issuer.TradeName ?? issuer.LegalName, issuer.Rnc), $"Factura {ecf.Encf}",
+            $"Factura <span class=\"mono\">{E(h.InvoiceNo)}</span> del {Date(h.InvoiceDate!.Value)}" + (h.DueDate is { } due && due != h.InvoiceDate ? $" · vence el {Date(due)}" : string.Empty));
+        html.Append("<dl>");
+        if (issuer.TradeName is not null)
+        {
+            html.Fact("Razón social", E(issuer.LegalName));
+        }
+
+        if (issuer.Address is not null)
+        {
+            html.Fact("Dirección", E(issuer.Address));
+        }
+
+        html.Fact("Cliente", E(package.ReceiverName) + (package.ReceiverRnc.Length == 0 ? string.Empty : " · RNC / cédula <span class=\"mono\">" + E(package.ReceiverRnc) + "</span>")
+            + (package.ReceiverPassport is null ? string.Empty : " · pasaporte " + E(package.ReceiverPassport)));
+        if (package.Exemption is { } exemption)
+        {
+            html.Fact("Exención", E($"{exemption.Regime} certificación {exemption.CertificateNo} · {exemption.ProjectName}"));
+        }
+
+        html.Append("</dl>");
+        html.PricedLines(d.Lines.Select(l => (l.LineNo, l.ItemCode, l.ItemDescription, l.Uom, l.Quantity, l.UnitPrice, l.NetAmount, l.Itbis, l.NetAmount + l.Itbis)), h.NetTotal, h.TaxTotal ?? 0m, h.Total ?? 0m);
+        html.Append("<div style=\"display:flex;gap:14px;align-items:center;margin-top:10px\">");
+        if (ecf.StampUrl is not null)
+        {
+            html.Append("<img alt=\"QR del timbre DGII\" width=\"120\" height=\"120\" src=\"data:image/png;base64,").Append(StampQr(ecf.StampUrl)).Append("\">");
+        }
+
+        html.Append("<div>e-NCF <span class=\"mono\">").Append(E(ecf.Encf)).Append("</span><br>Código de seguridad: <span class=\"mono\">").Append(E(ecf.SecurityCode ?? "—"))
+            .Append("</span><br>Fecha de firma digital: ").Append(ecf.SignatureDate is { } signed ? LocalDateTime(signed) : "—").Append("</div></div>");
+        return Close(html);
+    }
+
+    /// <summary>The QR of the DGII stamp URL as a base64 PNG.</summary>
+    public static string StampQr(string url)
+    {
+        using var generator = new QRCoder.QRCodeGenerator();
+        using var data = generator.CreateQrCode(url, QRCoder.QRCodeGenerator.ECCLevel.M);
+        return Convert.ToBase64String(new QRCoder.PngByteQRCode(data).GetGraphic(4));
+    }
+
     /// <summary>The delivery note (E-UX3-7), after the gate-out.</summary>
     public static string Delivery(DeliveryPrint d)
     {

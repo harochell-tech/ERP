@@ -189,6 +189,7 @@ public static class CommandEndpoints
         ecf.MapCommand<ApproveEcfSeries, ApproveEcfSeriesHandler>();
         ecf.MapCommand<DiscardEcfSeries, DiscardEcfSeriesHandler>();
         ecf.MapCommand<CloseEcfSeries, CloseEcfSeriesHandler>();
+        ecf.MapCommand<CancelUnusedEcfNumbers, CancelUnusedEcfNumbersHandler>();
         ecf.MapCommand<AdvanceEcfDocument, AdvanceEcfDocumentHandler>();
         ecf.MapCommand<NudgeEcfDocuments, NudgeEcfDocumentsHandler>();
         ecf.MapCommand<ResolveEcfDocument, ResolveEcfDocumentHandler>();
@@ -336,6 +337,7 @@ public static class CommandEndpoints
         // MAIL-02 (E-MAIL-6, E-MAIL-01-8, 10): documents by e-mail, one permission per document, and the retry of a failed message.
         sales.MapCommand<SendQuoteByEmail, SendQuoteByEmailHandler>();
         sales.MapCommand<SendProformaByEmail, SendProformaByEmailHandler>();
+        sales.MapCommand<SendInvoiceByEmail, SendInvoiceByEmailHandler>();
         sales.MapCommand<SendDeliveryByEmail, SendDeliveryByEmailHandler>();
         sales.MapCommand<SendStatementByEmail, SendStatementByEmailHandler>();
         sales.MapCommand<SendArAgingByEmail, SendArAgingByEmailHandler>();
@@ -383,7 +385,7 @@ public static class CommandEndpoints
         typeof(SetSupplierContactHandler), typeof(ImportSuppliersHandler), typeof(ActivateSuppliersHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler), typeof(CreateFreightItemHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
-        typeof(PrepareEcfSeriesHandler), typeof(ApproveEcfSeriesHandler), typeof(DiscardEcfSeriesHandler), typeof(CloseEcfSeriesHandler), typeof(AdvanceEcfDocumentHandler),
+        typeof(PrepareEcfSeriesHandler), typeof(ApproveEcfSeriesHandler), typeof(DiscardEcfSeriesHandler), typeof(CloseEcfSeriesHandler), typeof(CancelUnusedEcfNumbersHandler), typeof(AdvanceEcfDocumentHandler),
         typeof(NudgeEcfDocumentsHandler), typeof(ResolveEcfDocumentHandler),
         typeof(CreatePlantHandler), typeof(CreateLocationHandler), typeof(RenameLocationHandler), typeof(SetPlantStatusHandler), typeof(SetLocationStatusHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
@@ -421,7 +423,7 @@ public static class CommandEndpoints
         typeof(ResendInvoiceEcfHandler), typeof(ResendCreditNoteEcfHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),
         typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(PrepareCustomerRefundHandler), typeof(ReleaseCustomerRefundHandler), typeof(VoidCustomerRefundHandler),
-        typeof(SendQuoteByEmailHandler), typeof(SendProformaByEmailHandler), typeof(SendDeliveryByEmailHandler), typeof(SendStatementByEmailHandler), typeof(SendArAgingByEmailHandler),
+        typeof(SendQuoteByEmailHandler), typeof(SendProformaByEmailHandler), typeof(SendInvoiceByEmailHandler), typeof(SendDeliveryByEmailHandler), typeof(SendStatementByEmailHandler), typeof(SendArAgingByEmailHandler),
         typeof(RetryDocumentEmailHandler),
         typeof(CreateCashSaleHandler), typeof(UpdateCashSaleDraftHandler), typeof(SubmitCashSaleForPaymentHandler), typeof(ReturnCashSaleToDraftHandler), typeof(AllocateReceiptToOrderHandler),
         typeof(ReleaseOrderAllocationHandler), typeof(ConfirmCashSaleHandler), typeof(CancelCashSaleHandler),

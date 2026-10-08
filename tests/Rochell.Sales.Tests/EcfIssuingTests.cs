@@ -112,6 +112,7 @@ public sealed class EcfIssuingTests(PostgresFixture postgres)
     private static async Task<JsonElement> PayloadOfAsync(TestHarness h, Guid source)
         => JsonDocument.Parse((await h.ScalarAsync<string>("SELECT payload::text FROM tax.ecf_document WHERE source_id = @s", ("s", source)))!).RootElement;
 
+    [Trait("AcceptanceVs4", "ECF-02")]
     [Fact]
     public async Task A_paid_cash_sale_is_an_eCF_32_naming_its_identified_buyer_paid_by_the_assigned_receipts()
     {
@@ -133,8 +134,17 @@ public sealed class EcfIssuingTests(PostgresFixture postgres)
         Assert.Equal((1, 2, "5900.00"), (idDoc.GetProperty("paymentType").GetInt32(), idDoc.GetProperty("paymentFormsTable")[0].GetProperty("paymentMethod").GetInt32(),
             idDoc.GetProperty("paymentFormsTable")[0].GetProperty("paymentAmount").GetRawText()));
         Assert.Equal(("40212345678", "María Pérez"), (payload.GetProperty("buyer").GetProperty("rnc").GetString(), payload.GetProperty("buyer").GetProperty("companyName").GetString()));
+        // ECF-02: under the summary amount Alanube answers the e-CF 32 in the same response — one step accepts it.
+        await h.GrantAsync(h.CompanyId, IdentityConstants.DailyProcessUserId, "PROCESO_DIARIO");
+        var document = await h.ScalarAsync<Guid>("SELECT document_id FROM tax.ecf_document WHERE source_id = @s", ("s", invoice));
+        var step = Json(await h.RunAsync(
+            new AdvanceEcfDocument(h.CompanyId, await h.Sessions.StartServiceSessionAsync(IdentityConstants.DailyProcessUserId), "adv-32", document),
+            new AdvanceEcfDocumentHandler(new SimulatedEcfProvider(), [new InvoiceEcfUpdater()])));
+        Assert.StartsWith("ACCEPTED", step.GetProperty("outcome").GetString());
+        Assert.Equal("ECF_ACCEPTED", await h.ScalarAsync<string>("SELECT fiscal_status FROM sal.invoice WHERE invoice_id = @i", ("i", invoice)));
     }
 
+    [Trait("AcceptanceVs4", "ECF-04")]
     [Fact]
     public async Task An_exempt_CONFOTUR_invoice_is_an_eCF_44_with_every_line_exempt_and_the_certification()
     {
@@ -160,6 +170,7 @@ public sealed class EcfIssuingTests(PostgresFixture postgres)
 
     private static JsonElement Json(CommandResult result) => JsonDocument.Parse(result.ResultPayload).RootElement;
 
+    [Trait("AcceptanceVs4", "ECF-01")]
     [Fact]
     public async Task An_invoice_through_the_gateway_takes_the_next_eNCF_and_its_eCF_31_matches_it_to_the_cent()
     {
@@ -189,6 +200,40 @@ public sealed class EcfIssuingTests(PostgresFixture postgres)
         Assert.Equal("SUBMITTED", await w.AdvanceAsync(invoice));
         Assert.Equal("ACCEPTED", await w.AdvanceAsync(invoice));
         Assert.Equal("ECF_ACCEPTED:E310000000001", await w.FiscalAsync("sal.invoice", "invoice_id", invoice));
+        Assert.Equal("PDF,XML", await h.ScalarAsync<string>(
+            "SELECT string_agg(f.kind, ',' ORDER BY f.kind) FROM tax.ecf_file f JOIN tax.ecf_document d ON d.document_id = f.document_id WHERE d.source_id = @i", ("i", invoice)));
+        var detail = JsonDocument.Parse(await h.QueryAsync(new Rochell.Sales.Queries.GetInvoice(h.CompanyId, w.Billing, invoice), new Rochell.Sales.Queries.GetInvoiceHandler())).RootElement;
+        Assert.Equal("ACCEPTED", detail.GetProperty("ecf").GetProperty("status").GetString());
+        Assert.False(string.IsNullOrEmpty(detail.GetProperty("ecf").GetProperty("securityCode").GetString()));
+        Assert.StartsWith("https://", detail.GetProperty("ecf").GetProperty("stampUrl").GetString());
+    }
+
+    [Trait("AcceptanceVs4", "E2E-ECF")]
+    [Fact]
+    public async Task An_accepted_invoice_is_emailed_with_the_PDF_carrying_the_QR_and_the_signed_XML_and_a_sending_one_is_not()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        var invoice = await w.InvoiceAsync();
+        await w.IssueAsync(invoice);
+        var cobros = await h.SessionWithRolesAsync("COBROS");
+        var mail = new Rochell.Platform.Mail.MailSwitch(true);
+
+        var early = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
+            new Rochell.Sales.Mail.SendInvoiceByEmail(h.CompanyId, cobros, "m0", invoice, ["compras@cliente.do"]), new Rochell.Sales.Mail.SendInvoiceByEmailHandler(mail)));
+        await w.AdvanceAsync(invoice);
+        await w.AdvanceAsync(invoice);
+        var sent = Json(await h.RunAsync(
+            new Rochell.Sales.Mail.SendInvoiceByEmail(h.CompanyId, cobros, "m1", invoice, ["compras@cliente.do"], "Gracias por su compra."), new Rochell.Sales.Mail.SendInvoiceByEmailHandler(mail)));
+
+        Assert.Equal(Rochell.Sales.Mail.DocumentMailErrors.NotSendable, early.Code);
+        Assert.Equal("QUEUED", sent.GetProperty("status").GetString());
+        Assert.Equal("INVOICE|E310000000001.pdf|E310000000001.xml|application/xml|Factura E310000000001", await h.ScalarAsync<string>(
+            "SELECT document_type || '|' || file_name || '|' || attachment_name || '|' || attachment_type || '|' || split_part(subject, ' — ', 1) FROM core.mail_message WHERE document_id = @i",
+            ("i", invoice)));
+        var html = await h.ScalarAsync<string>("SELECT html FROM core.mail_message WHERE document_id = @i", ("i", invoice));
+        Assert.Contains("data:image/png;base64,", html);
+        Assert.Contains("E310000000001", html);
     }
 
     [Fact]
@@ -218,6 +263,7 @@ public sealed class EcfIssuingTests(PostgresFixture postgres)
         Assert.Equal(1L, await h.ScalarAsync<long>("SELECT next_number FROM tax.ecf_series WHERE ecf_type = '31'"));
     }
 
+    [Trait("AcceptanceVs4", "ECF-05")]
     [Fact]
     public async Task A_rejected_invoice_is_resent_with_another_eNCF_once_its_data_is_corrected()
     {
@@ -280,6 +326,7 @@ public sealed class EcfIssuingTests(PostgresFixture postgres)
         Assert.Equal("ECF_ACTION:-", await w.FiscalAsync("sal.invoice", "invoice_id", invoice));
     }
 
+    [Trait("AcceptanceVs4", "ECF-03")]
     [Fact]
     public async Task A_credit_note_of_an_accepted_invoice_is_an_eCF_34_citing_it_with_code_3()
     {

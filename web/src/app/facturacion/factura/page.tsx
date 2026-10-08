@@ -7,6 +7,7 @@ import { query, type Schemas } from "@/api/client";
 import { CopyField, RecordEcfForm } from "@/components/Ecf";
 import { MoneyText, SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
+import { InvoiceMail } from "@/components/DocumentMail";
 import { EcfStampBlock } from "@/components/EcfGateway";
 import { AccountingStatus, ConfirmAction, ErrorBox, Field, FieldMessage, fieldAria, LineTable, Money, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { invoiceEncfPrefix } from "@/lib/authorizations";
@@ -474,6 +475,13 @@ function InvoiceDetail() {
       ) : null}
       {/* VS4-04 (E-VS4-04-4): the e-CF through Alanube — e-NCF, security code, signature date and the DGII stamp's QR. */}
       <EcfStampBlock ecf={data.ecf} />
+      {data.ecf ? (
+        <InvoiceMail
+          invoiceId={h.invoiceId}
+          invoiceNo={h.invoiceNo}
+          blocked={h.fiscalStatus === "ECF_ACCEPTED" && h.commercialStatus !== "VOIDED" ? null : "La factura se envía por correo cuando la DGII acepta su e-CF."}
+        />
+      ) : null}
       {issued ? (
         <p className="actions">
           <Link href={`/facturacion/factura/imprimir/?id=${h.invoiceId}`}>Imprimir factura</Link>

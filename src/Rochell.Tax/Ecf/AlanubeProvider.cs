@@ -58,6 +58,30 @@ public sealed partial class AlanubeProvider(HttpClient http, EcfSettings setting
         return new SubmitOutcome(SubmitKind.Invalid, (int)status, null, null, code, message ?? Truncate(body));
     }
 
+    /// <summary>E-VS4-12: <c>POST /cancellations</c> — annuls unused e-NCF ranges with the DGII (ANECF).</summary>
+    public async Task<SubmitOutcome> CancelAsync(JsonObject payload, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        using var request = Request(HttpMethod.Post, "cancellations");
+        request.Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
+        var (status, body, failure) = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (failure is not null || status is null || (int)status >= 500)
+        {
+            return new SubmitOutcome(SubmitKind.Transient, status is null ? null : (int)status, null, null, null, failure ?? Truncate(body));
+        }
+
+        if (status is HttpStatusCode.Created or HttpStatusCode.OK)
+        {
+            var id = JsonNode.Parse(body) is JsonObject o && o["id"] is JsonValue v && v.TryGetValue<string>(out var text) ? text : null;
+            return id is null
+                ? new SubmitOutcome(SubmitKind.Transient, (int)status, null, null, null, "Alanube answered without a cancellation id.")
+                : new SubmitOutcome(SubmitKind.Registered, (int)status, id, null, null, null);
+        }
+
+        var (code, message) = ReadError(body);
+        return new SubmitOutcome(SubmitKind.Invalid, (int)status, null, null, code, message ?? Truncate(body));
+    }
+
     public async Task<QueryOutcome> QueryAsync(string ecfType, string providerId, CancellationToken cancellationToken)
     {
         using var request = Request(HttpMethod.Get, $"{PathOf(ecfType)}/{Uri.EscapeDataString(providerId)}");

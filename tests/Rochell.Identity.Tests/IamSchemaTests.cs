@@ -42,9 +42,9 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["VENDEDOR"] = "cash_sale:create,customer:create,customer:import,customer:update,mail:retry,quote:email,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11
         ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,delivery_zone:manage,fiscal_authorization:register,rnc:read,sales:read,sales_order:close",
         ["DESPACHO"] = "delivery:email,delivery:manage,fleet:manage,mail:retry,sales:read", // + e-mail (E-MAIL-01-8)
-        ["FACTURACION"] = "credit_note:create,credit_note:issue,delivery:email,ecf:resolve,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:issue,mail:retry,proforma:email,proforma:void,sales:read",
+        ["FACTURACION"] = "credit_note:create,credit_note:issue,delivery:email,ecf:resolve,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:email,invoice:issue,mail:retry,proforma:email,proforma:void,sales:read",
         ["CAJA"] = "cash_sale:create,receipt:apply,receipt:record,sales:read", // E-CF1-11: sells for cash and records the payment
-        ["COBROS"] = "customer_refund:prepare,customer_withholding:record,mail:retry,receipt:apply,receipt:deposit,receipt:record,sales:read,statement:email",
+        ["COBROS"] = "customer_refund:prepare,customer_withholding:record,invoice:email,mail:retry,receipt:apply,receipt:deposit,receipt:record,sales:read,statement:email",
         ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
         ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,production:read,production_master:manage,recipe:approve,shift_summary:post",
         ["CALIDAD"] = "fg_lot:release,master_data:read,production:read",
@@ -56,7 +56,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(142L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + ecf:process (E-VS4-02-1); + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
+        Assert.Equal(143L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + invoice:email (E-VS4-05-2); + ecf:process (E-VS4-02-1); + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
         Assert.Equal(49L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + ecf_series:approve ≠ prepare (E-VS4-01-8); + fixed_asset:approve ≠ manage (E-AF-11) + exchange rates and import settlements prepare ≠ approve (E-USD1-01-7) // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {

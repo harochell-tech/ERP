@@ -267,3 +267,119 @@ public sealed class ListEcfSeriesHandler : IQueryHandler<ListEcfSeries>
         return ApiJson.Serialize(new EcfSeriesList(items));
     }
 }
+
+/// <summary>
+/// E-VS4-12, ECF-10: the Controller annuls with the DGII, through Alanube (ANECF), the numbers a CLOSED range will never use — its unused
+/// tail (the range becomes CANCELLED) and the e-NCF resolved as never issued (E-VS4-04-3).
+/// </summary>
+public sealed record CancelUnusedEcfNumbers(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid SeriesId, long ExpectedVersion) : ICommand;
+
+[RequiresPermission("ecf_series:approve", StepUp = true)]
+public sealed class CancelUnusedEcfNumbersHandler(IEcfProvider provider) : ICommandHandler<CancelUnusedEcfNumbers>
+{
+    private const int MaxRanges = 10000; // type-limit: Alanube's rangeCancelledEnfc
+
+    public string CommandType => "Tax.CancelUnusedEcfNumbers";
+
+    public async Task<string> HandleAsync(CancelUnusedEcfNumbers command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var row = await EcfSeriesBook.LockAsync(context, command.SeriesId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
+        if (row.Status != "CLOSED")
+        {
+            throw new DomainException(EcfErrors.InvalidState, $"The range is {row.Status}: only a CLOSED range has its unused numbers annulled.");
+        }
+
+        var notIssued = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT encf FROM tax.ecf_document WHERE company_id = @c AND series_id = @s AND status = 'REJECTED' AND reason LIKE @p ORDER BY encf",
+            r => r.GetString(0),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("s", row.Id),
+            ("p", EcfResolutions.NotIssuedPrefix + "%")).ConfigureAwait(false);
+        var ranges = notIssued.Select(e => (From: e, To: e)).ToList();
+        var tail = row.Next <= row.To;
+        if (tail)
+        {
+            ranges.Add((EcfSeriesBook.Encf(row.EcfType, row.Next), EcfSeriesBook.Encf(row.EcfType, row.To)));
+        }
+
+        if (ranges.Count == 0)
+        {
+            throw new DomainException(EcfErrors.InvalidState, "The range used every number: there is nothing to annul.");
+        }
+
+        if (ranges.Count > MaxRanges)
+        {
+            throw new DomainException(EcfErrors.CancelFailed, "Too many single numbers to annul in one request; ask the support team.");
+        }
+
+        var quantity = notIssued.Count + (tail ? row.To - row.Next + 1 : 0);
+        var rnc = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT rnc FROM md.company WHERE company_id = @c", r => r.GetString(0), cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false)).Single();
+        // A number for the DGII; a test company's RNC as it is.
+        System.Text.Json.Nodes.JsonNode sender = long.TryParse(rnc, NumberStyles.None, CultureInfo.InvariantCulture, out var number) ? number : rnc;
+        var payload = new System.Text.Json.Nodes.JsonObject
+        {
+            ["header"] = new System.Text.Json.Nodes.JsonObject { ["rncSender"] = sender, ["cancelledEncfQuantity"] = quantity },
+            ["cancellations"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+            {
+                ["lineNumber"] = 1,
+                ["ecfType"] = int.Parse(row.EcfType, CultureInfo.InvariantCulture),
+                ["rangeCancelledEnfc"] = new System.Text.Json.Nodes.JsonArray(
+                    [.. ranges.Select(r => (System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject { ["encfFrom"] = r.From, ["encfUntil"] = r.To })]),
+                ["cancelledEncfQuantity"] = quantity,
+            }),
+        };
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var outcome = await provider.CancelAsync(payload, cancellationToken).ConfigureAwait(false);
+        if (outcome.Kind != SubmitKind.Registered)
+        {
+            throw new DomainException(
+                EcfErrors.CancelFailed, $"Alanube did not register the annulment ({outcome.HttpStatus?.ToString(CultureInfo.InvariantCulture) ?? "no answer"}): {outcome.Code} {outcome.Message}".Trim());
+        }
+
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            INSERT INTO tax.ecf_call (call_id, company_id, series_id, operation, mode, http_status, outcome, provider_code, message, called_at, duration_ms)
+            VALUES (@id, @c, @s, 'CANCEL', @m, @hs, 'OK', NULL, @msg, @at, @ms)
+            """,
+            cancellationToken,
+            ("id", context.Ids.NewId()),
+            ("c", context.CompanyId),
+            ("s", row.Id),
+            ("m", provider.Mode),
+            ("hs", (object?)outcome.HttpStatus ?? DBNull.Value),
+            ("msg", $"Anulación {outcome.ProviderId}: {quantity} e-NCF"),
+            ("at", context.Clock.UtcNow),
+            ("ms", (int)Math.Min(watch.ElapsedMilliseconds, int.MaxValue))).ConfigureAwait(false);
+
+        var version = row.Version + 1;
+        var eventId = await context.AppendEventAsync(
+            new EventDraft(
+                "EcfNumbersCancelled", 1, EcfSeriesBook.Aggregate, row.Id, version,
+                JsonSerializer.Serialize(new { seriesId = row.Id, ecfType = row.EcfType, cancellationId = outcome.ProviderId, quantity, ranges = ranges.Select(r => new { from = r.From, to = r.To }) }),
+                Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            tail
+                ? "UPDATE tax.ecf_series SET status = 'CANCELLED', cancelled_from = next_number, cancelled_to = range_to, version = @v WHERE series_id = @s"
+                : "UPDATE tax.ecf_series SET version = @v WHERE series_id = @s",
+            cancellationToken,
+            ("v", version),
+            ("s", row.Id)).ConfigureAwait(false);
+        if (tail)
+        {
+            await context.AppendStateAsync(EcfSeriesBook.Aggregate, row.Id, "DOCUMENT", "CLOSED", "CANCELLED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        }
+
+        return JsonSerializer.Serialize(new { seriesId = row.Id, status = tail ? "CANCELLED" : "CLOSED", cancellationId = outcome.ProviderId, quantity, version });
+    }
+}

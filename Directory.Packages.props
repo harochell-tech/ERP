@@ -16,6 +16,8 @@
     <PackageVersion Include="AWSSDK.S3" Version="4.0.103.4" />
     <!-- Outgoing mail through an SMTP relay (E-MAIL-1): EHLO name, STARTTLS and MIME attachments. -->
     <PackageVersion Include="MailKit" Version="4.18.1" />
+    <!-- VS4-05 (E-VS4-05-1): the DGII stamp's QR in the PDF of an invoice sent by e-mail (PNG, no System.Drawing). -->
+    <PackageVersion Include="QRCoder" Version="1.6.0" />
     <!-- Analyzers -->
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" />
     <!-- Tests -->

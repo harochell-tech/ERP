@@ -22,7 +22,11 @@ public static class MailErrors
 /// (for a statement of account, the customer).
 /// </summary>
 public sealed record MailDraft(
-    string DocumentType, Guid DocumentId, string DocumentNo, Guid? PartyId, IReadOnlyList<string> Recipients, string Subject, string BodyText, string FileName, string Html);
+    string DocumentType, Guid DocumentId, string DocumentNo, Guid? PartyId, IReadOnlyList<string> Recipients, string Subject, string BodyText, string FileName, string Html,
+    MailAttachment? Extra = null);
+
+/// <summary>VS4-05 (E-VS4-05-1): a second file attached as it is (the signed XML of an e-CF).</summary>
+public sealed record MailAttachment(string Name, byte[] Content, string ContentType);
 
 /// <summary>Queues outgoing mail inside the command that asks for it (E-MAIL-7): the message exists only if the command commits.</summary>
 public static partial class MailOutbox
@@ -87,10 +91,13 @@ public static partial class MailOutbox
             context.Transaction,
             """
             INSERT INTO core.mail_message (mail_id, company_id, document_type, document_id, document_no, party_id, recipients, subject, body_text, file_name, html, status,
-                                           next_attempt_at, request_event_id, requested_by, requested_at)
-            VALUES (@id, @c, @type, @doc, @no, @party, @to, @subject, @body, @file, @html, 'QUEUED', @now, @event, @by, @now)
+                                           next_attempt_at, request_event_id, requested_by, requested_at, attachment_name, attachment, attachment_type)
+            VALUES (@id, @c, @type, @doc, @no, @party, @to, @subject, @body, @file, @html, 'QUEUED', @now, @event, @by, @now, @an, @ab, @at)
             """,
             cancellationToken,
+            ("an", (object?)draft.Extra?.Name ?? DBNull.Value),
+            ("ab", (object?)draft.Extra?.Content ?? DBNull.Value),
+            ("at", (object?)draft.Extra?.ContentType ?? DBNull.Value),
             ("id", mailId),
             ("c", context.CompanyId),
             ("type", draft.DocumentType),

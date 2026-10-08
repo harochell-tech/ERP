@@ -38,6 +38,8 @@ internal static class DevStackProgram
         {
             await using var harness = await TestHarness.CreateAsync(postgres);
             var accounts = await DevSeed.RunAsync(harness);
+            // As `rochell-migrate create-company` does (E-FIS1-04-7): the daily process runs the e-CF worker and the expiry (E-VS4-02-1).
+            await harness.GrantAsync(harness.CompanyId, Rochell.Identity.IdentityConstants.DailyProcessUserId, "PROCESO_DIARIO");
             using var idp = new SimulatedIdp(publicOrigin + SimulatedIdp.BrowserPath);
             foreach (var account in accounts)
             {
@@ -114,6 +116,11 @@ internal sealed class DevApiHost(TestHarness harness, SimulatedIdp idp, string? 
         builder.UseSetting("Rochell:Mail:Interval", "00:00:01");
         builder.UseSetting("Rochell:Mail:RendererUrl", "http://localhost:9");
         builder.UseSetting("Rochell:Mail:Smtp:Host", "localhost");
+
+        // E-VS4-05-3: the e-CF gateway against the simulated Alanube, polled every second; nothing leaves the machine. Invoices take
+        // the gateway only while a range is ACTIVE (the e-CF journey opens one and closes it again).
+        builder.UseSetting("Rochell:Ecf:Mode", "SIMULATED");
+        builder.UseSetting("Rochell:Ecf:Interval", "00:00:01");
 
         builder.ConfigureTestServices(services =>
         {

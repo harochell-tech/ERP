@@ -1286,6 +1286,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-VS4-04-6 | VS4-04 | Inicio: counters of e-CF requiring attention and rejected, and a red notice while the gateway is in contingency. |
 | E-VS4-04-7 | VS4-04 | Webhook: no new code; the secret is generated on the server and Alanube's panel is set with the URL `…/api/v1/ecf/webhook` and the header `X-Rochell-Ecf-Secret` (steps in `staging.md`). |
 | E-VS4-04-8 | VS4-04 | Contract test: a command runs against the sandbox the automatable cases (CT-01, 03, 05, 06, 07, 08, 12, 13, 14) and keeps the raw answers without the token; the others (02, 04, 09, 10, 11, 15, 16) are answered with evidence in `docs/acceptance/vs4-contract-test.md`, which the owner signs before Production (N-01). |
+| E-VS4-05-1 | VS4-05 | Invoice by e-mail (E-VS4-9): a «Enviar por correo» button on an accepted invoice (ECF_ACCEPTED), like the quote; it attaches Core's PDF with the QR and the signed XML from Alanube. Sending is manual for now, never automatic on acceptance. |
+| E-VS4-05-2 | VS4-05 | New permission `invoice:email` for Facturación and Cobros. |
+| E-VS4-05-3 | VS4-05 | E2E-ECF: the dev stack runs the simulated Alanube; the browser journey goes range → invoice → accepted → QR → e-mail and closes the range at the end so the other journeys keep the manual channel. |
+| E-VS4-05-4 | VS4-05 | Acceptance matrix `docs/acceptance/vs4.md` with ECF-01…10 and E2E-ECF, each with its test. |
+| E-VS4-05-5 | VS4-05 | Production, in order: (1) the contract test signed; (2) Alanube's production token on the server; (3) the production ranges registered from the first number the current provider did not use, per type; (4) `ECF_MODE=PRODUCTION` only on the owner's explicit order, like mail Live. |
+| E-VS4-05-6 | VS4-05 | Staging becomes production on 2026-11-01 (the owner): the e-CF gateway's PRODUCTION mode is switched on on the same server. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
