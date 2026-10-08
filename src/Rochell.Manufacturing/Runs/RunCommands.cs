@@ -29,7 +29,8 @@ public sealed record RecordShiftSummary(
     decimal GoodUnits,
     decimal MixScrapUnits,
     decimal FreshScrapUnits,
-    IReadOnlyList<ConsumptionInput> Consumption) : IPlantScopedCommand;
+    IReadOnlyList<ConsumptionInput> Consumption,
+    string? ConsumptionReason = null) : IPlantScopedCommand;
 
 /// <summary>
 /// E-MFG1-03-5: the plant manager posts the DRAFT summary (four eyes): PRODUCTION_ISSUE per lot (FIFO by lot code) + P-08, the finished

@@ -46,6 +46,9 @@ public sealed class ApiOptions
     /// <summary>E-VS4-11: the e-CF gateway (Off unless configured).</summary>
     public Rochell.Tax.Ecf.EcfSettings Ecf { get; set; } = new();
 
+    /// <summary>MFG2-02: the machines' portal (Off without a BaseUrl).</summary>
+    public Rochell.Manufacturing.Portal.PortalSettings Portal { get; set; } = new();
+
     public ReverseProxySettings ReverseProxy { get; set; } = new();
 }
 

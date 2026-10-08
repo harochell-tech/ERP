@@ -19,6 +19,7 @@ using Rochell.MasterData.Items;
 using Rochell.Manufacturing.Costing;
 using Rochell.Manufacturing.Lots;
 using Rochell.Manufacturing.Machines;
+using Rochell.Manufacturing.Portal;
 using Rochell.Manufacturing.Recipes;
 using Rochell.Manufacturing.Runs;
 using Rochell.Manufacturing.Shifts;
@@ -360,6 +361,15 @@ public static class CommandEndpoints
         manufacturing.MapCommand<PrepareRecipe, PrepareRecipeHandler>();
         manufacturing.MapCommand<ApproveRecipe, ApproveRecipeHandler>();
         manufacturing.MapCommand<StartProductionRun, StartProductionRunHandler>();
+        // MFG2-02 (E-MFG2-1/6): the daily process's steps reading the machines' portal.
+        manufacturing.MapCommand<ImportPortalData, ImportPortalDataHandler>();
+        manufacturing.MapCommand<SyncPortalShift, SyncPortalShiftHandler>();
+        // MFG2-03 (E-MFG2-3, E-MFG2-01-7): Producción › Portal pairings.
+        manufacturing.MapCommand<SetPortalMachine, SetPortalMachineHandler>();
+        manufacturing.MapCommand<SetPortalMould, SetPortalMouldHandler>();
+        manufacturing.MapCommand<SetPortalShift, SetPortalShiftHandler>();
+        manufacturing.MapCommand<SetPortalMaterial, SetPortalMaterialHandler>();
+        manufacturing.MapCommand<RemovePortalPairing, RemovePortalPairingHandler>();
         manufacturing.MapCommand<CancelProductionRun, CancelProductionRunHandler>();
         manufacturing.MapCommand<RecordShiftSummary, RecordShiftSummaryHandler>();
         manufacturing.MapCommand<PostShiftSummary, PostShiftSummaryHandler>();
@@ -431,6 +441,8 @@ public static class CommandEndpoints
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),
+        typeof(ImportPortalDataHandler), typeof(SyncPortalShiftHandler), typeof(SetPortalMachineHandler), typeof(SetPortalMouldHandler), typeof(SetPortalShiftHandler),
+        typeof(SetPortalMaterialHandler), typeof(RemovePortalPairingHandler),
         typeof(StartProductionRunHandler), typeof(CancelProductionRunHandler), typeof(RecordShiftSummaryHandler), typeof(PostShiftSummaryHandler), typeof(ReverseShiftSummaryHandler),
         typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler), typeof(SettleCostCollectorHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),

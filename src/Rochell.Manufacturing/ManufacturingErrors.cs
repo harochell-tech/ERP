@@ -25,6 +25,8 @@ public static class ManufacturingErrors
     public const string LocationInvalid = "LOCATION_INVALID";
     public const string UomNotConvertible = "UOM_NOT_CONVERTIBLE";
     public const string ReasonRequired = "REASON_REQUIRED";
+    public const string ConsumptionPending = "CONSUMPTION_PENDING";
+    public const string PortalPairingInvalid = "PORTAL_PAIRING_INVALID";
     public const string PeriodClosed = "PERIOD_CLOSED";
     public const string CollectorSettled = "COLLECTOR_SETTLED";
     public const string LotMoved = "LOT_MOVED";

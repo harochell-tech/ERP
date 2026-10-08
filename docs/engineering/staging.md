@@ -294,3 +294,19 @@ with `settings.json`:
 `first31` / `first34` are the first unused numbers of the **sandbox** ranges (the test uses 5 + `burst` numbers of 31 and one of
 34). The report has one JSON line per request with Alanube's raw answer, never the token; its findings go to
 `docs/acceptance/vs4-contract-test.md`.
+
+## Machines' portal (MFG-2, E-MFG2-1)
+
+Core reads `https://industriasrochell.com.do/data/exportar.php` every 15 minutes once `PORTAL_URL=https://industriasrochell.com.do/`
+is a variable of the GitHub Environment `staging`. Core's key (`core_token` in the portal's `config/portal-config.php`) goes in a
+file on the server, never in the `.env`:
+
+```
+sudo mkdir -p /opt/rochell-staging/secrets/portal
+sudo nano /opt/rochell-staging/secrets/portal/core-token
+sudo chown -R 1654:1654 /opt/rochell-staging/secrets/portal
+sudo chmod 500 /opt/rochell-staging/secrets/portal
+sudo chmod 400 /opt/rochell-staging/secrets/portal/core-token
+```
+
+Then `deploy-staging`. Producción › Portal shows the last good read, the last failure and what could not be imported.
