@@ -7,7 +7,7 @@ editable originals; these Markdown copies are what the code is built against. If
 
 | # | Document | Role |
 | --- | --- | --- |
-| 1 | [`errata.md`](errata.md) | Implementation errata E-PR02-1 … E-VS2-10, each approved by Alexander, plus the derived implementation rules. Overrides everything below for the point it covers. |
+| 1 | [`errata.md`](errata.md) | Implementation errata E-PR02-1 … E-LAB1-10, each approved by Alexander, plus the derived implementation rules. Overrides everything below for the point it covers. |
 | 1b | [`vs2/frozen-baseline-vs2.md`](vs2/frozen-baseline-vs2.md) | **Frozen Baseline of Vertical Slice #2** (supplier payments and banks), approved 2026-09-25 with E-VS2-1…10. Builds on VS#1; errata override it where they apply. |
 | 1c | [`vs3/frozen-baseline-vs3.md`](vs3/frozen-baseline-vs3.md) | **Frozen Baseline of Vertical Slice #3** (sales, dispatch, collections), approved 2026-09-27 with E-VS3-1…16. |
 | 1d | [`fin1/frozen-baseline-fin1.md`](fin1/frozen-baseline-fin1.md) | **Frozen Baseline of FIN-1** (adjustment journal, trial balance, financial statements), approved 2026-09-27 with E-FIN1-1…10. |
@@ -21,6 +21,7 @@ editable originals; these Markdown copies are what the code is built against. If
 | 1i | [`ent1/frozen-baseline-ent1.md`](ent1/frozen-baseline-ent1.md) | **Baseline of ENT-1** (driver confirms the delivery from the delivery note's QR with a PIN and a photo; POD from Core, ADM Cloud retired), approved 2026-10-08 with E-ENT-1…8. |
 | 1j | [`mfg3/frozen-baseline-mfg3.md`](mfg3/frozen-baseline-mfg3.md) | **Baseline of MFG-3** (prefilled daily report, OEE per machine and shift, preventive maintenance by cycles / hours / days), approved 2026-10-08 with E-MFG3-1…11. |
 | 1k | [`prt1/frozen-baseline-prt1.md`](prt1/frozen-baseline-prt1.md) | **Baseline of PRT-1** (one editable print format per document for screen, PDF and reprint; logo, columns, paper; mandatory fiscal content checked), approved 2026-10-08 with E-PRT-1…10. |
+| 1l | [`lab1/frozen-baseline-lab1.md`](lab1/frozen-baseline-lab1.md) | **Baseline of LAB-1** (quality lab: compression and absorption tests per lot, 28-day evaluation, final release, recall, certificate), approved 2026-10-08 with E-LAB1-1…10. |
 | 2 | [`baseline/06-frozen-baseline-patch-1.1.md`](baseline/06-frozen-baseline-patch-1.1.md) | Patch 1.1: prices > 0, STOCK_COVERAGE naming, deployment environment. |
 | 3 | [`baseline/05-frozen-baseline-patch-1.md`](baseline/05-frozen-baseline-patch-1.md) | Patch 1 (P-1 … P-8): posting prerequisites roll back, exact reversals (R-02/R-07 A/B), schema and tests replaced. |
 | 4 | [`baseline/04-architecture-v2.1.1-frozen-baseline.md`](baseline/04-architecture-v2.1.1-frozen-baseline.md) | **Frozen Baseline of Vertical Slice #1** (§8 schema … §17 PR plan) and errata E-1 … E-12. |

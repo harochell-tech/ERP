@@ -393,6 +393,16 @@ public static class CommandEndpoints
         manufacturing.MapCommand<UnblockLot, UnblockLotHandler>();
         manufacturing.MapCommand<ScrapLot, ScrapLotHandler>();
         manufacturing.MapCommand<SettleCostCollector, SettleCostCollectorHandler>();
+        // LAB1-01 (E-LAB1-01-2…14): the quality lab — requirements, parameters, failure types, short codes, compression and absorption tests.
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.SetItemSpec, Rochell.Manufacturing.Quality.SetItemSpecHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.SetLabParameter, Rochell.Manufacturing.Quality.SetLabParameterHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.DefineFailureType, Rochell.Manufacturing.Quality.DefineFailureTypeHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.SetFailureTypeStatus, Rochell.Manufacturing.Quality.SetFailureTypeStatusHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.SetMachineShortCode, Rochell.Manufacturing.Quality.SetMachineShortCodeHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.RecordCompressionTests, Rochell.Manufacturing.Quality.RecordCompressionTestsHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.VoidCompressionTest, Rochell.Manufacturing.Quality.VoidCompressionTestHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.RecordAbsorptionTests, Rochell.Manufacturing.Quality.RecordAbsorptionTestsHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.VoidAbsorptionTest, Rochell.Manufacturing.Quality.VoidAbsorptionTestHandler>();
 
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
@@ -463,6 +473,8 @@ public static class CommandEndpoints
         typeof(SetPortalMaterialHandler), typeof(RemovePortalPairingHandler),
         typeof(StartProductionRunHandler), typeof(CancelProductionRunHandler), typeof(RecordShiftSummaryHandler), typeof(PostShiftSummaryHandler), typeof(ReverseShiftSummaryHandler),
         typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler), typeof(SettleCostCollectorHandler),
+        typeof(Rochell.Manufacturing.Quality.SetItemSpecHandler), typeof(Rochell.Manufacturing.Quality.SetLabParameterHandler), typeof(Rochell.Manufacturing.Quality.DefineFailureTypeHandler), typeof(Rochell.Manufacturing.Quality.SetFailureTypeStatusHandler), typeof(Rochell.Manufacturing.Quality.SetMachineShortCodeHandler),
+        typeof(Rochell.Manufacturing.Quality.RecordCompressionTestsHandler), typeof(Rochell.Manufacturing.Quality.VoidCompressionTestHandler), typeof(Rochell.Manufacturing.Quality.RecordAbsorptionTestsHandler), typeof(Rochell.Manufacturing.Quality.VoidAbsorptionTestHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
         typeof(PrepareAssetClassHandler), typeof(ApproveAssetClassHandler), typeof(DiscardAssetClassHandler), typeof(PutFixedAssetInServiceHandler),
         typeof(TransferFixedAssetHandler), typeof(UpdateFixedAssetHandler), typeof(CreateCardsForPostedInvoicesHandler),

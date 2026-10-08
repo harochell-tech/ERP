@@ -225,4 +225,39 @@ test("a production day from the recipe to a released lot (MFG-1)", async ({ brow
   await expect(nightDialog.getByRole("button", { name: "Liberar", exact: true })).toHaveCount(0);
   await nightDialog.getByRole("button", { name: "Cerrar", exact: true }).click();
   await expect(nightDialog).toBeHidden();
+
+  // LAB1-01 (E-LAB1-01-6…14): the lab technician finds the night lot on Calidad › Laboratorio, types two specimens with their
+  // measures — the server shows each strength before saving: 44,000 ÷ (19.5 × 39.5) = 57.12431 kg/cm² — and voids one with a reason.
+  const lab = await signIn(browser, "Laboratorio");
+  await nav(lab, "Laboratorio");
+  await lab.getByLabel("Código del lote").fill(nightLot);
+  await lab.getByTestId(`lab-lot:${nightLot}`).getByRole("button", { name: "Ensayar" }).click();
+  await expect(lab.getByTestId("lab-lot")).toContainText(nightLot);
+  const press = lab.getByTestId("lab-compression-form");
+  for (const [n, load] of [
+    [1, "44000"],
+    [2, "45000"],
+  ] as const) {
+    if (n > 1) {
+      await press.getByRole("button", { name: "Agregar probeta" }).click();
+    }
+    const specimen = lab.getByTestId(`lab-specimen:${n}`);
+    await specimen.getByLabel("Carga (kg)").fill(load);
+    await specimen.getByLabel("Ancho (cm)").fill("19.5");
+    await specimen.getByLabel("Alto (cm)").fill("19.5");
+    await specimen.getByLabel("Largo (cm)").fill("39.5");
+  }
+  await expect(lab.getByTestId("lab-specimen-result:1")).toContainText("57.12431 kg/cm²");
+  await expect(lab.getByTestId("lab-specimen-result:2")).toContainText("58.42259 kg/cm²");
+  await expectFits(lab);
+  await press.getByRole("button", { name: "Guardar 2 probeta(s)" }).click();
+  const specimens = lab.getByTestId("lab-compression-tests");
+  await expect(specimens.getByRole("row")).toHaveCount(3);
+  await expect(specimens).toContainText("57.12431");
+  await specimens.getByRole("row").nth(1).getByRole("button", { name: "Anular" }).click();
+  const voidDialog = lab.getByRole("dialog");
+  await voidDialog.getByLabel("Motivo: Anular").fill("Carga mal leída");
+  await voidDialog.getByRole("button", { name: "Confirmar: Anular" }).click();
+  await expect(specimens.getByRole("row").nth(1)).toContainText("Anulado: Carga mal leída");
+  await expect(specimens.getByRole("button", { name: "Anular" })).toHaveCount(1);
 });

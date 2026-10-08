@@ -10,7 +10,8 @@ namespace Rochell.Manufacturing.Queries;
 
 public sealed record ListMachines(Guid CompanyId, Guid SessionId, Guid? PlantId = null, string? Status = null) : IQuery;
 
-public sealed record MachineView(Guid MachineId, Guid PlantId, string PlantCode, string Code, string Name, string Status, long Version);
+/// <remarks><c>ShortCode</c> (E-LAB1-3): P1, P2, P3 — the machine's part of a lot's field code; null until Calidad sets it.</remarks>
+public sealed record MachineView(Guid MachineId, Guid PlantId, string PlantCode, string Code, string Name, string Status, long Version, string? ShortCode = null);
 
 public sealed record MachineList(IReadOnlyList<MachineView> Items);
 
@@ -27,12 +28,12 @@ public sealed class ListMachinesHandler : IQueryHandler<ListMachines>
             context.Connection,
             context.Transaction,
             """
-            SELECT m.machine_id, m.plant_id, p.code, m.code, m.name, m.status, m.version
+            SELECT m.machine_id, m.plant_id, p.code, m.code, m.name, m.status, m.version, m.short_code
             FROM md.machine m JOIN md.plant p ON p.plant_id = m.plant_id
             WHERE m.company_id = @c AND (CAST(@p AS uuid) IS NULL OR m.plant_id = CAST(@p AS uuid)) AND (CAST(@s AS text) IS NULL OR m.status = CAST(@s AS text))
             ORDER BY p.code, m.code
             """,
-            r => new MachineView(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetInt64(6)),
+            r => new MachineView(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetInt64(6), r.NullableString(7)),
             cancellationToken,
             ("c", context.CompanyId),
             ("p", query.PlantId),

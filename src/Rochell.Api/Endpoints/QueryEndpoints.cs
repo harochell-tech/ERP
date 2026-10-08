@@ -79,6 +79,7 @@ public static class QueryEndpoints
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler), typeof(GetDriverEvidenceHandler), typeof(GetDriverDeliveryHandler), typeof(Rochell.Sales.Printing.GetPrintDocumentHandler), typeof(Rochell.Sales.Printing.ListPrintFormatsHandler), typeof(Rochell.Sales.Printing.GetPrintFormatHandler),
         typeof(Rochell.Sales.Printing.PreviewPrintFormatHandler),
+        typeof(Rochell.Manufacturing.Quality.ListLabLotsHandler), typeof(Rochell.Manufacturing.Quality.GetLabLotHandler), typeof(Rochell.Manufacturing.Quality.ListItemSpecsHandler), typeof(Rochell.Manufacturing.Quality.GetLabSettingsHandler), typeof(Rochell.Manufacturing.Quality.PreviewCompressionTestsHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
@@ -231,6 +232,24 @@ public static class QueryEndpoints
         manufacturing.MapGet("/maintenance-tasks", (HttpContext http, Guid companyId, Rochell.Manufacturing.Maintenance.ListMaintenanceTasksHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new Rochell.Manufacturing.Maintenance.ListMaintenanceTasks(companyId, s), handler, ct))
             .Describe<Rochell.Manufacturing.Maintenance.MaintenanceTaskList>(nameof(Rochell.Manufacturing.Maintenance.ListMaintenanceTasks));
+        // LAB1-01 (E-LAB1-01-13/14): the lab's lots, a lot with its tests, the per-item requirements, the parameters, and what specimens would give.
+        manufacturing.MapGet("/lab/lots", (HttpContext http, Guid companyId, string? search, int? limit, Rochell.Manufacturing.Quality.ListLabLotsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.ListLabLots(companyId, s, search, limit ?? DefaultLimit), handler, ct))
+            .Describe<Rochell.Manufacturing.Quality.LabLotList>(nameof(Rochell.Manufacturing.Quality.ListLabLots));
+        manufacturing.MapGet("/lab/lots/{lotId:guid}", (HttpContext http, Guid companyId, Guid lotId, Rochell.Manufacturing.Quality.GetLabLotHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.GetLabLot(companyId, s, lotId), handler, ct))
+            .Describe<Rochell.Manufacturing.Quality.LabLotDetail>(nameof(Rochell.Manufacturing.Quality.GetLabLot), notFound: true);
+        manufacturing.MapGet("/lab/item-specs", (HttpContext http, Guid companyId, Rochell.Manufacturing.Quality.ListItemSpecsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.ListItemSpecs(companyId, s), handler, ct))
+            .Describe<Rochell.Manufacturing.Quality.ItemSpecList>(nameof(Rochell.Manufacturing.Quality.ListItemSpecs));
+        manufacturing.MapGet("/lab/settings", (HttpContext http, Guid companyId, Rochell.Manufacturing.Quality.GetLabSettingsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.GetLabSettings(companyId, s), handler, ct))
+            .Describe<Rochell.Manufacturing.Quality.LabSettings>(nameof(Rochell.Manufacturing.Quality.GetLabSettings));
+        manufacturing.MapPost("/lab/compression-tests/preview", (HttpContext http, Guid companyId, Rochell.Manufacturing.Quality.PreviewCompressionTestsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<Rochell.Manufacturing.Quality.PreviewCompressionRequest, Rochell.Manufacturing.Quality.PreviewCompressionTests>(
+                    http, (s, b) => new Rochell.Manufacturing.Quality.PreviewCompressionTests(companyId, s, b.LotId, b.BreakDate, b.Specimens), handler, ct))
+            .Describe<Rochell.Manufacturing.Quality.CompressionPreview>(nameof(Rochell.Manufacturing.Quality.PreviewCompressionTests), notFound: true)
+            .Accepts<Rochell.Manufacturing.Quality.PreviewCompressionRequest>("application/json");
         manufacturing.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetProductionRunHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetProductionRun(companyId, s, runId), handler, ct))
             .Describe<ProductionRunDetail>(nameof(GetProductionRun), notFound: true);
