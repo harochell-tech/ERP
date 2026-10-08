@@ -131,3 +131,23 @@ changed the draft: the portal no longer replaces it, E-MFG2-01-2), `consumption_
 `portal_consumption_id` / PENDING — the recipe's theoretical as a placeholder, never posted: a CHECK, E-MFG2-8, E-MFG2-01-8) and
 `consumption_reason` (10–300 characters, a typed consumption on an online batch plant). Permission `portal:manage` (plant manager,
 E-MFG2-01-7); PROCESO_DIARIO gains `shift_summary:record` and `production_run:manage` (E-MFG2-6) — 144 permissions.
+
+## MFG2-02 — reading the portal, drafts from it (migration 0100, E-MFG2-1…14, E-MFG2-01-1…8)
+
+- `PortalService` (API, every `Rochell:Portal:Interval`, 15 min) runs `PortalRunner.RunOnceAsync` per company with pairings, as the
+  daily process: `ImportPortalData` (yesterday and today) → `StartProductionRun` for the runs a group needs → `SyncPortalShift` per
+  group (a batch plant's machines, or an offline machine alone, per date and portal shift). Nothing is posted.
+- `ImportPortalData` (`IPortalSource`, `PortalHttpSource` = GET `data/exportar.php` with `X-Core-Token`) keeps a reading only when a
+  machine's shift changed (SHA-256) and each batch-plant post once (its portal id); unpaired machines / batch plants are warnings; a
+  failed read is recorded in `mfg.portal_sync_state` (last good read, last failure, warnings).
+- `SyncPortalShift`: per machine and mould with blocks, the run's DRAFT summary (`source` PORTAL): units = blocks; batches = the post's
+  batches split by units, else ⌈units ÷ units per batch⌉; consumption = the latest post of the batch plant once every machine of the
+  group ended its shift, split by each run's theoretical consumption (the post's unit must be the pairing's; converted to the base
+  unit) — `BATCH_PLANT`; otherwise the theoretical as a `PENDING` placeholder. Theoretical = per batch ÷ units per batch × units
+  (E-MFG2-7). A posted summary, a MANUAL one or a draft a person changed (`edited_by`) is left alone; an unchanged draft is not
+  rewritten. Locations come from `mfg.portal_material` (the group's batch plant first).
+- `RecordShiftSummary` (+ `ConsumptionReason`): on a PORTAL draft a person's save sets `edited_by`; the same consumption keeps its
+  source, another one becomes MANUAL and needs a reason of 10–300 characters when the machine's batch plant is online
+  (`REASON_REQUIRED`). `PostShiftSummary` refuses `PENDING` (`CONSUMPTION_PENDING`) and treats `edited_by` like the recorder for
+  four eyes. The writing is shared: `ShiftSummaryWriter`.
+- Staging: `PORTAL_URL` (GitHub Environment) and `secrets/portal/core-token` on the server (`staging.md`). 266 commands.

@@ -72,6 +72,8 @@ jobs:
           # E-VS4-11: optional. Without ECF_MODE the e-CF gateway is OFF; the token stays in a file on the server.
           ECF_MODE: ${{ vars.ECF_MODE }}
           ECF_BASE_URL: ${{ vars.ECF_BASE_URL }}
+          # MFG2-02: optional. Without PORTAL_URL the machines' portal is not read.
+          PORTAL_URL: ${{ vars.PORTAL_URL }}
         run: |
           scp deploy/staging/compose.yaml deploy/staging/Caddyfile deploy/staging/init-roles.sql \
               deploy/staging/deploy.sh deploy/staging/backup.sh deploy/staging/seed.sh deploy/staging/seed-vs3.sh deploy/staging/seed-mfg.sh deploy/staging/rnc-weekly.sh "${TARGET}:/opt/rochell-staging/"
@@ -88,7 +90,7 @@ jobs:
               printf '%s=%s\n' "${name}" "${value}"
             done
             # Optional variables: written only when the environment defines them.
-            for name in MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC ECF_MODE ECF_BASE_URL; do
+            for name in MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC ECF_MODE ECF_BASE_URL PORTAL_URL; do
               value="${!name}"
               if test -n "${value}"; then printf '%s=%s\n' "${name}" "${value}"; fi
             done

@@ -10,6 +10,7 @@ using Rochell.Api.Mail;
 using Rochell.Identity;
 using Rochell.Identity.Authorization;
 using Rochell.Identity.Sessions;
+using Rochell.Manufacturing.Portal;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Hosting;
 using Rochell.Platform.Json;
@@ -130,6 +131,21 @@ if (settings.Ecf.Enabled)
 {
     services.AddSingleton<EcfService>();
     services.AddHostedService(sp => sp.GetRequiredService<EcfService>());
+}
+
+// MFG2-02 (E-MFG2-1): the machines' portal, read every 15 min when configured; its key is a file on the server.
+services.AddSingleton(settings.Portal);
+if (settings.Portal.Enabled)
+{
+    settings.Portal.Token ??= FromFile(settings.Portal.TokenFile, "Portal:TokenFile")?.Trim();
+    Required(settings.Portal.Token, "Portal:Token");
+    services.AddHttpClient<IPortalSource, PortalHttpSource>(client => client.Timeout = TimeSpan.FromSeconds(60));
+    services.AddSingleton<PortalService>();
+    services.AddHostedService(sp => sp.GetRequiredService<PortalService>());
+}
+else
+{
+    services.AddSingleton<IPortalSource, NoPortalSource>();
 }
 
 // E-PR18-5: the sealer and the digest connect as rochell_sealer and are switched on by configuration.
