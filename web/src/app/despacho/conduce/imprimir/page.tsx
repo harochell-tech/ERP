@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, Fragment } from "react";
 import { query } from "@/api/client";
+import { DriverQrBlock } from "@/components/DriverLink";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { NoPermission } from "@/components/ui";
 import { Watermark } from "@/components/Watermark";
@@ -152,6 +153,8 @@ function DeliveryPrint() {
           <div className="signature-box" />
           Recibido por (nombre, cédula, firma)
         </div>
+        {/* ENT1-03 (E-ENT-1/8): only once out of the gate and while the driver's link is usable. */}
+        <DriverQrBlock path={data.driverLinkPath} />
       </div>
     </div>
   );

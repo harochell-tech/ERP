@@ -109,6 +109,9 @@ public sealed class DriverConfirmationTests(PostgresFixture postgres)
         var silent = await Assert.ThrowsAsync<DomainException>(() => ConfirmAsync(h, t, "s", Access(h, t, "4821"), Report("DIFFERENCES")));
         var reported = await ConfirmAsync(h, t, "diff", Access(h, t, "4821"), Report("DIFFERENCES", "20 bloques rotos al descargar", phoneAt: h.Clock.UtcNow.AddHours(2)));
         var status = await h.ScalarAsync<string>("SELECT status FROM log.delivery WHERE delivery_id = @d", ("d", t.Delivery));
+        var waiting = JsonDocument.Parse(await h.QueryAsync(
+            new Rochell.Sales.Queries.ListDeliveries(h.CompanyId, t.S.Dispatch, DriverReportedDifferences: true), new Rochell.Sales.Queries.ListDeliveriesHandler())).RootElement.GetProperty("items");
+        var drivers = JsonDocument.Parse(await h.QueryAsync(new Rochell.Sales.Queries.ListDrivers(h.CompanyId, t.S.Dispatch), new Rochell.Sales.Queries.ListDriversHandler())).RootElement.GetProperty("items");
         await h.RunAsync(
             new RecordPod(h.CompanyId, t.S.Dispatch, "pod", t.Delivery, 4, "Ing. María Gómez", h.Clock.UtcNow, "entregas/x/d/c.jpg", DeliveryTests.Hash, [new(t.Line, 580m, 20m)], "Rotos al descargar"),
             new RecordPodHandler());
@@ -116,6 +119,8 @@ public sealed class DriverConfirmationTests(PostgresFixture postgres)
         Assert.Equal(DriverConfirmationErrors.ConfirmationInvalid, silent.Code);
         Assert.Equal("DIFFERENCES_REPORTED", reported.GetProperty("state").GetString());
         Assert.Equal("IN_TRANSIT", status);
+        Assert.Equal(1, waiting.GetArrayLength()); // Inicio: Dispatch completes it
+        Assert.True(drivers[0].GetProperty("pinSet").GetBoolean());
         // E-ENT1-01-6: two hours ahead is not believed — the server's time.
         Assert.Equal(1L, await h.ScalarAsync<long>("SELECT count(*) FROM log.driver_confirmation WHERE delivery_id = @d AND confirmed_at = server_at", ("d", t.Delivery)));
         Assert.Equal("DELIVERED_WITH_EXCEPTIONS:true", await h.ScalarAsync<string>(

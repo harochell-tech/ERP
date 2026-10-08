@@ -341,7 +341,8 @@ public sealed record ListDrivers(Guid CompanyId, Guid SessionId, string? Status 
 /// E-FLT-3, E-FLT-4: <see cref="DaysToLicenseExpiry"/> = licence expiry − today's business date (0 on its last day, negative once past);
 /// null without a date. An expired licence only warns.
 /// </summary>
-public sealed record DriverView(Guid DriverId, string FullName, string NationalId, string Status, long Version, DateOnly? LicenseExpiresOn, int? DaysToLicenseExpiry);
+/// <remarks>ENT1-03 (E-ENT-2): <paramref name="PinSet"/> once Dispatch gave the driver a PIN (the PIN itself is never read).</remarks>
+public sealed record DriverView(Guid DriverId, string FullName, string NationalId, string Status, long Version, DateOnly? LicenseExpiresOn, int? DaysToLicenseExpiry, bool PinSet = false);
 
 public sealed record DriverList(IReadOnlyList<DriverView> Items);
 
@@ -358,10 +359,11 @@ public sealed class ListDriversHandler : IQueryHandler<ListDrivers>
             context.Connection,
             context.Transaction,
             """
-            SELECT driver_id, full_name, national_id, status, version, license_expires_on, license_expires_on - CAST(@today AS date)
-            FROM log.driver WHERE company_id = @c AND (CAST(@s AS text) IS NULL OR status = CAST(@s AS text)) ORDER BY full_name
+            SELECT driver_id, full_name, national_id, status, version, license_expires_on, license_expires_on - CAST(@today AS date),
+                   EXISTS (SELECT 1 FROM log.driver_pin p WHERE p.company_id = d.company_id AND p.driver_id = d.driver_id)
+            FROM log.driver d WHERE company_id = @c AND (CAST(@s AS text) IS NULL OR status = CAST(@s AS text)) ORDER BY full_name
             """,
-            r => new DriverView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetInt64(4), r.IsDBNull(5) ? null : r.Date(5), r.IsDBNull(6) ? null : r.GetInt32(6)),
+            r => new DriverView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetInt64(4), r.IsDBNull(5) ? null : r.Date(5), r.IsDBNull(6) ? null : r.GetInt32(6), r.GetBoolean(7)),
             cancellationToken,
             ("today", BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow)),
             ("c", context.CompanyId),

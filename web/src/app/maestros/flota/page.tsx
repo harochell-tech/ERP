@@ -215,7 +215,10 @@ function DriverRow({ driver, onDone }: { driver: Schemas["DriverView"]; onDone: 
   const deactivate = useCommand(`deactivate-driver:${id}`, "/api/v1/companies/{companyId}/sales/deactivate-driver", `Chofer ${driver.fullName} desactivado.`);
   const activate = useCommand(`activate-driver:${id}`, "/api/v1/companies/{companyId}/sales/activate-driver", `Chofer ${driver.fullName} activado.`);
   const [edit, setEdit] = useState<{ name: string; license: string } | null>(null);
-  const busy = update.busy || deactivate.busy || activate.busy;
+  // ENT1-03 (E-ENT-2, E-ENT1-01-1): Despacho gives the driver the PIN he types on the delivery note's QR page.
+  const setPin = useCommand(`set-driver-pin:${id}`, "/api/v1/companies/{companyId}/sales/set-driver-pin", `PIN de ${driver.fullName} guardado. Dígaselo en persona.`);
+  const [pin, setPinValue] = useState<string | null>(null);
+  const busy = update.busy || deactivate.busy || activate.busy || setPin.busy;
   const target = { driverId: id, expectedVersion: driver.version };
   const name = edit === null ? null : edit.name;
   const warning = licenseWarning(driver.daysToLicenseExpiry);
@@ -246,6 +249,44 @@ function DriverRow({ driver, onDone }: { driver: Schemas["DriverView"]; onDone: 
       </td>
       <td>
         <StatusBadge status={driver.status} />
+      </td>
+      <td data-testid={`driver-pin:${driver.nationalId}`}>
+        {pin === null ? (
+          <>
+            {driver.pinSet ? "Asignado" : <span className="muted">Sin PIN</span>}{" "}
+            {can("driver_pin:manage") && driver.status === "ACTIVE" ? (
+              <button type="button" onClick={() => setPinValue("")}>
+                {driver.pinSet ? "Cambiar PIN" : "Asignar PIN"}
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <input
+              aria-label={`PIN de ${driver.fullName}`}
+              inputMode="numeric"
+              autoComplete="off"
+              value={pin}
+              onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            />
+            <button
+              type="button"
+              disabled={busy || !/^[0-9]{4}$/.test(pin)}
+              onClick={async () => {
+                if (await setPin.run({ driverId: id, pin })) {
+                  setPinValue(null);
+                  onDone();
+                }
+              }}
+            >
+              Guardar PIN
+            </button>
+            <button type="button" onClick={() => setPinValue(null)}>
+              Cancelar
+            </button>
+          </>
+        )}
+        <ErrorBox error={setPin.error} />
       </td>
       <td className="actions">
         {can("fleet:manage") ? (
@@ -352,6 +393,7 @@ export default function Page() {
               <th>Cédula</th>
               <th>Vencimiento de la licencia</th>
               <th>Estado</th>
+              <th>PIN del QR</th>
               <th />
             </tr>
           </thead>
