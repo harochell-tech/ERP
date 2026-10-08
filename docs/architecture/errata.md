@@ -1358,6 +1358,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PRT-8 | PRT-1 | Logo: PNG or JPEG up to 1 MB, one per company; each format decides whether and how large it shows; no SVG; it also replaces the app icon's monogram. |
 | E-PRT-9 | PRT-1 | New permission `print_format:manage` for DIRECTOR and SUPERADMIN. |
 | E-PRT-10 | PRT-1 | One active format per document per company; variants per customer or plant later. |
+| E-PRT-01-1 | PRT-01 | Templates are written in Liquid, rendered by the .NET library Fluid; a template reads only the document's data (no files, database or network). |
+| E-PRT-01-2 | PRT-01 | The server always renders the document: the screen's «Imprimir» shows the server's HTML and prints it; the e-mail turns the same HTML into the PDF. The two current designs go away. |
+| E-PRT-01-3 | PRT-01 | Amounts (2 decimals), quantities (no trailing zeros) and dates (dd/mm/yyyy) come formatted from the server; templates only place them. |
+| E-PRT-01-4 | PRT-01 | Each document ships a built-in «Rochell» format copying the current screen design; a company uses it until it saves its own version. |
+| E-PRT-01-5 | PRT-01 | Formats (versions DRAFT / ACTIVE / RETIRED) and the company logo live in master data; permission `print_format:manage` (E-PRT-9). |
+| E-PRT-01-6 | PRT-01 | Documents use IBM Plex Sans embedded in the document, so the PDF looks the same anywhere without internet. |
+| E-PRT-01-7 | PRT-01 | The server draws the QR codes inside the document (the driver's and the e-CF's; the invoice carries the driver's QR of E-ENT-9). |
+| E-PRT-01-8 | PRT-01 | PRT-01 moves the six current documents to the new rendering with no visible change; PRT-02 the editing screen and logo; PRT-03 the new documents. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
