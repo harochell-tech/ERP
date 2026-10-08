@@ -1,6 +1,6 @@
 # MFG-2 — Producción automática desde el portal de máquinas
 
-Aprobado por Alexander Rochell el 2026-10-08 (erratas E-MFG2-1…10 en `../errata.md`). Se construye sobre MFG-1 (máquinas, turnos,
+Aprobado por Alexander Rochell el 2026-10-08 (erratas E-MFG2-1…14 y E-MFG2-01-1…6 en `../errata.md`). Se construye sobre MFG-1 (máquinas, turnos,
 recetas, corridas, resúmenes de turno, consumo P-08, USAGE-TOLERANCE) y sobre el portal de máquinas
 (`industriasrochell.com.do`, PHP + MySQL en Hostinger), que pasa al repositorio privado `harochell-tech/portal`.
 
@@ -29,6 +29,11 @@ resumen de turno y compara lo gastado contra lo que dice la receta.
   lo escriba con motivo.
 - **Seguridad del portal** (E-MFG2-9/10): credenciales fuera del código y de la carpeta pública, contraseña de la base cambiada,
   código en GitHub privado.
+
+- **Dosificadoras** (E-MFG2-11): planta1 ← Dosificadora 1 (sin internet: consumo a mano, sin comparación automática); planta2 y
+  planta3 ← Dosificadora 2 (comparación automática).
+- **Mantenimientos** (E-MFG2-12): en el portal, programados o al momento; sus ciclos no cuentan como producción.
+- **Turnos** (E-MFG2-13): T1 y T2 de MATILLA en Core como en el portal.
 
 ## 3. Plan de PRs
 
