@@ -29,7 +29,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
             + "purchase_order:approve,purchase_order:read,receipt:reverse,receipt_correction:approve,reconciliation:read,reconciliation:run,rnc:read,sales:read,"
             + "standard_cost:prepare,supplier:activate,supplier_invoice:read,supplier_invoice:reverse,valuation_residual:approve",
         ["DIRECTOR"] = "audit:read,bank:read,bank_account_number:read,configuration:read,fiscal_report:read,goods_receipt:read,hash:verify,iam:read,ledger:read,"
-            + "master_data:read,payment:read,period:read,production:read,purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission
+            + "master_data:read,payment:read,period:read,print_format:manage,production:read,purchase_order:read,reconciliation:read,rnc:read,sales:read,supplier_invoice:read", // E-ADM-1 (b): every READ permission; + print_format:manage (E-PRT-9)
         ["CONTADOR"] = "account_role_map:prepare,configuration:read,exchange_rate:prepare,exchange_rate:read,expense_category:prepare,fiscal_report:read,fixed_asset:manage,fx_revaluation:post,ledger:read,manual_journal:prepare,master_data:read,period:read,reconciliation:read", // E-FIN1-01-5, E-FIN1-04-2, E-UX4-13
         ["CUENTAS_POR_PAGAR"] = "bank:read,exchange_rate:read,goods_receipt:read,import_settlement:prepare,master_data:read,payment:read,purchase_order:read,rnc:read,supplier_invoice:match,supplier_invoice:post,supplier_invoice:read,"
             + "supplier_invoice:register,supplier_invoice:void",
@@ -37,16 +37,17 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
         ["PROBADOR"] = "identity:act_as", // E-B03-14, TEST databases only
         ["PROCESO_DIARIO"] = "ecf:process,fiscal_authorization:suspend,production_run:manage,shift_summary:record", // E-FIS1-04-7, E-VS4-02-1: the API's daily process only
         ["CARGA_CONFIGURACION"] = "account:manage,expense_category:prepare,fiscal_rule:configure,fiscal_rule_source:register", // E-CFG-1, E-GAS-03-4/7: the deployment CLI's configuration load only
+        ["CONFIRMACION_ENTREGA"] = "delivery:driver_confirm", // E-ENT1-01-5: the drivers' QR page only
         ["SEGUNDO_APROBADOR_CIERRE"] = "period:read,period_component:second_approve",
         ["SEGUNDO_APROBADOR_SEGURIDAD"] = "iam:read,role:second_approve",
         ["VENDEDOR"] = "cash_sale:create,customer:create,customer:import,customer:update,mail:retry,quote:email,quote:manage,rnc:read,sales:read,sales_order:cancel,sales_order:create", // E-VS3-01-11, E-VS3-03-8, E-QUO1-11
         ["CREDITO"] = "credit:approve,customer:activate,customer_terms:prepare,delivery_zone:manage,fiscal_authorization:register,rnc:read,sales:read,sales_order:close",
-        ["DESPACHO"] = "delivery:email,delivery:manage,fleet:manage,mail:retry,sales:read", // + e-mail (E-MAIL-01-8)
+        ["DESPACHO"] = "delivery:email,delivery:manage,delivery_link:reopen,driver_pin:manage,fleet:manage,mail:retry,sales:read", // + E-ENT1-01-1 // + e-mail (E-MAIL-01-8)
         ["FACTURACION"] = "credit_note:create,credit_note:issue,delivery:email,ecf:resolve,fiscal_authorization:register,fiscal_document:record,invoice:create,invoice:email,invoice:issue,mail:retry,proforma:email,proforma:void,sales:read",
         ["CAJA"] = "cash_sale:create,receipt:apply,receipt:record,sales:read", // E-CF1-11: sells for cash and records the payment
         ["COBROS"] = "customer_refund:prepare,customer_withholding:record,invoice:email,mail:retry,receipt:apply,receipt:deposit,receipt:record,sales:read,statement:email",
         ["SUPERVISOR_PRODUCCION"] = "master_data:read,production:read,production_run:manage,recipe:prepare,shift_summary:record", // E-MFG1-01-10
-        ["GERENTE_PLANTA"] = "fg_lot:scrap,master_data:read,portal:manage,production:read,production_master:manage,recipe:approve,shift_summary:post",
+        ["GERENTE_PLANTA"] = "fg_lot:scrap,maintenance_plan:manage,master_data:read,portal:manage,production:read,production_master:manage,recipe:approve,shift_summary:post",
         ["CALIDAD"] = "fg_lot:release,master_data:read,production:read",
         ["TESORERO"] = "bank:read,bank_line:match,bank_statement:import,exchange_rate:prepare,exchange_rate:read,party_bank_account:request,payment:prepare,payment:read,payment:void,receipt:bounce", // VS#2 §7
     };
@@ -56,7 +57,7 @@ public sealed class IamSchemaTests(PostgresFixture postgres)
     {
         await using var h = await TestHarness.CreateAsync(postgres);
 
-        Assert.Equal(144L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + portal:manage (E-MFG2-01-7); + invoice:email (E-VS4-05-2); + ecf:process (E-VS4-02-1); + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
+        Assert.Equal(149L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.permission WHERE permission_code NOT LIKE 'test:%'")); // + maintenance_plan:manage (E-MFG3-01-3); + print_format:manage (E-PRT-9); + driver_pin:manage, delivery_link:reopen, delivery:driver_confirm (E-ENT1-01-1/5); + portal:manage (E-MFG2-01-7); + invoice:email (E-VS4-05-2); + ecf:process (E-VS4-02-1); + ecf_series:prepare / approve, ecf:resolve (E-VS4-01-8); + fixed_asset:manage / approve (E-AF-11); + expense_category:prepare / approve (E-GAS-01-4); // + cash_sale:create (E-CF1-11); // + 4 document e-mail permissions and mail:retry (E-MAIL-01-8, 10); // + proforma:void, customer_refund:prepare / release (E-FIS1b-01-9, 11)
         Assert.Equal(49L, await h.ScalarAsync<long>("SELECT count(*) FROM iam.sod_rule")); // + ecf_series:approve ≠ prepare (E-VS4-01-8); + fixed_asset:approve ≠ manage (E-AF-11) + exchange rates and import settlements prepare ≠ approve (E-USD1-01-7) // + import ≠ activate for suppliers and customers (E-IMP-01-5)
         foreach (var (role, permissions) in ExpectedRoles)
         {

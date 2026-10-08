@@ -24,6 +24,7 @@ using Rochell.Procurement.Imports;
 using Rochell.Procurement.Queries;
 using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Customers;
+using Rochell.Sales.Deliveries;
 using Rochell.Sales.Mail;
 using Rochell.Sales.Proformas;
 using Rochell.Sales.Queries;
@@ -74,9 +75,10 @@ public static class QueryEndpoints
         typeof(GetApAgingHandler), typeof(ListBankTransfersHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler), typeof(ListDeliveryZonesHandler),
-        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(GetPortalSetupHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
+        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(GetPortalSetupHandler), typeof(GetMachineEfficiencyHandler), typeof(ListIdealCyclesHandler), typeof(Rochell.Manufacturing.Maintenance.ListMaintenanceTasksHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
-        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler),
+        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler), typeof(GetDriverEvidenceHandler), typeof(GetDriverDeliveryHandler), typeof(Rochell.Sales.Printing.GetPrintDocumentHandler), typeof(Rochell.Sales.Printing.ListPrintFormatsHandler), typeof(Rochell.Sales.Printing.GetPrintFormatHandler),
+        typeof(Rochell.Sales.Printing.PreviewPrintFormatHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
@@ -218,6 +220,17 @@ public static class QueryEndpoints
         manufacturing.MapGet("/portal", (HttpContext http, Guid companyId, GetPortalSetupHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetPortalSetup(companyId, s), handler, ct))
             .Describe<PortalSetupView>(nameof(GetPortalSetup));
+        // MFG3-02 (E-MFG3-4/6/7): each machine's efficiency per shift and its totals with the stoppages' reasons.
+        manufacturing.MapGet("/efficiency", (HttpContext http, Guid companyId, DateOnly from, DateOnly to, GetMachineEfficiencyHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetMachineEfficiency(companyId, s, from, to), handler, ct))
+            .Describe<MachineEfficiency>(nameof(GetMachineEfficiency));
+        manufacturing.MapGet("/ideal-cycles", (HttpContext http, Guid companyId, ListIdealCyclesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListIdealCycles(companyId, s), handler, ct))
+            .Describe<IdealCycleList>(nameof(ListIdealCycles));
+        // MFG3-03 (E-MFG3-8/10): the preventive maintenance tasks with how much of their interval has gone.
+        manufacturing.MapGet("/maintenance-tasks", (HttpContext http, Guid companyId, Rochell.Manufacturing.Maintenance.ListMaintenanceTasksHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Manufacturing.Maintenance.ListMaintenanceTasks(companyId, s), handler, ct))
+            .Describe<Rochell.Manufacturing.Maintenance.MaintenanceTaskList>(nameof(Rochell.Manufacturing.Maintenance.ListMaintenanceTasks));
         manufacturing.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetProductionRunHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetProductionRun(companyId, s, runId), handler, ct))
             .Describe<ProductionRunDetail>(nameof(GetProductionRun), notFound: true);
@@ -357,8 +370,8 @@ public static class QueryEndpoints
         sales.MapGet("/customers/{partyId:guid}/statement", (HttpContext http, Guid companyId, Guid partyId, DateOnly from, DateOnly to, string? format, GetCustomerStatementHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunReportAsync(http, format, s => new GetCustomerStatement(companyId, s, partyId, from, to), handler, ArCsv.Statement, $"estado-de-cuenta-{from:yyyyMMdd}-{to:yyyyMMdd}.csv", ct))
             .Describe<CustomerStatement>(nameof(GetCustomerStatement), notFound: true).Csv<CustomerStatement>();
-        sales.MapGet("/deliveries", (HttpContext http, Guid companyId, string? status, Guid? salesOrderId, int? limit, int? offset, Guid? partyId, DateOnly? from, DateOnly? to, Guid? vehicleId, Guid? driverId, ListDeliveriesHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunAsync(http, s => new ListDeliveries(companyId, s, status, salesOrderId, limit ?? DefaultLimit, offset ?? 0, partyId, from, to, vehicleId, driverId), handler, ct))
+        sales.MapGet("/deliveries", (HttpContext http, Guid companyId, string? status, Guid? salesOrderId, int? limit, int? offset, Guid? partyId, DateOnly? from, DateOnly? to, Guid? vehicleId, Guid? driverId, bool? driverReportedDifferences, ListDeliveriesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListDeliveries(companyId, s, status, salesOrderId, limit ?? DefaultLimit, offset ?? 0, partyId, from, to, vehicleId, driverId, driverReportedDifferences ?? false), handler, ct))
             .Describe<DeliveryList>(nameof(ListDeliveries));
         sales.MapGet("/deliveries/{deliveryId:guid}", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDelivery(companyId, s, deliveryId), handler, ct))
@@ -367,6 +380,31 @@ public static class QueryEndpoints
         sales.MapGet("/deliveries/{deliveryId:guid}/print", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryPrintHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDeliveryPrint(companyId, s, deliveryId), handler, ct))
             .Describe<DeliveryPrint>(nameof(GetDeliveryPrint), notFound: true);
+        // PRT-01 (E-PRT-01-2): every document as it prints, drawn by the server with the company's format; the address the screen was opened at
+        // goes in for the driver's QR.
+        sales.MapGet("/print/{documentType}/{id:guid}", (HttpContext http, Guid companyId, string documentType, Guid id, DateOnly? from, DateOnly? to, Rochell.Sales.Printing.GetPrintDocumentHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Sales.Printing.GetPrintDocument(companyId, s, documentType, id, from, to, $"{http.Request.Scheme}://{http.Request.Host}"), handler, ct))
+            .Describe<Rochell.Sales.Printing.PrintedDocument>(nameof(Rochell.Sales.Printing.GetPrintDocument), notFound: true);
+        // PRT-02 (E-PRT-02-1…7): the formats of every document, one version, and a preview that saves nothing.
+        sales.MapGet("/print-formats", (HttpContext http, Guid companyId, Rochell.Sales.Printing.ListPrintFormatsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Sales.Printing.ListPrintFormats(companyId, s), handler, ct))
+            .Describe<Rochell.Sales.Printing.PrintFormatList>(nameof(Rochell.Sales.Printing.ListPrintFormats));
+        sales.MapGet("/print-formats/{documentType}/{version:int}", (HttpContext http, Guid companyId, string documentType, int version, Rochell.Sales.Printing.GetPrintFormatHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Sales.Printing.GetPrintFormat(companyId, s, documentType, version), handler, ct))
+            .Describe<Rochell.Sales.Printing.PrintFormatDetail>(nameof(Rochell.Sales.Printing.GetPrintFormat), notFound: true);
+        sales.MapPost("/print-formats/preview", (HttpContext http, Guid companyId, Rochell.Sales.Printing.PreviewPrintFormatHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunBodyAsync<Rochell.Sales.Printing.PrintFormatPreviewRequest, Rochell.Sales.Printing.PreviewPrintFormat>(
+                    http, (s, b) => new Rochell.Sales.Printing.PreviewPrintFormat(companyId, s, b.DocumentType, b.Settings, b.Body, b.Css, b.DocumentNo, $"{http.Request.Scheme}://{http.Request.Host}"),
+                    handler, ct))
+            .Describe<Rochell.Sales.Printing.PrintFormatPreview>(nameof(Rochell.Sales.Printing.PreviewPrintFormat))
+            .Accepts<Rochell.Sales.Printing.PrintFormatPreviewRequest>("application/json");
+        // ENT1-02 (E-ENT-5): the driver's photo or signature; and the drivers' page view, for the service identity (the page itself uses /api/v1/public/deliveries).
+        sales.MapGet("/deliveries/{deliveryId:guid}/driver-evidence", (HttpContext http, Guid companyId, Guid deliveryId, GetDriverEvidenceHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetDriverEvidence(companyId, s, deliveryId), handler, ct))
+            .Describe<DriverEvidenceContent>(nameof(GetDriverEvidence), notFound: true);
+        sales.MapGet("/driver-deliveries/{deliveryId:guid}", (HttpContext http, Guid companyId, Guid deliveryId, int g, string k, GetDriverDeliveryHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetDriverDelivery(companyId, s, deliveryId, g, k), handler, ct))
+            .Describe<DriverDeliveryView>(nameof(GetDriverDelivery));
         sales.MapGet("/invoices", (HttpContext http, Guid companyId, string? commercialStatus, string? fiscalStatus, Guid? partyId, int? limit, int? offset, bool? openOnly, ListInvoicesHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListInvoices(companyId, s, commercialStatus, fiscalStatus, partyId, limit ?? DefaultLimit, offset ?? 0, openOnly ?? false), handler, ct))
             .Describe<InvoiceList>(nameof(ListInvoices));

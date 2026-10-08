@@ -93,6 +93,8 @@ export const NAV: readonly NavGroup[] = [
       { href: "/produccion/recetas/", label: "Recetas", permission: "production:read" },
       { href: "/produccion/maquinas/", label: "Máquinas y turnos", permission: "production:read" },
       { href: "/produccion/portal/", label: "Portal de máquinas", permission: "production:read" }, // MFG2-03
+      { href: "/produccion/eficiencia/", label: "Eficiencia", permission: "production:read" }, // MFG3-04
+      { href: "/produccion/mantenimiento/", label: "Mantenimiento preventivo", permission: "production:read" },
       { href: "/produccion/costos/", label: "Costos de producción", permission: "production:read" },
     ],
   },
@@ -162,6 +164,7 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/configuracion/", label: "Centro de configuración", permission: "configuration:read" },
       { href: "/configuracion/empresa/", label: "Empresa", permission: "configuration:read" },
+      { href: "/configuracion/formatos/", label: "Formatos de impresión", permission: "configuration:read" }, // PRT-02
       { href: "/maestros/plantas/", label: "Plantas y ubicaciones", permission: "master_data:read" },
       { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
       { href: "/contabilidad/estructuras/", label: "Estructuras de reporte", permission: "configuration:read" },
@@ -584,6 +587,10 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
   const menuVisible = mobile && menuOpen;
 
+  // ENT1-03 (E-ENT-1): the drivers' page is public — no sign-in, no menu.
+  if (pathname.startsWith("/entrega")) {
+    return <main className="driver-page">{children}</main>;
+  }
   if (state.status === "loading") {
     return (
       <main className="page">

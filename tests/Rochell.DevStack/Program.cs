@@ -40,6 +40,7 @@ internal static class DevStackProgram
             var accounts = await DevSeed.RunAsync(harness);
             // As `rochell-migrate create-company` does (E-FIS1-04-7): the daily process runs the e-CF worker and the expiry (E-VS4-02-1).
             await harness.GrantAsync(harness.CompanyId, Rochell.Identity.IdentityConstants.DailyProcessUserId, "PROCESO_DIARIO");
+            await harness.GrantAsync(harness.CompanyId, Rochell.Identity.IdentityConstants.DeliveryConfirmationUserId, "CONFIRMACION_ENTREGA"); // ENT1-02
             using var idp = new SimulatedIdp(publicOrigin + SimulatedIdp.BrowserPath);
             foreach (var account in accounts)
             {
@@ -121,6 +122,10 @@ internal sealed class DevApiHost(TestHarness harness, SimulatedIdp idp, string? 
         // the gateway only while a range is ACTIVE (the e-CF journey opens one and closes it again).
         builder.UseSetting("Rochell:Ecf:Mode", "SIMULATED");
         builder.UseSetting("Rochell:Ecf:Interval", "00:00:01");
+
+        // ENT1-02 (E-ENT-1/5): the drivers' page with a key of this run and the photos in a temporary folder.
+        builder.UseSetting("Rochell:Deliveries:LinkKey", Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
+        builder.UseSetting("Rochell:Deliveries:EvidenceRoot", Directory.CreateTempSubdirectory("rochell-evidence-").FullName);
 
         builder.ConfigureTestServices(services =>
         {

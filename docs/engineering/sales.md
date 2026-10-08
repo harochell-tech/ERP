@@ -245,3 +245,42 @@ steps (`ROCHELL_INVS_SEEDS`, `ROCHELL_INVS_STEPS`; workflow `inv-s`). `SalesConc
 the stock, credit notes over one line, an application against a bounce, and a receipt against the AR-REC close. The first runs
 found a spurious version conflict between two gate-outs of the same order; `Orders.LockCurrentAsync` now locks and reads the order
 in one step (E-VS3-11-7). The acceptance matrix is `docs/acceptance/vs3.md`, enforced by `AcceptanceVs3TraceabilityTests`.
+
+## ENT1-01 — the driver's confirmation from the delivery note's QR: schema (E-ENT-1…8, E-ENT1-01-1…10)
+
+Migration 0101:
+
+- `log.driver_pin`: one PIN per driver, set by DESPACHO (`driver_pin:manage`): PBKDF2 hash (32 bytes), 16-byte salt, ≥ 100,000
+  iterations; the PIN itself is never stored.
+- `log.delivery_link`: one per own-transport delivery, created at gate out; `generation` (the token is an HMAC of the delivery and the
+  generation under a server key, so the database holds no token and reprints show the same QR), `status` ACTIVE / LOCKED (exactly 5
+  failed PINs) / CONFIRMED / ANNULLED, `expires_at` (7 days). `delivery_link:reopen` starts a new generation.
+- `log.delivery_link_attempt`: every PIN try with the client address, append-only (5 per link, 30 per hour per address).
+- `log.driver_confirmation`: append-only, one per link generation — receiver, optional cédula, FULL / DIFFERENCES (differences need a
+  note), phone time, server time and the confirmed time (the phone's only up to the server's + 5 minutes), optional location, PHOTO /
+  SIGNATURE evidence reference and SHA-256 in the private bucket, client address, event.
+- `log.pod.driver_confirmation_id`: the POD made from, or completed from, a driver's confirmation.
+- Service identity `…d004` «Confirmación de entrega» with role CONFIRMACION_ENTREGA, holding only `delivery:driver_confirm`;
+  `rochell-migrate create-company` assigns it. 147 permissions, 29 roles.
+
+## ENT1-02 — the driver's confirmation: server (E-ENT-1…6, E-ENT1-01-1…10)
+
+- Gate out of an own-transport delivery opens its link (`log.delivery_link`, 7 days). A return trip, or a POD recorded by Dispatch,
+  annuls an open link; a POD after the driver reported differences cites that confirmation (`log.pod.driver_confirmation_id`).
+- `SetDriverPin` (`driver_pin:manage`): four digits, PBKDF2-SHA256 210,000 iterations with a 16-byte salt; events `DriverPinSet`
+  (aggregate `DriverPin`, no PIN in the payload). `ReopenDeliveryLink` (`delivery_link:reopen`): a link ACTIVE or LOCKED of a delivery
+  in transit gets a new generation, 0 failures and 7 more days; the old QR stops working.
+- `DriverLinkKey`: the link's HMAC-SHA256 of `company:delivery:generation` under the server key (`Rochell:Deliveries:LinkKeyFile`),
+  base64url. `GetDeliveryPrint.driverLinkPath` is `/entrega/?c=…&d=…&g=…&k=…` while the delivery is in transit and its link ACTIVE.
+- Service identity CONFIRMACION_ENTREGA (`delivery:driver_confirm`): `VerifyDriverPin` and `ConfirmDeliveryByDriver` answer a wrong
+  PIN instead of throwing, so the try (`log.delivery_link_attempt`) is committed: 5 wrong lock the link, 30 wrong an hour from one
+  address answer THROTTLED. FULL inserts the confirmation, closes the link and records the POD through `RecordPodHandler.RecordAsync`
+  with every line received; DIFFERENCES (a note is required) only the confirmation. Events on aggregate `DeliveryLink`.
+- `GetDriverDelivery`: number, customer, site, driver, vehicle and lines without prices, and the state (INVALID, ACTIVE, EXPIRED,
+  LOCKED, CONFIRMED, ANNULLED, RECORDED_BY_DISPATCH). `GetDelivery` gains `driverLink` and `driverConfirmation`; `GetDriverEvidence`
+  (`sales:read`) returns the photo from the store after checking its SHA-256.
+- Public API (`Rochell.Api/Deliveries/DriverPages.cs`, no sign-in, as the service identity): `GET /api/v1/public/deliveries/{c}/{d}?g&k`,
+  `POST …/pin`, `POST …/confirm` (multipart with `evidence`, an `Idempotency-Key`; JPEG / PNG by their first bytes, ≤ 5 MB; the PIN
+  is checked first, then the photo goes to the store under `entregas/<company>/<delivery>/<id>.jpg|png`, then the confirmation).
+- Evidence store `IEvidenceStore` (Platform): `S3EvidenceStore` (private B2 bucket, own key files) or `FileSystemEvidenceStore`
+  (Development / Test). 275 commands. Staging steps: `staging.md` › Drivers' page.

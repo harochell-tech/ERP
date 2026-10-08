@@ -1,0 +1,27 @@
+{%- comment -%} Proforma de un pedido para la DGII (E-FIS1-05-7, UX4-03 V-20): líneas con el ITBIS vigente hoy, firma y sello. {%- endcomment -%}
+{% if marca_agua %}<div class="watermark" data-testid="watermark" role="note" aria-label="Marca de agua: {{ marca_agua }}"><span>{{ marca_agua }}</span></div>{% endif %}
+{% if logo %}<img class="logo" src="{{ logo.src }}" alt="{{ emisor.nombre }}">{% endif %}
+{% if formato.textos.encabezado %}<p class="texto-encabezado">{{ formato.textos.encabezado }}</p>{% endif %}
+<h1>Proforma</h1>
+<p>Pedido <span class="mono">{{ proforma.pedido }}</span> del {{ proforma.fecha_pedido }} · proforma emitida el {{ proforma.fecha }}</p>
+<p data-testid="proforma-validity"><strong>Válida al {{ proforma.fecha }}:</strong> precios de la lista vigente e ITBIS según las reglas vigentes ese día.</p>
+<dl class="facts">
+  <dt>Suplidor</dt><dd>{{ emisor.nombre }} · RNC <span class="mono">{{ emisor.rnc }}</span></dd>
+  <dt>Cliente</dt><dd data-testid="proforma-customer">{{ cliente.nombre }} · RNC <span class="mono">{{ cliente.rnc }}</span></dd>
+  {% if proforma.obra %}<dt>Obra</dt><dd>{{ proforma.obra }}</dd>{% endif %}
+</dl>
+<table class="lineas">
+  <thead><tr>{% for c in formato.columnas %}<th class="{{ c.clase }}" style="{{ c.estilo }}">{{ c.titulo }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for l in lineas %}<tr{% if l.testid %} data-testid="{{ l.testid }}"{% endif %}>{% for c in formato.columnas %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{{ l[c.clave] }}</td>{% endfor %}</tr>
+  {% endfor %}
+  {% if totales_fila %}<tr class="totales">{% for c in formato.columnas %}{% assign t = totales_fila[c.clave] %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{% if forloop.first %}<strong>{{ totales_etiqueta }}</strong>{% elsif t %}<strong><span data-testid="{{ t.testid }}">{{ t.valor }}</span></strong>{% endif %}</td>{% endfor %}</tr>{% endif %}
+  </tbody>
+</table>
+<p class="muted">Documento no fiscal. El ITBIS se calcula con las reglas vigentes a la fecha de la proforma.</p>
+<div class="signature">
+  <div><div class="signature-line"></div>Firma del suplidor</div>
+  <div><div class="signature-box"></div>Sello del suplidor</div>
+</div>
+{% if formato.textos.cuentas %}<p class="texto-cuentas"><strong>Cuentas para pagos:</strong> {{ formato.textos.cuentas }}</p>{% endif %}
+{% if formato.textos.pie %}<p class="texto-pie muted">{{ formato.textos.pie }}</p>{% endif %}

@@ -74,6 +74,8 @@ jobs:
           ECF_BASE_URL: ${{ vars.ECF_BASE_URL }}
           # MFG2-02: optional. Without PORTAL_URL the machines' portal is not read.
           PORTAL_URL: ${{ vars.PORTAL_URL }}
+          # ENT1-02: optional. The private bucket of the drivers' photos (its key is a file on the server).
+          EVIDENCE_BUCKET: ${{ vars.EVIDENCE_BUCKET }}
         run: |
           scp deploy/staging/compose.yaml deploy/staging/Caddyfile deploy/staging/init-roles.sql \
               deploy/staging/deploy.sh deploy/staging/backup.sh deploy/staging/seed.sh deploy/staging/seed-vs3.sh deploy/staging/seed-mfg.sh deploy/staging/rnc-weekly.sh "${TARGET}:/opt/rochell-staging/"
@@ -90,7 +92,7 @@ jobs:
               printf '%s=%s\n' "${name}" "${value}"
             done
             # Optional variables: written only when the environment defines them.
-            for name in MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC ECF_MODE ECF_BASE_URL PORTAL_URL; do
+            for name in MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC ECF_MODE ECF_BASE_URL PORTAL_URL EVIDENCE_BUCKET; do
               value="${!name}"
               if test -n "${value}"; then printf '%s=%s\n' "${name}" "${value}"; fi
             done

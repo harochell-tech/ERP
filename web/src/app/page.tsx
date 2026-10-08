@@ -190,6 +190,15 @@ const TASKS: readonly Task[] = [
     countPermission: "sales:read",
     count: async (companyId) => (await query("/api/v1/companies/{companyId}/sales/deliveries", { path: { companyId }, query: { status: "IN_TRANSIT", limit: COUNT_LIMIT } })).items.length,
   },
+  // ENT1-03 (E-ENT1-01-10): the driver reported differences from the QR page; Dispatch completes the delivery.
+  {
+    href: "/despacho/tablero/?chofer=diferencias",
+    label: "Entregas con diferencias reportadas por el chofer",
+    permission: "delivery:manage",
+    countPermission: "sales:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/sales/deliveries", { path: { companyId }, query: { driverReportedDifferences: "true", limit: COUNT_LIMIT } })).items.length,
+  },
   { href: "/facturacion/por-facturar/", label: "Facturar entregas", permission: "invoice:create" },
   {
     href: "/facturacion/facturas/?filtro=ecf",
@@ -231,6 +240,33 @@ const TASKS: readonly Task[] = [
     count: async (companyId) => {
       const portal = await query("/api/v1/companies/{companyId}/manufacturing/portal", { path: { companyId } });
       return portal.warnings.length + portal.unpairedMachines.length + (portal.lastError ? 1 : 0);
+    },
+  },
+  // MFG3-04 (E-MFG3-7/10): preventive maintenance overdue and due soon; the week's stoppages without a reason.
+  {
+    href: "/produccion/mantenimiento/",
+    label: "Mantenimientos vencidos",
+    permission: "maintenance_plan:manage",
+    countPermission: "production:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/maintenance-tasks", { path: { companyId } })).overdue,
+  },
+  {
+    href: "/produccion/mantenimiento/?por-vencer=1",
+    label: "Mantenimientos por vencer",
+    permission: "maintenance_plan:manage",
+    countPermission: "production:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/maintenance-tasks", { path: { companyId } })).dueSoon,
+  },
+  {
+    href: "/produccion/eficiencia/",
+    label: "Paros sin razón esta semana",
+    permission: "production:read",
+    count: async (companyId) => {
+      const to = todayInDominicanRepublic();
+      const d = new Date(`${to}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - 6);
+      return (await query("/api/v1/companies/{companyId}/manufacturing/efficiency", { path: { companyId }, query: { from: d.toISOString().slice(0, 10), to } }))
+        .stoppagesWithoutReason;
     },
   },
   // VS4-04 (E-VS4-04-1/6): e-CF needing attention, rejected ones to resend or void, ranges running out or expiring.

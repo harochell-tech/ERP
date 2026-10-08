@@ -807,3 +807,18 @@ aprobar», «Bajas de activos por aprobar», «Cargas de activos por aprobar». 
   (`/fiscal/ecf/detalle/?id=`) with *Resolver* (ecf:resolve) and the XML / PDF downloads.
 - Inicio: «e-CF que requieren atención», «e-CF rechazados por reenviar o anular», «Rangos e-NCF por agotarse o vencer», and the red
   contingency notice (`EcfContingencyNotice`). Journey: `e2e/ecf-journey.spec.ts` (the dev stack's gateway is Off).
+
+## ENT1-03 — the driver's QR page and Dispatch's side (E-ENT-1…8, E-ENT1-01-1…10)
+
+- `/entrega/?c&d&g&k` is public: `Shell` renders it without session or menu. It reads the delivery from
+  `/api/v1/public/deliveries/{c}/{d}`, checks the PIN (`…/pin`), then sends the confirmation (`…/confirm`, multipart, an
+  `Idempotency-Key` created when the page opens): receiver, optional cédula, «Recibido completo» / «Hubo diferencias» with what was
+  different, a photo (reduced on the phone to 1600 px JPEG) or a signature drawn on a canvas, and the location when the phone allows.
+  Without signal the confirmation waits in IndexedDB (`rochell-entregas`) and is sent on `online` or the next visit.
+- The conduce's print shows the QR (`DriverQrBlock`, `QrCode`) bottom right once out of the gate while the link is usable.
+- The delivery shows «Confirmación del chofer»: the link's state, what the driver confirmed (with a map link), «Ver foto» /
+  «Ver firma» (`GetDriverEvidence`), and «Reabrir enlace» / «Reemplazar QR» for `delivery_link:reopen`. After differences, the POD
+  form starts from the driver's receiver, time and photo.
+- Maestros › Flota: «PIN del QR» per driver, «Asignar PIN» / «Cambiar PIN» for `driver_pin:manage`.
+- Inicio: «Entregas con diferencias reportadas por el chofer» (`ListDeliveries` with `driverReportedDifferences`).
+- Journey: `e2e/delivery-qr-journey.spec.ts` (E2E-ENT).

@@ -22,6 +22,9 @@ public static class DocumentMailErrors
     public const string NotRetryable = "MAIL_NOT_RETRYABLE";
 }
 
+/// <summary>The company as it signs the e-mails.</summary>
+public sealed record Issuer(string Name, string Rnc);
+
 /// <summary>E-MAIL-6: sends a quote already sent or converted, and not expired, as a PDF to the recipients given (E-MAIL-5).</summary>
 public sealed record SendQuoteByEmail(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid QuoteId, IReadOnlyList<string> Recipients, string? Message = null) : ICommand;
 
@@ -66,13 +69,17 @@ internal static partial class DocumentMail
 
     public static string FileName(string name) => Unsafe().Replace(name, "-") + ".pdf";
 
+    /// <summary>E-PRT-1/7: the document as it prints, with the company's format (no driver's QR: the e-mail is for the customer).</summary>
+    public static Task<Printing.PrintedDocument> PrintAsync(CommandContext context, string documentType, Guid id, CancellationToken cancellationToken, DateOnly? from = null, DateOnly? to = null)
+        => Printing.PrintDocuments.RenderAsync(context, new Printing.GetPrintDocument(context.CompanyId, context.SessionId, documentType, id, from, to), cancellationToken);
+
     /// <summary>
     /// Queues the message as the command's result (its id is the mail's). <paramref name="lead"/> is the sentence that names the
     /// document; the sender's optional message follows it.
     /// </summary>
     public static async Task<string> QueueAsync(
         CommandContext context, MailSwitch? mail, string documentType, Guid documentId, string documentNo, Guid partyId, IReadOnlyList<string> recipients, string? message, string subject,
-        string lead, string issuerName, string fileName, string html, CancellationToken cancellationToken, MailAttachment? extra = null)
+        string lead, string issuerName, string fileName, Printing.PrintedDocument document, CancellationToken cancellationToken, MailAttachment? extra = null)
     {
         if (mail is { Enabled: false })
         {
@@ -105,7 +112,7 @@ internal static partial class DocumentMail
                 JsonSerializer.Serialize(new { mailId = id, documentType, documentId, documentNo, recipients = to, subject }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
-        await MailOutbox.EnqueueAsync(context, id, new MailDraft(documentType, documentId, documentNo, partyId, to, subject, body, fileName, html, extra), eventId, sender.UserId, cancellationToken).ConfigureAwait(false);
+        await MailOutbox.EnqueueAsync(context, id, new MailDraft(documentType, documentId, documentNo, partyId, to, subject, body, fileName, document.Html, extra, document.FormatVersion), eventId, sender.UserId, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { mailId = id, status = "QUEUED", recipients = to.Count });
     }
 
@@ -136,7 +143,8 @@ public sealed class SendQuoteByEmailHandler(MailSwitch? mail = null) : ICommandH
             .ConfigureAwait(false);
         return await DocumentMail.QueueAsync(
             context, mail, "QUOTE", command.QuoteId, quote.QuoteNo, party!.Value, command.Recipients, command.Message, $"Cotización {quote.QuoteNo} — {quote.IssuerName}",
-            $"Adjuntamos la cotización {quote.QuoteNo}, válida hasta el {DocumentHtml.Date(quote.ValidUntil)}.", quote.IssuerName, DocumentMail.FileName(quote.QuoteNo), DocumentHtml.Quote(quote),
+            $"Adjuntamos la cotización {quote.QuoteNo}, válida hasta el {Rochell.Sales.Printing.PrintText.Date(quote.ValidUntil)}.", quote.IssuerName, DocumentMail.FileName(quote.QuoteNo),
+            await DocumentMail.PrintAsync(context, Printing.PrintDocumentTypes.Quote, command.QuoteId, cancellationToken).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
     }
 }
@@ -171,7 +179,8 @@ public sealed class SendInvoiceByEmailHandler(MailSwitch? mail = null) : IComman
         var issuerName = invoice.Issuer!.TradeName ?? invoice.Issuer.LegalName;
         return await DocumentMail.QueueAsync(
             context, mail, "INVOICE", command.InvoiceId, h.InvoiceNo, h.PartyId, command.Recipients, command.Message, $"Factura {ecf.Encf} — {issuerName}",
-            $"Adjuntamos la factura electrónica {ecf.Encf} ({h.InvoiceNo}) en PDF y su XML firmado.", issuerName, DocumentMail.FileName(ecf.Encf), DocumentHtml.Invoice(invoice, package),
+            $"Adjuntamos la factura electrónica {ecf.Encf} ({h.InvoiceNo}) en PDF y su XML firmado.", issuerName, DocumentMail.FileName(ecf.Encf),
+            await DocumentMail.PrintAsync(context, Printing.PrintDocumentTypes.Invoice, command.InvoiceId, cancellationToken).ConfigureAwait(false),
             cancellationToken, new MailAttachment($"{ecf.Encf}.xml", xml, "application/xml")).ConfigureAwait(false);
     }
 }
@@ -195,8 +204,8 @@ public sealed class SendProformaByEmailHandler(MailSwitch? mail = null) : IComma
 
         return await DocumentMail.QueueAsync(
             context, mail, "PROFORMA", command.ProformaId, f.ProformaNo, f.PartyId, command.Recipients, command.Message, $"Proforma {f.ProformaNo} — {proforma.IssuerName}",
-            $"Adjuntamos la proforma {f.ProformaNo}, correspondiente al conduce {f.DeliveryNo}; vence el {DocumentHtml.Date(f.DueDate)}.", proforma.IssuerName, DocumentMail.FileName(f.ProformaNo),
-            DocumentHtml.Proforma(proforma), cancellationToken).ConfigureAwait(false);
+            $"Adjuntamos la proforma {f.ProformaNo}, correspondiente al conduce {f.DeliveryNo}; vence el {Rochell.Sales.Printing.PrintText.Date(f.DueDate)}.", proforma.IssuerName, DocumentMail.FileName(f.ProformaNo),
+            await DocumentMail.PrintAsync(context, Printing.PrintDocumentTypes.Proforma, command.ProformaId, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
     }
 }
 
@@ -224,7 +233,8 @@ public sealed class SendDeliveryByEmailHandler(MailSwitch? mail = null) : IComma
             ("d", command.DeliveryId)).ConfigureAwait(false);
         return await DocumentMail.QueueAsync(
             context, mail, "DELIVERY", command.DeliveryId, delivery.DeliveryNo, party!.Value, command.Recipients, command.Message, $"Conduce {delivery.DeliveryNo} — {delivery.IssuerName}",
-            $"Adjuntamos el conduce {delivery.DeliveryNo} de su pedido {delivery.OrderNo}.", delivery.IssuerName, DocumentMail.FileName(delivery.DeliveryNo), DocumentHtml.Delivery(delivery),
+            $"Adjuntamos el conduce {delivery.DeliveryNo} de su pedido {delivery.OrderNo}.", delivery.IssuerName, DocumentMail.FileName(delivery.DeliveryNo),
+            await DocumentMail.PrintAsync(context, Printing.PrintDocumentTypes.DeliveryNote, command.DeliveryId, cancellationToken).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
     }
 }
@@ -241,11 +251,13 @@ public sealed class SendStatementByEmailHandler(MailSwitch? mail = null) : IComm
         var statement = await DocumentMail.ReadAsync<GetCustomerStatement, CustomerStatement>(
             context, new GetCustomerStatementHandler(), new GetCustomerStatement(context.CompanyId, context.SessionId, command.PartyId, command.From, command.To), cancellationToken).ConfigureAwait(false);
         var issuer = await DocumentMail.IssuerAsync(context, cancellationToken).ConfigureAwait(false);
-        var to = DocumentHtml.Date(statement.To);
+        var to = Rochell.Sales.Printing.PrintText.Date(statement.To);
         return await DocumentMail.QueueAsync(
             context, mail, "STATEMENT", command.PartyId, $"EC {to}", command.PartyId, command.Recipients, command.Message, $"Estado de cuenta al {to} — {issuer.Name}",
-            $"Adjuntamos su estado de cuenta del {DocumentHtml.Date(statement.From)} al {to}.", issuer.Name,
-            DocumentMail.FileName("estado-de-cuenta-" + statement.To.ToString("yyyyMMdd", CultureInfo.InvariantCulture)), DocumentHtml.Statement(statement, issuer), cancellationToken).ConfigureAwait(false);
+            $"Adjuntamos su estado de cuenta del {Rochell.Sales.Printing.PrintText.Date(statement.From)} al {to}.", issuer.Name,
+            DocumentMail.FileName("estado-de-cuenta-" + statement.To.ToString("yyyyMMdd", CultureInfo.InvariantCulture)),
+            await DocumentMail.PrintAsync(context, Printing.PrintDocumentTypes.Statement, command.PartyId, cancellationToken, command.From, command.To).ConfigureAwait(false), cancellationToken)
+            .ConfigureAwait(false);
     }
 }
 
@@ -262,11 +274,11 @@ public sealed class SendArAgingByEmailHandler(MailSwitch? mail = null) : IComman
         var customer = aging.Customers.SingleOrDefault(c => c.CustomerId == command.PartyId)
             ?? throw new DomainException(DocumentMailErrors.NotSendable, "The customer has no open invoices or proformas today.");
         var issuer = await DocumentMail.IssuerAsync(context, cancellationToken).ConfigureAwait(false);
-        var asOf = DocumentHtml.Date(aging.AsOf);
+        var asOf = Rochell.Sales.Printing.PrintText.Date(aging.AsOf);
         return await DocumentMail.QueueAsync(
             context, mail, "AR_AGING", command.PartyId, $"CxC {asOf}", command.PartyId, command.Recipients, command.Message, $"Facturas pendientes al {asOf} — {issuer.Name}",
             $"Adjuntamos el detalle de sus facturas pendientes al {asOf}.", issuer.Name, DocumentMail.FileName("facturas-pendientes-" + aging.AsOf.ToString("yyyyMMdd", CultureInfo.InvariantCulture)),
-            DocumentHtml.Aging(customer, aging.AsOf, aging.Buckets, issuer), cancellationToken).ConfigureAwait(false);
+            await DocumentMail.PrintAsync(context, Printing.PrintDocumentTypes.ArAging, command.PartyId, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
     }
 }
 

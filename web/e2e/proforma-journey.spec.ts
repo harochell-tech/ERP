@@ -102,7 +102,7 @@ test("proformas collected with ITBIS, certified, invoiced as one e-CF 44 and the
   await expect(billing.getByTestId("proforma-total")).toHaveText("1,770.00");
   await expect(billing.getByTestId("proforma-balance")).toHaveText("1,770.00");
   await expect(billing.getByText("Firma del suplidor")).toBeVisible();
-  await expect(billing.getByRole("button", { name: "Imprimir" })).toBeVisible();
+  await expect(billing.getByRole("link", { name: "Imprimir" })).toBeVisible(); // PRT-01: the server's printed proforma
   await expectFits(billing);
   await nav(billing, "Por facturar");
   await expect(billing.getByRole("heading", { name: "Por facturar" })).toBeVisible();

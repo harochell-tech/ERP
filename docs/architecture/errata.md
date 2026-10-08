@@ -1379,6 +1379,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-CFG-4 | CFG | The owner downloads the official PDFs in his browser; they are kept in `docs/fiscal/fuentes/` and their SHA-256 is computed from those files. Without the file the source is not registered. |
 | E-CFG-5 | CFG | Activation stays with a person: one «Activar» per rule. |
 | E-CFG-6 | CFG | Rule versions a person already configured are completed (source linked, tests run) when they match the file, and left alone when they differ. The rules start on 2026-10-01 («desde hoy», said on 2026-10-01). |
+| E-MFG3-01-1 | MFG3-01 | Core keeps each distinct version of a portal stoppage, maintenance window or daily report as it arrived, never changed (like the readings), and uses the latest. |
+| E-MFG3-01-2 | MFG3-01 | The ideal cycle is set per machine and product (the mould decides the product) on Máquinas y turnos by the plant manager with `production_master:manage`; each value holds from its date and the history stays. |
+| E-MFG3-01-3 | MFG3-01 | Maintenance plans are the plant manager's, with the new permission `maintenance_plan:manage`; tasks are deactivated, never deleted. |
+| E-MFG3-01-4 | MFG3-01 | The report's broken blocks reach the draft only when the shift's draft came from the portal and nobody changed it in Core; a later change of the report is taken again while the draft stays untouched. |
+| E-MFG3-01-5 | MFG3-01 | Running hours for maintenance: the shift's planned time minus stoppages, summed since the task was last done. |
 
 Implementation rules derived from the above (no architectural change):
 
