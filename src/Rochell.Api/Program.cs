@@ -88,6 +88,17 @@ if (settings.Mail.Mode != MailMode.Off)
 
 // E-VS4-11, E-VS4-02-6: the e-CF gateway is Off unless configured; Sandbox / Production call Alanube with the server's token; Simulated
 // only where the environment is Development or Test.
+// E-VS4-04-7: the token and the webhook secret live in files on the server, never in the repository or the .env.
+if (settings.Ecf.Enabled && string.IsNullOrWhiteSpace(settings.Ecf.Token) && !string.IsNullOrWhiteSpace(settings.Ecf.TokenFile) && settings.Ecf.Mode != EcfModes.Simulated)
+{
+    settings.Ecf.Token = FromFile(settings.Ecf.TokenFile, "Ecf:TokenFile")!.Trim();
+}
+
+if (string.IsNullOrWhiteSpace(settings.Ecf.WebhookSecret) && !string.IsNullOrWhiteSpace(settings.Ecf.WebhookSecretFile) && File.Exists(settings.Ecf.WebhookSecretFile))
+{
+    settings.Ecf.WebhookSecret = File.ReadAllText(settings.Ecf.WebhookSecretFile).Trim();
+}
+
 services.AddSingleton(settings.Ecf);
 services.AddSingleton(new EcfSwitch(settings.Ecf.Enabled));
 services.AddSingleton<IEcfSourceUpdater, Rochell.Sales.Ecf.InvoiceEcfUpdater>();

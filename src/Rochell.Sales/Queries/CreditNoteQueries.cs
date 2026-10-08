@@ -71,7 +71,7 @@ public sealed record CreditNoteLineView(int LineNo, Guid InvoiceLineId, int Invo
 /// <summary>E-UX3-9: <see cref="InvoiceIssuedById"/> is the user who issued the invoice; the credit note's issuer must be someone else.</summary>
 public sealed record CreditNoteDetail(
     CreditNoteSummary Header, string? CreatedBy, string? IssuedBy, Guid? PostingEventId, IReadOnlyList<CreditNoteLineView> Lines, ExternalFiscalRecordView? FiscalRecord, IReadOnlyList<StateChange> History,
-    Guid? InvoiceIssuedById);
+    Guid? InvoiceIssuedById, EcfStampView? Ecf = null);
 
 internal static class CreditNoteLines
 {
@@ -127,7 +127,8 @@ public sealed class GetCreditNoteHandler : IQueryHandler<GetCreditNote>
             ("n", query.CreditNoteId)).ConfigureAwait(false);
         var lines = await CreditNoteLines.ReadAsync(context, query.CreditNoteId, cancellationToken).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "CreditNote", query.CreditNoteId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new CreditNoteDetail(header, extra.CreatedBy, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, extra.InvoiceIssuedById));
+        var ecf = await EcfStamps.LatestAsync(context, query.CreditNoteId, cancellationToken).ConfigureAwait(false);
+        return ApiJson.Serialize(new CreditNoteDetail(header, extra.CreatedBy, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, extra.InvoiceIssuedById, ecf));
     }
 }
 

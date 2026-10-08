@@ -1789,6 +1789,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/ecf/resolve-ecf-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ResolveEcfDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/finance/prepare-account-role-map": {
         parameters: {
             query?: never;
@@ -5901,6 +5917,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/ecf/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListEcfDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/ecf/documents/{documentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetEcfDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/ecf/files/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetEcfFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/ecf/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetEcfAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/finance/events/{sourceEventId}/journals": {
         parameters: {
             query?: never;
@@ -8003,6 +8083,7 @@ export interface components {
             history: components["schemas"]["StateChange"][];
             /** Format: uuid */
             invoiceIssuedById: null | string;
+            ecf?: null | components["schemas"]["EcfStampView"];
         };
         CreditNoteFiscalPackage: {
             creditNoteNo: string;
@@ -8621,6 +8702,14 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        DocumentIssuer: {
+            rnc: string;
+            legalName: string;
+            tradeName: null | string;
+            address: null | string;
+            phone: null | string;
+            email: null | string;
+        };
         DocumentMailList: {
             items: components["schemas"]["DocumentMailView"][];
             savedEmails: string[];
@@ -8675,6 +8764,100 @@ export interface components {
         DueEcfDocumentList: {
             items: components["schemas"]["DueEcfDocument"][];
         };
+        EcfAlerts: {
+            /** Format: int32 */
+            requiresAction: number;
+            /** Format: int32 */
+            rejected: number;
+            /** Format: int32 */
+            sending: number;
+            inContingency: boolean;
+            /** Format: date-time */
+            failingSince: null | string;
+            ranges: components["schemas"]["EcfRangeAlert"][];
+        };
+        EcfCallView: {
+            operation: string;
+            mode: string;
+            /** Format: int32 */
+            httpStatus: null | number;
+            outcome: string;
+            providerCode: null | string;
+            message: null | string;
+            /** Format: date-time */
+            calledAt: string;
+            /** Format: int32 */
+            durationMs: number;
+        };
+        EcfDocumentDetail: {
+            document: components["schemas"]["EcfDocumentRow"];
+            providerId: null | string;
+            trackId: null | string;
+            securityCode: null | string;
+            /** Format: date-time */
+            signatureDate: null | string;
+            stampUrl: null | string;
+            governmentResponse: null | string;
+            /** Format: int32 */
+            polls: number;
+            /** Format: date-time */
+            nextPollAt: null | string;
+            calls: components["schemas"]["EcfCallView"][];
+            files: components["schemas"]["EcfFileView"][];
+            otherAttempts: components["schemas"]["EcfDocumentRow"][];
+        };
+        EcfDocumentList: {
+            items: components["schemas"]["EcfDocumentRow"][];
+            /** Format: int32 */
+            total: number;
+        };
+        EcfDocumentRow: {
+            /** Format: uuid */
+            documentId: string;
+            sourceKind: string;
+            /** Format: uuid */
+            sourceId: string;
+            sourceNo: null | string;
+            partyName: null | string;
+            ecfType: string;
+            encf: string;
+            /** Format: int32 */
+            attemptNo: number;
+            status: string;
+            reason: null | string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            finishedAt: null | string;
+            /** Format: decimal */
+            total: null | string;
+            /** Format: int64 */
+            version: number;
+        };
+        EcfFileContent: {
+            kind: string;
+            fileName: string;
+            contentBase64: string;
+        };
+        EcfFileView: {
+            /** Format: uuid */
+            fileId: string;
+            kind: string;
+            /** Format: int32 */
+            bytes: number;
+            /** Format: date-time */
+            fetchedAt: string;
+        };
+        EcfRangeAlert: {
+            ecfType: string;
+            next: string;
+            /** Format: int64 */
+            remaining: number;
+            /** Format: date */
+            validUntil: string;
+            low: boolean;
+            expiring: boolean;
+        };
         EcfSeriesList: {
             items: components["schemas"]["EcfSeriesView"][];
         };
@@ -8693,6 +8876,21 @@ export interface components {
             status: string;
             preparedBy: null | string;
             approvedBy: null | string;
+            /** Format: int64 */
+            version: number;
+        };
+        EcfStampView: {
+            /** Format: uuid */
+            documentId: string;
+            status: string;
+            encf: string;
+            /** Format: int32 */
+            attemptNo: number;
+            securityCode: null | string;
+            /** Format: date-time */
+            signatureDate: null | string;
+            stampUrl: null | string;
+            reason: null | string;
             /** Format: int64 */
             version: number;
         };
@@ -9391,6 +9589,8 @@ export interface components {
             creditNotes: components["schemas"]["CreditNoteSummary"][];
             creditable: components["schemas"]["CreditableLine"][];
             withholdings: components["schemas"]["InvoiceWithholdingView"][];
+            ecf?: null | components["schemas"]["EcfStampView"];
+            issuer?: null | components["schemas"]["DocumentIssuer"];
         };
         InvoiceFiscalPackage: {
             invoiceNo: string;
@@ -11990,6 +12190,15 @@ export interface components {
             invoiceId: string;
             /** Format: int64 */
             expectedVersion: number;
+        };
+        ResolveEcfDocument: {
+            /** Format: uuid */
+            documentId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            resolution: string;
+            providerId: null | string;
+            note: string;
         };
         RetryDocumentEmail: {
             /** Format: uuid */
@@ -21341,6 +21550,82 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["NudgeEcfDocuments"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ResolveEcfDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveEcfDocument"];
             };
         };
         responses: {
@@ -38821,6 +39106,209 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DueEcfDocumentList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListEcfDocuments: {
+        parameters: {
+            query?: {
+                status?: string;
+                search?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcfDocumentList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetEcfDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcfDocumentDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetEcfFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcfFileContent"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetEcfAlerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EcfAlerts"];
                 };
             };
             /** @description Bad Request */

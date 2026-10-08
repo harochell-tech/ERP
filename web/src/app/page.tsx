@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { query } from "@/api/client";
 import { lastEndedMonth } from "@/components/FixedAssets";
+import { EcfContingencyNotice } from "@/components/EcfGateway";
 import { EmptyState } from "@/components/StateNotices";
 import { todayInDominicanRepublic } from "@/lib/labels";
 import { isReadyToRelease } from "@/lib/production";
@@ -206,6 +207,28 @@ const TASKS: readonly Task[] = [
     count: async (companyId) =>
       (await query("/api/v1/companies/{companyId}/sales/receipts", { path: { companyId }, query: { status: "RECORDED", applicationStatus: "UNAPPLIED", limit: COUNT_LIMIT } })).items.length,
   },
+  // VS4-04 (E-VS4-04-1/6): e-CF needing attention, rejected ones to resend or void, ranges running out or expiring.
+  {
+    href: "/fiscal/ecf/?estado=REQUIRES_ACTION",
+    label: "e-CF que requieren atención",
+    permission: "ecf:resolve",
+    countPermission: "sales:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/ecf/alerts", { path: { companyId } })).requiresAction,
+  },
+  {
+    href: "/fiscal/ecf/?estado=REJECTED",
+    label: "e-CF rechazados por reenviar o anular",
+    permission: "invoice:issue",
+    countPermission: "sales:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/ecf/alerts", { path: { companyId } })).rejected,
+  },
+  {
+    href: "/fiscal/rangos/",
+    label: "Rangos e-NCF por agotarse o vencer",
+    permission: "ecf_series:prepare",
+    countPermission: "sales:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/ecf/alerts", { path: { companyId } })).ranges.length,
+  },
   // FIS1-05 (E-FIS1-05-10): CONFOTUR authorizations waiting for the Especialista fiscal.
   {
     href: "/fiscal/autorizaciones/?estado=PENDING_VERIFICATION",
@@ -389,6 +412,7 @@ export default function Home() {
         {company?.assignments.map((a) => (a.plantId ? `${a.roleName} (planta ${plantName(a.plantId, a.plantId.slice(0, 8))})` : a.roleName)).join(", ")}
       </p>
       <SetupCard />
+      <EcfContingencyNotice />
       <h2>Tareas</h2>
       {tasks.length === 0 ? (
         <EmptyState title="No hay tareas para sus roles en Inicio." testId="no-tasks">

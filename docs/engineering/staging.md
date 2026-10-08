@@ -244,3 +244,53 @@ Check: send a quote from the UI (Ventas › Cotización › Enviar por correo); 
 message arrives at the internal mailbox with the PDF. A failure shows the relay's answer in the history and in
 `docker compose logs api`; `core.mail_attempt` keeps every attempt.
 
+
+## e-CF gateway with Alanube (VS4-02…04, E-VS4-11, E-VS4-04-7)
+
+The gateway is **OFF** until `ECF_MODE` and `ECF_BASE_URL` are set as **variables of the GitHub Environment `staging`**:
+
+```
+ECF_MODE=SANDBOX
+ECF_BASE_URL=https://sandbox.alanube.co/dom/v1/
+```
+
+The token and the webhook secret never go to GitHub, the `.env` or the chat: they are files on the server, read by the API at
+start (`secrets/ecf`, mounted read-only at `/run/secrets/ecf`). On the server, once (and again to rotate the token):
+
+```
+sudo mkdir -p /opt/rochell-staging/secrets/ecf
+sudo nano /opt/rochell-staging/secrets/ecf/alanube-token
+openssl rand -hex 32 | sudo tee /opt/rochell-staging/secrets/ecf/webhook-secret
+sudo chown -R 1654:1654 /opt/rochell-staging/secrets/ecf
+sudo chmod 500 /opt/rochell-staging/secrets/ecf
+sudo chmod 400 /opt/rochell-staging/secrets/ecf/*
+```
+
+(`nano`: paste the token from Alanube's panel, Ctrl+O, Enter, Ctrl+X.) Then run `deploy-staging`. With SANDBOX the API refuses
+to start without the token file.
+
+**Webhook** (optional — without it the queue is still polled every 15 s): in Alanube's panel, notifications → URL
+`https://staging.industriasrochell.com.do/api/v1/ecf/webhook`, custom header `X-Rochell-Ecf-Secret` with the value printed by the
+`openssl` line above. A call without that header is answered 401 and logged; a valid one only brings the status queries forward.
+
+**Before switching on**: Configuración › Empresa → *Datos del emisor de e-CF* (the address is required), and Fiscal › Rangos e-NCF →
+a range per type approved by the Controller (at the cut-over: from the first number the previous provider did not use).
+
+**Contract test** (E-VS4-04-8, sandbox only): write a settings file on the server (no secret in it) and run
+
+```
+docker compose run --rm -v /opt/rochell-staging/ct:/ct -v /opt/rochell-staging/secrets/ecf:/run/secrets/ecf:ro migrate ecf-contract-test /ct/settings.json /ct/report.jsonl
+```
+
+with `settings.json`:
+
+```json
+{ "baseUrl": "https://sandbox.alanube.co/dom/v1/", "tokenFile": "/run/secrets/ecf/alanube-token",
+  "senderRnc": "131925332", "senderName": "BLOCK ROCHELL SRL", "senderAddress": "…",
+  "buyerRnc": "…", "buyerName": "…", "first31": 1, "first34": 1, "sequenceDueDate": "2027-12-31",
+  "unitPrice": "100.00", "itbisRate": "0.18", "burst": 50 }
+```
+
+`first31` / `first34` are the first unused numbers of the **sandbox** ranges (the test uses 5 + `burst` numbers of 31 and one of
+34). The report has one JSON line per request with Alanube's raw answer, never the token; its findings go to
+`docs/acceptance/vs4-contract-test.md`.
