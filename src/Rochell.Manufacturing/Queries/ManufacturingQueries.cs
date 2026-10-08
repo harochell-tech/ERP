@@ -240,7 +240,18 @@ public sealed record FgLotView(Guid LotId, string LotCode, string Status, DateTi
 /// <see cref="UsageTolerancePct"/> is the PRODUCTION policy's usage_tolerance_pct on the run's date (a fraction, e.g. 0.05), null without one.
 /// </summary>
 public sealed record ProductionRunDetail(
-    ProductionRunSummary Run, ShiftSummaryView? Summary, IReadOnlyList<ConsumptionView> Consumption, FgLotView? Lot, Guid RecipeVersionId, int RecipeVersion, decimal? UsageTolerancePct);
+    ProductionRunSummary Run, ShiftSummaryView? Summary, IReadOnlyList<ConsumptionView> Consumption, FgLotView? Lot, Guid RecipeVersionId, int RecipeVersion, decimal? UsageTolerancePct,
+    RunPortalView? Portal = null);
+
+/// <summary>
+/// MFG2-03 (E-MFG2-4/7/8/11): where the summary came from. <see cref="BatchPlant"/> is the machine's paired batch plant (null: offline or
+/// not paired, <see cref="Paired"/>); <see cref="PortalUnits"/> are the blocks of the run's product in the portal's latest reading of
+/// the shift, shown beside the draft once a person changed it (<see cref="EditedBy"/>). <see cref="LastCycle"/> is the portal's local time
+/// (Santo Domingo), "yyyy-MM-dd HH:mm".
+/// </summary>
+public sealed record RunPortalView(
+    bool Paired, string? PortalCode, string? BatchPlant, string? Source, string? ConsumptionSource, string? ConsumptionReason, string? EditedBy, decimal? PortalUnits, int? Cycles,
+    int? MaintenanceCycles, int? DeadMinutes, bool? ShiftClosed, string? LastCycle, DateTime? ReadAt);
 
 /// <summary>E-UX4-2: the usage tolerance in force and the variance of a real consumption against its theoretical.</summary>
 internal static class UsageVariance
@@ -343,7 +354,31 @@ public sealed class GetProductionRunHandler : IQueryHandler<GetProductionRun>
                 cancellationToken,
                 ("s", summary.SummaryId),
                 ("now", context.Clock.UtcNow)).ConfigureAwait(false);
-        return ApiJson.Serialize(new ProductionRunDetail(run, summary, consumption, lot, recipe.Id, recipe.Version, tolerance));
+        var portal = (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT pm.portal_code IS NOT NULL, pm.portal_code, pm.batch_plant, ss.source, ss.consumption_source, ss.consumption_reason, coalesce(u.display_name, u.email),
+                   (SELECT sum((x ->> 'bloques')::numeric) FROM jsonb_array_elements(rd.moulds) x JOIN mfg.portal_mould mo ON mo.company_id = r.company_id AND mo.mould = x ->> 'molde'
+                    WHERE mo.item_id = r.item_id),
+                   rd.cycles, rd.maintenance_cycles, rd.dead_minutes, rd.closed, rd.last_cycle, rd.fetched_at
+            FROM mfg.production_run r
+            LEFT JOIN mfg.portal_machine pm ON pm.company_id = r.company_id AND pm.machine_id = r.machine_id
+            LEFT JOIN mfg.shift_summary ss ON ss.run_id = r.run_id AND ss.status IN ('DRAFT', 'POSTED')
+            LEFT JOIN iam.user u ON u.user_id = ss.edited_by
+            LEFT JOIN mfg.portal_shift ps ON ps.company_id = r.company_id AND ps.shift_id = r.shift_id
+            LEFT JOIN LATERAL (SELECT * FROM mfg.portal_reading x WHERE x.company_id = r.company_id AND x.portal_code = pm.portal_code AND x.shift_date = r.business_date
+                               AND x.shift_no = ps.shift_no ORDER BY x.fetched_at DESC LIMIT 1) rd ON true
+            WHERE r.run_id = @r
+            """,
+            r => new RunPortalView(
+                r.GetBoolean(0), r.NullableString(1), r.NullableString(2), r.NullableString(3), r.NullableString(4), r.NullableString(5), r.NullableString(6),
+                r.IsDBNull(7) ? null : r.GetDecimal(7), r.IsDBNull(8) ? null : r.GetInt32(8), r.IsDBNull(9) ? null : r.GetInt32(9), r.IsDBNull(10) ? null : r.GetInt32(10),
+                r.IsDBNull(11) ? null : r.GetBoolean(11), r.IsDBNull(12) ? null : r.GetDateTime(12).ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+                r.IsDBNull(13) ? null : r.Utc(13)),
+            cancellationToken,
+            ("r", query.RunId)).ConfigureAwait(false)).Single();
+        return ApiJson.Serialize(new ProductionRunDetail(run, summary, consumption, lot, recipe.Id, recipe.Version, tolerance, portal));
     }
 }
 

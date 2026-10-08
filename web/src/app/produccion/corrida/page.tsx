@@ -43,6 +43,32 @@ interface ConsumptionDraft {
   uom: string;
 }
 
+/** MFG2-03 (E-MFG2-4/7/8): what the machines' portal says of this run and where its consumption came from. */
+function PortalInfo({ portal }: { portal: Detail["portal"] }) {
+  if (!portal || portal.source !== "PORTAL") {
+    return null;
+  }
+  const consumption =
+    portal.consumptionSource === "PENDING"
+      ? portal.batchPlant
+        ? "Sin consumo de dosificadora todavía: lleva el teórico y no se puede cerrar hasta que llegue o se escriba con motivo."
+        : "Sin consumo: la dosificadora de esta máquina no está conectada; escríbalo antes de cerrar."
+      : portal.consumptionSource === "BATCH_PLANT"
+        ? `Consumo enviado por la ${portal.batchPlant} al cierre del turno.`
+        : `Consumo escrito a mano${portal.consumptionReason ? `: ${portal.consumptionReason}` : "."}`;
+  return (
+    <div className={`notice${portal.consumptionSource === "PENDING" ? " warning" : ""}`} data-testid="run-portal">
+      <strong>Del portal de máquinas</strong> ({portal.portalCode}): {portal.portalUnits != null ? `${formatQuantity(portal.portalUnits)} bloques` : "sin lectura"} en{" "}
+      {portal.cycles ?? 0} ciclos{portal.maintenanceCycles ? `, ${portal.maintenanceCycles} en mantenimiento no cuentan` : ""}
+      {portal.shiftClosed ? " · turno terminado" : " · turno en curso"}
+      {portal.lastCycle ? ` · último ciclo ${portal.lastCycle.slice(11)}` : ""}.
+      <br />
+      <span data-testid="run-portal-consumption">{consumption}</span>
+      {portal.editedBy ? <span> · Cambiado por {portal.editedBy}: el portal ya no lo actualiza.</span> : null}
+    </div>
+  );
+}
+
 function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; lines: RecipeLine[]; locations: Location[]; onDone: () => void }) {
   const run = detail.run;
   const existing = detail.summary?.status === "DRAFT" ? detail.summary : null;
@@ -51,6 +77,9 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
     "/api/v1/companies/{companyId}/manufacturing/record-shift-summary",
     `Resumen del turno de la corrida ${run.runNo} ${existing ? "reemplazado" : "registrado"}; falta que el Gerente de planta lo cierre.`,
   );
+  // MFG2-03 (E-MFG2-8): typing the consumption of a machine whose batch plant is online needs a reason (the server checks it).
+  const online = detail.portal?.source === "PORTAL" && detail.portal.batchPlant != null;
+  const [reason, setReason] = useState("");
   const [form, setForm] = useState(() => ({
     batches: existing ? String(existing.batches) : "",
     goodUnits: existing?.goodUnits ?? "",
@@ -112,7 +141,7 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
         if (!fe.check(found) || batches === null) {
           return;
         }
-        if (await record.run({ plantId: run.plantId, runId: run.runId, batches, goodUnits, mixScrapUnits, freshScrapUnits, consumption: body })) {
+        if (await record.run({ plantId: run.plantId, runId: run.runId, batches, goodUnits, mixScrapUnits, freshScrapUnits, consumption: body, consumptionReason: reason.trim() || null })) {
           onDone();
         }
       }}
@@ -136,6 +165,15 @@ function RecordSummary({ detail, lines, locations, onDone }: { detail: Detail; l
         resumen.
       </p>
       {locations.length === 0 ? <p className="warning">No hay ubicaciones de existencias disponibles para la planta.</p> : null}
+      {online ? (
+        <Field
+          label="Motivo si cambia el consumo"
+          hint={`El consumo lo envía la ${detail.portal?.batchPlant}. Si lo cambia, explique por qué (10 a 300 caracteres); si solo anota los rotos, déjelo vacío.`}
+          wide
+        >
+          <input value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} data-testid="consumption-reason" />
+        </Field>
+      ) : null}
       <LineTable>
         <thead>
           <tr>
@@ -338,6 +376,7 @@ function RunDetail() {
       </dl>
 
       <h2>Resumen del turno</h2>
+      <PortalInfo portal={detail.portal} />
       {summary === null ? (
         <p className="muted" data-testid="summary-status">
           Sin resumen

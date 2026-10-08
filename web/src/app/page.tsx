@@ -207,6 +207,32 @@ const TASKS: readonly Task[] = [
     count: async (companyId) =>
       (await query("/api/v1/companies/{companyId}/sales/receipts", { path: { companyId }, query: { status: "RECORDED", applicationStatus: "UNAPPLIED", limit: COUNT_LIMIT } })).items.length,
   },
+  // MFG2-03 (E-MFG2-7/8): drafts from the machines' portal still without the batch plant's consumption, consumption beyond the
+  // usage tolerance, and the portal's warnings for the plant manager.
+  {
+    href: "/produccion/dia/",
+    label: "Resúmenes del portal sin consumo de dosificadora",
+    permission: "shift_summary:record",
+    countPermission: "production:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/portal", { path: { companyId } })).pendingConsumption,
+  },
+  {
+    href: "/produccion/dia/",
+    label: "Consumo de materia prima fuera de tolerancia",
+    permission: "shift_summary:post",
+    countPermission: "production:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/portal", { path: { companyId } })).outOfTolerance,
+  },
+  {
+    href: "/produccion/portal/",
+    label: "Avisos del portal de máquinas",
+    permission: "portal:manage",
+    countPermission: "production:read",
+    count: async (companyId) => {
+      const portal = await query("/api/v1/companies/{companyId}/manufacturing/portal", { path: { companyId } });
+      return portal.warnings.length + portal.unpairedMachines.length + (portal.lastError ? 1 : 0);
+    },
+  },
   // VS4-04 (E-VS4-04-1/6): e-CF needing attention, rejected ones to resend or void, ranges running out or expiring.
   {
     href: "/fiscal/ecf/?estado=REQUIRES_ACTION",

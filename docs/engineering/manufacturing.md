@@ -151,3 +151,18 @@ E-MFG2-01-7); PROCESO_DIARIO gains `shift_summary:record` and `production_run:ma
   (`REASON_REQUIRED`). `PostShiftSummary` refuses `PENDING` (`CONSUMPTION_PENDING`) and treats `edited_by` like the recorder for
   four eyes. The writing is shared: `ShiftSummaryWriter`.
 - Staging: `PORTAL_URL` (GitHub Environment) and `secrets/portal/core-token` on the server (`staging.md`). 266 commands.
+
+## MFG2-03 — Producción › Portal, the run's portal block, Inicio (E-MFG2-3/7/8, E-MFG2-01-7)
+
+- Commands (`portal:manage`, Gerente de planta): `SetPortalMachine` (portal code, machine, batch plant or none), `SetPortalMould`
+  (finished good), `SetPortalShift` (1–9 → shift), `SetPortalMaterial` (batch plant, code in upper case, raw material, a unit it
+  converts from, a stock location), `RemovePortalPairing` (`MACHINE` / `MOULD` / `SHIFT` / `MATERIAL` `bp/CODE`); every change is a
+  `PortalPairingChanged` event of the company's `PortalPairing` aggregate. 271 commands.
+- `GetPortalSetup` (`production:read`): the pairings, the last good read and failure, the warnings, machines the portal sends that are
+  not paired, PORTAL drafts with PENDING consumption and with batch-plant consumption beyond `usage_tolerance_pct`.
+- `GetProductionRun` carries `portal` (`RunPortalView`): paired, portal code, batch plant, source, consumption source and reason, who
+  changed the draft, the portal's blocks of the run's product, cycles, maintenance cycles, dead minutes, shift ended, last cycle (local).
+- Web: Producción › Portal de máquinas (`/produccion/portal/`); the run page shows «Del portal de máquinas» with the consumption's state
+  and asks a reason when the consumption of an online batch plant is changed; Inicio counts drafts without the batch plant's
+  consumption (Supervisor), consumption beyond tolerance (Gerente), and the portal's warnings (`portal:manage`). Journey:
+  `e2e/portal-journey.spec.ts`.

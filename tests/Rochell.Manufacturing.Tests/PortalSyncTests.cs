@@ -102,6 +102,10 @@ public sealed class PortalSyncTests(PostgresFixture postgres)
         // 1,500 / 150 = 10 batches; theoretical cement 1,800 kg, sand 18 t, admixture 15 l.
         Assert.Equal("PORTAL:PENDING:10:1500:DRAFT:ADITIVO-P=15.000/15.000,ARENA-LAVADA=18.000/18.000,CEMENTO-GU=1800.000/1800.000", pending);
         Assert.Equal(ManufacturingErrors.ConsumptionPending, early.Code);
+        var detail = JsonDocument.Parse(await h.QueryAsync(new Rochell.Manufacturing.Queries.GetProductionRun(h.CompanyId, w.S.Supervisor, run), new Rochell.Manufacturing.Queries.GetProductionRunHandler()))
+            .RootElement.GetProperty("portal");
+        Assert.Equal(("PORTAL", "BATCH_PLANT", "dosificadora2", "1500", true), (detail.GetProperty("source").GetString(), detail.GetProperty("consumptionSource").GetString(),
+            detail.GetProperty("batchPlant").GetString(), detail.GetProperty("portalUnits").GetString(), detail.GetProperty("shiftClosed").GetBoolean()));
         Assert.Equal((2, 1), (second.Posts, second.Written));
         // The latest post: 11 batches, cement 1,850.5 kg, sand 12.5 m³ × 1.47 = 18.375 t, admixture 16 l; theoretical by units unchanged.
         Assert.Equal("PORTAL:BATCH_PLANT:11:1500:DRAFT:ADITIVO-P=16.000/15.000,ARENA-LAVADA=18.375/18.000,CEMENTO-GU=1850.500/1800.000", real);
