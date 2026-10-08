@@ -186,168 +186,42 @@ public sealed class RecordShiftSummaryHandler : ICommandHandler<RecordShiftSumma
 {
     public string CommandType => "Manufacturing.RecordShiftSummary";
 
-    private sealed record RecipeLine(Guid MaterialItemId, decimal QtyPerBatch, string BaseUom);
-
     public async Task<string> HandleAsync(RecordShiftSummary command, CommandContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
-        if (command.Batches <= 0)
-        {
-            throw new DomainException(ManufacturingErrors.QuantityInvalid, "The batches are one or more.");
-        }
-
-        var good = MfgSql.Quantity(command.GoodUnits, "The good units");
-        var mixScrap = command.MixScrapUnits == 0m ? 0m : MfgSql.Quantity(command.MixScrapUnits, "The mix scrap");
-        var freshScrap = command.FreshScrapUnits == 0m ? 0m : MfgSql.Quantity(command.FreshScrapUnits, "The fresh scrap");
         var run = await Runs.LockAsync(context, command.PlantId, command.RunId, cancellationToken).ConfigureAwait(false);
-        if (run.Status != "IN_PROGRESS")
-        {
-            throw new DomainException(ManufacturingErrors.InvalidState, $"The run is {run.Status}.");
-        }
-
-        var recipe = await Reading.ListAsync(
-            context.Connection,
-            context.Transaction,
-            "SELECT l.material_item_id, l.qty_per_batch, i.base_uom FROM mfg.recipe_line l JOIN md.item i ON i.item_id = l.material_item_id WHERE l.recipe_version_id = @r",
-            r => new RecipeLine(r.GetGuid(0), r.GetDecimal(1), r.GetString(2)),
-            cancellationToken,
-            ("r", run.RecipeVersionId)).ConfigureAwait(false);
-        var consumption = command.Consumption ?? [];
-        if (consumption.Select(c => c.MaterialItemId).Distinct().Count() != consumption.Count
-            || !consumption.Select(c => c.MaterialItemId).ToHashSet().SetEquals(recipe.Select(r => r.MaterialItemId)))
-        {
-            throw new DomainException(ManufacturingErrors.MaterialsMismatch, "Record the real consumption of each material of the recipe, once each.");
-        }
-
-        var lines = new List<(Guid Material, Guid Location, decimal Entered, string Uom, decimal Qty, decimal Theoretical)>();
-        foreach (var input in consumption)
-        {
-            var line = recipe.Single(r => r.MaterialItemId == input.MaterialItemId);
-            var entered = MfgSql.Quantity(input.Quantity, "The consumed quantity");
-            if (await MfgSql.ScalarAsync<Guid?>(
-                    context, "SELECT location_id FROM md.location WHERE company_id = @c AND location_id = @l AND plant_id = @p AND NOT is_transit AND NOT is_curing", cancellationToken,
-                    ("c", context.CompanyId), ("l", input.LocationId), ("p", run.PlantId)).ConfigureAwait(false) is null)
-            {
-                throw new DomainException(ManufacturingErrors.LocationInvalid, "Materials are consumed from a stock location of the run's plant.");
-            }
-
-            var uom = (input.Uom ?? string.Empty).Trim();
-            decimal qty;
-            if (uom == line.BaseUom)
-            {
-                qty = entered;
-            }
-            else
-            {
-                var factor = await MfgSql.ScalarAsync<decimal?>(
-                    context,
-                    """
-                    SELECT factor FROM md.uom_conversion
-                    WHERE company_id = @c AND item_id = @i AND from_uom = @u AND to_uom = @b AND effective_from <= @d AND (effective_to IS NULL OR effective_to > @d)
-                    """,
-                    cancellationToken,
-                    ("c", context.CompanyId),
-                    ("i", input.MaterialItemId),
-                    ("u", uom),
-                    ("b", line.BaseUom),
-                    ("d", run.BusinessDate)).ConfigureAwait(false)
-                    ?? throw new DomainException(ManufacturingErrors.UomNotConvertible, $"Unit {uom} is neither the base unit ({line.BaseUom}) nor has a conversion in force for the material.");
-                qty = decimal.Round(entered * factor, 6, MidpointRounding.AwayFromZero);
-                if (qty == 0m)
-                {
-                    throw new DomainException(ManufacturingErrors.QuantityInvalid, "The consumed quantity rounds to zero in the base unit.");
-                }
-            }
-
-            lines.Add((input.MaterialItemId, input.LocationId, entered, uom, qty, line.QtyPerBatch * command.Batches));
-        }
-
         var recorder = await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        var existing = await Runs.LiveSummaryAsync(context, run.RunId, cancellationToken).ConfigureAwait(false);
-        if (existing is { Status: "POSTED" })
+
+        // MFG-2 (E-MFG2-01-2/8, E-MFG2-8): a person's change to a draft the portal prepared stops the portal from replacing it; a typed
+        // consumption for a machine whose batch plant is online needs a reason; the same consumption keeps where it came from.
+        var current = await ShiftSummaryWriter.ProvenanceAsync(context, run.RunId, cancellationToken).ConfigureAwait(false);
+        var provenance = SummaryProvenance.Manual(command.ConsumptionReason);
+        if (current is { Source: "PORTAL" } portal)
         {
-            throw new DomainException(ManufacturingErrors.InvalidState, "The run's summary is already POSTED.");
+            var sameConsumption = await ShiftSummaryWriter.SameConsumptionAsync(context, run.RunId, command.Consumption ?? [], cancellationToken).ConfigureAwait(false);
+            var online = await MfgSql.ScalarAsync<string?>(
+                context, "SELECT batch_plant FROM mfg.portal_machine WHERE company_id = @c AND machine_id = @m", cancellationToken, ("c", context.CompanyId), ("m", run.MachineId))
+                .ConfigureAwait(false) is not null;
+            provenance = sameConsumption
+                ? portal with { EditedBy = recorder }
+                : portal with { EditedBy = recorder, ConsumptionSource = "MANUAL", ConsumptionId = null, ConsumptionReason = Reason(command.ConsumptionReason, online) };
         }
 
-        var summaryId = existing?.SummaryId ?? context.ResultRef;
-        var version = (existing?.Version ?? 0) + 1;
-        var eventId = await context.AppendEventAsync(
-            new EventDraft(
-                "ShiftSummaryRecorded",
-                1,
-                Runs.SummaryAggregate,
-                summaryId,
-                version,
-                JsonSerializer.Serialize(new
-                {
-                    summaryId,
-                    runId = run.RunId,
-                    batches = command.Batches,
-                    goodUnits = Runs.Qty(good),
-                    mixScrapUnits = Runs.Qty(mixScrap),
-                    freshScrapUnits = Runs.Qty(freshScrap),
-                    consumption = lines.Select(l => new { materialItemId = l.Material, locationId = l.Location, quantity = Runs.Qty(l.Entered), uom = l.Uom, baseQuantity = Runs.Qty(l.Qty) }),
-                }),
-                Publish: true,
-                BusinessDate: run.BusinessDate),
-            cancellationToken).ConfigureAwait(false);
-        if (existing is null)
-        {
-            await Sql.ExecuteAsync(
-                context.Connection,
-                context.Transaction,
-                """
-                INSERT INTO mfg.shift_summary (summary_id, company_id, run_id, batches, good_units, mix_scrap_units, fresh_scrap_units, status, recorded_by, version)
-                VALUES (@id, @c, @r, @b, @g, @mix, @fresh, 'DRAFT', @by, 1)
-                """,
-                cancellationToken,
-                ("id", summaryId),
-                ("c", context.CompanyId),
-                ("r", run.RunId),
-                ("b", command.Batches),
-                ("g", good),
-                ("mix", mixScrap),
-                ("fresh", freshScrap),
-                ("by", recorder)).ConfigureAwait(false);
-            await context.AppendStateAsync(Runs.SummaryAggregate, summaryId, "DOCUMENT", null, "DRAFT", CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            await Sql.ExecuteAsync(
-                context.Connection,
-                context.Transaction,
-                "UPDATE mfg.shift_summary SET batches = @b, good_units = @g, mix_scrap_units = @mix, fresh_scrap_units = @fresh, version = @v WHERE summary_id = @id",
-                cancellationToken,
-                ("b", command.Batches),
-                ("g", good),
-                ("mix", mixScrap),
-                ("fresh", freshScrap),
-                ("v", version),
-                ("id", summaryId)).ConfigureAwait(false);
-            await Sql.ExecuteAsync(context.Connection, context.Transaction, "DELETE FROM mfg.material_consumption WHERE summary_id = @id", cancellationToken, ("id", summaryId)).ConfigureAwait(false);
-        }
+        var (summaryId, version, replaced) = await ShiftSummaryWriter.WriteAsync(
+            context, run, command.Batches, command.GoodUnits, command.MixScrapUnits, command.FreshScrapUnits, command.Consumption ?? [], provenance, CommandType, cancellationToken)
+            .ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { summaryId, runId = run.RunId, status = "DRAFT", version, replaced, consumptionSource = provenance.ConsumptionSource });
+    }
 
-        foreach (var (material, location, entered, uom, qty, theoretical) in lines)
+    private static string? Reason(string? reason, bool required)
+    {
+        var text = (reason ?? string.Empty).Trim();
+        return text.Length switch
         {
-            await Sql.ExecuteAsync(
-                context.Connection,
-                context.Transaction,
-                """
-                INSERT INTO mfg.material_consumption (summary_id, company_id, material_item_id, location_id, entered_qty, entered_uom, qty, theoretical_qty)
-                VALUES (@s, @c, @m, @l, @e, @u, @q, @t)
-                """,
-                cancellationToken,
-                ("s", summaryId),
-                ("c", context.CompanyId),
-                ("m", material),
-                ("l", location),
-                ("e", entered),
-                ("u", uom),
-                ("q", qty),
-                ("t", theoretical)).ConfigureAwait(false);
-        }
-
-        return JsonSerializer.Serialize(new { summaryId, runId = run.RunId, status = "DRAFT", version, replaced = existing is not null });
+            0 when !required => null,
+            >= 10 and <= 300 => text,
+            _ => throw new DomainException(ManufacturingErrors.ReasonRequired, "The batch plant sends this machine's consumption: typing it needs a reason of 10 to 300 characters (E-MFG2-8)."),
+        };
     }
 }

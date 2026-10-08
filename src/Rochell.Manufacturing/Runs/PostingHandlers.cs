@@ -35,8 +35,16 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
             throw new DomainException(ManufacturingErrors.VersionConflict, $"The summary changed (version {summary.Version}, expected {command.ExpectedVersion}); reload and retry.");
         }
 
+        // MFG-2 (E-MFG2-8, E-MFG2-01-8): a draft whose consumption still is the recipe's placeholder waits for the batch plant or a typed one.
+        var provenance = await ShiftSummaryWriter.ProvenanceAsync(context, run.RunId, cancellationToken).ConfigureAwait(false);
+        if (provenance is { ConsumptionSource: "PENDING" })
+        {
+            throw new DomainException(
+                ManufacturingErrors.ConsumptionPending, "The summary has no real consumption yet (sin consumo de dosificadora): wait for the batch plant or type it with a reason.");
+        }
+
         var poster = await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
-        if (poster == summary.RecordedBy && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
+        if ((poster == summary.RecordedBy || poster == provenance?.EditedBy) && !await ControlWaiver.WaivedAsync(context, cancellationToken).ConfigureAwait(false))
         {
             throw new DomainException(ManufacturingErrors.FourEyes, "A shift summary is posted by someone other than who recorded it (E-MFG1-03-5).");
         }
