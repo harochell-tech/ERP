@@ -232,7 +232,7 @@ public sealed class EcfIssuingTests(PostgresFixture postgres)
             "SELECT document_type || '|' || file_name || '|' || attachment_name || '|' || attachment_type || '|' || split_part(subject, ' — ', 1) FROM core.mail_message WHERE document_id = @i",
             ("i", invoice)));
         var html = await h.ScalarAsync<string>("SELECT html FROM core.mail_message WHERE document_id = @i", ("i", invoice));
-        Assert.Contains("data:image/png;base64,", html);
+        Assert.Contains("<svg", html); // PRT-01 (E-PRT-01-7): the DGII stamp's QR drawn in the document
         Assert.Contains("E310000000001", html);
     }
 

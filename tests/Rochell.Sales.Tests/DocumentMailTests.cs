@@ -66,7 +66,7 @@ public sealed class DocumentMailTests(PostgresFixture postgres)
         Assert.Equal((DocumentMailErrors.NotSendable, AuthorizationErrors.NotAuthorized, DocumentMailErrors.Disabled), (draft.Code, cobros.Code, off.Code));
         Assert.Equal(("QUOTE", quoteNo, "compras@constructorauno.com.do,obra@constructorauno.com.do", $"Cotización {quoteNo} — {issuer}", $"{quoteNo}.pdf", "QUEUED"),
             (mail.Type, mail.DocumentNo, mail.Recipients, mail.Subject, mail.FileName, mail.Status));
-        Assert.StartsWith($"Estimado cliente:\n\nAdjuntamos la cotización {quoteNo}, válida hasta el {DocumentHtml.Date(ReceiptTests.Today(h).AddDays(30))}.\n\nQuedamos atentos a su orden de compra.\n\nAtentamente,\n", mail.Body, StringComparison.Ordinal);
+        Assert.StartsWith($"Estimado cliente:\n\nAdjuntamos la cotización {quoteNo}, válida hasta el {Rochell.Sales.Printing.PrintText.Date(ReceiptTests.Today(h).AddDays(30))}.\n\nQuedamos atentos a su orden de compra.\n\nAtentamente,\n", mail.Body, StringComparison.Ordinal);
         Assert.EndsWith($"\n{issuer}", mail.Body, StringComparison.Ordinal);
 
         // The print view's content: 1,000 blocks at 50.00 = 50,000.00 + 9,000.00 ITBIS = 59,000.00; the notes, HTML-encoded.
@@ -101,7 +101,7 @@ public sealed class DocumentMailTests(PostgresFixture postgres)
 
         Assert.Equal((DocumentMailErrors.NotSendable, AuthorizationErrors.NotAuthorized, DocumentMailErrors.NotSendable), (notOut.Code, seller.Code, voided.Code));
         Assert.Equal(("DELIVERY", deliveryNo, $"{deliveryNo}.pdf", "DELIVERY"), (note.Type, note.DocumentNo, note.FileName, byBilling.Type));
-        foreach (var expected in new[] { $"<h1>Conduce {deliveryNo}</h1>", "Placa A 123-456", "Pedro Cliente (del cliente)", "Bruto 18,000 kg · tara 8,000 kg · neto 10,000 kg", "<td class=\"num\">200</td>", "Recibido por (nombre, cédula, firma)" })
+        foreach (var expected in new[] { $"<h1>Conduce {deliveryNo}</h1>", "Placa A 123-456", "Pedro Cliente (del cliente)", "Bruto 18,000 kg · tara 8,000 kg · neto <span data-testid=\"conduce-net\">10,000</span> kg", "<td class=\"num\">200</td>", "Recibido por (nombre, cédula, firma)" })
         {
             Assert.Contains(expected, note.Html, StringComparison.Ordinal);
         }
@@ -109,7 +109,7 @@ public sealed class DocumentMailTests(PostgresFixture postgres)
         // PF-000001: 200 blocks at 50.00 = 10,000.00 + 1,800.00 ITBIS = 11,800.00.
         Assert.Equal(("PROFORMA", "PF-000001", "PF-000001.pdf"), (pf.Type, pf.DocumentNo, pf.FileName));
         Assert.Contains($"Adjuntamos la proforma PF-000001, correspondiente al conduce {deliveryNo}; vence el ", pf.Body, StringComparison.Ordinal);
-        foreach (var expected in new[] { "<h1>Proforma PF-000001</h1>", "<td class=\"num\">10,000.00</td>", "<td class=\"num\">1,800.00</td>", "<td class=\"num\">11,800.00</td>", "Sello del suplidor" })
+        foreach (var expected in new[] { "<h1>Proforma <span class=\"mono\" data-testid=\"proforma-no\">PF-000001</span></h1>", ">10,000.00</span></td>", ">1,800.00</span></td>", ">11,800.00</span></td>", "Sello del suplidor" })
         {
             Assert.Contains(expected, pf.Html, StringComparison.Ordinal);
         }
@@ -129,12 +129,12 @@ public sealed class DocumentMailTests(PostgresFixture postgres)
         var aging = await MailAsync(h, (await h.RunAsync(new SendArAgingByEmail(h.CompanyId, w.Cobros, "cxc", w.S.Customer, To), new SendArAgingByEmailHandler())).ResultRef);
 
         Assert.Equal((AuthorizationErrors.NotAuthorized, DocumentMailErrors.NotSendable), (billing.Code, nothing.Code));
-        var day = DocumentHtml.Date(today);
+        var day = Rochell.Sales.Printing.PrintText.Date(today);
         Assert.Equal(("STATEMENT", $"Estado de cuenta al {day} — {await IssuerAsync(h)}", $"estado-de-cuenta-{today:yyyyMMdd}.pdf"), (statement.Type, statement.Subject, statement.FileName));
 
         // The invoice of 5,900.00, then the receipt of 900.00 (unapplied): balance 5,000.00.
         foreach (var expected in new[] { "<h1>Estado de cuenta</h1>", "Saldo inicial", "<td>Factura</td><td class=\"mono\">FA-000001</td><td class=\"num\">5,900.00</td>", "<td>Cobro</td><td class=\"mono\">REC-000001</td>",
-                     "<th colspan=\"3\">Saldo final</th><td class=\"num\">5,900.00</td><td class=\"num\">900.00</td><td class=\"num\">5,000.00</td>" })
+                     "<th colspan=\"3\">Saldo final</th><td class=\"num\">5,900.00</td><td class=\"num\">900.00</td><td class=\"num\"><span data-testid=\"statement-closing\">5,000.00</span></td>" })
         {
             Assert.Contains(expected, statement.Html, StringComparison.Ordinal);
         }

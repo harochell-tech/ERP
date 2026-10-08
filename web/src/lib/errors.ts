@@ -413,6 +413,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   ECF_RESOLUTION_INVALID: "Revise la resolución: el id de Alanube (letras y números) y qué verificó, de 10 a 300 caracteres.",
   PORTAL_PAIRING_INVALID: "Revise la equivalencia: códigos del portal en minúscula, materiales en mayúscula, y el artículo del tipo correcto.",
   DRIVER_PIN_INVALID: "El PIN del chofer son 4 números.",
+  PRINT_TEMPLATE_INVALID: "El formato de impresión tiene un error y no se pudo dibujar el documento. Revise la plantilla.",
   DELIVERY_LINK_INVALID: "Este enlace de entrega no es válido. Pida a Despacho que reimprima el conduce.",
   DRIVER_CONFIRMATION_INVALID: "Revise la confirmación: quién recibió, la foto o firma, y qué fue diferente si lo hubo.",
   CONSUMPTION_PENDING: "El resumen todavía no tiene el consumo real: espere el de la dosificadora o escríbalo con un motivo.",

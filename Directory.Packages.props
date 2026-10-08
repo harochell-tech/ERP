@@ -18,6 +18,8 @@
     <PackageVersion Include="MailKit" Version="4.18.1" />
     <!-- VS4-05 (E-VS4-05-1): the DGII stamp's QR in the PDF of an invoice sent by e-mail (PNG, no System.Drawing). -->
     <PackageVersion Include="QRCoder" Version="1.6.0" />
+    <!-- PRT-01 (E-PRT-01-1): print formats as sandboxed Liquid templates. -->
+    <PackageVersion Include="Fluid.Core" Version="2.40.0" />
     <!-- Analyzers -->
     <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" />
     <!-- Tests -->

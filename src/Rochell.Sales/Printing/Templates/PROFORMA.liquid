@@ -1,0 +1,23 @@
+{%- comment -%} Proforma de una entrega (E-FIS1b-01-13): emisor, cliente, obra, líneas con ITBIS, totales, firma y sello del suplidor. {%- endcomment -%}
+{% if marca_agua %}<div class="watermark" data-testid="watermark" role="note" aria-label="Marca de agua: {{ marca_agua }}"><span>{{ marca_agua }}</span></div>{% endif %}
+<h1>Proforma <span class="mono" data-testid="proforma-no">{{ proforma.numero }}</span></h1>
+<p>Conduce <span class="mono">{{ proforma.conduce }}</span> · pedido <span class="mono">{{ proforma.pedido }}</span> · entregado el {{ proforma.fecha }} · vence el {{ proforma.vence }}</p>
+<dl class="facts">
+  <dt>Suplidor</dt><dd>{{ emisor.nombre }} · RNC <span class="mono">{{ emisor.rnc }}</span></dd>
+  <dt>Cliente</dt><dd>{{ cliente.nombre }} · RNC <span class="mono">{{ cliente.rnc }}</span></dd>
+  {% if proforma.obra %}<dt>Obra</dt><dd>{{ proforma.obra }}</dd>{% endif %}
+</dl>
+<table>
+  <thead><tr><th class="num">#</th><th>Producto</th><th>Unidad</th><th class="num">Cantidad</th><th class="num">Precio (RD$)</th><th class="num">Neto (RD$)</th><th class="num">ITBIS (RD$)</th><th class="num">Total (RD$)</th></tr></thead>
+  <tbody>
+  {% for l in lineas %}
+    <tr><td class="num">{{ l.linea }}</td><td>{{ l.codigo }} — {{ l.descripcion }}</td><td>{{ l.unidad }}</td><td class="num">{{ l.cantidad }}</td><td class="num">{{ l.precio }}</td><td class="num">{{ l.neto }}</td><td class="num">{{ l.itbis }}</td><td class="num">{{ l.total }}</td></tr>
+  {% endfor %}
+    <tr><th colspan="5">Totales (RD$)</th><td class="num"><span data-testid="print-proforma-net">{{ totales.neto }}</span></td><td class="num"><span data-testid="print-proforma-itbis">{{ totales.itbis }}</span></td><td class="num"><span data-testid="print-proforma-total">{{ totales.total }}</span></td></tr>
+  </tbody>
+</table>
+<p class="muted">Documento no fiscal. El ITBIS se calculó con la regla vigente el día de la entrega; el comprobante fiscal se emite cuando la DGII resuelva la exención.</p>
+<div class="signature">
+  <div><div class="signature-line"></div>Firma del suplidor</div>
+  <div><div class="signature-box"></div>Sello del suplidor</div>
+</div>

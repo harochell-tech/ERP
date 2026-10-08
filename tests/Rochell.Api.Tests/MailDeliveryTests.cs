@@ -92,7 +92,7 @@ public sealed class MailDeliveryTests(PostgresFixture postgres, MailFixture mail
             "COT-000001", new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31), "SENT", false, "131925332", "BLOCK ROCHELL SRL", "101010101", "Constructora Uno & Hijos", "PICKUP_AT_PLANT", null, "OC-77",
             "Precios sujetos a disponibilidad", [new(1, "BLOQUE-6", "Bloque de 6 pulgadas", "un", 1000m, 50.00m, 50000.00m, 9000.00m, 59000.00m)], 50000.00m, 9000.00m, 59000.00m);
 
-        var pdf = await new GotenbergPdfRenderer(http, Settings(MailMode.Live)).RenderAsync(Rochell.Sales.Mail.DocumentHtml.Quote(quote), CancellationToken.None);
+        var pdf = await new GotenbergPdfRenderer(http, Settings(MailMode.Live)).RenderAsync(Rochell.Sales.Printing.PrintRenderer.Render(new(Rochell.Sales.Printing.PrintDocuments.BuiltIn("QUOTE"), string.Empty), "Cotización", Rochell.Sales.Printing.PrintDocuments.QuoteModel(quote)).Html, CancellationToken.None);
 
         // One letter page (612 × 792 points) with embedded text: Chromium laid the document out.
         var text = System.Text.Encoding.Latin1.GetString(pdf);

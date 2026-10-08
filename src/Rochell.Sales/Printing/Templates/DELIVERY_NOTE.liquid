@@ -1,0 +1,42 @@
+{%- comment -%} Conduce (E-UX3-7, FLT-01, PRS-05, ENT-1): emisor, cliente, obra, pesada, líneas con lotes, firmas y el QR del chofer. {%- endcomment -%}
+{% if marca_agua %}<div class="watermark" data-testid="watermark" role="note" aria-label="Marca de agua: {{ marca_agua }}"><span>{{ marca_agua }}</span></div>{% endif %}
+<header class="print-head">
+  <div>
+    <strong>{{ emisor.nombre }}</strong>
+    <div>RNC <span class="mono">{{ emisor.rnc }}</span></div>
+    <div>Planta {{ conduce.planta }}</div>
+  </div>
+  <div class="print-number">
+    <h1>Conduce {{ conduce.numero }}</h1>
+    <div>Pedido <span class="mono">{{ conduce.pedido }}</span> del {{ conduce.fecha_pedido }}</div>
+  </div>
+</header>
+<dl class="facts">
+  <dt>Cliente</dt>
+  <dd data-testid="conduce-customer">{{ cliente.nombre }} · RNC <span class="mono">{{ cliente.rnc }}</span></dd>
+  <dt>Entrega</dt>
+  <dd>{{ conduce.termino }}{% if conduce.obra %} · obra: {{ conduce.obra }}{% endif %}</dd>
+  <dt>Planificado el</dt>
+  <dd>{{ conduce.planificado }}</dd>
+  <dt>Salida por portería</dt>
+  <dd data-testid="conduce-gate-out">{{ conduce.salida }}</dd>
+  <dt>Vehículo y chofer</dt>
+  <dd>{% if transporte.ficha %}<strong data-testid="conduce-ficha">Ficha {{ transporte.ficha }} · </strong>{% endif %}{% if transporte.placa %}Placa {{ transporte.placa }}{% else %}—{% endif %}{% if transporte.chofer %} · {{ transporte.chofer }}{% endif %}{% if transporte.del_cliente %} (del cliente){% endif %}</dd>
+  <dt>Pesada</dt>
+  <dd>{% if pesada %}Bruto {{ pesada.bruto }} kg · tara {{ pesada.tara }} kg · neto <span data-testid="conduce-net">{{ pesada.neto }}</span> kg{% if pesada.ticket %} · ticket {{ pesada.ticket }}{% endif %}{% else %}Sin pesar{% endif %}</dd>
+</dl>
+<table>
+  <thead><tr><th class="num">#</th><th>Producto</th><th>Unidad</th><th class="num">Planificado</th><th class="num">Despachado</th><th class="num">Entregado</th><th>Lotes</th></tr></thead>
+  <tbody>
+  {% for l in lineas %}
+    <tr><td class="num">{{ l.linea }}</td><td>{{ l.codigo }} — {{ l.descripcion }}</td><td>{{ l.unidad }}</td><td class="num">{{ l.planificado }}</td><td class="num">{{ l.despachado }}</td><td class="num">{{ l.entregado }}</td><td>{{ l.lotes }}</td></tr>
+    {% if l.flete %}<tr data-testid="conduce-freight:{{ l.linea }}"><td></td><td>{{ l.flete }}</td><td>{{ l.unidad }}</td><td class="num">{{ l.planificado }}</td><td class="num">{{ l.despachado }}</td><td class="num">{{ l.entregado }}</td><td>—</td></tr>{% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+{% if recibido %}<p>Recibido por {{ recibido.nombre }} el {{ recibido.fecha }}.</p>{% endif %}
+<div class="signature">
+  <div><div class="signature-box"></div>Despachado por</div>
+  <div><div class="signature-box"></div>Recibido por (nombre, cédula, firma)</div>
+  {% if qr_chofer %}<div class="driver-qr" data-testid="conduce-driver-qr"><div class="qr" data-testid="driver-qr" data-url="{{ qr_chofer.url }}">{{ qr_chofer.svg | raw }}</div><div>Chofer: escanee para confirmar la entrega</div></div>{% endif %}
+</div>

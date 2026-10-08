@@ -1,0 +1,33 @@
+{%- comment -%} Estado de cuenta (UX4-03 V-19, E-FIS1b-9): movimientos del período, saldo final y proformas abiertas aparte. {%- endcomment -%}
+<div class="print-head"><div><h1>Estado de cuenta</h1><p>Del {{ periodo.desde }} al {{ periodo.hasta }} · emitido el {{ periodo.emitido }}</p></div></div>
+<dl class="facts">
+  <dt>Emisor</dt><dd>{{ emisor.nombre }}</dd>
+  <dt>Cliente</dt><dd data-testid="print-statement-customer">{{ cliente.nombre }}{% if cliente.rnc %} · RNC <span class="mono">{{ cliente.rnc }}</span>{% endif %}</dd>
+  <dt>Saldo al {{ periodo.hasta }}</dt><dd><strong><span class="mono">RD$ <span data-testid="print-statement-closing">{{ saldos.final }}</span></span></strong></dd>
+</dl>
+<table>
+  <thead><tr><th>Fecha</th><th>Tipo</th><th>Documento</th><th class="num">Débito (RD$)</th><th class="num">Crédito (RD$)</th><th class="num">Saldo (RD$)</th></tr></thead>
+  <tbody>
+    <tr><td>{{ periodo.desde }}</td><td colspan="4">Saldo inicial</td><td class="num">{{ saldos.inicial }}</td></tr>
+  {% for m in movimientos %}
+    <tr><td>{{ m.fecha }}</td><td>{{ m.tipo }}</td><td class="mono">{{ m.documento }}</td><td class="num">{{ m.debito }}</td><td class="num">{{ m.credito }}</td><td class="num">{{ m.saldo }}</td></tr>
+  {% endfor %}
+    <tr><th colspan="3">Saldo final</th><td class="num">{{ saldos.debitos }}</td><td class="num">{{ saldos.creditos }}</td><td class="num"><span data-testid="statement-closing">{{ saldos.final }}</span></td></tr>
+  </tbody>
+</table>
+{% if proformas.size > 0 %}
+<section data-testid="statement-proformas">
+  <h2>Proformas abiertas</h2>
+  <p class="muted">Entregas que esperan su comprobante fiscal. No forman parte del saldo de arriba; se cobran contra la proforma.</p>
+  <table>
+    <thead><tr><th>Proforma</th><th>Conduce</th><th>Fecha</th><th>Vence</th><th class="num">Total (RD$)</th><th class="num">Cobrado (RD$)</th><th class="num">Saldo (RD$)</th><th class="num">Depósito ITBIS (RD$)</th></tr></thead>
+    <tbody>
+    {% for f in proformas %}
+      <tr><td class="mono">{{ f.numero }}</td><td class="mono">{{ f.conduce }}</td><td>{{ f.fecha }}</td><td>{{ f.vence }}</td><td class="num">{{ f.total }}</td><td class="num">{{ f.cobrado }}</td><td class="num">{{ f.saldo }}</td><td class="num">{{ f.deposito }}</td></tr>
+    {% endfor %}
+      <tr><th colspan="6">Saldo en proformas</th><td class="num"><span data-testid="statement-proforma-balance">{{ saldos.proformas }}</span></td><td></td></tr>
+    </tbody>
+  </table>
+</section>
+{% endif %}
+<p class="muted">Si encuentra alguna diferencia, comuníquese con nuestro departamento de cobros. Documento no fiscal.</p>

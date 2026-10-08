@@ -77,7 +77,7 @@ public static class QueryEndpoints
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler), typeof(ListDeliveryZonesHandler),
         typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(GetPortalSetupHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
-        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler), typeof(GetDriverEvidenceHandler), typeof(GetDriverDeliveryHandler),
+        typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler), typeof(GetDriverEvidenceHandler), typeof(GetDriverDeliveryHandler), typeof(Rochell.Sales.Printing.GetPrintDocumentHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
@@ -368,6 +368,11 @@ public static class QueryEndpoints
         sales.MapGet("/deliveries/{deliveryId:guid}/print", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryPrintHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDeliveryPrint(companyId, s, deliveryId), handler, ct))
             .Describe<DeliveryPrint>(nameof(GetDeliveryPrint), notFound: true);
+        // PRT-01 (E-PRT-01-2): every document as it prints, drawn by the server with the company's format; the address the screen was opened at
+        // goes in for the driver's QR.
+        sales.MapGet("/print/{documentType}/{id:guid}", (HttpContext http, Guid companyId, string documentType, Guid id, DateOnly? from, DateOnly? to, Rochell.Sales.Printing.GetPrintDocumentHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Sales.Printing.GetPrintDocument(companyId, s, documentType, id, from, to, $"{http.Request.Scheme}://{http.Request.Host}"), handler, ct))
+            .Describe<Rochell.Sales.Printing.PrintedDocument>(nameof(Rochell.Sales.Printing.GetPrintDocument), notFound: true);
         // ENT1-02 (E-ENT-5): the driver's photo or signature; and the drivers' page view, for the service identity (the page itself uses /api/v1/public/deliveries).
         sales.MapGet("/deliveries/{deliveryId:guid}/driver-evidence", (HttpContext http, Guid companyId, Guid deliveryId, GetDriverEvidenceHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDriverEvidence(companyId, s, deliveryId), handler, ct))
