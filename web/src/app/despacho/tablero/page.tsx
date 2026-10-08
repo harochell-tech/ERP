@@ -5,7 +5,7 @@ import { query } from "@/api/client";
 import { EmptyState, LoadingIndicator } from "@/components/StateNotices";
 import { NoPermission, StatusBadge } from "@/components/ui";
 import { formatQuantity } from "@/lib/decimal";
-import { DELIVERY_TERMS, formatDate, formatDateTime } from "@/lib/labels";
+import { DELIVERY_TERMS, formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labels";
 import { BOARD_COLUMNS } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useLoad } from "@/lib/useQuery";
@@ -22,7 +22,8 @@ export default function Page() {
     can("sales:read")
       ? async () => {
           // CF1-05 (E-CF1-05-14): a cash sale paid with money that counts is planned without waiting for «Verificar pago».
-          const [paidCash, confirmed, partial, ...columns] = await Promise.all([
+          const [driverToday, paidCash, confirmed, partial, ...columns] = await Promise.all([
+            query("/api/v1/companies/{companyId}/sales/deliveries", { path: { companyId }, query: { driverConfirmedOn: todayInDominicanRepublic(), limit: 200 } }),
             query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "PENDING_PAYMENT", cashSale: "true", limit: 200 } }),
             query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "CONFIRMED", limit: 200 } }),
             query("/api/v1/companies/{companyId}/sales/orders", { path: { companyId }, query: { status: "PARTIALLY_DELIVERED", limit: 200 } }),
@@ -33,6 +34,7 @@ export default function Page() {
           return {
             orders: orders.map((o, i) => ({ ...o, detail: details[i] })).filter((o) => o.status !== "PENDING_PAYMENT" || o.detail?.cashSale?.covered === true),
             columns: columns.map((c) => c.items),
+            driverToday: driverToday.items,
           };
         }
       : null,
@@ -144,6 +146,39 @@ export default function Page() {
           </section>
         );
       })}
+      {data.driverToday.length > 0 ? (
+        <section data-testid="board-driver-today">
+          <h2>Confirmadas por el chofer hoy ({data.driverToday.length})</h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Conduce</th>
+                  <th>Cliente</th>
+                  <th>Chofer</th>
+                  <th>Recibió</th>
+                  <th>Hora</th>
+                  <th>Resultado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.driverToday.map((d) => (
+                  <tr key={d.deliveryId}>
+                    <td className="mono">
+                      <Link href={`/despacho/conduce/?id=${d.deliveryId}`}>{d.deliveryNo}</Link>
+                    </td>
+                    <td className="wrap">{d.customerName}</td>
+                    <td className="wrap">{d.driverName ?? "—"}</td>
+                    <td className="wrap">{d.driverReceiver ?? "—"}</td>
+                    <td>{d.driverConfirmedAt ? formatDateTime(d.driverConfirmedAt) : "—"}</td>
+                    <td>{d.driverOutcome === "DIFFERENCES" ? (d.status === "IN_TRANSIT" ? "Con diferencias: falta completar" : "Con diferencias") : "Completa"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
       {empty.length > 0 ? (
         <p className="muted" data-testid="board-empty-columns">
           Sin conduces {empty.length === BOARD_COLUMNS.length ? "en curso" : `en: ${empty.join(", ").toLowerCase()}`}.

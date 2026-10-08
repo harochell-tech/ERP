@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Rochell.Identity;
 using Rochell.Platform.Commands;
@@ -69,6 +70,17 @@ public sealed class DriverConfirmationTests(PostgresFixture postgres)
         Assert.Equal("19650.00", await DeliveryTests.Balance(h, t.S, "COGS"));
         // E-ENT1-01-6: a phone two minutes ahead is within bounds: its time is the confirmation's (the POD never lies in the future).
         Assert.Equal(1L, await h.ScalarAsync<long>("SELECT count(*) FROM log.driver_confirmation WHERE delivery_id = @d AND confirmed_at = phone_at AND phone_at > server_at", ("d", t.Delivery)));
+
+        // ENT1-04: the dispatch board lists the day's driver confirmations with their outcome and receiver.
+        var day = DateOnly.Parse((await h.ScalarAsync<string>(
+            "SELECT (confirmed_at AT TIME ZONE 'America/Santo_Domingo')::date::text FROM log.driver_confirmation WHERE delivery_id = @d", ("d", t.Delivery)))!, CultureInfo.InvariantCulture);
+        var confirmed = JsonDocument.Parse(await h.QueryAsync(
+            new Rochell.Sales.Queries.ListDeliveries(h.CompanyId, t.S.Dispatch, DriverConfirmedOn: day), new Rochell.Sales.Queries.ListDeliveriesHandler())).RootElement.GetProperty("items");
+        var otherDay = JsonDocument.Parse(await h.QueryAsync(
+            new Rochell.Sales.Queries.ListDeliveries(h.CompanyId, t.S.Dispatch, DriverConfirmedOn: day.AddDays(1)), new Rochell.Sales.Queries.ListDeliveriesHandler())).RootElement.GetProperty("items");
+        Assert.Equal(1, confirmed.GetArrayLength());
+        Assert.Equal(("FULL", "Ing. María Gómez"), (confirmed[0].GetProperty("driverOutcome").GetString(), confirmed[0].GetProperty("driverReceiver").GetString()));
+        Assert.Equal(0, otherDay.GetArrayLength());
     }
 
     [Fact]

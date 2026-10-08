@@ -370,8 +370,8 @@ public static class QueryEndpoints
         sales.MapGet("/customers/{partyId:guid}/statement", (HttpContext http, Guid companyId, Guid partyId, DateOnly from, DateOnly to, string? format, GetCustomerStatementHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunReportAsync(http, format, s => new GetCustomerStatement(companyId, s, partyId, from, to), handler, ArCsv.Statement, $"estado-de-cuenta-{from:yyyyMMdd}-{to:yyyyMMdd}.csv", ct))
             .Describe<CustomerStatement>(nameof(GetCustomerStatement), notFound: true).Csv<CustomerStatement>();
-        sales.MapGet("/deliveries", (HttpContext http, Guid companyId, string? status, Guid? salesOrderId, int? limit, int? offset, Guid? partyId, DateOnly? from, DateOnly? to, Guid? vehicleId, Guid? driverId, bool? driverReportedDifferences, ListDeliveriesHandler handler, QueryRunner runner, CancellationToken ct)
-                => runner.RunAsync(http, s => new ListDeliveries(companyId, s, status, salesOrderId, limit ?? DefaultLimit, offset ?? 0, partyId, from, to, vehicleId, driverId, driverReportedDifferences ?? false), handler, ct))
+        sales.MapGet("/deliveries", (HttpContext http, Guid companyId, string? status, Guid? salesOrderId, int? limit, int? offset, Guid? partyId, DateOnly? from, DateOnly? to, Guid? vehicleId, Guid? driverId, bool? driverReportedDifferences, DateOnly? driverConfirmedOn, ListDeliveriesHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListDeliveries(companyId, s, status, salesOrderId, limit ?? DefaultLimit, offset ?? 0, partyId, from, to, vehicleId, driverId, driverReportedDifferences ?? false, driverConfirmedOn), handler, ct))
             .Describe<DeliveryList>(nameof(ListDeliveries));
         sales.MapGet("/deliveries/{deliveryId:guid}", (HttpContext http, Guid companyId, Guid deliveryId, GetDeliveryHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetDelivery(companyId, s, deliveryId), handler, ct))

@@ -284,3 +284,10 @@ Migration 0101:
   is checked first, then the photo goes to the store under `entregas/<company>/<delivery>/<id>.jpg|png`, then the confirmation).
 - Evidence store `IEvidenceStore` (Platform): `S3EvidenceStore` (private B2 bucket, own key files) or `FileSystemEvidenceStore`
   (Development / Test). 275 commands. Staging steps: `staging.md` › Drivers' page.
+
+## ENT1-04 — the day's driver confirmations on the dispatch board
+
+`ListDeliveries` returns each delivery's latest driver confirmation (`driverOutcome` FULL / DIFFERENCES, `driverReceiver`,
+`driverConfirmedAt`) and filters by `driverConfirmedOn` (the confirmation's date in America/Santo_Domingo). Tablero de despacho shows
+«Confirmadas por el chofer hoy» so Dispatch reviews them together; a delivery with differences still in transit reads «falta
+completar». No schema change.

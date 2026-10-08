@@ -9174,6 +9174,10 @@ export interface components {
             version: number;
             fleetCode: null | string;
             driverName: null | string;
+            driverOutcome?: null | string;
+            driverReceiver?: null | string;
+            /** Format: date-time */
+            driverConfirmedAt?: null | string;
         };
         DeliveryZoneList: {
             items: components["schemas"]["DeliveryZoneView"][];
@@ -40795,6 +40799,7 @@ export interface operations {
                 vehicleId?: string;
                 driverId?: string;
                 driverReportedDifferences?: boolean;
+                driverConfirmedOn?: string;
             };
             header?: never;
             path: {
