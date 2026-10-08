@@ -1,18 +1,19 @@
 {%- comment -%} Estado de cuenta (UX4-03 V-19, E-FIS1b-9): movimientos del período, saldo final y proformas abiertas aparte. {%- endcomment -%}
+{% if marca_agua %}<div class="watermark" data-testid="watermark" role="note" aria-label="Marca de agua: {{ marca_agua }}"><span>{{ marca_agua }}</span></div>{% endif %}
+{% if logo %}<img class="logo" src="{{ logo.src }}" alt="{{ emisor.nombre }}">{% endif %}
+{% if formato.textos.encabezado %}<p class="texto-encabezado">{{ formato.textos.encabezado }}</p>{% endif %}
 <div class="print-head"><div><h1>Estado de cuenta</h1><p>Del {{ periodo.desde }} al {{ periodo.hasta }} · emitido el {{ periodo.emitido }}</p></div></div>
 <dl class="facts">
   <dt>Emisor</dt><dd>{{ emisor.nombre }}</dd>
   <dt>Cliente</dt><dd data-testid="print-statement-customer">{{ cliente.nombre }}{% if cliente.rnc %} · RNC <span class="mono">{{ cliente.rnc }}</span>{% endif %}</dd>
   <dt>Saldo al {{ periodo.hasta }}</dt><dd><strong><span class="mono">RD$ <span data-testid="print-statement-closing">{{ saldos.final }}</span></span></strong></dd>
 </dl>
-<table>
-  <thead><tr><th>Fecha</th><th>Tipo</th><th>Documento</th><th class="num">Débito (RD$)</th><th class="num">Crédito (RD$)</th><th class="num">Saldo (RD$)</th></tr></thead>
+<table class="lineas">
+  <thead><tr>{% for c in formato.columnas %}<th class="{{ c.clase }}" style="{{ c.estilo }}">{{ c.titulo }}</th>{% endfor %}</tr></thead>
   <tbody>
-    <tr><td>{{ periodo.desde }}</td><td colspan="4">Saldo inicial</td><td class="num">{{ saldos.inicial }}</td></tr>
-  {% for m in movimientos %}
-    <tr><td>{{ m.fecha }}</td><td>{{ m.tipo }}</td><td class="mono">{{ m.documento }}</td><td class="num">{{ m.debito }}</td><td class="num">{{ m.credito }}</td><td class="num">{{ m.saldo }}</td></tr>
+  {% for l in lineas %}<tr>{% for c in formato.columnas %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{{ l[c.clave] }}</td>{% endfor %}</tr>
   {% endfor %}
-    <tr><th colspan="3">Saldo final</th><td class="num">{{ saldos.debitos }}</td><td class="num">{{ saldos.creditos }}</td><td class="num"><span data-testid="statement-closing">{{ saldos.final }}</span></td></tr>
+  <tr class="totales">{% for c in formato.columnas %}{% assign t = totales_fila[c.clave] %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{% if forloop.first %}<strong>{{ totales_etiqueta }}</strong>{% elsif t %}<strong><span data-testid="{{ t.testid }}">{{ t.valor }}</span></strong>{% endif %}</td>{% endfor %}</tr>
   </tbody>
 </table>
 {% if proformas.size > 0 %}
@@ -31,3 +32,5 @@
 </section>
 {% endif %}
 <p class="muted">Si encuentra alguna diferencia, comuníquese con nuestro departamento de cobros. Documento no fiscal.</p>
+{% if formato.textos.cuentas %}<p class="texto-cuentas"><strong>Cuentas para pagos:</strong> {{ formato.textos.cuentas }}</p>{% endif %}
+{% if formato.textos.pie %}<p class="texto-pie muted">{{ formato.textos.pie }}</p>{% endif %}

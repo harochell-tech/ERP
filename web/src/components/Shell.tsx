@@ -162,6 +162,7 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/configuracion/", label: "Centro de configuración", permission: "configuration:read" },
       { href: "/configuracion/empresa/", label: "Empresa", permission: "configuration:read" },
+      { href: "/configuracion/formatos/", label: "Formatos de impresión", permission: "configuration:read" }, // PRT-02
       { href: "/maestros/plantas/", label: "Plantas y ubicaciones", permission: "master_data:read" },
       { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
       { href: "/contabilidad/estructuras/", label: "Estructuras de reporte", permission: "configuration:read" },

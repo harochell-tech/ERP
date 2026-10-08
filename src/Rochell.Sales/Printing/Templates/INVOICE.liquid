@@ -1,5 +1,7 @@
 {%- comment -%} Factura (E-VS4-04-4, E-ENT-9): emisor, cliente, líneas, totales, timbre del e-CF con su QR y los QR del chofer de las entregas en tránsito. {%- endcomment -%}
 {% if marca_agua %}<div class="watermark" data-testid="watermark" role="note" aria-label="Marca de agua: {{ marca_agua }}"><span>{{ marca_agua }}</span></div>{% endif %}
+{% if logo %}<img class="logo" src="{{ logo.src }}" alt="{{ emisor.nombre }}">{% endif %}
+{% if formato.textos.encabezado %}<p class="texto-encabezado">{{ formato.textos.encabezado }}</p>{% endif %}
 <header class="print-head">
   <div>
     <strong>{{ emisor.nombre }}</strong>
@@ -20,18 +22,19 @@
   <dd>{{ cliente.nombre }}{% if cliente.rnc %} · RNC / cédula <span class="mono">{{ cliente.rnc }}</span>{% endif %}{% if cliente.pasaporte %} · pasaporte {{ cliente.pasaporte }}{% endif %}</dd>
   {% if exencion %}<dt>Exención</dt><dd>{{ exencion.regimen }} certificación {{ exencion.certificado }} · {{ exencion.proyecto }}</dd>{% endif %}
 </dl>
-<table>
-  <thead><tr><th class="num">#</th><th>Descripción</th><th>Unidad</th><th class="num">Cantidad</th><th class="num">Precio (RD$)</th><th class="num">ITBIS (RD$)</th><th class="num">Importe (RD$)</th></tr></thead>
+<table class="lineas">
+  <thead><tr>{% for c in formato.columnas %}<th class="{{ c.clase }}" style="{{ c.estilo }}">{{ c.titulo }}</th>{% endfor %}</tr></thead>
   <tbody>
-  {% for l in lineas %}
-    <tr><td class="num">{{ l.linea }}</td><td>{{ l.codigo }} — {{ l.descripcion }}<span class="muted"> · conduce {{ l.conduce }}</span></td><td>{{ l.unidad }}</td><td class="num">{{ l.cantidad }}</td><td class="num">{{ l.precio }}</td><td class="num">{{ l.itbis }}</td><td class="num">{{ l.importe }}</td></tr>
+  {% for l in lineas %}<tr>{% for c in formato.columnas %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{% if c.clave == "descripcion" %}{{ l.descripcion }}<span class="muted"> · conduce {{ l.conduce }}</span>{% else %}{{ l[c.clave] }}{% endif %}</td>{% endfor %}</tr>
   {% endfor %}
   </tbody>
   <tfoot>
-    <tr><th colspan="6" class="num">Subtotal</th><td class="num">{{ totales.neto }}</td></tr>
-    <tr><th colspan="6" class="num">ITBIS</th><td class="num">{{ totales.itbis }}</td></tr>
-    <tr><th colspan="6" class="num">Total</th><td class="num"><strong>RD$ <span data-testid="print-total">{{ totales.total }}</span></strong></td></tr>
+    <tr><th colspan="{{ formato.colspan_totales }}" class="num">Subtotal</th><td class="num">{{ totales.neto }}</td></tr>
+    <tr><th colspan="{{ formato.colspan_totales }}" class="num">ITBIS</th><td class="num">{{ totales.itbis }}</td></tr>
+    <tr><th colspan="{{ formato.colspan_totales }}" class="num">Total</th><td class="num"><strong>RD$ <span data-testid="print-total">{{ totales.total }}</span></strong></td></tr>
   </tfoot>
 </table>
 {% if ecf %}<div class="ecf-print" data-testid="print-ecf"><div class="qr" data-testid="ecf-qr">{{ ecf.qr | raw }}</div><div><div>Código de seguridad: <span class="mono">{{ ecf.codigo_seguridad }}</span></div><div>Fecha de firma digital: {{ ecf.fecha_firma }}</div></div></div>{% endif %}
 {% if qrs_chofer.size > 0 %}<div class="driver-qrs">{% for q in qrs_chofer %}<div class="driver-qr" data-testid="invoice-driver-qr"><div class="qr" data-url="{{ q.url }}">{{ q.svg | raw }}</div><div>Conduce {{ q.conduce }}: chofer, escanee para confirmar la entrega</div></div>{% endfor %}</div>{% endif %}
+{% if formato.textos.cuentas %}<p class="texto-cuentas"><strong>Cuentas para pagos:</strong> {{ formato.textos.cuentas }}</p>{% endif %}
+{% if formato.textos.pie %}<p class="texto-pie muted">{{ formato.textos.pie }}</p>{% endif %}

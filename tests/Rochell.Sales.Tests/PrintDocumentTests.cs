@@ -60,7 +60,7 @@ public sealed class PrintDocumentTests(PostgresFixture postgres)
             $$$"""
             INSERT INTO md.print_format (company_id, document_type, version, status, body, css, created_by, created_at, activated_by, activated_at)
             VALUES ('{{{h.CompanyId}}}', 'DELIVERY_NOTE', 1, 'RETIRED', '<p>vieja</p>', '', '{{{h.UserId}}}', now(), '{{{h.UserId}}}', now()),
-                   ('{{{h.CompanyId}}}', 'DELIVERY_NOTE', 2, 'ACTIVE', '<h1>CONDUCE {{ conduce.numero }}</h1>{% for l in lineas %}<p>{{ l.codigo }}={{ l.despachado }}</p>{% endfor %}', '.doc h1{color:red}', '{{{h.UserId}}}', now(), '{{{h.UserId}}}', now()),
+                   ('{{{h.CompanyId}}}', 'DELIVERY_NOTE', 2, 'ACTIVE', '<h1>CONDUCE {{ conduce.numero }}</h1>{% for l in lineas %}<p>{{ l.unidad }}={{ l.despachado }}</p>{% endfor %}', '.doc h1{color:red}', '{{{h.UserId}}}', now(), '{{{h.UserId}}}', now()),
                    ('{{{h.CompanyId}}}', 'DELIVERY_NOTE', 3, 'DRAFT', '<p>borrador</p>', '', '{{{h.UserId}}}', now(), NULL, NULL);
             """);
 
@@ -68,7 +68,7 @@ public sealed class PrintDocumentTests(PostgresFixture postgres)
         var no = await h.ScalarAsync<string>("SELECT delivery_no FROM log.delivery WHERE delivery_id = @d", ("d", delivery));
 
         Assert.Equal(2, printed.GetProperty("formatVersion").GetInt32());
-        Assert.Equal($"<h1>CONDUCE {no}</h1><p>BLOQUE-6=100</p>", printed.GetProperty("body").GetString());
+        Assert.Equal($"<h1>CONDUCE {no}</h1><p>un=100</p>", printed.GetProperty("body").GetString());
         Assert.Contains(".doc h1{color:red}", printed.GetProperty("css").GetString(), StringComparison.Ordinal);
     }
 }

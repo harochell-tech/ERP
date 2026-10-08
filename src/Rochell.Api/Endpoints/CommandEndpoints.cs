@@ -307,6 +307,10 @@ public static class CommandEndpoints
         sales.MapCommand<RecordGateOut, RecordGateOutHandler>();
         sales.MapCommand<RecordPod, RecordPodHandler>();
         sales.MapCommand<SetDriverPin, SetDriverPinHandler>(); // ENT1-02 (E-ENT-2, E-ENT1-01-1)
+        sales.MapCommand<Rochell.Sales.Printing.SavePrintFormatDraft, Rochell.Sales.Printing.SavePrintFormatDraftHandler>(); // PRT-02 (E-PRT-02-1…7)
+        sales.MapCommand<Rochell.Sales.Printing.ActivatePrintFormat, Rochell.Sales.Printing.ActivatePrintFormatHandler>();
+        sales.MapCommand<Rochell.Sales.Printing.RestorePrintFormat, Rochell.Sales.Printing.RestorePrintFormatHandler>();
+        sales.MapCommand<Rochell.Sales.Printing.SetCompanyLogo, Rochell.Sales.Printing.SetCompanyLogoHandler>();
         sales.MapCommand<ReopenDeliveryLink, ReopenDeliveryLinkHandler>();
         sales.MapCommand<VerifyDriverPin, VerifyDriverPinHandler>(); // the service identity's; the drivers' page uses /api/v1/public/deliveries
         sales.MapCommand<ConfirmDeliveryByDriver, ConfirmDeliveryByDriverHandler>();
@@ -432,7 +436,8 @@ public static class CommandEndpoints
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),
         typeof(CreateQuoteHandler), typeof(UpdateDraftQuoteHandler), typeof(SubmitQuoteForApprovalHandler), typeof(ApproveQuotePricesHandler), typeof(ReturnQuoteToDraftHandler),
         typeof(SendQuoteHandler), typeof(MarkQuoteLostHandler), typeof(CancelQuoteHandler), typeof(CopyQuoteHandler), typeof(ConvertQuoteHandler),
-        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(SetDriverPinHandler), typeof(ReopenDeliveryLinkHandler), typeof(VerifyDriverPinHandler),
+        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(SetDriverPinHandler), typeof(Rochell.Sales.Printing.SavePrintFormatDraftHandler), typeof(Rochell.Sales.Printing.ActivatePrintFormatHandler),
+        typeof(Rochell.Sales.Printing.RestorePrintFormatHandler), typeof(Rochell.Sales.Printing.SetCompanyLogoHandler), typeof(ReopenDeliveryLinkHandler), typeof(VerifyDriverPinHandler),
         typeof(ConfirmDeliveryByDriverHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(CreateInvoiceFromProformasHandler), typeof(VoidProformaHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
         typeof(ResendInvoiceEcfHandler), typeof(ResendCreditNoteEcfHandler),

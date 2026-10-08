@@ -21,6 +21,16 @@ public sealed record RenderedDocument(string Title, string Html, string Css, str
 public static class PrintErrors
 {
     public const string TemplateInvalid = "PRINT_TEMPLATE_INVALID";
+
+    /// <summary>E-PRT-02-3: a template with scripts, event attributes, javascript: links or external files.</summary>
+    public const string TemplateUnsafe = "PRINT_TEMPLATE_UNSAFE";
+
+    public const string SettingsInvalid = "PRINT_SETTINGS_INVALID";
+
+    /// <summary>E-PRT-5, E-PRT-02-6: the test document lacks what the law or ENT-1 require.</summary>
+    public const string MandatoryMissing = "PRINT_MANDATORY_MISSING";
+
+    public const string LogoInvalid = "PRINT_LOGO_INVALID";
 }
 
 /// <summary>

@@ -1,18 +1,19 @@
 {%- comment -%} Facturas pendientes de un cliente por antigüedad (E-VS3-09-1, E-FIS1b-3). {%- endcomment -%}
+{% if marca_agua %}<div class="watermark" data-testid="watermark" role="note" aria-label="Marca de agua: {{ marca_agua }}"><span>{{ marca_agua }}</span></div>{% endif %}
+{% if logo %}<img class="logo" src="{{ logo.src }}" alt="{{ emisor.nombre }}">{% endif %}
+{% if formato.textos.encabezado %}<p class="texto-encabezado">{{ formato.textos.encabezado }}</p>{% endif %}
 <div class="print-head"><div><h1>Facturas pendientes</h1><p>Al {{ corte }}</p></div></div>
 <dl class="facts">
   <dt>Emisor</dt><dd>{{ emisor.nombre }} · RNC <span class="mono">{{ emisor.rnc }}</span></dd>
   <dt>Cliente</dt><dd>{{ cliente.nombre }}</dd>
 </dl>
-<table>
-  <thead><tr><th>Factura</th><th>e-NCF</th><th>Fecha</th><th>Vence</th><th class="num">Días vencida</th><th class="num">Pendiente (RD$)</th></tr></thead>
+<table class="lineas">
+  <thead><tr>{% for c in formato.columnas %}<th class="{{ c.clase }}" style="{{ c.estilo }}">{{ c.titulo }}</th>{% endfor %}</tr></thead>
   <tbody>
-  {% for d in facturas %}
-    <tr><td class="mono">{{ d.numero }}</td><td class="mono">{{ d.encf }}</td><td>{{ d.fecha }}</td><td>{{ d.vence }}</td><td class="num">{{ d.dias }}</td><td class="num">{{ d.pendiente }}</td></tr>
-  {% else %}
-    <tr><td colspan="6">Sin facturas pendientes.</td></tr>
+  {% for l in lineas %}<tr>{% for c in formato.columnas %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{{ l[c.clave] }}</td>{% endfor %}</tr>
+  {% else %}<tr><td colspan="{{ formato.columnas.size }}">Sin facturas pendientes.</td></tr>
   {% endfor %}
-    <tr><th colspan="5">Total pendiente</th><td class="num">{{ totales.pendiente }}</td></tr>
+  <tr class="totales">{% for c in formato.columnas %}{% assign t = totales_fila[c.clave] %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{% if forloop.first %}<strong>{{ totales_etiqueta }}</strong>{% elsif t %}<strong><span data-testid="{{ t.testid }}">{{ t.valor }}</span></strong>{% endif %}</td>{% endfor %}</tr>
   </tbody>
 </table>
 <table>
@@ -33,3 +34,5 @@
 </table>
 {% endif %}
 <p class="muted">Si ya realizó el pago, comuníquese con nuestro departamento de cobros con el comprobante.</p>
+{% if formato.textos.cuentas %}<p class="texto-cuentas"><strong>Cuentas para pagos:</strong> {{ formato.textos.cuentas }}</p>{% endif %}
+{% if formato.textos.pie %}<p class="texto-pie muted">{{ formato.textos.pie }}</p>{% endif %}

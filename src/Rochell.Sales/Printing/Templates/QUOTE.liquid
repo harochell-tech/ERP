@@ -1,5 +1,7 @@
 {%- comment -%} Cotización (E-QUO1-04-5, E-UX3-10): emisor, cliente, líneas con ITBIS informativo, totales, validez y condiciones. {%- endcomment -%}
 {% if marca_agua %}<div class="watermark" data-testid="watermark" role="note" aria-label="Marca de agua: {{ marca_agua }}"><span>{{ marca_agua }}</span></div>{% endif %}
+{% if logo %}<img class="logo" src="{{ logo.src }}" alt="{{ emisor.nombre }}">{% endif %}
+{% if formato.textos.encabezado %}<p class="texto-encabezado">{{ formato.textos.encabezado }}</p>{% endif %}
 <h1>Cotización {{ cotizacion.numero }}</h1>
 <p>Emitida el {{ cotizacion.fecha }} · <strong data-testid="print-valid-until">válida hasta el {{ cotizacion.valida_hasta }}</strong></p>
 <dl class="facts">
@@ -8,19 +10,20 @@
   {% if cotizacion.referencia %}<dt>Su referencia</dt><dd>{{ cotizacion.referencia }}</dd>{% endif %}
   <dt>Entrega</dt><dd>{{ cotizacion.termino }}{% if cotizacion.obra %} · obra: {{ cotizacion.obra }}{% endif %}</dd>
 </dl>
-<table>
-  <thead><tr><th class="num">#</th><th>Producto</th><th>Unidad</th><th class="num">Cantidad</th><th class="num">Precio (RD$)</th><th class="num">Neto (RD$)</th><th class="num">ITBIS (RD$)</th><th class="num">Total (RD$)</th></tr></thead>
+<table class="lineas">
+  <thead><tr>{% for c in formato.columnas %}<th class="{{ c.clase }}" style="{{ c.estilo }}">{{ c.titulo }}</th>{% endfor %}</tr></thead>
   <tbody>
-  {% for l in lineas %}
-    <tr><td class="num">{{ l.linea }}</td><td>{{ l.codigo }} — {{ l.descripcion }}{% if l.exento %} (exento){% endif %}</td><td>{{ l.unidad }}</td><td class="num">{{ l.cantidad }}</td><td class="num">{{ l.precio }}</td><td class="num">{{ l.neto }}</td><td class="num">{{ l.itbis }}</td><td class="num">{{ l.total }}</td></tr>
+  {% for l in lineas %}<tr{% if l.testid %} data-testid="{{ l.testid }}"{% endif %}>{% for c in formato.columnas %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{{ l[c.clave] }}</td>{% endfor %}</tr>
   {% endfor %}
-    <tr><th colspan="5">Totales (RD$)</th><td class="num"><span data-testid="print-net">{{ totales.neto }}</span></td><td class="num"><span data-testid="print-itbis">{{ totales.itbis }}</span></td><td class="num"><span data-testid="print-total">{{ totales.total }}</span></td></tr>
+  {% if totales_fila %}<tr class="totales">{% for c in formato.columnas %}{% assign t = totales_fila[c.clave] %}<td class="{{ c.clase }}" style="{{ c.estilo }}">{% if forloop.first %}<strong>{{ totales_etiqueta }}</strong>{% elsif t %}<strong><span data-testid="{{ t.testid }}">{{ t.valor }}</span></strong>{% endif %}</td>{% endfor %}</tr>{% endif %}
   </tbody>
 </table>
 {% if cotizacion.notas %}<p><strong>Notas:</strong> {{ cotizacion.notas }}</p>{% endif %}
 <h2>Condiciones generales</h2>
-<p class="muted" data-testid="print-conditions">Precios en pesos dominicanos, sin ITBIS salvo indicación; el ITBIS mostrado es informativo, calculado con las reglas vigentes a la fecha de la cotización. Sujeto a disponibilidad. Documento no fiscal.</p>
+<p class="muted" data-testid="print-conditions">{% if formato.textos.condiciones %}{{ formato.textos.condiciones }}{% else %}Precios en pesos dominicanos, sin ITBIS salvo indicación; el ITBIS mostrado es informativo, calculado con las reglas vigentes a la fecha de la cotización. Sujeto a disponibilidad. Documento no fiscal.{% endif %}</p>
 <div class="signature">
   <div><div class="signature-line"></div>Por el suplidor</div>
   <div><div class="signature-line"></div>Aceptación del cliente</div>
 </div>
+{% if formato.textos.cuentas %}<p class="texto-cuentas"><strong>Cuentas para pagos:</strong> {{ formato.textos.cuentas }}</p>{% endif %}
+{% if formato.textos.pie %}<p class="texto-pie muted">{{ formato.textos.pie }}</p>{% endif %}

@@ -51,7 +51,10 @@ public sealed class GetPrintDocumentHandler(DriverLinkKey? key = null) : IQueryH
 
 public static class PrintDocuments
 {
-    private sealed record Format(string Body, string Css, int Version);
+    /// <summary>A format to render with: its body, its own CSS, its settings (JSON) and its version (0: built-in).</summary>
+    public sealed record Format(string Body, string Css, string Settings, int Version);
+
+    private sealed record Logo(byte[] Content, string ContentType);
 
     private sealed record Company(string LegalName, string Rnc);
 
@@ -92,7 +95,8 @@ public static class PrintDocuments
         return RenderAsync(new QueryContext(context.Connection, context.Transaction, context.CompanyId, context.SessionId, context.Clock), null, query, cancellationToken);
     }
 
-    public static async Task<PrintedDocument> RenderAsync(QueryContext context, DriverLinkKey? key, GetPrintDocument query, CancellationToken cancellationToken)
+    public static async Task<PrintedDocument> RenderAsync(
+        QueryContext context, DriverLinkKey? key, GetPrintDocument query, CancellationToken cancellationToken, Format? format = null, string? watermark = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(query);
@@ -107,22 +111,75 @@ public static class PrintDocuments
             PrintDocumentTypes.ArAging => await AgingAsync(context, query, cancellationToken).ConfigureAwait(false),
             _ => throw new DomainException(QueryErrors.InvalidParameter, $"Unknown document type {query.DocumentType}."),
         };
-        var format = await FormatAsync(context, query.DocumentType, cancellationToken).ConfigureAwait(false);
-        var rendered = PrintRenderer.Render(new PrintTemplate(format.Body, format.Css), title, model);
-        return new PrintedDocument(query.DocumentType, format.Version, rendered.Title, rendered.Html, rendered.Css, rendered.Body);
+        format ??= await FormatAsync(context, query.DocumentType, cancellationToken).ConfigureAwait(false);
+        return Render(query.DocumentType, title, model, format, await LogoAsync(context, cancellationToken).ConfigureAwait(false), watermark);
+    }
+
+    /// <summary>E-PRT-8: the company's logo as a data URI, or null.</summary>
+    public static async Task<string?> LogoAsync(QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var logo = await Reading.SingleOrDefaultAsync(
+            context.Connection, context.Transaction, "SELECT content, content_type FROM md.company_logo WHERE company_id = @c", r => new Logo(r.GetFieldValue<byte[]>(0), r.GetString(1)),
+            cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false);
+        return logo is null ? null : $"data:{logo.ContentType};base64,{Convert.ToBase64String(logo.Content)}";
+    }
+
+    /// <summary>
+    /// E-PRT-02-1: a model drawn with a format — the settings add the visible columns (title, alignment, width), the fixed texts and the
+    /// logo; their CSS goes before the format's own. <paramref name="watermark"/> replaces the document's (the preview's «VISTA PREVIA»).
+    /// </summary>
+    public static PrintedDocument Render(string documentType, string title, IReadOnlyDictionary<string, object?> model, Format format, string? logoDataUri, string? watermark = null)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(format);
+        var settings = PrintFormatRules.Parse(documentType, format.Settings);
+        var catalogue = PrintFormatRules.Catalogue(documentType);
+        var columns = settings.Columns.Where(c => c.Show && catalogue.Any(k => k.Key == c.Key)).Select(c => (object?)new Dictionary<string, object?>
+        {
+            ["clave"] = c.Key,
+            ["titulo"] = c.Title,
+            ["clase"] = catalogue.First(k => k.Key == c.Key).Numeric ? "num" : string.Empty,
+            ["estilo"] = (c.WidthPercent is { } w ? string.Create(CultureInfo.InvariantCulture, $"width:{w}%;") : string.Empty)
+                + $"text-align:{c.Align switch { "DERECHA" => "right", "CENTRO" => "center", _ => "left" }}",
+        }).ToList();
+        var decorated = new Dictionary<string, object?>(model, StringComparer.Ordinal)
+        {
+            ["formato"] = new Dictionary<string, object?>
+            {
+                ["columnas"] = columns,
+                ["colspan_totales"] = I(Math.Max(1, columns.Count - 1)),
+                ["papel"] = settings.Paper,
+                ["textos"] = new Dictionary<string, object?>
+                {
+                    ["encabezado"] = settings.Texts.Header,
+                    ["pie"] = settings.Texts.Footer,
+                    ["condiciones"] = settings.Texts.Conditions,
+                    ["cuentas"] = settings.Texts.BankAccounts,
+                },
+            },
+            ["logo"] = settings.ShowLogo && logoDataUri is not null ? new Dictionary<string, object?> { ["src"] = logoDataUri } : null,
+        };
+        if (watermark is not null)
+        {
+            decorated["marca_agua"] = watermark;
+        }
+
+        var rendered = PrintRenderer.Render(new PrintTemplate(format.Body, PrintFormatRules.Css(settings) + "\n" + format.Css), title, decorated);
+        return new PrintedDocument(documentType, format.Version, rendered.Title, rendered.Html, rendered.Css, rendered.Body);
     }
 
     /// <summary>E-PRT-01-4: the company's ACTIVE version, else the built-in «Rochell» format (version 0).</summary>
-    private static async Task<Format> FormatAsync(QueryContext context, string documentType, CancellationToken cancellationToken)
+    public static async Task<Format> FormatAsync(QueryContext context, string documentType, CancellationToken cancellationToken)
         => await Reading.SingleOrDefaultAsync(
                context.Connection,
                context.Transaction,
-               "SELECT body, css, version FROM md.print_format WHERE company_id = @c AND document_type = @t AND status = 'ACTIVE'",
-               r => new Format(r.GetString(0), r.GetString(1), r.GetInt32(2)),
+               "SELECT body, css, settings::text, version FROM md.print_format WHERE company_id = @c AND document_type = @t AND status = 'ACTIVE'",
+               r => new Format(r.GetString(0), r.GetString(1), r.GetString(2), r.GetInt32(3)),
                cancellationToken,
                ("c", context.CompanyId),
                ("t", documentType)).ConfigureAwait(false)
-           ?? new Format(BuiltIn(documentType), string.Empty, 0);
+           ?? new Format(BuiltIn(documentType), string.Empty, "{}", 0);
 
     /// <summary>The built-in «Rochell» format of a document type (E-PRT-01-4).</summary>
     public static string BuiltIn(string documentType)
@@ -173,7 +230,46 @@ public static class PrintDocuments
     {
         var d = await ReadAsync<GetDeliveryPrint, DeliveryPrint>(context, new GetDeliveryPrintHandler(key), new GetDeliveryPrint(context.CompanyId, context.SessionId, query.Id), cancellationToken)
             .ConfigureAwait(false);
-        var model = new Dictionary<string, object?>
+        return ($"Conduce {d.DeliveryNo}", DeliveryModel(d, query.BaseUrl));
+    }
+
+    private static Dictionary<string, object?> Total(string value, string testId) => new() { ["valor"] = value, ["testid"] = testId };
+
+    /// <summary>The conduce's model (E-UX3-7, ENT-1); the driver's QR only with the screen's address.</summary>
+    public static IReadOnlyDictionary<string, object?> DeliveryModel(DeliveryPrint d, string? baseUrl)
+    {
+        ArgumentNullException.ThrowIfNull(d);
+        var lines = new List<object?>();
+        foreach (var l in d.Lines)
+        {
+            lines.Add(new Dictionary<string, object?>
+            {
+                ["linea"] = I(l.LineNo),
+                ["producto"] = $"{l.ItemCode} — {l.ItemDescription}",
+                ["unidad"] = l.Uom,
+                ["planificado"] = Q(l.QtyPlanned),
+                ["despachado"] = Q(l.QtyIssued),
+                ["entregado"] = Q(l.QtyDelivered),
+                ["lotes"] = l.Lots.Count == 0 ? "—" : string.Join(" · ", l.Lots.Select(x => $"{x.LotCode} ({x.SourceLocationCode}): {Q(x.BaseQuantity)}")),
+            });
+            if (l.Freight is { } freight)
+            {
+                // PRS-05 (E-PRS-04-7): the line's freight, same quantities, no price.
+                lines.Add(new Dictionary<string, object?>
+                {
+                    ["testid"] = $"conduce-freight:{I(l.LineNo)}",
+                    ["linea"] = string.Empty,
+                    ["producto"] = freight,
+                    ["unidad"] = l.Uom,
+                    ["planificado"] = Q(l.QtyPlanned),
+                    ["despachado"] = Q(l.QtyIssued),
+                    ["entregado"] = Q(l.QtyDelivered),
+                    ["lotes"] = "—",
+                });
+            }
+        }
+
+        return new Dictionary<string, object?>
         {
             ["marca_agua"] = d.GateOutAt is null ? "BORRADOR – NO DESPACHADO" : null,
             ["emisor"] = Issuer(d.IssuerName, d.IssuerRnc),
@@ -199,22 +295,10 @@ public static class PrintDocuments
             ["pesada"] = d.GrossKg is { } gross
                 ? new Dictionary<string, object?> { ["bruto"] = Q(gross), ["tara"] = Q(d.TareKg ?? 0m), ["neto"] = Q(d.NetKg ?? 0m), ["ticket"] = d.WeighTicketRef }
                 : null,
-            ["lineas"] = d.Lines.Select(l => (object?)new Dictionary<string, object?>
-            {
-                ["linea"] = I(l.LineNo),
-                ["codigo"] = l.ItemCode,
-                ["descripcion"] = l.ItemDescription,
-                ["unidad"] = l.Uom,
-                ["planificado"] = Q(l.QtyPlanned),
-                ["despachado"] = Q(l.QtyIssued),
-                ["entregado"] = Q(l.QtyDelivered),
-                ["lotes"] = l.Lots.Count == 0 ? "—" : string.Join(" · ", l.Lots.Select(x => $"{x.LotCode} ({x.SourceLocationCode}): {Q(x.BaseQuantity)}")),
-                ["flete"] = l.Freight,
-            }).ToList(),
+            ["lineas"] = lines,
             ["recibido"] = d.ReceivedByName is null ? null : new Dictionary<string, object?> { ["nombre"] = d.ReceivedByName, ["fecha"] = PrintText.DateTime(d.ReceivedAt) },
-            ["qr_chofer"] = DriverQr(query.BaseUrl, d.DriverLinkPath),
+            ["qr_chofer"] = DriverQr(baseUrl, d.DriverLinkPath),
         };
-        return ($"Conduce {d.DeliveryNo}", model);
     }
 
     private static async Task<(string, IReadOnlyDictionary<string, object?>)> QuoteAsync(QueryContext context, GetPrintDocument query, CancellationToken cancellationToken)
@@ -223,7 +307,21 @@ public static class PrintDocuments
         return ($"Cotización {q.QuoteNo}", QuoteModel(q));
     }
 
-    /// <summary>The quote's model (also what a test renders without a database).</summary>
+    /// <summary>A priced line as the quote and both proformas print it.</summary>
+    private static Dictionary<string, object?> PricedLine(int no, string code, string name, string uom, decimal quantity, decimal price, decimal net, decimal itbis, decimal total, bool exempt = false)
+        => new()
+        {
+            ["linea"] = I(no),
+            ["producto"] = $"{code} — {name}{(exempt ? " (exento)" : string.Empty)}",
+            ["unidad"] = uom,
+            ["cantidad"] = Q(quantity),
+            ["precio"] = M(price),
+            ["neto"] = M(net),
+            ["itbis"] = M(itbis),
+            ["total"] = M(total),
+        };
+
+    /// <summary>The quote's model (QUO1-04, E-UX3-10).</summary>
     public static IReadOnlyDictionary<string, object?> QuoteModel(QuotePrint q)
     {
         ArgumentNullException.ThrowIfNull(q);
@@ -250,20 +348,14 @@ public static class PrintDocuments
                 ["obra"] = q.SiteAddress,
                 ["notas"] = q.Notes,
             },
-            ["lineas"] = q.Lines.Select(l => (object?)new Dictionary<string, object?>
+            ["lineas"] = q.Lines.Select(l => (object?)PricedLine(l.LineNo, l.ItemCode, l.ItemName, l.Uom, l.Quantity, l.UnitPrice, l.Net, l.Itbis, l.Total, l.Exempt)).ToList(),
+            ["totales_etiqueta"] = "Totales (RD$)",
+            ["totales_fila"] = new Dictionary<string, object?>
             {
-                ["linea"] = I(l.LineNo),
-                ["codigo"] = l.ItemCode,
-                ["descripcion"] = l.ItemName,
-                ["unidad"] = l.Uom,
-                ["cantidad"] = Q(l.Quantity),
-                ["precio"] = M(l.UnitPrice),
-                ["neto"] = M(l.Net),
-                ["itbis"] = M(l.Itbis),
-                ["total"] = M(l.Total),
-                ["exento"] = l.Exempt,
-            }).ToList(),
-            ["totales"] = new Dictionary<string, object?> { ["neto"] = M(q.NetTotal), ["itbis"] = M(q.ItbisTotal), ["total"] = M(q.Total) },
+                ["neto"] = Total(M(q.NetTotal), "print-net"),
+                ["itbis"] = Total(M(q.ItbisTotal), "print-itbis"),
+                ["total"] = Total(M(q.Total), "print-total"),
+            },
         };
     }
 
@@ -272,11 +364,6 @@ public static class PrintDocuments
         var detail = await ReadAsync<GetInvoice, InvoiceDetail>(context, new GetInvoiceHandler(), new GetInvoice(context.CompanyId, context.SessionId, query.Id), cancellationToken).ConfigureAwait(false);
         var pkg = await ReadAsync<GetInvoiceFiscalPackage, InvoiceFiscalPackage>(
             context, new GetInvoiceFiscalPackageHandler(), new GetInvoiceFiscalPackage(context.CompanyId, context.SessionId, query.Id), cancellationToken).ConfigureAwait(false);
-        var h = detail.Header;
-        var ecf = detail.Ecf;
-        var issuer = detail.Issuer;
-        var accepted = ecf is not null ? ecf.Status is "ACCEPTED" or "ACCEPTED_CONDITIONAL" : h.FiscalStatus == "ACCEPTED_EXTERNAL";
-        var encf = ecf is not null && accepted ? ecf.Encf : h.Encf;
 
         // E-ENT-9: the driver's QR of each delivery of the invoice still in transit with its link usable.
         var qrs = new List<object?>();
@@ -306,8 +393,21 @@ public static class PrintDocuments
             }
         }
 
+        return ($"Factura {detail.Header.InvoiceNo}", InvoiceModel(detail, pkg, qrs));
+    }
+
+    /// <summary>The invoice's model (E-VS4-04-4, E-ENT-9): «SIN VALIDEZ FISCAL» until the DGII accepts its e-CF, then the stamp and its QR.</summary>
+    public static IReadOnlyDictionary<string, object?> InvoiceModel(InvoiceDetail detail, InvoiceFiscalPackage pkg, IReadOnlyList<object?> driverQrs)
+    {
+        ArgumentNullException.ThrowIfNull(detail);
+        ArgumentNullException.ThrowIfNull(pkg);
+        var h = detail.Header;
+        var ecf = detail.Ecf;
+        var issuer = detail.Issuer;
+        var accepted = ecf is not null ? ecf.Status is "ACCEPTED" or "ACCEPTED_CONDITIONAL" : h.FiscalStatus == "ACCEPTED_EXTERNAL";
+        var encf = ecf is not null && accepted ? ecf.Encf : h.Encf;
         var contact = string.Join(" · ", new[] { issuer?.Phone, issuer?.Email }.Where(x => !string.IsNullOrEmpty(x)));
-        var model = new Dictionary<string, object?>
+        return new Dictionary<string, object?>
         {
             ["marca_agua"] = h.CommercialStatus == "VOIDED" ? "ANULADA" : accepted ? null : "SIN VALIDEZ FISCAL",
             ["emisor"] = new Dictionary<string, object?>
@@ -339,8 +439,7 @@ public static class PrintDocuments
             ["lineas"] = detail.Lines.Select(l => (object?)new Dictionary<string, object?>
             {
                 ["linea"] = I(l.LineNo),
-                ["codigo"] = l.ItemCode,
-                ["descripcion"] = l.ItemDescription,
+                ["descripcion"] = $"{l.ItemCode} — {l.ItemDescription}",
                 ["conduce"] = l.DeliveryNo,
                 ["unidad"] = l.Uom,
                 ["cantidad"] = Q(l.Quantity),
@@ -352,16 +451,22 @@ public static class PrintDocuments
             ["ecf"] = ecf is not null && accepted && ecf.StampUrl is { } stamp
                 ? new Dictionary<string, object?> { ["qr"] = QrSvg(stamp), ["codigo_seguridad"] = ecf.SecurityCode, ["fecha_firma"] = PrintText.DateTime(ecf.SignatureDate) }
                 : null,
-            ["qrs_chofer"] = qrs,
+            ["qrs_chofer"] = driverQrs,
         };
-        return ($"Factura {h.InvoiceNo}", model);
     }
 
     private static async Task<(string, IReadOnlyDictionary<string, object?>)> ProformaAsync(QueryContext context, GetPrintDocument query, CancellationToken cancellationToken)
     {
         var p = await ReadAsync<GetProforma, ProformaDetail>(context, new GetProformaHandler(), new GetProforma(context.CompanyId, context.SessionId, query.Id), cancellationToken).ConfigureAwait(false);
+        return ($"Proforma {p.Header.ProformaNo}", ProformaModel(p));
+    }
+
+    /// <summary>The delivery proforma's model (E-FIS1b-01-13).</summary>
+    public static IReadOnlyDictionary<string, object?> ProformaModel(ProformaDetail p)
+    {
+        ArgumentNullException.ThrowIfNull(p);
         var f = p.Header;
-        var model = new Dictionary<string, object?>
+        return new Dictionary<string, object?>
         {
             ["marca_agua"] = f.Status == "VOIDED" ? "ANULADA" : null,
             ["emisor"] = Issuer(p.IssuerName, p.IssuerRnc),
@@ -375,21 +480,15 @@ public static class PrintDocuments
                 ["vence"] = PrintText.Date(f.DueDate),
                 ["obra"] = p.SiteAddress,
             },
-            ["lineas"] = p.Lines.Select(l => (object?)new Dictionary<string, object?>
+            ["lineas"] = p.Lines.Select(l => (object?)PricedLine(l.LineNo, l.ItemCode, l.ItemName, l.Uom, l.Quantity, l.UnitPrice, l.Net, l.Itbis, l.Total)).ToList(),
+            ["totales_etiqueta"] = "Totales (RD$)",
+            ["totales_fila"] = new Dictionary<string, object?>
             {
-                ["linea"] = I(l.LineNo),
-                ["codigo"] = l.ItemCode,
-                ["descripcion"] = l.ItemName,
-                ["unidad"] = l.Uom,
-                ["cantidad"] = Q(l.Quantity),
-                ["precio"] = M(l.UnitPrice),
-                ["neto"] = M(l.Net),
-                ["itbis"] = M(l.Itbis),
-                ["total"] = M(l.Total),
-            }).ToList(),
-            ["totales"] = new Dictionary<string, object?> { ["neto"] = M(f.Net), ["itbis"] = M(f.Itbis), ["total"] = M(f.Total) },
+                ["neto"] = Total(M(f.Net), "print-proforma-net"),
+                ["itbis"] = Total(M(f.Itbis), "print-proforma-itbis"),
+                ["total"] = Total(M(f.Total), "print-proforma-total"),
+            },
         };
-        return ($"Proforma {f.ProformaNo}", model);
     }
 
     private static async Task<(string, IReadOnlyDictionary<string, object?>)> OrderProformaAsync(QueryContext context, GetPrintDocument query, CancellationToken cancellationToken)
@@ -399,10 +498,16 @@ public static class PrintDocuments
         var status = await Reading.SingleOrDefaultAsync(
             context.Connection, context.Transaction, "SELECT status FROM sal.sales_order WHERE company_id = @c AND sales_order_id = @o", r => r.GetString(0), cancellationToken,
             ("c", context.CompanyId), ("o", query.Id)).ConfigureAwait(false);
-        var model = new Dictionary<string, object?>
+        return ($"Proforma del pedido {p.OrderNo}", OrderProformaModel(p, status));
+    }
+
+    /// <summary>The order proforma's model (E-FIS1-05-7); BORRADOR before the order is confirmed, CANCELADO once cancelled (V-20).</summary>
+    public static IReadOnlyDictionary<string, object?> OrderProformaModel(SalesOrderProforma p, string? orderStatus)
+    {
+        ArgumentNullException.ThrowIfNull(p);
+        return new Dictionary<string, object?>
         {
-            // UX4-03 (V-20): an order not yet confirmed prints BORRADOR, a cancelled one CANCELADO.
-            ["marca_agua"] = status switch { "DRAFT" or "PENDING_CREDIT" => "BORRADOR", "CANCELLED" => "CANCELADO", _ => null },
+            ["marca_agua"] = orderStatus switch { "DRAFT" or "PENDING_CREDIT" => "BORRADOR", "CANCELLED" => "CANCELADO", _ => null },
             ["emisor"] = Issuer(p.IssuerName, p.IssuerRnc),
             ["cliente"] = new Dictionary<string, object?> { ["nombre"] = p.CustomerName, ["rnc"] = p.CustomerRnc },
             ["proforma"] = new Dictionary<string, object?>
@@ -412,21 +517,15 @@ public static class PrintDocuments
                 ["fecha"] = PrintText.Date(p.ProformaDate),
                 ["obra"] = p.SiteAddress,
             },
-            ["lineas"] = p.Lines.Select(l => (object?)new Dictionary<string, object?>
+            ["lineas"] = p.Lines.Select(l => (object?)PricedLine(l.LineNo, l.ItemCode, l.ItemName, l.Uom, l.Quantity, l.UnitPrice, l.Net, l.Itbis, l.Total)).ToList(),
+            ["totales_etiqueta"] = "Totales (RD$)",
+            ["totales_fila"] = new Dictionary<string, object?>
             {
-                ["linea"] = I(l.LineNo),
-                ["codigo"] = l.ItemCode,
-                ["descripcion"] = l.ItemName,
-                ["unidad"] = l.Uom,
-                ["cantidad"] = Q(l.Quantity),
-                ["precio"] = M(l.UnitPrice),
-                ["neto"] = M(l.Net),
-                ["itbis"] = M(l.Itbis),
-                ["total"] = M(l.Total),
-            }).ToList(),
-            ["totales"] = new Dictionary<string, object?> { ["neto"] = M(p.NetTotal), ["itbis"] = M(p.ItbisTotal), ["total"] = M(p.Total) },
+                ["neto"] = Total(M(p.NetTotal), "proforma-net"),
+                ["itbis"] = Total(M(p.ItbisTotal), "proforma-itbis"),
+                ["total"] = Total(M(p.Total), "proforma-total"),
+            },
         };
-        return ($"Proforma del pedido {p.OrderNo}", model);
     }
 
     private static async Task<(string, IReadOnlyDictionary<string, object?>)> StatementAsync(QueryContext context, GetPrintDocument query, CancellationToken cancellationToken)
@@ -439,33 +538,43 @@ public static class PrintDocuments
         var s = await ReadAsync<GetCustomerStatement, CustomerStatement>(
             context, new GetCustomerStatementHandler(), new GetCustomerStatement(context.CompanyId, context.SessionId, query.Id, from, to), cancellationToken).ConfigureAwait(false);
         var company = await CompanyAsync(context, cancellationToken).ConfigureAwait(false);
-        var model = new Dictionary<string, object?>
+        return ($"Estado de cuenta {s.CustomerName}", StatementModel(s, company.LegalName, company.Rnc, Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow)));
+    }
+
+    /// <summary>The statement's model (UX4-03 V-19): the opening balance as the first line, the period's lines, the closing totals, open proformas apart.</summary>
+    public static IReadOnlyDictionary<string, object?> StatementModel(CustomerStatement s, string issuerName, string issuerRnc, DateOnly issuedOn)
+    {
+        ArgumentNullException.ThrowIfNull(s);
+        var lines = new List<object?>
         {
-            ["emisor"] = Issuer(company.LegalName, company.Rnc),
+            new Dictionary<string, object?>
+            {
+                ["fecha"] = PrintText.Date(s.From), ["tipo"] = "Saldo inicial", ["documento"] = string.Empty, ["debito"] = string.Empty, ["credito"] = string.Empty, ["saldo"] = M(s.Opening),
+            },
+        };
+        lines.AddRange(s.Entries.Select(e => (object?)new Dictionary<string, object?>
+        {
+            ["fecha"] = PrintText.Date(e.PostingDate),
+            ["tipo"] = StatementKinds.GetValueOrDefault(e.Kind, e.Kind),
+            ["documento"] = e.DocumentNo ?? "—",
+            ["debito"] = M(e.Debit),
+            ["credito"] = M(e.Credit),
+            ["saldo"] = M(e.Balance),
+        }));
+        return new Dictionary<string, object?>
+        {
+            ["emisor"] = Issuer(issuerName, issuerRnc),
             ["cliente"] = new Dictionary<string, object?> { ["nombre"] = s.CustomerName, ["rnc"] = s.Rnc },
-            ["periodo"] = new Dictionary<string, object?>
+            ["periodo"] = new Dictionary<string, object?> { ["desde"] = PrintText.Date(s.From), ["hasta"] = PrintText.Date(s.To), ["emitido"] = PrintText.Date(issuedOn) },
+            ["lineas"] = lines,
+            ["totales_etiqueta"] = "Saldo final",
+            ["totales_fila"] = new Dictionary<string, object?>
             {
-                ["desde"] = PrintText.Date(s.From),
-                ["hasta"] = PrintText.Date(s.To),
-                ["emitido"] = PrintText.Date(Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow)),
+                ["debito"] = Total(M(s.TotalDebit), "statement-debit"),
+                ["credito"] = Total(M(s.TotalCredit), "statement-credit"),
+                ["saldo"] = Total(M(s.Closing), "statement-closing"),
             },
-            ["movimientos"] = s.Entries.Select(e => (object?)new Dictionary<string, object?>
-            {
-                ["fecha"] = PrintText.Date(e.PostingDate),
-                ["tipo"] = StatementKinds.GetValueOrDefault(e.Kind, e.Kind),
-                ["documento"] = e.DocumentNo ?? "—",
-                ["debito"] = M(e.Debit),
-                ["credito"] = M(e.Credit),
-                ["saldo"] = M(e.Balance),
-            }).ToList(),
-            ["saldos"] = new Dictionary<string, object?>
-            {
-                ["inicial"] = M(s.Opening),
-                ["debitos"] = M(s.TotalDebit),
-                ["creditos"] = M(s.TotalCredit),
-                ["final"] = M(s.Closing),
-                ["proformas"] = M(s.ProformaBalance),
-            },
+            ["saldos"] = new Dictionary<string, object?> { ["inicial"] = M(s.Opening), ["final"] = M(s.Closing), ["proformas"] = M(s.ProformaBalance) },
             ["proformas"] = s.OpenProformas.Select(f => (object?)new Dictionary<string, object?>
             {
                 ["numero"] = f.ProformaNo,
@@ -478,7 +587,6 @@ public static class PrintDocuments
                 ["deposito"] = M(f.Deposit),
             }).ToList(),
         };
-        return ($"Estado de cuenta {s.CustomerName}", model);
     }
 
     private static async Task<(string, IReadOnlyDictionary<string, object?>)> AgingAsync(QueryContext context, GetPrintDocument query, CancellationToken cancellationToken)
@@ -487,14 +595,21 @@ public static class PrintDocuments
         var c = aging.Customers.SingleOrDefault(x => x.CustomerId == query.Id)
             ?? new ArAgingCustomer(query.Id, await CustomerNameAsync(context, query.Id, cancellationToken).ConfigureAwait(false), 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, [], 0m, 0m, []);
         var company = await CompanyAsync(context, cancellationToken).ConfigureAwait(false);
-        var b = aging.Buckets;
+        return ($"Facturas pendientes {c.CustomerName}", AgingModel(c, aging.AsOf, aging.Buckets, company.LegalName, company.Rnc));
+    }
+
+    /// <summary>The open invoices and proformas of a customer by age (E-VS3-09-1, E-FIS1b-3).</summary>
+    public static IReadOnlyDictionary<string, object?> AgingModel(ArAgingCustomer c, DateOnly asOf, ArAgingBuckets b, string issuerName, string issuerRnc)
+    {
+        ArgumentNullException.ThrowIfNull(c);
+        ArgumentNullException.ThrowIfNull(b);
         string Days(int d) => d > 0 ? I(d) : "Al día";
-        var model = new Dictionary<string, object?>
+        return new Dictionary<string, object?>
         {
-            ["emisor"] = Issuer(company.LegalName, company.Rnc),
+            ["emisor"] = Issuer(issuerName, issuerRnc),
             ["cliente"] = new Dictionary<string, object?> { ["nombre"] = c.CustomerName },
-            ["corte"] = PrintText.Date(aging.AsOf),
-            ["facturas"] = c.Documents.Select(d => (object?)new Dictionary<string, object?>
+            ["corte"] = PrintText.Date(asOf),
+            ["lineas"] = c.Documents.Select(d => (object?)new Dictionary<string, object?>
             {
                 ["numero"] = d.InvoiceNo,
                 ["encf"] = d.Encf ?? "—",
@@ -503,13 +618,14 @@ public static class PrintDocuments
                 ["dias"] = Days(d.DaysOverdue),
                 ["pendiente"] = M(d.OpenAmount),
             }).ToList(),
+            ["totales_etiqueta"] = "Total pendiente",
+            ["totales_fila"] = new Dictionary<string, object?> { ["pendiente"] = Total(M(c.Total), "aging-total") },
             ["tramos"] = new List<object?>
             {
                 $"1–{I(b.Bucket1Days)} días", $"{I(b.Bucket1Days + 1)}–{I(b.Bucket2Days)} días", $"{I(b.Bucket2Days + 1)}–{I(b.Bucket3Days)} días", $"Más de {I(b.Bucket3Days)} días",
             },
             ["totales"] = new Dictionary<string, object?>
             {
-                ["pendiente"] = M(c.Total),
                 ["al_dia"] = M(c.Current),
                 ["por_tramo"] = new List<object?> { M(c.Bucket1), M(c.Bucket2), M(c.Bucket3), M(c.Over) },
                 ["a_favor"] = M(c.Unapplied),
@@ -526,7 +642,6 @@ public static class PrintDocuments
                 ["saldo"] = M(f.Balance),
             }).ToList(),
         };
-        return ($"Facturas pendientes {c.CustomerName}", model);
     }
 
     private static async Task<string> CustomerNameAsync(QueryContext context, Guid partyId, CancellationToken cancellationToken)

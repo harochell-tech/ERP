@@ -28,3 +28,25 @@ Baseline `docs/architecture/prt1/frozen-baseline-prt1.md` (E-PRT-1…10, E-PRT-0
 - Web: `PrintedDocument` shows the server's CSS and body in a shadow root (styles isolated both ways; Playwright reads through it) and
   prints it. The print pages of conduce, quote, invoice, statement and order proforma use it; the delivery proforma prints at
   `/facturacion/proforma/imprimir/`.
+
+## PRT-02 — Configuración › Formatos de impresión (E-PRT-3…10, E-PRT-02-1…7; migration 0103)
+
+- `PrintSettings` (stored in `md.print_format.settings`): mode SENCILLO / AVANZADO, paper CARTA / MEDIA_CARTA / TICKET_80 (the ticket only
+  for the invoice), margins 3–30 mm, font 9–20 px, row padding 2–20 px, title colour, logo (shown, width 10–120 mm, position), the
+  columns of the document's table (key, title, shown, width %, alignment, order; `PrintFormatRules.Catalogue`) and fixed texts
+  (header, footer, quote conditions, bank accounts). `PrintFormatRules.Css` turns them into CSS (`@page` size and margins first).
+- The built-in templates read `formato.columnas` (header, rows by `l[c.clave]`, a totals row by column), `formato.textos` and `logo`;
+  the models give each line the catalogue's keys and `totales_fila` (value and test id per column).
+- Commands: `SavePrintFormatDraft` (one DRAFT per type; SENCILLO stores the built-in template, AVANZADO its own template and CSS after
+  `EnsureSafe` — no scripts, `on…=`, `javascript:`, external `src` / `href` / `@import` / `url()` — and a parse),
+  `ActivatePrintFormat` (step-up; `PrintSamples.EnsureMandatory` renders the type's example: invoice e-NCF, issuer and buyer RNC, QR,
+  security code, signature date; conduce driver's QR and its draft watermark; then ACTIVE → RETIRED, draft → ACTIVE),
+  `RestorePrintFormat` (a version, or 0 the built-in one, into the draft), `SetCompanyLogo` (PNG / JPEG by their bytes, ≤ 1 MB).
+  All `print_format:manage`; 279 commands.
+- Queries (`configuration:read`): `ListPrintFormats` (types, active and draft versions, history, logo), `GetPrintFormat` (a version's
+  settings, template, CSS and the built-in template), `PreviewPrintFormat` (POST `…/sales/print-formats/preview`: the document of
+  that number, else the latest of the type, else `PrintSamples.Model`; watermark «VISTA PREVIA»; nothing saved).
+- Migration 0103: the DIRECTOR role is «Director» (no longer read-only: it changes the print formats).
+- Web: `/configuracion/formatos/` (menu Configuración › Formatos de impresión): logo, one tab per document, simple settings or advanced
+  template, preview (`DocumentView`), save, activate, versions with restore. Dev stack: a Director account. Journey:
+  `e2e/print-formats-journey.spec.ts`.

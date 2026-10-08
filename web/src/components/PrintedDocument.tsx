@@ -13,6 +13,20 @@ import { useLoad } from "@/lib/useQuery";
 
 export type PrintDocumentType = "DELIVERY_NOTE" | "INVOICE" | "QUOTE" | "PROFORMA" | "ORDER_PROFORMA" | "STATEMENT" | "AR_AGING";
 
+/** A server-drawn document in an isolated block: its CSS and body in a shadow root (styles do not cross either way). */
+export function DocumentView({ css, body, testId = "printed-document", formatVersion }: { css: string; body: string; testId?: string; formatVersion?: number }) {
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = host.current;
+    if (!element) {
+      return;
+    }
+    const root = element.shadowRoot ?? element.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${css}</style><div class="doc">${body}</div>`;
+  }, [css, body]);
+  return <div ref={host} data-testid={testId} data-format-version={formatVersion} />;
+}
+
 export function PrintedDocument({
   documentType,
   id,
@@ -34,15 +48,6 @@ export function PrintedDocument({
       : null,
     [companyId, documentType, id, from, to],
   );
-  const host = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const element = host.current;
-    if (!element || !data) {
-      return;
-    }
-    const root = element.shadowRoot ?? element.attachShadow({ mode: "open" });
-    root.innerHTML = `<style>${data.css}</style><div class="doc">${data.body}</div>`;
-  }, [data]);
   if (!can("sales:read")) {
     return <NoPermission />;
   }
@@ -57,7 +62,7 @@ export function PrintedDocument({
           Imprimir
         </button>
       </div>
-      <div ref={host} data-testid="printed-document" data-format-version={data.formatVersion} />
+      <DocumentView css={data.css} body={data.body} formatVersion={data.formatVersion} />
     </div>
   );
 }
