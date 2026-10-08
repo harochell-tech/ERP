@@ -64,6 +64,11 @@ const STATUS: Readonly<Record<string, string>> = {
   NOT_ACTIVE: "No está activo",
   NAME_DIFFERS: "Nombre distinto",
   ACCEPTED_EXTERNAL: "e-CF aceptado",
+  // VS4-03: the e-CF through the gateway.
+  ECF_SENDING: "e-CF en envío",
+  ECF_ACCEPTED: "e-CF aceptado",
+  ECF_REJECTED: "e-CF rechazado",
+  ECF_ACTION: "e-CF requiere atención",
   PARTIALLY_PAID: "Cobrada parcialmente",
   PAID: "Cobrada",
   CREDITED: "Acreditada",
@@ -126,6 +131,7 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   PENDING_EXTERNAL: "attention", UNAPPLIED: "attention", BOUNCED: "error",
   PARTIALLY_PAID: "progress", PARTIALLY_APPLIED: "progress", DEPOSITED: "progress", RECORDED: "progress",
   ACCEPTED_EXTERNAL: "done", PAID: "done", CREDITED: "done", APPLIED: "done",
+  ECF_SENDING: "progress", ECF_ACCEPTED: "done", ECF_REJECTED: "error", ECF_ACTION: "attention", // VS4-03
   NOT_FOUND: "error", NOT_ACTIVE: "attention", NAME_DIFFERS: "attention", // E-RNC-7
   IN_PROGRESS: "progress", CURING: "progress", COMPLETED: "done", SETTLED: "done", SCRAPPED: "error", // MFG1-07
   PENDING_VERIFICATION: "progress", SUSPENDED: "attention", EXHAUSTED: "neutral", EXPIRED: "neutral", // FIS1-05

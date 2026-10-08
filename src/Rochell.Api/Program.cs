@@ -89,6 +89,9 @@ if (settings.Mail.Mode != MailMode.Off)
 // E-VS4-11, E-VS4-02-6: the e-CF gateway is Off unless configured; Sandbox / Production call Alanube with the server's token; Simulated
 // only where the environment is Development or Test.
 services.AddSingleton(settings.Ecf);
+services.AddSingleton(new EcfSwitch(settings.Ecf.Enabled));
+services.AddSingleton<IEcfSourceUpdater, Rochell.Sales.Ecf.InvoiceEcfUpdater>();
+services.AddSingleton<IEcfSourceUpdater, Rochell.Sales.Ecf.CreditNoteEcfUpdater>();
 switch (settings.Ecf.Mode)
 {
     case EcfModes.Off:

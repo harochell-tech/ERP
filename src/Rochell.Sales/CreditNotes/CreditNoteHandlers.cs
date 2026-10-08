@@ -4,8 +4,10 @@ using Rochell.Finance.Posting;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Sales.Deliveries;
+using Rochell.Sales.Ecf;
 using Rochell.Sales.Invoices;
 using Rochell.Tax.Authorizations;
+using Rochell.Tax.Ecf;
 
 namespace Rochell.Sales.CreditNotes;
 
@@ -71,7 +73,7 @@ internal static class Crediting
 
     public static void EnsureCreditable(Invoice invoice)
     {
-        if (invoice.Commercial is not ("CONFIRMED" or "PARTIALLY_PAID" or "PAID") || invoice.Fiscal != "ACCEPTED_EXTERNAL")
+        if (invoice.Commercial is not ("CONFIRMED" or "PARTIALLY_PAID" or "PAID") || invoice.Fiscal is not ("ACCEPTED_EXTERNAL" or "ECF_ACCEPTED"))
         {
             throw new DomainException(CreditNoteErrors.InvoiceNotCreditable, $"A credit note needs a fiscalized, not credited invoice (it is {invoice.Commercial} / {invoice.Fiscal}, E-VS3-06-1).");
         }
@@ -182,9 +184,10 @@ public sealed class CreateCreditNoteHandler : ICommandHandler<CreateCreditNote>
 }
 
 [RequiresPermission("credit_note:issue", StepUp = true)]
-public sealed class IssueCreditNoteHandler : ICommandHandler<IssueCreditNote>
+public sealed class IssueCreditNoteHandler(EcfSwitch? gateway = null) : ICommandHandler<IssueCreditNote>
 {
     private readonly PostingEngine _engine = new();
+    private readonly EcfSwitch _gateway = gateway ?? EcfSwitch.Off;
 
     public string CommandType => "Sales.IssueCreditNote";
 
@@ -239,6 +242,9 @@ public sealed class IssueCreditNoteHandler : ICommandHandler<IssueCreditNote>
         }
 
         var today = SalesSql.Today(context);
+        // E-VS4-03-1: through Alanube when the gateway is on and e-CF 34 has an ACTIVE range; else the manual channel.
+        var viaGateway = await EcfQueue.UsesGatewayAsync(context, _gateway, SalesEcf.CreditNoteType, cancellationToken).ConfigureAwait(false);
+        var fiscal = viaGateway ? "ECF_SENDING" : "PENDING_EXTERNAL";
         var inputs = new Dictionary<string, string> { ["credit_note_no"] = note.No, ["invoice_no"] = invoice.InvoiceNo, ["invoice_encf"] = invoice.Encf! };
         var plan = await _engine.PrepareAsync(
             context,
@@ -271,11 +277,12 @@ public sealed class IssueCreditNoteHandler : ICommandHandler<IssueCreditNote>
             context.Connection,
             context.Transaction,
             """
-            UPDATE sal.credit_note SET commercial_status = 'CONFIRMED', accounting_status = 'POSTED', fiscal_status = 'PENDING_EXTERNAL', credit_date = @d, posting_event_id = @e,
+            UPDATE sal.credit_note SET commercial_status = 'CONFIRMED', accounting_status = 'POSTED', fiscal_status = @fiscal, credit_date = @d, posting_event_id = @e,
               issued_by = @by, version = @v
             WHERE credit_note_id = @n
             """,
             cancellationToken,
+            ("fiscal", fiscal),
             ("d", today),
             ("e", eventId),
             ("by", issuer),
@@ -294,7 +301,18 @@ public sealed class IssueCreditNoteHandler : ICommandHandler<IssueCreditNote>
         var invoiceStatus = await InvoiceStanding.RefreshAsync(context, invoiceId, CommandType, eventId, cancellationToken).ConfigureAwait(false);
 
         var journal = await _engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { creditNoteId = command.CreditNoteId, commercialStatus = "CONFIRMED", accountingStatus = "POSTED", fiscalStatus = "PENDING_EXTERNAL", invoiceStatus, journalId = journal.JournalId, version });
+        var queued = viaGateway ? await SalesEcf.QueueCreditNoteAsync(context, command.CreditNoteId, today, CommandType, cancellationToken).ConfigureAwait(false) : null;
+        return JsonSerializer.Serialize(new
+        {
+            creditNoteId = command.CreditNoteId,
+            commercialStatus = "CONFIRMED",
+            accountingStatus = "POSTED",
+            fiscalStatus = fiscal,
+            ecfNumber = queued?.Encf,
+            invoiceStatus,
+            journalId = journal.JournalId,
+            version,
+        });
     }
 }
 

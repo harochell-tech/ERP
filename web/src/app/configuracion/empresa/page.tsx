@@ -72,6 +72,79 @@ function LegalNameForm({ company, onDone }: { company: Company; onDone: () => vo
   );
 }
 
+type Contact = { address: string; tradeName: string; phone: string; email: string };
+
+// E-VS4-03-2: the e-CF issuer's data — the address is required by Alanube; trade name, phone (809-555-1234) and e-mail are optional.
+function ContactForm({ company, onDone }: { company: Company; onDone: () => void }) {
+  const update = useCommand<"/api/v1/companies/{companyId}/master-data/update-company-contact", Contact>(
+    "update-company-contact",
+    "/api/v1/companies/{companyId}/master-data/update-company-contact",
+  );
+  const [v, setV] = useState<Contact>(
+    update.restored ?? { address: company.address ?? "", tradeName: company.tradeName ?? "", phone: company.phone ?? "", email: company.email ?? "" },
+  );
+  const [confirming, setConfirming] = useState(false);
+  const fe = useFieldErrors<keyof Contact>();
+  const set = (key: keyof Contact) => (e: { target: { value: string } }) => setV({ ...v, [key]: e.target.value });
+  const t = { address: v.address.trim(), tradeName: v.tradeName.trim(), phone: v.phone.trim(), email: v.email.trim() };
+  return (
+    <>
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (
+            fe.check({
+              address: t.address === "" ? "Indique la dirección." : t.address.length > 100 && "Hasta 100 caracteres.",
+              tradeName: t.tradeName.length > 150 && "Hasta 150 caracteres.",
+              phone: t.phone !== "" && !/^[0-9]{3}-[0-9]{3}-[0-9]{4}$/.test(t.phone) && "Escriba el teléfono así: 809-555-1234.",
+              email: t.email !== "" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t.email) && "Revise el correo.",
+            })
+          ) {
+            setConfirming(true);
+          }
+        }}
+      >
+        <Field label="Dirección" required error={fe.errors.address} wide hint="Va en cada e-CF como domicilio del emisor.">
+          <input value={v.address} maxLength={100} onChange={set("address")} />
+        </Field>
+        <Field label="Nombre comercial" error={fe.errors.tradeName}>
+          <input value={v.tradeName} maxLength={150} onChange={set("tradeName")} />
+        </Field>
+        <Field label="Teléfono" error={fe.errors.phone}>
+          <input value={v.phone} maxLength={12} inputMode="tel" placeholder="809-555-1234" onChange={set("phone")} />
+        </Field>
+        <Field label="Correo" error={fe.errors.email}>
+          <input value={v.email} maxLength={80} type="email" onChange={set("email")} />
+        </Field>
+        <div className="actions form-actions">
+          <button type="submit" className="primary" disabled={update.busy}>
+            Guardar datos del emisor
+          </button>
+        </div>
+        <ErrorBox error={update.error} />
+      </form>
+      <ConfirmDialog
+        open={confirming}
+        title="¿Guardar los datos del emisor?"
+        confirmLabel="Confirmar: Guardar datos del emisor"
+        stepUp
+        busy={update.busy}
+        onCancel={() => setConfirming(false)}
+        onConfirm={async () => {
+          setConfirming(false);
+          const body = { address: t.address, tradeName: t.tradeName || null, phone: t.phone || null, email: t.email || null };
+          if (await update.run(body, v, "Datos del emisor guardados.")) {
+            onDone();
+          }
+        }}
+      >
+        <p>Los e-CF que se emitan desde ahora llevan esta dirección{t.tradeName ? `, el nombre comercial «${t.tradeName}»` : ""} y estos datos de contacto. El cambio queda registrado.</p>
+      </ConfirmDialog>
+    </>
+  );
+}
+
 function PlantRow({ plant, canManage, onDone }: { plant: Plant; canManage: boolean; onDone: () => void }) {
   const update = useCommand<"/api/v1/companies/{companyId}/master-data/update-plant-name", { name: string }>(
     `update-plant-name:${plant.plantId}`,
@@ -182,6 +255,23 @@ export default function Page() {
         <section className="card">
           <h2 style={{ marginTop: 0 }}>Cambiar la razón social</h2>
           <LegalNameForm key={data.legalName} company={data} onDone={done} />
+        </section>
+      ) : null}
+      <h2>Datos del emisor de e-CF</h2>
+      <dl className="facts">
+        <dt>Dirección</dt>
+        <dd data-testid="company-address">{data.address ?? <span className="muted">Sin dirección: los e-CF no se pueden emitir por Alanube hasta completarla.</span>}</dd>
+        <dt>Nombre comercial</dt>
+        <dd>{data.tradeName ?? "—"}</dd>
+        <dt>Teléfono</dt>
+        <dd>{data.phone ?? "—"}</dd>
+        <dt>Correo</dt>
+        <dd>{data.email ?? "—"}</dd>
+      </dl>
+      {canManage ? (
+        <section className="card">
+          <h2 style={{ marginTop: 0 }}>Cambiar los datos del emisor</h2>
+          <ContactForm key={`${data.address ?? ""}|${data.tradeName ?? ""}|${data.phone ?? ""}|${data.email ?? ""}`} company={data} onDone={done} />
         </section>
       ) : null}
       <h2>Plantas</h2>

@@ -36,6 +36,7 @@ using Rochell.Sales.CreditNotes;
 using Rochell.Sales.CashSales;
 using Rochell.Sales.Customers;
 using Rochell.Sales.Deliveries;
+using Rochell.Sales.Ecf;
 using Rochell.Sales.Fleet;
 using Rochell.Sales.Invoices;
 using Rochell.Sales.Mail;
@@ -77,6 +78,7 @@ public static class CommandEndpoints
         ArgumentNullException.ThrowIfNull(company);
         var masterData = company.MapGroup("/master-data").WithTags("MasterData");
         masterData.MapCommand<UpdateCompanyLegalName, UpdateCompanyLegalNameHandler>();
+        masterData.MapCommand<UpdateCompanyContact, UpdateCompanyContactHandler>();
         masterData.MapCommand<UpdatePlantName, UpdatePlantNameHandler>();
         masterData.MapCommand<CreateSupplier, CreateSupplierHandler>();
         masterData.MapCommand<CreateForeignSupplier, CreateForeignSupplierHandler>(); // USD1-03 (E-USD1-03-9)
@@ -310,6 +312,8 @@ public static class CommandEndpoints
         sales.MapCommand<IssueInvoice, IssueInvoiceHandler>();
         sales.MapCommand<RecordExternalFiscalDocument, RecordExternalFiscalDocumentHandler>();
         sales.MapCommand<VoidUnfiscalizedInvoice, VoidUnfiscalizedInvoiceHandler>();
+        sales.MapCommand<ResendInvoiceEcf, ResendInvoiceEcfHandler>();
+        sales.MapCommand<ResendCreditNoteEcf, ResendCreditNoteEcfHandler>();
         sales.MapCommand<CreateCreditNote, CreateCreditNoteHandler>();
         sales.MapCommand<IssueCreditNote, IssueCreditNoteHandler>();
         sales.MapCommand<RecordExternalCreditNoteDocument, RecordExternalCreditNoteDocumentHandler>();
@@ -373,7 +377,7 @@ public static class CommandEndpoints
     /// <summary>Every handler class the host resolves (the verifier is built by <see cref="HashVerification"/>).</summary>
     public static IReadOnlyList<Type> Handlers { get; } =
     [
-        typeof(UpdateCompanyLegalNameHandler), typeof(UpdatePlantNameHandler),
+        typeof(UpdateCompanyLegalNameHandler), typeof(UpdateCompanyContactHandler), typeof(UpdatePlantNameHandler),
         typeof(CreateForeignSupplierHandler), typeof(UpdateForeignSupplierDraftHandler), typeof(CreateSupplierHandler), typeof(UpdateSupplierHandler), typeof(ActivateSupplierHandler), typeof(SetSupplierPaymentTermsHandler),
         typeof(SetSupplierContactHandler), typeof(ImportSuppliersHandler), typeof(ActivateSuppliersHandler), typeof(CreateRawMaterialHandler), typeof(CreateFinishedGoodHandler), typeof(CreateFreightItemHandler),
         typeof(DefineUomConversionHandler), typeof(ActivateItemHandler),
@@ -413,6 +417,7 @@ public static class CommandEndpoints
         typeof(SendQuoteHandler), typeof(MarkQuoteLostHandler), typeof(CancelQuoteHandler), typeof(CopyQuoteHandler), typeof(ConvertQuoteHandler),
         typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(CreateInvoiceFromProformasHandler), typeof(VoidProformaHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),
+        typeof(ResendInvoiceEcfHandler), typeof(ResendCreditNoteEcfHandler),
         typeof(CreateCreditNoteHandler), typeof(IssueCreditNoteHandler), typeof(RecordExternalCreditNoteDocumentHandler),
         typeof(RecordReceiptHandler), typeof(DepositReceiptsHandler), typeof(ApplyReceiptHandler), typeof(PrepareCustomerRefundHandler), typeof(ReleaseCustomerRefundHandler), typeof(VoidCustomerRefundHandler),
         typeof(SendQuoteByEmailHandler), typeof(SendProformaByEmailHandler), typeof(SendDeliveryByEmailHandler), typeof(SendStatementByEmailHandler), typeof(SendArAgingByEmailHandler),

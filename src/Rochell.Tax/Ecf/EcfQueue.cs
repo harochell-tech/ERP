@@ -18,6 +18,21 @@ public static class EcfQueue
 {
     public const string Aggregate = "EcfDocument";
 
+    /// <summary>E-VS4-03-1: a document goes through the gateway when it is on and its e-CF type has an ACTIVE range; else the manual channel.</summary>
+    public static async Task<bool> UsesGatewayAsync(CommandContext context, EcfSwitch gateway, string ecfType, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(gateway);
+        return gateway.On && (await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT 1 FROM tax.ecf_series WHERE company_id = @c AND ecf_type = @t AND status = 'ACTIVE'",
+            r => r.GetInt32(0),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("t", ecfType)).ConfigureAwait(false)).Count > 0;
+    }
+
     /// <param name="build">The e-CF from its e-NCF and the range's due date (Alanube's <c>sequenceDueDate</c>).</param>
     public static async Task<EcfEnqueued> EnqueueAsync(
         CommandContext context, string sourceKind, Guid sourceId, string ecfType, DateOnly issueDate, Func<string, DateOnly, JsonObject> build, string commandType,

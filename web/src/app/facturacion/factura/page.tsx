@@ -332,6 +332,7 @@ function InvoiceDetail() {
   );
   const record = useCommand(`record-ecf:${id}`, "/api/v1/companies/{companyId}/sales/record-external-fiscal-document", () => `e-CF registrado en la factura ${data?.header.invoiceNo ?? ""}.`);
   const voidInvoice = useCommand(`void-invoice:${id}`, "/api/v1/companies/{companyId}/sales/void-unfiscalized-invoice", () => `Factura ${data?.header.invoiceNo ?? ""} anulada.`);
+  const resend = useCommand(`resend-ecf:${id}`, "/api/v1/companies/{companyId}/sales/resend-invoice-ecf", () => `Factura ${data?.header.invoiceNo ?? ""} enviada de nuevo con otro e-NCF.`);
   const [creditNoteOpen, setCreditNoteOpen] = useState(false);
   if (!can("sales:read")) {
     return <NoPermission />;
@@ -476,7 +477,21 @@ function InvoiceDetail() {
           {data.fiscalRecord.recordedBy ?? "—"}
         </p>
       ) : null}
-      {h.commercialStatus === "CONFIRMED" && h.fiscalStatus === "PENDING_EXTERNAL" && can("invoice:void") ? (
+      {/* E-VS4-03-3: a rejected e-CF is sent again with another e-NCF once its data is corrected, or the invoice is voided. */}
+      {h.commercialStatus !== "VOIDED" && h.fiscalStatus === "ECF_REJECTED" && can("invoice:issue") ? (
+        <div className="actions">
+          <ConfirmAction
+            label="Reenviar e-CF"
+            stepUp
+            consequence="Se arma de nuevo el e-CF con los datos actuales del cliente y de la empresa y se envía con el siguiente e-NCF del rango; el número rechazado queda consumido."
+            busy={resend.busy}
+            testId="invoice-resend-ecf"
+            onConfirm={async () => (await resend.run({ invoiceId: h.invoiceId, expectedVersion: h.version })) && reload()}
+          />
+          <ErrorBox error={resend.error} />
+        </div>
+      ) : null}
+      {h.commercialStatus === "CONFIRMED" && (h.fiscalStatus === "PENDING_EXTERNAL" || h.fiscalStatus === "ECF_REJECTED") && can("invoice:void") ? (
         <div className="actions">
           <ReasonAction label="Anular factura (nunca fiscalizada)" stepUp consequence="La factura queda anulada y su asiento se reversa; los conduces vuelven a quedar por facturar. No se puede deshacer." busy={voidInvoice.busy} onConfirm={async (reason) => (await voidInvoice.run({ invoiceId: h.invoiceId, expectedVersion: h.version, reason })) && reload()} />
           <ErrorBox error={voidInvoice.error} />

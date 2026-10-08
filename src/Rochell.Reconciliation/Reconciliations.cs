@@ -408,13 +408,13 @@ public static class Reconciliations
             """),
         ["FISC-DOC"] = (
             Findings + """
-            -- E-VS3-08-6: issued invoices and credit notes dated on or before the cutoff whose e-CF is not final yet.
+            -- E-VS3-08-6: issued invoices and credit notes dated on or before the cutoff whose e-CF is not final yet (manual or, E-VS4-03-1, gateway).
             SELECT 'FA:' || invoice_no AS match_key, total AS value_a, NULL::numeric AS value_b, 'FISCAL_DOCUMENT_PENDING' AS classification,
                    'ERROR' AS severity, 'AR-REC' AS component
-            FROM sal.invoice WHERE company_id = @c AND commercial_status NOT IN ('DRAFT', 'VOIDED') AND fiscal_status = 'PENDING_EXTERNAL' AND invoice_date <= @cutoff
+            FROM sal.invoice WHERE company_id = @c AND commercial_status NOT IN ('DRAFT', 'VOIDED') AND fiscal_status IN ('PENDING_EXTERNAL', 'ECF_SENDING', 'ECF_REJECTED', 'ECF_ACTION') AND invoice_date <= @cutoff
             UNION ALL
             SELECT 'NC:' || credit_note_no, total, NULL, 'FISCAL_DOCUMENT_PENDING', 'ERROR', 'AR-REC'
-            FROM sal.credit_note WHERE company_id = @c AND commercial_status = 'CONFIRMED' AND fiscal_status = 'PENDING_EXTERNAL' AND credit_date <= @cutoff) f
+            FROM sal.credit_note WHERE company_id = @c AND commercial_status = 'CONFIRMED' AND fiscal_status IN ('PENDING_EXTERNAL', 'ECF_SENDING', 'ECF_REJECTED', 'ECF_ACTION') AND credit_date <= @cutoff) f
             """,
             null),
         ["DELIVERY-OPEN"] = (

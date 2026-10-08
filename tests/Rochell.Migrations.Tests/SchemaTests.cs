@@ -44,7 +44,7 @@ public sealed class SchemaTests(PostgresFixture postgres)
             FROM information_schema.columns WHERE table_schema = 'md' AND table_name = 'company'
             """);
 
-        Assert.Equal("company_id:uuid:NO,rnc:text:NO,legal_name:text:NO", columns);
+        Assert.Equal("company_id:uuid:NO,rnc:text:NO,legal_name:text:NO,address:text:YES,trade_name:text:YES,phone:text:YES,email:text:YES", columns); // + the e-CF issuer (E-VS4-03-2)
     }
 
     [Fact]

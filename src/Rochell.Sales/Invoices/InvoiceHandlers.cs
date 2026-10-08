@@ -4,10 +4,12 @@ using Rochell.Finance.Posting;
 using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Sales.Deliveries;
+using Rochell.Sales.Ecf;
 using Rochell.Sales.Proformas;
 using Rochell.Sales.Receipts;
 using Rochell.Tax;
 using Rochell.Tax.Authorizations;
+using Rochell.Tax.Ecf;
 
 namespace Rochell.Sales.Invoices;
 
@@ -369,10 +371,11 @@ public sealed class CreateInvoiceFromProformasHandler : ICommandHandler<CreateIn
 }
 
 [RequiresPermission("invoice:issue", StepUp = true)]
-public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
+public sealed class IssueInvoiceHandler(EcfSwitch? gateway = null) : ICommandHandler<IssueInvoice>
 {
     private readonly PostingEngine _engine = new();
     private readonly TaxEngine _tax = new();
+    private readonly EcfSwitch _gateway = gateway ?? EcfSwitch.Off;
 
     public string CommandType => "Sales.IssueInvoice";
 
@@ -431,6 +434,10 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
                 ? "The e-CF type is 31 (crédito fiscal) or 32 (consumo) (E-VS3-05-8); 44 needs a fiscal authorization."
                 : "An invoice under a fiscal authorization is an e-CF 44; invoice it anew without the authorization to charge ITBIS (E-FIS1-03-5).");
         }
+
+        // E-VS4-03-1: through Alanube when the gateway is on and the type has an ACTIVE range; else the manual channel.
+        var viaGateway = await EcfQueue.UsesGatewayAsync(context, _gateway, ecfType, cancellationToken).ConfigureAwait(false);
+        var fiscal = viaGateway ? "ECF_SENDING" : "PENDING_EXTERNAL";
 
         // SAL-09: the delivery lines in id order; the invoiced quantity never passes the delivered one. E-FIS1-03-2: the authorization first.
         var lines = await Invoicing.LinesAsync(context, command.InvoiceId, cancellationToken).ConfigureAwait(false);
@@ -532,7 +539,7 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
             context.Connection,
             context.Transaction,
             """
-            UPDATE sal.invoice SET commercial_status = 'CONFIRMED', accounting_status = 'POSTED', fiscal_status = 'PENDING_EXTERNAL', invoice_date = @date, due_date = @due,
+            UPDATE sal.invoice SET commercial_status = 'CONFIRMED', accounting_status = 'POSTED', fiscal_status = @fiscal, invoice_date = @date, due_date = @due,
               ecf_type = @ecf, tax_determination_id = @det, tax_total = @tax, total = @total, ar_doc_id = @ar, posting_event_id = @e, issued_by = @by, version = @v
             WHERE invoice_id = @i
             """,
@@ -540,6 +547,7 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
             ("date", today),
             ("due", today.AddDays(days)),
             ("ecf", ecfType),
+            ("fiscal", fiscal),
             ("det", determination.DeterminationId),
             ("tax", itbis),
             ("total", total),
@@ -612,12 +620,16 @@ public sealed class IssueInvoiceHandler : ICommandHandler<IssueInvoice>
             }
         }
 
+        // E-VS4-3: the e-CF with the next e-NCF of the range, queued in this transaction.
+        var queued = viaGateway ? await SalesEcf.QueueInvoiceAsync(context, command.InvoiceId, ecfType, today, CommandType, cancellationToken).ConfigureAwait(false) : null;
+
         return JsonSerializer.Serialize(new
         {
             invoiceId = command.InvoiceId,
             commercialStatus = commercial,
             accountingStatus = "POSTED",
-            fiscalStatus = "PENDING_EXTERNAL",
+            fiscalStatus = fiscal,
+            ecfNumber = queued?.Encf,
             netTotal = Invoicing.M(row.Net),
             taxTotal = Invoicing.M(itbis),
             total = Invoicing.M(total),
@@ -764,7 +776,7 @@ public sealed class VoidUnfiscalizedInvoiceHandler : ICommandHandler<VoidUnfisca
                 ("c", context.CompanyId), ("i", command.InvoiceId)).ConfigureAwait(false),
             cancellationToken).ConfigureAwait(false);
         var row = await Invoicing.LockAsync(context, command.InvoiceId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
-        if (row.Commercial != "CONFIRMED" || row.Fiscal != "PENDING_EXTERNAL")
+        if (row.Commercial != "CONFIRMED" || row.Fiscal is not ("PENDING_EXTERNAL" or "ECF_REJECTED"))
         {
             throw new DomainException(InvoiceErrors.NotVoidable, $"Only an issued, never fiscalized invoice is voided (it is {row.Commercial} / {row.Fiscal}; a fiscalized one needs a credit note).");
         }

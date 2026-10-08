@@ -27,6 +27,12 @@ public sealed class EcfSettings
     public bool Enabled => Mode is EcfModes.Sandbox or EcfModes.Production or EcfModes.Simulated;
 }
 
+/// <summary>E-VS4-03-1: whether this deployment sends e-CF through the gateway (its mode is not Off). Off: every document takes the manual channel.</summary>
+public sealed record EcfSwitch(bool On)
+{
+    public static readonly EcfSwitch Off = new(false);
+}
+
 public static class EcfModes
 {
     public const string Off = "OFF";
@@ -61,6 +67,8 @@ public static class EcfErrors
     public const string VersionConflict = "VERSION_CONFLICT";
     public const string InvalidState = "INVALID_STATE";
     public const string ApproverIsPreparer = "APPROVER_IS_CREATOR";
+    public const string IssuerIncomplete = "ECF_ISSUER_INCOMPLETE";
+    public const string PayloadInvalid = "ECF_PAYLOAD_INVALID";
 }
 
 /// <summary>What a provider answered to an issuance.</summary>
