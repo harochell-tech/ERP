@@ -39540,6 +39540,13 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "driverReportedDifferences",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -53735,6 +53742,10 @@
               "integer"
             ],
             "format": "int32"
+          },
+          "pinSet": {
+            "type": "boolean",
+            "default": false
           }
         },
         "additionalProperties": false

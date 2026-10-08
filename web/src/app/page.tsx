@@ -190,6 +190,15 @@ const TASKS: readonly Task[] = [
     countPermission: "sales:read",
     count: async (companyId) => (await query("/api/v1/companies/{companyId}/sales/deliveries", { path: { companyId }, query: { status: "IN_TRANSIT", limit: COUNT_LIMIT } })).items.length,
   },
+  // ENT1-03 (E-ENT1-01-10): the driver reported differences from the QR page; Dispatch completes the delivery.
+  {
+    href: "/despacho/tablero/?chofer=diferencias",
+    label: "Entregas con diferencias reportadas por el chofer",
+    permission: "delivery:manage",
+    countPermission: "sales:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/sales/deliveries", { path: { companyId }, query: { driverReportedDifferences: "true", limit: COUNT_LIMIT } })).items.length,
+  },
   { href: "/facturacion/por-facturar/", label: "Facturar entregas", permission: "invoice:create" },
   {
     href: "/facturacion/facturas/?filtro=ecf",

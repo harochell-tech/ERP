@@ -243,6 +243,14 @@ dialog.confirm-dialog textarea { width: 100%; font: inherit; }
 .proforma .signature > div { flex: 1; }
 .proforma .signature-line { border-bottom: 1px solid var(--fg); height: 64px; margin-bottom: 6px; }
 .proforma .signature-box { border: 1px dashed var(--muted); height: 110px; margin-bottom: 6px; border-radius: 6px; }
+/* ENT1-03 (E-ENT-8): the driver's QR, bottom right of the delivery note. */
+.proforma .driver-qr { flex: 0 0 140px; text-align: center; font-size: 11px; color: var(--fg); }
+.driver-page { max-width: 560px; margin: 0 auto; padding: 16px; }
+.driver-page h1 { font-size: 22px; }
+.driver-page .choice { display: flex; gap: 8px; flex-wrap: wrap; }
+.driver-page .choice label { flex: 1 1 200px; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface); }
+.driver-page canvas.signature-pad { width: 100%; height: 180px; border: 1px dashed var(--muted); border-radius: 8px; touch-action: none; background: #fff; }
+.driver-page .photo-preview { max-width: 100%; border-radius: 8px; margin-top: 8px; }
 @media print {
   body { background: #fff; }
   .sidebar, .topbar, .no-print { display: none !important; }

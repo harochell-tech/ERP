@@ -584,6 +584,10 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
   const menuVisible = mobile && menuOpen;
 
+  // ENT1-03 (E-ENT-1): the drivers' page is public — no sign-in, no menu.
+  if (pathname.startsWith("/entrega")) {
+    return <main className="driver-page">{children}</main>;
+  }
   if (state.status === "loading") {
     return (
       <main className="page">

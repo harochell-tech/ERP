@@ -9158,6 +9158,8 @@ export interface components {
             licenseExpiresOn: null | string;
             /** Format: int32 */
             daysToLicenseExpiry: null | number;
+            /** @default false */
+            pinSet?: boolean;
         };
         DueEcfDocument: {
             /** Format: uuid */
@@ -39409,6 +39411,7 @@ export interface operations {
                 to?: string;
                 vehicleId?: string;
                 driverId?: string;
+                driverReportedDifferences?: boolean;
             };
             header?: never;
             path: {

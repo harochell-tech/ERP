@@ -71,6 +71,7 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await submit(dispatch, "Planificar conduce");
   const status = dispatch.getByTestId("delivery-status");
   await expect(status).toHaveText("Planificado");
+  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
   // FLT-01 (E-FLT-1…4): the truck is picked by its ficha; a licence about to expire warns and does not block the dispatch.
   const planned = dispatch.url();
   await dispatch.goto("/maestros/flota/");
@@ -118,7 +119,8 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   // Billing: invoice what was delivered (5,000.00 + 18 % ITBIS), then the e-CF from the provider's portal.
   const billing = await signIn(browser, "Facturación");
   await nav(billing, "Por facturar");
-  await billing.getByRole("checkbox", { name: /^Facturar CD-\d+ BLOQUE-6$/ }).first().check();
+  // Its own delivery: other journeys leave deliveries of Constructora Uno to bill (ENT-1's driver confirmations).
+  await billing.getByRole("checkbox", { name: `Facturar ${deliveryNo} BLOQUE-6` }).check();
   await billing.getByRole("button", { name: "Crear factura con 1 línea(s)" }).click();
   await confirmAction(billing, "Emitir factura");
   // V-06: an issued invoice reads "Emitida"; V-05 (E-UX4-11): Facturación does not see its accounting status.

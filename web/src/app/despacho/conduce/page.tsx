@@ -279,12 +279,23 @@ function GateOut({ delivery, onDone }: { delivery: Delivery; onDone: () => void 
   );
 }
 
+/** A UTC instant as the value of a datetime-local field (the browser's time zone). */
+function localInput(utc: string): string {
+  const d = new Date(utc);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const id = delivery.header.deliveryId;
   const pod = useCommand(`pod:${id}`, "/api/v1/companies/{companyId}/sales/record-pod", `Conduce ${delivery.header.deliveryNo}: entrega al cliente registrada.`);
-  const [receiver, setReceiver] = useState("");
-  const [receivedAt, setReceivedAt] = useState("");
-  const [evidence, setEvidence] = useState<EvidenceValue>(NO_EVIDENCE);
+  // ENT1-03 (E-ENT1-01-10): after the driver reported differences, the form starts from what he confirmed — receiver, time and photo.
+  const driver = delivery.driverConfirmation?.outcome === "DIFFERENCES" ? delivery.driverConfirmation : null;
+  const [receiver, setReceiver] = useState(driver?.receiverName ?? "");
+  const [receivedAt, setReceivedAt] = useState(driver ? localInput(driver.confirmedAt) : "");
+  const [evidence, setEvidence] = useState<EvidenceValue>(
+    driver ? { ref: `Foto del chofer ${delivery.header.deliveryNo}`, sha256: driver.evidenceSha256, fileName: "foto del chofer" } : NO_EVIDENCE,
+  );
   const [received, setReceived] = useState<Record<string, string>>(() => Object.fromEntries(delivery.lines.map((l) => [l.deliveryLineId, l.qtyIssued])));
   const [returned, setReturned] = useState<Record<string, string>>({});
   const [exception, setException] = useState("");
@@ -341,7 +352,13 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
       <Field label="Fecha y hora de recepción" required error={fe.errors.receivedAt}>
         <input type="datetime-local" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} />
       </Field>
-      <Evidence label="Constancia de entrega firmada (foto o firma)" value={evidence} onChange={setEvidence} errors={{ ref: fe.errors.ref, sha256: fe.errors.sha256 }} />
+      {driver ? (
+        <p className="notice" data-testid="pod-from-driver">
+          El chofer reportó diferencias: «{driver.note}». Escriba lo recibido y lo devuelto; la foto del chofer es la constancia.
+        </p>
+      ) : (
+        <Evidence label="Constancia de entrega firmada (foto o firma)" value={evidence} onChange={setEvidence} errors={{ ref: fe.errors.ref, sha256: fe.errors.sha256 }} />
+      )}
       <LineTable>
         <thead>
           <tr>
@@ -400,6 +417,84 @@ function Pod({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
 }
 
 
+const LINK_STATE: Record<string, string> = {
+  ACTIVE: "Activo: el chofer puede confirmar",
+  LOCKED: "Bloqueado: 5 PIN equivocados",
+  EXPIRED: "Vencido",
+  CONFIRMED: "Usado: el chofer confirmó",
+  ANNULLED: "Anulado",
+};
+
+/** ENT1-03 (E-ENT-1…5): the driver's link and what the driver confirmed, with the photo or signature from the private store. */
+function DriverBlock({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
+  const { companyId, can } = useSession();
+  const id = delivery.header.deliveryId;
+  const link = delivery.driverLink;
+  const confirmation = delivery.driverConfirmation;
+  const reopen = useCommand(`reopen-link:${id}`, "/api/v1/companies/{companyId}/sales/reopen-delivery-link", "Enlace reabierto: reimprima el conduce para el chofer.");
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<unknown>(null);
+  if (!link && !confirmation) {
+    return null;
+  }
+  return (
+    <section className="card" data-testid="driver-block">
+      <h2 style={{ marginTop: 0 }}>Confirmación del chofer</h2>
+      {link ? (
+        <p data-testid="driver-link-state">
+          Enlace del QR: {LINK_STATE[link.status] ?? link.status} · vence {formatDateTime(link.expiresAt)}
+          {link.failedAttempts > 0 ? ` · ${link.failedAttempts} PIN equivocados` : ""}
+        </p>
+      ) : null}
+      {confirmation ? (
+        <>
+          <p data-testid="driver-confirmation">
+            {confirmation.outcome === "FULL" ? "Recibido completo" : "Hubo diferencias"} · recibió {confirmation.receiverName}
+            {confirmation.receiverNationalId ? ` (cédula ${confirmation.receiverNationalId})` : ""} el {formatDateTime(confirmation.confirmedAt)}
+            {confirmation.note ? ` · «${confirmation.note}»` : ""}
+            {confirmation.latitude && confirmation.longitude ? (
+              <>
+                {" · "}
+                <a href={`https://www.google.com/maps?q=${confirmation.latitude},${confirmation.longitude}`} target="_blank" rel="noreferrer">
+                  ubicación
+                </a>
+              </>
+            ) : null}
+            {confirmation.completedByPod ? " · entrega al cliente registrada" : ""}
+          </p>
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="photo-preview" src={photo} alt="Constancia del chofer" data-testid="driver-evidence" style={{ maxWidth: 360 }} />
+          ) : (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const file = await query("/api/v1/companies/{companyId}/sales/deliveries/{deliveryId}/driver-evidence", { path: { companyId, deliveryId: id } });
+                  setPhoto(`data:${file.contentType};base64,${file.contentBase64}`);
+                } catch (e) {
+                  setPhotoError(e);
+                }
+              }}
+            >
+              Ver {confirmation.evidenceKind === "PHOTO" ? "foto" : "firma"}
+            </button>
+          )}
+          <ErrorBox error={photoError} />
+        </>
+      ) : null}
+      {link && can("delivery_link:reopen") && delivery.header.status === "IN_TRANSIT" && (link.status === "LOCKED" || link.status === "EXPIRED" || link.status === "ACTIVE") ? (
+        <div className="actions">
+          <button type="button" disabled={reopen.busy} onClick={async () => (await reopen.run({ deliveryId: id })) && onDone()}>
+            {link.status === "ACTIVE" ? "Reemplazar QR (conduce perdido)" : "Reabrir enlace"}
+          </button>
+          <ErrorBox error={reopen.error} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function DeliveryDetail() {
   const { companyId, can, plantName } = useSession();
   const id = useSearchParams().get("id") ?? "";
@@ -447,6 +542,7 @@ function DeliveryDetail() {
       {step === "START_LOADING" ? <StartLoading delivery={data} onDone={reload} /> : null}
       {step === "CONFIRM_LOADED" ? <ConfirmLoaded delivery={data} onDone={reload} /> : null}
       {step === "GATE_OUT" ? <GateOut delivery={data} onDone={reload} /> : null}
+      <DriverBlock delivery={data} onDone={reload} />
       {step === "POD" ? <Pod delivery={data} onDone={reload} /> : null}
       {can("delivery:manage") ? (
         <div className="actions">

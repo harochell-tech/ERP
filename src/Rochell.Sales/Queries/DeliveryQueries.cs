@@ -15,7 +15,7 @@ namespace Rochell.Sales.Queries;
 /// </summary>
 public sealed record ListDeliveries(
     Guid CompanyId, Guid SessionId, string? Status = null, Guid? SalesOrderId = null, int Limit = 50, int Offset = 0, Guid? PartyId = null, DateOnly? From = null, DateOnly? To = null,
-    Guid? VehicleId = null, Guid? DriverId = null) : IQuery;
+    Guid? VehicleId = null, Guid? DriverId = null, bool DriverReportedDifferences = false) : IQuery;
 
 public sealed record DeliverySummary(
     Guid DeliveryId, string DeliveryNo, Guid SalesOrderId, string OrderNo, string CustomerName, string PlantCode, string DeliveryTermCode, string ControlTransfersAt, string Status,
@@ -57,6 +57,8 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
              WHERE d.company_id = @c AND (CAST(@s AS text) IS NULL OR d.status = CAST(@s AS text)) AND (CAST(@o AS uuid) IS NULL OR d.sales_order_id = CAST(@o AS uuid))
               AND (CAST(@p AS uuid) IS NULL OR o.party_id = CAST(@p AS uuid))
               AND (CAST(@veh AS uuid) IS NULL OR d.vehicle_id = CAST(@veh AS uuid)) AND (CAST(@drv AS uuid) IS NULL OR d.driver_id = CAST(@drv AS uuid))
+              AND (NOT @diff OR (d.status = 'IN_TRANSIT' AND EXISTS (
+                     SELECT 1 FROM log.driver_confirmation c WHERE c.company_id = d.company_id AND c.delivery_id = d.delivery_id AND c.outcome = 'DIFFERENCES')))
               AND ((CAST(@from AS date) IS NULL AND CAST(@to AS date) IS NULL) OR coalesce((d.gate_out_at AT TIME ZONE 'America/Santo_Domingo')::date,
                      (SELECT min(e.business_date) FROM core.domain_event e WHERE e.company_id = d.company_id AND e.aggregate_id = d.delivery_id))
                    BETWEEN coalesce(CAST(@from AS date), DATE '0001-01-01') AND coalesce(CAST(@to AS date), DATE '9999-12-31'))
@@ -71,6 +73,7 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
             ("p", query.PartyId),
             ("veh", query.VehicleId),
             ("drv", query.DriverId),
+            ("diff", query.DriverReportedDifferences),
             ("from", query.From),
             ("to", query.To),
             ("limit", query.Limit),
