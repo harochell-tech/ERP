@@ -1,8 +1,8 @@
 # LAB-1 — Laboratorio de calidad y trazabilidad de lotes
 
-**Estado: BORRADOR — pendiente de aprobación de Alexander Rochell.** Las decisiones D-01…D-10 de la sección 13 se proponen como
-errata E-LAB1-1…10. Hasta su "apruebo" no se escribe código ni se agregan filas a `../errata.md`; lo que este documento dice es
-propuesta, no especificación.
+**Estado: CONGELADO — aprobado por Alexander Rochell el 2026-10-08**, con las decisiones D-01…D-10 de la sección 13 tal como se
+recomiendan (errata E-LAB1-1…10 en `../errata.md`). Es la especificación; cualquier cambio sigue la regla de congelamiento.
+Matriz de aceptación: `../../acceptance/lab1.md`.
 
 Fuentes: handoff [`LAB-1_handoff_trazabilidad_lotes_calidad.md`](LAB-1_handoff_trazabilidad_lotes_calidad.md); Excel validado
 [`reference/Registro_Ensayos_Compresion_Lotes.xlsx`](reference/Registro_Ensayos_Compresion_Lotes.xlsx) (fórmulas y campos) y su
@@ -193,7 +193,7 @@ asientos contables: LAB-1 no toca el mayor (el bloqueo y la liberación final so
 Consultas: lotes con su evaluación, detalle del lote (ensayos, evaluación, conduces), recall hacia adelante y hacia atrás,
 curva de edad, gráfico de control y comparación de máquinas, certificado (impresión y verificación pública).
 
-## 7. Máquina de estados del lote (propuesta, D-04 y D-05)
+## 7. Máquina de estados del lote (D-04 y D-05)
 
 ```
 CURING ──ReleaseLot──▶ RELEASED ──FinalReleaseLot (CUMPLE real)──▶ FINAL_RELEASED
@@ -217,7 +217,7 @@ CURING ──ReleaseLot──▶ RELEASED ──FinalReleaseLot (CUMPLE real)─
 | `lab_spec:manage` | CALIDAD | Requisitos por ítem, parámetros, tipos de falla, código corto de máquina |
 | `lab:read` | LABORATORIO, CALIDAD, Gerente de planta, Supervisor, Ventas, Director, Auditor | Consultas, recall, gráficos |
 
-SoD propuesto: producir (`shift_summary:record`) ≠ liberación final, igual que hoy con la preliminar. El bloqueo automático lo
+SoD: producir (`shift_summary:record`) ≠ liberación final, igual que hoy con la preliminar. El bloqueo automático lo
 ejecuta el sistema como consecuencia del ensayo registrado; queda en el historial con el ensayo que lo causó.
 
 ## 9. Histórico previo a Core
@@ -246,7 +246,7 @@ Calidad de los datos, a tener en cuenta en la importación (D-06):
 6. Sin datos de trazabilidad de producción (mezcla, cemento, curado, unidades) ni ensayos de absorción.
 7. Todos los lotes salen «Sin requisito» (no hay requisitos cargados); 8 con alerta «CV alto».
 
-## 10. Pruebas de aceptación (propuestas)
+## 10. Pruebas de aceptación
 
 | ID | Given | When | Then |
 | --- | --- | --- | --- |
@@ -279,7 +279,7 @@ Calidad de los datos, a tener en cuenta en la importación (D-06):
 | X-L4 | Medidas nominales de Block 4" (el Excel las marca como supuestas) | Alexander | Datos reales de 4" |
 | X-L5 | Códigos de las 3 máquinas en Core staging y su pareja `planta1..3` → P1, P2, P3 | Alexander / Gerente de planta | D-03 en staging |
 
-## 12. Plan de PRs (propuesto)
+## 12. Plan de PRs
 
 | PR | Contenido | Pruebas |
 | --- | --- | --- |
@@ -290,7 +290,7 @@ Calidad de los datos, a tener en cuenta en la importación (D-06):
 | LAB1-04 | Gráfico de control, comparación de máquinas, curva de edad en pantalla; importación del histórico | LAB-16, E2E-L1 |
 | LAB1-05 (portal) | Retirar o redirigir `resultado_compresion` del checklist | — |
 
-## 13. Decisiones (para aprobar como E-LAB1-1…10)
+## 13. Decisiones (aprobadas como E-LAB1-1…10)
 
 | # | Decisión | Recomendación |
 | --- | --- | --- |

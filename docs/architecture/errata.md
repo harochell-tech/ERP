@@ -1320,6 +1320,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-CFG-4 | CFG | The owner downloads the official PDFs in his browser; they are kept in `docs/fiscal/fuentes/` and their SHA-256 is computed from those files. Without the file the source is not registered. |
 | E-CFG-5 | CFG | Activation stays with a person: one «Activar» per rule. |
 | E-CFG-6 | CFG | Rule versions a person already configured are completed (source linked, tests run) when they match the file, and left alone when they differ. The rules start on 2026-10-01 («desde hoy», said on 2026-10-01). |
+| E-LAB1-1 | LAB-1 | The internal lot code `PT-<item>-<yyyyMMdd>-<shift>` stays; `mfg.fg_lot` gains a unique `field_code`, the one printed on labels, delivery notes and certificates: `<item's lot prefix><DDMMYY><machine short code>`, e.g. `8070325P1`. The first shift (T1) never carries a suffix; any other shift always carries `-<shift>` (`8070325P1-T2`), whether or not another lot exists that day. |
+| E-LAB1-2 | LAB-1 | One lot per run stays (E-MFG1-7). A test belongs to exactly one lot; with two shifts there are two lots that day and each needs its own specimens. |
+| E-LAB1-3 | LAB-1 | `md.machine.short_code` (P1, P2, P3), unique per company. The link to the portal's `planta1..3` is the existing `mfg.portal_machine` pairing. D-04 of MFG-1 (one line per plant) no longer applies: MATILLA has three machines. |
+| E-LAB1-4 | LAB-1 | Double release: `RELEASED` = preliminary (visual, as today; may be dispatched). New status `FINAL_RELEASED` = the lab's verdict is CUMPLE on real data at ≥ 26 days. A NO CUMPLE blocks the lot from CURING, RELEASED or FINAL_RELEASED and produces the recall list. `BlockLot` / `UnblockLot` extend to released lots (unblocking returns the lot to the status it came from) and the gate-out skips BLOCKED lots even when their stock is in the yard. |
+| E-LAB1-5 | LAB-1 | An estimated verdict may block (preventive; Calidad unblocks with a reason). It never gives `FINAL_RELEASED`. An estimated CUMPLE changes nothing. |
+| E-LAB1-6 | LAB-1 | The history before Core (42 lots, 216 specimens, `docs/architecture/lab1/reference/historico_ensayos.csv`) is imported into `qa` as read-only legacy lots without `fg_lot_id`, keeping the original code. It feeds the control chart and the age curve. Specimens of age 0 are imported flagged and never enter an estimate. |
+| E-LAB1-7 | LAB-1 | At the gate-out, scanning a rack label chooses the lot; without a scan, FIFO (E-VS3-04-5) stays the default. |
+| E-LAB1-8 | LAB-1 | Pavers (ASTM C936, no mould in the portal) are out of LAB-1 v1; the per-item requirements are left ready to include them later. |
+| E-LAB1-9 | LAB-1 | Permissions (two segments, as the permission code format requires): `lab_test:record` (lab technician, new role LABORATORIO, and CALIDAD), `fg_lot:final_release` and `lab_spec:manage` (CALIDAD), `lab:read` for the queries. CALIDAD signs the certificate. SoD: recording a shift summary ≠ final release. |
+| E-LAB1-10 | LAB-1 | While an item has no 28-day requirement the verdict is «Sin requisito»: it neither blocks nor allows `FINAL_RELEASED`. |
 
 Implementation rules derived from the above (no architectural change):
 
