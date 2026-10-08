@@ -1343,6 +1343,10 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG3-9 | MFG-3 | The mechanic marks a task done in the portal's Mantenimientos page by choosing it; Core publishes the task list to the portal and reads back the done ones; a done task's counter restarts. |
 | E-MFG3-10 | MFG-3 | «Por vencer» at 90 %, «Vencida» at 100 %: a counter on Core's Inicio and a portal push notification to subscribers with the Mantenimiento role. |
 | E-MFG3-11 | MFG-3 | Spare parts used in maintenance are out of scope for now. |
+| E-MFG3-00-1 | MFG3-00 | Paver (adoquín) is not counted by the machines: its «Producido» stays manual; the lock applies to 4", 6" and 8" only. |
+| E-MFG3-00-2 | MFG3-00 | «Producido» can no longer be overwritten in the portal; a machine miscount is corrected in Core on the shift draft (who changed it is kept). |
+| E-MFG3-00-3 | MFG3-00 | The day's «rechazados / dañados» become the draft's fresh scrap (E-MFG3-2); the next day's confirmed curing loss («Confirma la producción real de ayer») is shown in Core as a suggestion when Calidad releases the lot, never recorded by itself. |
+| E-MFG3-00-4 | MFG3-00 | For plants 2 and 3 the report's raw-material fields show what the batch plant sent, in its unit; plant 1 stays manual. |
 | E-PRT-1 | PRT-1 | One print format per document, kept in Core: the screen print, the e-mailed PDF and reprints come from the same format. |
 | E-PRT-2 | PRT-1 | Documents: delivery note, invoice (e-CF 31 / 32 / 44), quote, proforma, statement, aging; new: credit note (e-CF 34), receipt, customer refund, purchase order. |
 | E-PRT-3 | PRT-1 | Configuración › Formatos de impresión with a live preview of a real document: logo, colours, font, paper (letter, half letter, 80 mm ticket), margins, columns (which, order, width, alignment), row height, font size, fixed texts (header, footer, terms, bank accounts, signature). |
