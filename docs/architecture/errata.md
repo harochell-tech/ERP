@@ -1366,6 +1366,13 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-PRT-01-6 | PRT-01 | Documents use IBM Plex Sans embedded in the document, so the PDF looks the same anywhere without internet. |
 | E-PRT-01-7 | PRT-01 | The server draws the QR codes inside the document (the driver's and the e-CF's; the invoice carries the driver's QR of E-ENT-9). |
 | E-PRT-01-8 | PRT-01 | PRT-01 moves the six current documents to the new rendering with no visible change; PRT-02 the editing screen and logo; PRT-03 the new documents. |
+| E-PRT-02-1 | PRT-02 | The built-in templates read «settings» that the simple screen changes without code: columns (which, order, width, alignment), fixed texts, logo, colours, font, row height, paper and margins. |
+| E-PRT-02-2 | PRT-02 | A version edited in advanced mode keeps its own template and CSS; the simple screen no longer adjusts it. Going back means starting again from the built-in format or an earlier version. |
+| E-PRT-02-3 | PRT-02 | A template is not saved with `<script>`, `on…=` attributes, `javascript:` links, or external files or fonts; only the company's logo and the document's data. |
+| E-PRT-02-4 | PRT-02 | Paper: letter and half letter for every document; 80 mm ticket only for the consumer invoice (32) and the receipt. The size is set per format. |
+| E-PRT-02-5 | PRT-02 | Preview with the latest real document of the type, or one chosen by number, exactly as it prints, with the watermark «VISTA PREVIA». |
+| E-PRT-02-6 | PRT-02 | Before activating, Core renders a test document and checks the mandatory content (invoice and credit note: e-NCF, RNCs, QR, security code, signature date; conduce: driver's QR and watermark); if anything is missing it says what and does not activate. |
+| E-PRT-02-7 | PRT-02 | Holders of `configuration:read` (Contador, Controller, Auditor) see the formats in Configuración › Formatos de impresión without change buttons. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
