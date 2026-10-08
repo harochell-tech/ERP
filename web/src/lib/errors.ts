@@ -418,6 +418,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PRINT_SETTINGS_INVALID: "Revise los ajustes: papel, márgenes de 3 a 30 mm, letra de 9 a 20 px, color #rrggbb, columnas con título y al menos una visible.",
   PRINT_MANDATORY_MISSING: "Al formato le falta algo obligatorio (vea el detalle). No se activó.",
   PRINT_LOGO_INVALID: "El logo debe ser una imagen PNG o JPEG de hasta 1 MB.",
+  IDEAL_CYCLE_INVALID: "El ciclo ideal va de más de 0 a 3,600 segundos, para una máquina y un producto terminado; si ya hay uno desde esa fecha, use una fecha posterior.",
   DELIVERY_LINK_INVALID: "Este enlace de entrega no es válido. Pida a Despacho que reimprima el conduce.",
   DRIVER_CONFIRMATION_INVALID: "Revise la confirmación: quién recibió, la foto o firma, y qué fue diferente si lo hubo.",
   CONSUMPTION_PENDING: "El resumen todavía no tiene el consumo real: espere el de la dosificadora o escríbalo con un motivo.",

@@ -4317,6 +4317,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/manufacturing/set-ideal-cycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetIdealCycle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/manufacturing/sync-portal-shift": {
         parameters: {
             query?: never;
@@ -5189,6 +5205,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetPortalSetup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/efficiency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetMachineEfficiency"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10452,6 +10484,42 @@ export interface components {
             /** @default ACTIVE */
             status?: string;
         };
+        MachineEfficiency: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            shifts: components["schemas"]["ShiftEfficiencyView"][];
+            machines: components["schemas"]["MachineEfficiencyTotal"][];
+            missingIdealCycles: string[];
+            /** Format: int32 */
+            stoppagesWithoutReason: number;
+        };
+        MachineEfficiencyTotal: {
+            /** Format: uuid */
+            machineId: string;
+            machineCode: string;
+            machineName: string;
+            /** Format: decimal */
+            plannedMinutes: string;
+            /** Format: decimal */
+            stoppageMinutes: string;
+            /** Format: decimal */
+            runningMinutes: string;
+            /** Format: decimal */
+            availability: null | string;
+            /** Format: decimal */
+            performance: null | string;
+            /** Format: decimal */
+            quality: null | string;
+            /** Format: decimal */
+            oee: null | string;
+            /** Format: decimal */
+            lostUnits: null | string;
+            /** Format: decimal */
+            lostValue: null | string;
+            reasons: components["schemas"]["StoppageReasonView"][];
+        };
         MachineList: {
             items: components["schemas"]["MachineView"][];
         };
@@ -13441,6 +13509,16 @@ export interface components {
             driverId: string;
             pin: string;
         };
+        SetIdealCycle: {
+            /** Format: uuid */
+            machineId: string;
+            /** Format: uuid */
+            itemId: string;
+            /** Format: date */
+            validFrom: string;
+            /** Format: decimal */
+            seconds: string;
+        };
         SetLocationStatus: {
             /** Format: uuid */
             locationId: string;
@@ -13530,6 +13608,42 @@ export interface components {
             area: string;
             status: string;
             missing: string[];
+        };
+        ShiftEfficiencyView: {
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            shiftNo: number;
+            portalCode: string;
+            /** Format: uuid */
+            machineId: string;
+            machineCode: string;
+            machineName: string;
+            /** Format: decimal */
+            plannedMinutes: string;
+            /** Format: decimal */
+            maintenanceMinutes: string;
+            /** Format: decimal */
+            stoppageMinutes: string;
+            /** Format: decimal */
+            runningMinutes: string;
+            /** Format: int32 */
+            cycles: number;
+            /** Format: decimal */
+            availability: null | string;
+            /** Format: decimal */
+            performance: null | string;
+            /** Format: decimal */
+            quality: null | string;
+            /** Format: decimal */
+            oee: null | string;
+            /** Format: decimal */
+            lostUnits: null | string;
+            /** Format: decimal */
+            lostValue: null | string;
+            /** Format: int32 */
+            stoppagesWithoutReason: number;
+            reasons: components["schemas"]["StoppageReasonView"][];
         };
         ShiftList: {
             items: components["schemas"]["ShiftView"][];
@@ -13674,6 +13788,13 @@ export interface components {
             balance: string;
             /** Format: decimal */
             deposit: string;
+        };
+        StoppageReasonView: {
+            reason: string;
+            /** Format: int32 */
+            count: number;
+            /** Format: decimal */
+            minutes: string;
         };
         SubmitCashSaleForPayment: {
             /** Format: uuid */
@@ -34420,6 +34541,82 @@ export interface operations {
             };
         };
     };
+    SetIdealCycle: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetIdealCycle"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     SyncPortalShift: {
         parameters: {
             query?: never;
@@ -37775,6 +37972,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortalSetupView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetMachineEfficiency: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MachineEfficiency"];
                 };
             };
             /** @description Bad Request */

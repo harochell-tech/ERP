@@ -371,6 +371,7 @@ public static class CommandEndpoints
         manufacturing.MapCommand<StartProductionRun, StartProductionRunHandler>();
         // MFG2-02 (E-MFG2-1/6): the daily process's steps reading the machines' portal.
         manufacturing.MapCommand<ImportPortalData, ImportPortalDataHandler>();
+        manufacturing.MapCommand<SetIdealCycle, SetIdealCycleHandler>(); // MFG3-02 (E-MFG3-5)
         manufacturing.MapCommand<SyncPortalShift, SyncPortalShiftHandler>();
         // MFG2-03 (E-MFG2-3, E-MFG2-01-7): Producción › Portal pairings.
         manufacturing.MapCommand<SetPortalMachine, SetPortalMachineHandler>();
@@ -451,7 +452,7 @@ public static class CommandEndpoints
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),
-        typeof(ImportPortalDataHandler), typeof(SyncPortalShiftHandler), typeof(SetPortalMachineHandler), typeof(SetPortalMouldHandler), typeof(SetPortalShiftHandler),
+        typeof(ImportPortalDataHandler), typeof(SetIdealCycleHandler), typeof(SyncPortalShiftHandler), typeof(SetPortalMachineHandler), typeof(SetPortalMouldHandler), typeof(SetPortalShiftHandler),
         typeof(SetPortalMaterialHandler), typeof(RemovePortalPairingHandler),
         typeof(StartProductionRunHandler), typeof(CancelProductionRunHandler), typeof(RecordShiftSummaryHandler), typeof(PostShiftSummaryHandler), typeof(ReverseShiftSummaryHandler),
         typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler), typeof(SettleCostCollectorHandler),

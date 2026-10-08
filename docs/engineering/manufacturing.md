@@ -179,3 +179,20 @@ Migration 0104:
 - `mfg.maintenance_task`: per machine, a code, name, every N CYCLES / RUNNING_HOURS / DAYS, instructions, ACTIVE / INACTIVE.
   `mfg.maintenance_done`: append-only, from the PORTAL (its maintenance id) or from CORE (who recorded it), never both.
 - Permission `maintenance_plan:manage` for GERENTE_PLANTA (149 permissions).
+
+## MFG3-02 — the portal's stoppages, maintenance and reports; ideal cycle; efficiency (E-MFG3-2…7, E-MFG3-01-1/2/4)
+
+- `ImportPortalData` also keeps each new version of a paired machine's stoppages (`paros`), maintenance windows (`mantenimientos`)
+  and daily reports (`reportes`) — an older portal without them still imports. A new report version brings its machine's day (shift 1)
+  up to date.
+- `SyncPortalShift`: the latest daily report's broken blocks of a machine with a single shift that day become fresh scrap, split
+  among its products by units (good = blocks − broken); two shifts that day, or more broken than blocks, leave a warning instead.
+  A draft a person changed is kept, as before.
+- `SetIdealCycle` (`production_master:manage`): seconds per machine and product from a date (one per date; a later date replaces it).
+- `GetMachineEfficiency` (`production:read`, `GET …/manufacturing/efficiency?from&to`, at most 93 days): per paired machine and portal
+  shift, from the latest reading and the latest version of each stoppage and maintenance window — planned minutes = window (up to
+  now) − maintenance; stoppages starting inside maintenance do not count; running = planned − stoppages; availability = running ÷
+  planned; performance = Σ cycles × ideal seconds ÷ running seconds (null when a mould's product has no ideal cycle, listed in
+  `missingIdealCycles`); quality = good ÷ (good + scrap) of the shift's summaries; OEE = their product (ratios to 4 decimals); lost
+  blocks = stoppage seconds ÷ the main mould's ideal cycle × its blocks per cycle, valued at the ACTIVE standard cost; stoppages by
+  reason (`SIN_RAZON` without one). Totals per machine over the period. 280 commands.
