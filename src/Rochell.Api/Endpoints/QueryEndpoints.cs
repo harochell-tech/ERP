@@ -75,7 +75,7 @@ public static class QueryEndpoints
         typeof(GetApAgingHandler), typeof(ListBankTransfersHandler), typeof(GetPaymentProposalHandler), typeof(ListPaymentsHandler), typeof(GetPaymentHandler), typeof(ListBankAccountsHandler), typeof(ListRefundsToMatchHandler),
         typeof(ListPartyBankAccountsHandler), typeof(ListBankStatementsHandler), typeof(ListBankStatementLinesHandler), typeof(GetBankReconciliationHandler),
         typeof(ListCustomersHandler), typeof(GetCustomerHandler), typeof(ListCustomerTermsHandler), typeof(ListStandardCostsHandler), typeof(ListPriceListsHandler), typeof(ListPriceListHeadersHandler), typeof(ListDeliveryZonesHandler),
-        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(GetPortalSetupHandler), typeof(GetMachineEfficiencyHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
+        typeof(GetPriceListHandler), typeof(ListVehiclesHandler), typeof(ListDriversHandler), typeof(ListMachinesHandler), typeof(ListShiftsHandler), typeof(ListRecipesHandler), typeof(GetRecipeHandler), typeof(ListProductionRunsHandler), typeof(GetProductionRunHandler), typeof(GetPortalSetupHandler), typeof(GetMachineEfficiencyHandler), typeof(Rochell.Manufacturing.Maintenance.ListMaintenanceTasksHandler), typeof(ListFgLotsHandler), typeof(ListCostCollectorsHandler), typeof(GetProductionDayHandler), typeof(ListOpeningBatchesHandler), typeof(GetOpeningBatchHandler),
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler), typeof(GetDriverEvidenceHandler), typeof(GetDriverDeliveryHandler), typeof(Rochell.Sales.Printing.GetPrintDocumentHandler), typeof(Rochell.Sales.Printing.ListPrintFormatsHandler), typeof(Rochell.Sales.Printing.GetPrintFormatHandler),
         typeof(Rochell.Sales.Printing.PreviewPrintFormatHandler),
@@ -224,6 +224,10 @@ public static class QueryEndpoints
         manufacturing.MapGet("/efficiency", (HttpContext http, Guid companyId, DateOnly from, DateOnly to, GetMachineEfficiencyHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetMachineEfficiency(companyId, s, from, to), handler, ct))
             .Describe<MachineEfficiency>(nameof(GetMachineEfficiency));
+        // MFG3-03 (E-MFG3-8/10): the preventive maintenance tasks with how much of their interval has gone.
+        manufacturing.MapGet("/maintenance-tasks", (HttpContext http, Guid companyId, Rochell.Manufacturing.Maintenance.ListMaintenanceTasksHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Manufacturing.Maintenance.ListMaintenanceTasks(companyId, s), handler, ct))
+            .Describe<Rochell.Manufacturing.Maintenance.MaintenanceTaskList>(nameof(Rochell.Manufacturing.Maintenance.ListMaintenanceTasks));
         manufacturing.MapGet("/runs/{runId:guid}", (HttpContext http, Guid companyId, Guid runId, GetProductionRunHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetProductionRun(companyId, s, runId), handler, ct))
             .Describe<ProductionRunDetail>(nameof(GetProductionRun), notFound: true);

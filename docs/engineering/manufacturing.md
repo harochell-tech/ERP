@@ -196,3 +196,16 @@ Migration 0104:
   `missingIdealCycles`); quality = good ÷ (good + scrap) of the shift's summaries; OEE = their product (ratios to 4 decimals); lost
   blocks = stoppage seconds ÷ the main mould's ideal cycle × its blocks per cycle, valued at the ACTIVE standard cost; stoppages by
   reason (`SIN_RAZON` without one). Totals per machine over the period. 280 commands.
+
+## MFG3-03 — preventive maintenance plans (E-MFG3-8…10, E-MFG3-01-3/5)
+
+- `DefineMaintenanceTask` (code in capitals, unique — what the mechanic chooses in the portal), `UpdateMaintenanceTask`,
+  `SetMaintenanceTaskStatus` (ACTIVE / INACTIVE, never deleted), `RecordMaintenanceDone` (CORE, by the plant manager): all
+  `maintenance_plan:manage`. 284 commands.
+- `ImportPortalData`: a closed portal maintenance window whose `tarea` is the code of an ACTIVE task of its machine records that task
+  done (PORTAL, once per window).
+- `ListMaintenanceTasks` (`production:read`, `GET …/manufacturing/maintenance-tasks`): each task with what has gone since it was last
+  done (or created) — cycles of the machine's shifts, running hours (planned − maintenance − stoppages up to now) or days —, the share
+  of its interval (`used`), the state OK / POR_VENCER (≥ 90 %) / VENCIDA (≥ 100 %) / INACTIVE, the last five done (local time), and
+  the counts `dueSoon` / `overdue` for Inicio.
+- Publishing the task list to the portal and its push notices come with the portal's MFG3-00b.

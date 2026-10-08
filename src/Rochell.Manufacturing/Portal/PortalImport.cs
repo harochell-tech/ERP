@@ -183,6 +183,8 @@ public sealed class ImportPortalDataHandler(IPortalSource source) : ICommandHand
                     ("id", context.Ids.NewId()), ("c", context.CompanyId), ("pid", window.Id), ("p", code), ("from", PortalTime.Parse(window.From)),
                     ("to", window.To is null ? DBNull.Value : PortalTime.Parse(window.To)), ("reason", window.Reason), ("task", (object?)window.Task ?? DBNull.Value),
                     ("sha", SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(window, PortalJson.Options))), ("at", now)).ConfigureAwait(false);
+                await Maintenance.PortalMaintenanceDone.RecordAsync(
+                    context, code, window.Id, window.Task, window.To is null ? null : PortalTime.Parse(window.To), cancellationToken).ConfigureAwait(false);
             }
         }
 
