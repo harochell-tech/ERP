@@ -1343,6 +1343,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG3-9 | MFG-3 | The mechanic marks a task done in the portal's Mantenimientos page by choosing it; Core publishes the task list to the portal and reads back the done ones; a done task's counter restarts. |
 | E-MFG3-10 | MFG-3 | «Por vencer» at 90 %, «Vencida» at 100 %: a counter on Core's Inicio and a portal push notification to subscribers with the Mantenimiento role. |
 | E-MFG3-11 | MFG-3 | Spare parts used in maintenance are out of scope for now. |
+| E-PRT-1 | PRT-1 | One print format per document, kept in Core: the screen print, the e-mailed PDF and reprints come from the same format. |
+| E-PRT-2 | PRT-1 | Documents: delivery note, invoice (e-CF 31 / 32 / 44), quote, proforma, statement, aging; new: credit note (e-CF 34), receipt, customer refund, purchase order. |
+| E-PRT-3 | PRT-1 | Configuración › Formatos de impresión with a live preview of a real document: logo, colours, font, paper (letter, half letter, 80 mm ticket), margins, columns (which, order, width, alignment), row height, font size, fixed texts (header, footer, terms, bank accounts, signature). |
+| E-PRT-4 | PRT-1 | Each format also has an advanced mode: an HTML / CSS template with variables in a sandboxed template language that cannot read outside the document. |
+| E-PRT-5 | PRT-1 | A format missing the mandatory content cannot be activated — invoice and credit note: e-NCF, issuer and buyer RNC, QR, security code, signature date; delivery note: the driver's QR (ENT-1) and the watermark before gate out; checked by rendering a test document. |
+| E-PRT-6 | PRT-1 | Each change is a draft with preview, activated with one button under step-up; versions are kept and an earlier one can be restored. |
+| E-PRT-7 | PRT-1 | Reprints use the active format; an e-mailed PDF records the format version used and a copy is kept. |
+| E-PRT-8 | PRT-1 | Logo: PNG or JPEG up to 1 MB, one per company; each format decides whether and how large it shows; no SVG; it also replaces the app icon's monogram. |
+| E-PRT-9 | PRT-1 | New permission `print_format:manage` for DIRECTOR and SUPERADMIN. |
+| E-PRT-10 | PRT-1 | One active format per document per company; variants per customer or plant later. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
