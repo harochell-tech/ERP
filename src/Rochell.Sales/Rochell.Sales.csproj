@@ -10,5 +10,11 @@
     <ProjectReference Include="..\Rochell.MasterData\Rochell.MasterData.csproj" />
     <ProjectReference Include="..\Rochell.Tax\Rochell.Tax.csproj" />
     <PackageReference Include="QRCoder" />
+    <PackageReference Include="Fluid.Core" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- PRT-01 (E-PRT-01-4): the built-in «Rochell» print formats. -->
+    <EmbeddedResource Include="Printing/Templates/*.liquid" />
+    <EmbeddedResource Include="Printing/Assets/*" />
   </ItemGroup>
 </Project>

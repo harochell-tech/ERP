@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -27,10 +28,41 @@ public sealed class PortalSettings
     public bool Enabled => !string.IsNullOrWhiteSpace(BaseUrl);
 }
 
+/// <remarks>MFG3-00 adds stoppages, maintenance windows and daily reports; an older portal leaves them out (null).</remarks>
 public sealed record PortalExport(
     [property: JsonPropertyName("generado_en")] string GeneratedAt,
     [property: JsonPropertyName("turnos")] IReadOnlyList<PortalShift> Shifts,
-    [property: JsonPropertyName("consumos")] IReadOnlyList<PortalPost> Posts);
+    [property: JsonPropertyName("consumos")] IReadOnlyList<PortalPost> Posts,
+    [property: JsonPropertyName("paros")] IReadOnlyList<PortalStoppage>? Stoppages = null,
+    [property: JsonPropertyName("mantenimientos")] IReadOnlyList<PortalMaintenance>? Maintenance = null,
+    [property: JsonPropertyName("reportes")] IReadOnlyList<PortalDailyReport>? Reports = null);
+
+/// <summary>MFG3-00 (E-MFG3-3): a stoppage as the portal recorded it; the end and the reason arrive later.</summary>
+public sealed record PortalStoppage(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("planta")] string Machine,
+    [property: JsonPropertyName("inicio")] string Start,
+    [property: JsonPropertyName("fin")] string? End,
+    [property: JsonPropertyName("duracion_segundos")] int? Seconds,
+    [property: JsonPropertyName("razon")] string? Reason,
+    [property: JsonPropertyName("detalle")] string? Detail);
+
+/// <summary>MFG3-00 (E-MFG3-3/9): a maintenance window; <see cref="Task"/> names the Core task it did (MFG3-03).</summary>
+public sealed record PortalMaintenance(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("planta")] string Machine,
+    [property: JsonPropertyName("desde")] string From,
+    [property: JsonPropertyName("hasta")] string? To,
+    [property: JsonPropertyName("motivo")] string Reason,
+    [property: JsonPropertyName("tarea")] string? Task = null);
+
+/// <summary>MFG3-00 (E-MFG3-2, E-MFG3-00-3): the day's broken blocks and the next day's good blocks confirmed after curing, per size.</summary>
+public sealed record PortalDailyReport(
+    [property: JsonPropertyName("planta")] string Machine,
+    [property: JsonPropertyName("fecha")] string Date,
+    [property: JsonPropertyName("rechazos")] int? Broken,
+    [property: JsonPropertyName("confirmado_curado")] IReadOnlyDictionary<string, int>? CuredGood,
+    [property: JsonPropertyName("actualizado_en")] string? UpdatedAt);
 
 public sealed record PortalShift(
     [property: JsonPropertyName("planta")] string Machine,
@@ -67,10 +99,23 @@ public sealed record PortalMaterial(
     [property: JsonPropertyName("cantidad")] string Quantity,
     [property: JsonPropertyName("unidad")] string Unit);
 
+/// <summary>MFG3-05 (E-MFG3-9/10): a preventive maintenance task as the portal's Mantenimientos lists it.</summary>
+public sealed record PortalTaskOut(
+    [property: JsonPropertyName("codigo")] string Code,
+    [property: JsonPropertyName("planta")] string Machine,
+    [property: JsonPropertyName("nombre")] string Name,
+    [property: JsonPropertyName("estado")] string State,
+    [property: JsonPropertyName("transcurrido")] string Since,
+    [property: JsonPropertyName("cada")] int Every,
+    [property: JsonPropertyName("unidad")] string Unit);
+
 /// <summary>The portal, or a fake one in the tests.</summary>
 public interface IPortalSource
 {
     Task<PortalExport> FetchAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
+    /// <summary>MFG3-05: hands the portal Core's preventive tasks (data/planes.php); nothing by default.</summary>
+    Task PublishTasksAsync(IReadOnlyList<PortalTaskOut> tasks, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 /// <summary>GET data/exportar.php with the header X-Core-Token.</summary>
@@ -92,6 +137,20 @@ public sealed class PortalHttpSource(HttpClient http, PortalSettings settings) :
         }
 
         return JsonSerializer.Deserialize<PortalExport>(body) ?? throw new HttpRequestException("The portal answered an empty export.");
+    }
+
+    public async Task PublishTasksAsync(IReadOnlyList<PortalTaskOut> tasks, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var url = new Uri(new Uri(settings.BaseUrl!.EndsWith('/') ? settings.BaseUrl : settings.BaseUrl + "/"), "data/planes.php");
+        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(new { tareas = tasks }) };
+        request.Headers.Add("X-Core-Token", settings.Token);
+        using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new HttpRequestException($"The portal answered {(int)response.StatusCode} to the maintenance tasks: {(body.Length > 300 ? body[..300] : body)}");
+        }
     }
 }
 

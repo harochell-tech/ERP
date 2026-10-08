@@ -166,3 +166,65 @@ E-MFG2-01-7); PROCESO_DIARIO gains `shift_summary:record` and `production_run:ma
   and asks a reason when the consumption of an online batch plant is changed; Inicio counts drafts without the batch plant's
   consumption (Supervisor), consumption beyond tolerance (Gerente), and the portal's warnings (`portal:manage`). Journey:
   `e2e/portal-journey.spec.ts`.
+
+## MFG3-01 — efficiency and preventive maintenance: schema (E-MFG3-1…11, E-MFG3-00-1…4, E-MFG3-01-1…5)
+
+Migration 0104:
+
+- `mfg.portal_stoppage`, `mfg.portal_maintenance`, `mfg.portal_daily_report`: each distinct version (unique by the content's SHA-256)
+  of a portal stoppage (start, end, seconds, reason, detail), maintenance window (start, end, reason, the task it names) and machine's
+  daily report (broken blocks, good blocks confirmed after curing per size), append-only; portal times are Dominican local `timestamp`.
+- `mfg.ideal_cycle`: seconds per machine and product from a date on (append-only; a later date replaces it), set with
+  `production_master:manage`.
+- `mfg.maintenance_task`: per machine, a code, name, every N CYCLES / RUNNING_HOURS / DAYS, instructions, ACTIVE / INACTIVE.
+  `mfg.maintenance_done`: append-only, from the PORTAL (its maintenance id) or from CORE (who recorded it), never both.
+- Permission `maintenance_plan:manage` for GERENTE_PLANTA (149 permissions).
+
+## MFG3-02 — the portal's stoppages, maintenance and reports; ideal cycle; efficiency (E-MFG3-2…7, E-MFG3-01-1/2/4)
+
+- `ImportPortalData` also keeps each new version of a paired machine's stoppages (`paros`), maintenance windows (`mantenimientos`)
+  and daily reports (`reportes`) — an older portal without them still imports. A new report version brings its machine's day (shift 1)
+  up to date.
+- `SyncPortalShift`: the latest daily report's broken blocks of a machine with a single shift that day become fresh scrap, split
+  among its products by units (good = blocks − broken); two shifts that day, or more broken than blocks, leave a warning instead.
+  A draft a person changed is kept, as before.
+- `SetIdealCycle` (`production_master:manage`): seconds per machine and product from a date (one per date; a later date replaces it).
+- `GetMachineEfficiency` (`production:read`, `GET …/manufacturing/efficiency?from&to`, at most 93 days): per paired machine and portal
+  shift, from the latest reading and the latest version of each stoppage and maintenance window — planned minutes = window (up to
+  now) − maintenance; stoppages starting inside maintenance do not count; running = planned − stoppages; availability = running ÷
+  planned; performance = Σ cycles × ideal seconds ÷ running seconds (null when a mould's product has no ideal cycle, listed in
+  `missingIdealCycles`); quality = good ÷ (good + scrap) of the shift's summaries; OEE = their product (ratios to 4 decimals); lost
+  blocks = stoppage seconds ÷ the main mould's ideal cycle × its blocks per cycle, valued at the ACTIVE standard cost; stoppages by
+  reason (`SIN_RAZON` without one). Totals per machine over the period. 280 commands.
+
+## MFG3-03 — preventive maintenance plans (E-MFG3-8…10, E-MFG3-01-3/5)
+
+- `DefineMaintenanceTask` (code in capitals, unique — what the mechanic chooses in the portal), `UpdateMaintenanceTask`,
+  `SetMaintenanceTaskStatus` (ACTIVE / INACTIVE, never deleted), `RecordMaintenanceDone` (CORE, by the plant manager): all
+  `maintenance_plan:manage`. 284 commands.
+- `ImportPortalData`: a closed portal maintenance window whose `tarea` is the code of an ACTIVE task of its machine records that task
+  done (PORTAL, once per window).
+- `ListMaintenanceTasks` (`production:read`, `GET …/manufacturing/maintenance-tasks`): each task with what has gone since it was last
+  done (or created) — cycles of the machine's shifts, running hours (planned − maintenance − stoppages up to now) or days —, the share
+  of its interval (`used`), the state OK / POR_VENCER (≥ 90 %) / VENCIDA (≥ 100 %) / INACTIVE, the last five done (local time), and
+  the counts `dueSoon` / `overdue` for Inicio.
+- Publishing the task list to the portal and its push notices come with the portal's MFG3-00b.
+
+## MFG3-04 — efficiency and maintenance screens (E-MFG3-4…10)
+
+- `ListIdealCycles` (`production:read`, `GET …/manufacturing/ideal-cycles`): every ideal cycle and which is in force today.
+- Web: Producción › Eficiencia (`/produccion/eficiencia/`: per machine and per shift — availability, performance, quality, overall
+  efficiency as percentages moved from the server's ratios, stoppage minutes by reason, lost blocks and their cost; notices for
+  missing ideal cycles and stoppages without a reason); Máquinas y turnos gains «Ciclo ideal»; Producción › Mantenimiento preventivo
+  (`/produccion/mantenimiento/`: tasks with their state, define, mark done, deactivate). Inicio: overdue and due-soon maintenance
+  (`maintenance_plan:manage`) and the week's stoppages without a reason. Journey: `e2e/maintenance-journey.spec.ts`.
+
+## MFG3-05 — Core's tasks in the portal (E-MFG3-9/10; portal MFG3-00b)
+
+- After every read, `PortalRunner` runs `PublishMaintenanceTasks` (`shift_summary:record`, the daily process): the ACTIVE tasks of
+  paired machines — code, portal machine, name, state, what has gone, every, unit — go to the portal's `data/planes.php`
+  (`IPortalSource.PublishTasksAsync`, header X-Core-Token); a failure is a warning of the pass. 285 commands.
+- Portal (harochell-tech/portal, MFG3-00b): `inc/tareas.php` creates `tareas_mantenimiento` and `mantenimientos.tarea` on first use;
+  `data/planes.php` replaces the list and sends a push to users with the Mantenimiento (or admin) role when a task becomes «Por
+  vencer» or «Vencida»; Mantenimientos lists the tasks and asks which one was done when a window ends; the export carries `tarea`,
+  which Core reads back as the task done.

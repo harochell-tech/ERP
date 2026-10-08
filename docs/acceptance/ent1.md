@@ -14,5 +14,6 @@ Baseline `docs/architecture/ent1/frozen-baseline-ent1.md` (E-ENT-1…8, E-ENT1-0
 | E-ENT-8 | QR bottom right with its line; none before the gate | E2E-ENT |
 | E-ENT1-01-9 | Dispatch's POD first annuls the link: «registrada por Despacho» | `DriverConfirmationTests.A_pod_recorded_by_dispatch_first_annuls_the_link` |
 | E-ENT1-01-10 | Differences: the delivery waits, Inicio counts it, the POD form starts from the driver's confirmation and cites it | `DriverConfirmationTests.Differences_wait_for_dispatch…`, E2E-ENT |
+| ENT1-04 | Tablero de despacho › «Confirmadas por el chofer hoy»: the day's confirmations (`ListDeliveries` `driverConfirmedOn`, local date) with receiver, time and outcome, each opening its conduce | `DriverConfirmationTests.A_wrong_pin_is_kept_and_a_full_receipt_becomes_the_pod`, E2E-ENT |
 
 E2E-ENT: `web/e2e/delivery-qr-journey.spec.ts`.

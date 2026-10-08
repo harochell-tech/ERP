@@ -1314,12 +1314,76 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG2-01-6 | MFG2-01 | Every portal reading and batch-plant post is kept, never deleted, with its time, to audit where each figure of a summary came from. |
 | E-MFG2-01-7 | MFG2-01 | The plant manager pairs the portal on Producción › Portal (new permission `portal:manage`); the Supervisor and the plant manager see it and the connection's state. |
 | E-MFG2-01-8 | MFG2-01 | Until the batch plant's consumption arrives a draft carries the recipe's theoretical consumption, marked «sin consumo de dosificadora», and is never posted; the real one replaces it. For planta1 (offline batch plant) the Supervisor types the real one. |
+| E-ENT-1 | ENT-1 | The driver confirms on a public Core page without signing in: at gate out (C-08) Core creates a single-use link per delivery that expires after 7 days; the printed delivery note carries its QR. The portal takes no part. |
+| E-ENT-2 | ENT-1 | Each driver in Maestros › Choferes has a 4-digit PIN set by the dispatch manager (only its hash is kept); the page asks the assigned driver's PIN; 5 failed attempts lock the link and Dispatch reopens it. |
+| E-ENT-3 | ENT-1 | The driver records who received (name, optional cédula), a photo of the delivery or an on-screen signature (required), the confirmation time, the phone's location when allowed, and «Recibido completo» or «Hubo diferencias» with a note. |
+| E-ENT-4 | ENT-1 | «Recibido completo» records the POD (C-09) with everything received under the service identity «Confirmación de entrega», which holds only that permission; «Hubo diferencias» records nothing and waits for Dispatch, who completes the POD from the driver's note. |
+| E-ENT-5 | ENT-1 | The photo or signature is reduced on the phone (longer side ≈ 1600 px) and stored in a private Backblaze B2 bucket apart from the WORM one; the POD keeps the object reference and its SHA-256; Dispatch sees it from the delivery's detail. |
+| E-ENT-6 | ENT-1 | Without signal the page keeps the confirmation on the phone and sends it when the signal returns; the recorded time is the confirmation's, not the upload's. |
+| E-ENT-7 | ENT-1 | From 2026-11-01 (staging becomes production) new deliveries come only from Core; the portal's deliveries module stays read-only for history and the ADM Cloud credentials are removed from the portal when November closes. |
+| E-ENT-8 | ENT-1 | The QR sits at the bottom right of the delivery note with «Chofer: escanee para confirmar la entrega»; a note without gate out keeps its watermark and has no QR. |
+| E-ENT-9 | ENT-1 | The printed invoice also carries the driver's QR of each of its deliveries still in transit (one QR per delivery, labelled with its conduce number; delivered ones carry none). It is the conduce's same link: confirming from either paper is the same. Built with PRT-1 as mandatory content of the invoice format. |
+| E-ENT1-01-1 | ENT1-01 | The DESPACHO role sets driver PINs and reopens locked links, with two new permissions `driver_pin:manage` and `delivery_link:reopen`. |
+| E-ENT1-01-2 | ENT1-01 | The link token is an HMAC of the delivery and the link's generation under a server key kept as a file (like the Alanube token): every reprint shows the same QR and the database stores no token. Reopening starts a new generation, invalidating the previous QR (the note is reprinted). |
+| E-ENT1-01-3 | ENT1-01 | The PIN is kept with a slow salted hash per driver; the real defence is the limit: 5 failed attempts per link and 30 per hour per client address. |
+| E-ENT1-01-4 | ENT1-01 | Only own-transport deliveries (always with driver and vehicle) get a link; pickups at the plant do not (control transfers at gate out). |
+| E-ENT1-01-5 | ENT1-01 | New technical role CONFIRMACION_ENTREGA with the single permission `delivery:driver_confirm`; its command `ConfirmDeliveryByDriver` records the POD with everything received only. 147 permissions, 29 roles. |
+| E-ENT1-01-6 | ENT1-01 | The phone's time is used only between gate out and the server's time + 5 minutes; otherwise the server's time. Both are kept. |
+| E-ENT1-01-7 | ENT1-01 | One immutable row per valid confirmation: receiver, optional cédula (11 digits), full / differences, note, phone time, server time, optional location (latitude, longitude, accuracy), photo or signature (reference and SHA-256), client address. |
+| E-ENT1-01-8 | ENT1-01 | JPEG or PNG, at most 5 MB after reduction, stored as `entregas/<company>/<delivery>/<confirmation>.jpg`. |
+| E-ENT1-01-9 | ENT1-01 | A POD recorded by Dispatch first annuls the link; a later scan shows «Esta entrega ya fue registrada por Despacho». |
+| E-ENT1-01-10 | ENT1-01 | With differences the delivery stays IN_TRANSIT marked «Chofer reportó diferencias», counted on Dispatch's Inicio; the POD form opens prefilled with the driver's receiver, time and photo, and Dispatch writes the returned quantities and the reason. |
+| E-MFG3-1 | MFG-3 | The portal's daily report comes prefilled and locked with production per size (cycles × mould, maintenance cycles excluded) and, for plants 2 and 3, the batch plant 2 consumption; the supervisor writes only breakage, quality, hours and remarks; plant 1's consumption stays manual. |
+| E-MFG3-2 | MFG-3 | The report's «Bloques rechazados / dañados» become the shift draft's fresh scrap in Core unless the draft was changed in Core; with two shifts the split is made by hand in Core. |
+| E-MFG3-3 | MFG-3 | The portal export adds stoppages (start, duration, reason) and maintenance windows; Core keeps them immutable like the readings. |
+| E-MFG3-4 | MFG-3 | Per machine and shift: planned time = shift − scheduled maintenance; running time = planned − stoppages; availability = running ÷ planned; performance = cycles × ideal cycle ÷ running; quality = good ÷ (good + mix scrap + fresh scrap); OEE = their product. |
+| E-MFG3-5 | MFG-3 | The ideal cycle (seconds) per machine and mould is master data in Core set by the plant manager; without it performance is not computed and a warning is shown. Core proposes the average of the best hours of the last month and the owner confirms it. |
+| E-MFG3-6 | MFG-3 | Stoppage cost: units not produced = stoppage × ideal capacity, valued at the product's standard cost; information only, no journal. |
+| E-MFG3-7 | MFG-3 | Shown as columns of Producción del día per machine and shift and in a weekly report per machine with stoppage reasons; stoppages without a reason show «Sin razón» and count on Inicio; reasons are still written in the portal. |
+| E-MFG3-8 | MFG-3 | Preventive maintenance plans in Core (Producción › Mantenimiento preventivo): per machine, tasks every N cycles, every N running hours or every N days, defined by the plant manager. |
+| E-MFG3-9 | MFG-3 | The mechanic marks a task done in the portal's Mantenimientos page by choosing it; Core publishes the task list to the portal and reads back the done ones; a done task's counter restarts. |
+| E-MFG3-10 | MFG-3 | «Por vencer» at 90 %, «Vencida» at 100 %: a counter on Core's Inicio and a portal push notification to subscribers with the Mantenimiento role. |
+| E-MFG3-11 | MFG-3 | Spare parts used in maintenance are out of scope for now. |
+| E-MFG3-00-1 | MFG3-00 | Paver (adoquín) is not counted by the machines: its «Producido» stays manual; the lock applies to 4", 6" and 8" only. |
+| E-MFG3-00-2 | MFG3-00 | «Producido» can no longer be overwritten in the portal; a machine miscount is corrected in Core on the shift draft (who changed it is kept). |
+| E-MFG3-00-3 | MFG3-00 | The day's «rechazados / dañados» become the draft's fresh scrap (E-MFG3-2); the next day's confirmed curing loss («Confirma la producción real de ayer») is shown in Core as a suggestion when Calidad releases the lot, never recorded by itself. |
+| E-MFG3-00-4 | MFG3-00 | For plants 2 and 3 the report's raw-material fields show what the batch plant sent, in its unit; plant 1 stays manual. |
+| E-PRT-1 | PRT-1 | One print format per document, kept in Core: the screen print, the e-mailed PDF and reprints come from the same format. |
+| E-PRT-2 | PRT-1 | Documents: delivery note, invoice (e-CF 31 / 32 / 44), quote, proforma, statement, aging; new: credit note (e-CF 34), receipt, customer refund, purchase order. |
+| E-PRT-3 | PRT-1 | Configuración › Formatos de impresión with a live preview of a real document: logo, colours, font, paper (letter, half letter, 80 mm ticket), margins, columns (which, order, width, alignment), row height, font size, fixed texts (header, footer, terms, bank accounts, signature). |
+| E-PRT-4 | PRT-1 | Each format also has an advanced mode: an HTML / CSS template with variables in a sandboxed template language that cannot read outside the document. |
+| E-PRT-5 | PRT-1 | A format missing the mandatory content cannot be activated — invoice and credit note: e-NCF, issuer and buyer RNC, QR, security code, signature date; delivery note: the driver's QR (ENT-1) and the watermark before gate out; checked by rendering a test document. |
+| E-PRT-6 | PRT-1 | Each change is a draft with preview, activated with one button under step-up; versions are kept and an earlier one can be restored. |
+| E-PRT-7 | PRT-1 | Reprints use the active format; an e-mailed PDF records the format version used and a copy is kept. |
+| E-PRT-8 | PRT-1 | Logo: PNG or JPEG up to 1 MB, one per company; each format decides whether and how large it shows; no SVG; it also replaces the app icon's monogram. |
+| E-PRT-9 | PRT-1 | New permission `print_format:manage` for DIRECTOR and SUPERADMIN. |
+| E-PRT-10 | PRT-1 | One active format per document per company; variants per customer or plant later. |
+| E-PRT-01-1 | PRT-01 | Templates are written in Liquid, rendered by the .NET library Fluid; a template reads only the document's data (no files, database or network). |
+| E-PRT-01-2 | PRT-01 | The server always renders the document: the screen's «Imprimir» shows the server's HTML and prints it; the e-mail turns the same HTML into the PDF. The two current designs go away. |
+| E-PRT-01-3 | PRT-01 | Amounts (2 decimals), quantities (no trailing zeros) and dates (dd/mm/yyyy) come formatted from the server; templates only place them. |
+| E-PRT-01-4 | PRT-01 | Each document ships a built-in «Rochell» format copying the current screen design; a company uses it until it saves its own version. |
+| E-PRT-01-5 | PRT-01 | Formats (versions DRAFT / ACTIVE / RETIRED) and the company logo live in master data; permission `print_format:manage` (E-PRT-9). |
+| E-PRT-01-6 | PRT-01 | Documents use IBM Plex Sans embedded in the document, so the PDF looks the same anywhere without internet. |
+| E-PRT-01-7 | PRT-01 | The server draws the QR codes inside the document (the driver's and the e-CF's; the invoice carries the driver's QR of E-ENT-9). |
+| E-PRT-01-8 | PRT-01 | PRT-01 moves the six current documents to the new rendering with no visible change; PRT-02 the editing screen and logo; PRT-03 the new documents. |
+| E-PRT-02-1 | PRT-02 | The built-in templates read «settings» that the simple screen changes without code: columns (which, order, width, alignment), fixed texts, logo, colours, font, row height, paper and margins. |
+| E-PRT-02-2 | PRT-02 | A version edited in advanced mode keeps its own template and CSS; the simple screen no longer adjusts it. Going back means starting again from the built-in format or an earlier version. |
+| E-PRT-02-3 | PRT-02 | A template is not saved with `<script>`, `on…=` attributes, `javascript:` links, or external files or fonts; only the company's logo and the document's data. |
+| E-PRT-02-4 | PRT-02 | Paper: letter and half letter for every document; 80 mm ticket only for the consumer invoice (32) and the receipt. The size is set per format. |
+| E-PRT-02-5 | PRT-02 | Preview with the latest real document of the type, or one chosen by number, exactly as it prints, with the watermark «VISTA PREVIA». |
+| E-PRT-02-6 | PRT-02 | Before activating, Core renders a test document and checks the mandatory content (invoice and credit note: e-NCF, RNCs, QR, security code, signature date; conduce: driver's QR and watermark); if anything is missing it says what and does not activate. |
+| E-PRT-02-7 | PRT-02 | Holders of `configuration:read` (Contador, Controller, Auditor) see the formats in Configuración › Formatos de impresión without change buttons. |
 | E-CFG-1 | CFG | The assistant loads fiscal configuration under a new service identity, «Carga de configuración», that only registers sources, configures rule versions, links sources and runs their tests. It cannot activate. The audit trail says, truthfully, that this identity configured them. |
 | E-CFG-2 | CFG | It is done with a command-line tool on the server that runs the same commands as the screens; events, the command log and the hash chain stay intact. |
 | E-CFG-3 | CFG | The values come from a file in the repository with the sources and rules of the fiscal dossier, reviewable in a PR before loading. |
 | E-CFG-4 | CFG | The owner downloads the official PDFs in his browser; they are kept in `docs/fiscal/fuentes/` and their SHA-256 is computed from those files. Without the file the source is not registered. |
 | E-CFG-5 | CFG | Activation stays with a person: one «Activar» per rule. |
 | E-CFG-6 | CFG | Rule versions a person already configured are completed (source linked, tests run) when they match the file, and left alone when they differ. The rules start on 2026-10-01 («desde hoy», said on 2026-10-01). |
+| E-MFG3-01-1 | MFG3-01 | Core keeps each distinct version of a portal stoppage, maintenance window or daily report as it arrived, never changed (like the readings), and uses the latest. |
+| E-MFG3-01-2 | MFG3-01 | The ideal cycle is set per machine and product (the mould decides the product) on Máquinas y turnos by the plant manager with `production_master:manage`; each value holds from its date and the history stays. |
+| E-MFG3-01-3 | MFG3-01 | Maintenance plans are the plant manager's, with the new permission `maintenance_plan:manage`; tasks are deactivated, never deleted. |
+| E-MFG3-01-4 | MFG3-01 | The report's broken blocks reach the draft only when the shift's draft came from the portal and nobody changed it in Core; a later change of the report is taken again while the draft stays untouched. |
+| E-MFG3-01-5 | MFG3-01 | Running hours for maintenance: the shift's planned time minus stoppages, summed since the task was last done. |
 | E-LAB1-1 | LAB-1 | The internal lot code `PT-<item>-<yyyyMMdd>-<shift>` stays; `mfg.fg_lot` gains a unique `field_code`, the one printed on labels, delivery notes and certificates: `<item's lot prefix><DDMMYY><machine short code>`, e.g. `8070325P1`. The first shift (T1) never carries a suffix; any other shift always carries `-<shift>` (`8070325P1-T2`), whether or not another lot exists that day. |
 | E-LAB1-2 | LAB-1 | One lot per run stays (E-MFG1-7). A test belongs to exactly one lot; with two shifts there are two lots that day and each needs its own specimens. |
 | E-LAB1-3 | LAB-1 | `md.machine.short_code` (P1, P2, P3), unique per company. The link to the portal's `planta1..3` is the existing `mfg.portal_machine` pairing. D-04 of MFG-1 (one line per plant) no longer applies: MATILLA has three machines. |

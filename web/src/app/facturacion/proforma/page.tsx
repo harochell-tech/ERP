@@ -40,9 +40,10 @@ function Proforma() {
       <Watermark text={f.status === "VOIDED" ? "ANULADA" : null} />
       <div className="actions no-print">
         <Link href="/facturacion/proformas/">← Proformas</Link>
-        <button type="button" className="primary" onClick={() => window.print()}>
+        {/* PRT-01: the printed proforma is the server's, with the company's format. */}
+        <Link className="button primary" href={`/facturacion/proforma/imprimir/?id=${id}`}>
           Imprimir
-        </button>
+        </Link>
         {f.status === "OPEN" && can("proforma:void") ? (
           <ReasonAction
             label="Anular proforma"

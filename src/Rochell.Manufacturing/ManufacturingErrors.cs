@@ -33,4 +33,7 @@ public static class ManufacturingErrors
     public const string CuringNotDone = "CURING_NOT_DONE";
     public const string MonthNotEnded = "MONTH_NOT_ENDED";
     public const string RunsOpen = "RUNS_OPEN";
+
+    /// <summary>MFG3-02 (E-MFG3-5): an ideal cycle out of range, for something that is not a machine and a finished good, or a date already set.</summary>
+    public const string IdealCycleInvalid = "IDEAL_CYCLE_INVALID";
 }
