@@ -1409,6 +1409,8 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-LAB1-01-13 | LAB1-01 | The four permissions of E-LAB1-9 and the role LABORATORIO are seeded in LAB1-01, although `FinalReleaseLot` arrives in LAB1-02. `lab:read`: Laboratorio, Calidad, Gerente de planta, Supervisor de producción, Director, Auditor. |
 | E-LAB1-01-14 | LAB1-01 | New menu group «Calidad»: Laboratorio (phone screen: the lot is chosen by field code, several specimens of one date are entered, the server shows the strength before saving), Requisitos por ítem and Parámetros. It needs a connection; no offline mode in this version. |
 | E-LAB1-01-15 | LAB1-01 | `qa.legacy_lot` and the import of the history go in LAB1-04's migration, not in LAB1-01's. |
+| E-LAB1-01-16 | LAB1-01 | TST-01's marker `test:` (the resource of the test permissions) counts only where a permission code starts; a production resource that ends in «test» is allowed, so `lab_test:record` (E-LAB1-9) stays. Approved 2026-10-08. |
+| E-LAB1-01-17 | LAB1-01 | A break date or an absorption test date after today is refused, as one before the lot's production date is (E-LAB1-01-6). Approved 2026-10-08. |
 
 Implementation rules derived from the above (no architectural change):
 

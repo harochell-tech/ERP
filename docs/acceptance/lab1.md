@@ -1,6 +1,6 @@
 # LAB-1 acceptance — quality lab and lot traceability
 
-Baseline LAB-1 (`docs/architecture/lab1/frozen-baseline-lab1.md`) §10, with the approved errata E-LAB1-1…10 and E-LAB1-01-1…15. The «PR»
+Baseline LAB-1 (`docs/architecture/lab1/frozen-baseline-lab1.md`) §10, with the approved errata E-LAB1-1…10 and E-LAB1-01-1…17. The «PR»
 column names the PR that delivers each one (baseline §12). Every acceptance ID gets at least one test tagged
 `[Trait("AcceptanceLab1", "<ID>")]`; `AcceptanceLab1TraceabilityTests` fails if an ID has neither a tagged test nor a place in its
 pending list (the IDs of LAB1-02…04), or is missing from this matrix.

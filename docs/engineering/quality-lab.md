@@ -4,7 +4,7 @@ Baseline: `docs/architecture/lab1/frozen-baseline-lab1.md` (E-LAB1-1…10). Acce
 The lab's code lives in `Rochell.Manufacturing/Quality` with its own schema `qa` (E-LAB1-01-1); the module graph does not change.
 LAB-1 posts nothing to the ledger.
 
-## LAB1-01 — schema, field code, short code, requirements, tests (E-LAB1-01-1…15; migration 0105)
+## LAB1-01 — schema, field code, short code, requirements, tests (E-LAB1-01-1…17; migration 0105)
 
 ### The lot's field code and the machine's short code
 
@@ -38,7 +38,7 @@ LAB-1 posts nothing to the ledger.
 
 - `RecordCompressionTests` (`lab_test:record`, plant-scoped): 1–30 specimens of one lot broken on one date. The lot may be in any
   status but VOIDED (E-LAB1-01-7); the break date is not before the lot's production date (its run's business date) nor after today
-  (E-LAB1-01-6; the same day is age 0, flagged `ageZero`). Per specimen (baseline §4.1): gross area = width × length — a missing
+  (E-LAB1-01-6, E-LAB1-01-17; the same day is age 0, flagged `ageZero`). Per specimen (baseline §4.1): gross area = width × length — a missing
   measure is the item's nominal one, and without requirements the specimen is refused (`LAB_SPEC_MISSING`); gross strength = load ÷
   area. `qa.compression_test` keeps the measures as entered, `nominal_used`, the spec version, and the area and strength computed
   then, with 6 decimals (E-LAB1-01-8). MPa (× the conversion parameter) and the net-area strength (÷ the item's net-area fraction)
