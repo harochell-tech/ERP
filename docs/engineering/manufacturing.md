@@ -166,3 +166,16 @@ E-MFG2-01-7); PROCESO_DIARIO gains `shift_summary:record` and `production_run:ma
   and asks a reason when the consumption of an online batch plant is changed; Inicio counts drafts without the batch plant's
   consumption (Supervisor), consumption beyond tolerance (Gerente), and the portal's warnings (`portal:manage`). Journey:
   `e2e/portal-journey.spec.ts`.
+
+## MFG3-01 — efficiency and preventive maintenance: schema (E-MFG3-1…11, E-MFG3-00-1…4, E-MFG3-01-1…5)
+
+Migration 0104:
+
+- `mfg.portal_stoppage`, `mfg.portal_maintenance`, `mfg.portal_daily_report`: each distinct version (unique by the content's SHA-256)
+  of a portal stoppage (start, end, seconds, reason, detail), maintenance window (start, end, reason, the task it names) and machine's
+  daily report (broken blocks, good blocks confirmed after curing per size), append-only; portal times are Dominican local `timestamp`.
+- `mfg.ideal_cycle`: seconds per machine and product from a date on (append-only; a later date replaces it), set with
+  `production_master:manage`.
+- `mfg.maintenance_task`: per machine, a code, name, every N CYCLES / RUNNING_HOURS / DAYS, instructions, ACTIVE / INACTIVE.
+  `mfg.maintenance_done`: append-only, from the PORTAL (its maintenance id) or from CORE (who recorded it), never both.
+- Permission `maintenance_plan:manage` for GERENTE_PLANTA (149 permissions).
