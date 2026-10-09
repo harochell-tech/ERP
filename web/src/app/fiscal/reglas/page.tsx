@@ -24,6 +24,7 @@ import {
   WITHHOLDING_BASE_LABELS,
   WITHHOLDING_PARTY_TYPES,
   WITHHOLDING_SCOPE_LABELS,
+  DOCUMENT_SERIES_LABELS,
   type CaseRow,
   type FiscalRuleForm,
   type TaxComponentRow,
@@ -164,6 +165,13 @@ function GuidedFields({ kind, form, onChange, errors }: { kind: FiscalRuleKind; 
             options={Object.entries(WITHHOLDING_SCOPE_LABELS).map(([code, label]) => ({ code, label }))}
             selected={form.appliesTo ?? []}
             onChange={(appliesTo) => set({ appliesTo })}
+          />
+          <CheckGroup
+            id="document-series-message"
+            legend="Comprobantes del proveedor (ninguno marcado = ambos; NG 02-2026: el 30 % a empresas solo en serie B)"
+            options={Object.entries(DOCUMENT_SERIES_LABELS).map(([code, label]) => ({ code, label }))}
+            selected={form.documentSeries ?? []}
+            onChange={(documentSeries) => set({ documentSeries })}
           />
         </>
       ) : (

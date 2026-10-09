@@ -33,8 +33,12 @@ public sealed record FiscalRuleDefinition(
     decimal? Amount = null,
     string? Label = null,
     IReadOnlyList<TaxComponent>? Components = null,
-    IReadOnlySet<string>? AppliesTo = null)
+    IReadOnlySet<string>? AppliesTo = null,
+    IReadOnlySet<string>? DocumentSeries = null)
 {
+    /// <summary>E-X1-02-3: the supplier documents a withholding applies to — B (series B NCF) and E (e-CF).</summary>
+    public static readonly IReadOnlySet<string> SupplierDocumentSeries = new HashSet<string>(StringComparer.Ordinal) { "B", "E" };
+
     /// <summary>E-FIS2-01-2: the purchased categories the 606 classifies (the raw materials of md.item).</summary>
     public static readonly IReadOnlySet<string> RawMaterialCategories = new HashSet<string>(StringComparer.Ordinal) { "CEMENTO", "AGREGADO", "ADITIVO", "OTRA_MATERIA_PRIMA" };
 
@@ -46,7 +50,7 @@ public sealed record FiscalRuleDefinition(
     };
 
     private static readonly string[] ItbisKeys = ["tax_code", "rate", "effect", "exempt_item_categories"];
-    private static readonly string[] WithholdingKeys = ["tax_code", "rate", "base", "party_types", "isr_withholding_type", "applies_to"];
+    private static readonly string[] WithholdingKeys = ["tax_code", "rate", "base", "party_types", "isr_withholding_type", "applies_to", "document_series"];
     private static readonly string[] TaxTypeKeys = ["label", "components"];
     private static readonly string[] ComponentKeys = ["tax_code", "rate", "effect"];
     private static readonly IReadOnlySet<string> ComponentEffects = new HashSet<string>(StringComparer.Ordinal)
@@ -160,7 +164,17 @@ public sealed record FiscalRuleDefinition(
             }
         }
 
-        return new FiscalRuleDefinition(kind, taxCode, rate, TaxEffects.Withholding, new HashSet<string>(StringComparer.Ordinal), @base, parties, isrType, AppliesTo: appliesTo);
+        IReadOnlySet<string>? series = null;
+        if (root.TryGetProperty("document_series", out var seriesList))
+        {
+            series = StringSet(seriesList, "document_series", SupplierDocumentSeries);
+            if (series.Count == 0)
+            {
+                throw Invalid("document_series cannot be empty; leave it out to withhold on both B-series and e-CF invoices.");
+            }
+        }
+
+        return new FiscalRuleDefinition(kind, taxCode, rate, TaxEffects.Withholding, new HashSet<string>(StringComparer.Ordinal), @base, parties, isrType, AppliesTo: appliesTo, DocumentSeries: series);
     }
 
     /// <summary>E-GAS-02-1: the label shown to whoever registers and the components, each with its own tax code.</summary>

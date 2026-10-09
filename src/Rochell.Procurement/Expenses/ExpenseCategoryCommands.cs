@@ -7,12 +7,17 @@ namespace Rochell.Procurement.Expenses;
 /// <paramref name="AccountId"/> is an ACTIVE expense account that is not a control account; <paramref name="GoodsType606"/> the 606
 /// type of goods and services ("01"…"11"); <paramref name="LineClass"/> SERVICE or GOODS (withholdings and the 606 amount columns).
 /// </summary>
+/// <remarks>E-X1-02-1: <paramref name="IsrWithholdingType"/> is the 606 ISR withholding type of its purchases ("1"…"9"), or none.</remarks>
 public sealed record PrepareExpenseCategory(
-    Guid CompanyId, Guid SessionId, string IdempotencyKey, string Code, string Name, Guid AccountId, string GoodsType606, string LineClass) : ICommand;
+    Guid CompanyId, Guid SessionId, string IdempotencyKey, string Code, string Name, Guid AccountId, string GoodsType606, string LineClass, string? IsrWithholdingType = null) : ICommand;
 
 /// <summary>Corrects a DRAFT category: name, 606 type and class (code and account never change, E-GAS-01-3).</summary>
 public sealed record UpdateExpenseCategoryDraft(
-    Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ExpenseCategoryId, long ExpectedVersion, string Name, string GoodsType606, string LineClass) : ICommand;
+    Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ExpenseCategoryId, long ExpectedVersion, string Name, string GoodsType606, string LineClass, string? IsrWithholdingType = null)
+    : ICommand;
+
+/// <summary>E-X1-02-1: the Controller sets or clears the ISR withholding type of a category already approved (step-up).</summary>
+public sealed record SetExpenseCategoryIsrType(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ExpenseCategoryId, long ExpectedVersion, string? IsrWithholdingType) : ICommand;
 
 /// <summary>
 /// E-GAS-03-1/3: approves one or several DRAFT categories (step-up); each by someone other than who prepared it. A category that

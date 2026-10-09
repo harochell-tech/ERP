@@ -151,6 +151,7 @@ public static class CommandEndpoints
         procurement.MapCommand<ApproveExpenseCategories, ApproveExpenseCategoriesHandler>();
         procurement.MapCommand<DeactivateExpenseCategory, DeactivateExpenseCategoryHandler>();
         procurement.MapCommand<ReactivateExpenseCategory, ReactivateExpenseCategoryHandler>();
+        procurement.MapCommand<SetExpenseCategoryIsrType, SetExpenseCategoryIsrTypeHandler>(); // X1-02 (E-X1-02-1)
         procurement.MapCommand<MatchSupplierInvoice, MatchSupplierInvoiceHandler>();
         procurement.MapCommand<ApproveMatchException, ApproveMatchExceptionHandler>();
         procurement.MapCommand<VoidSupplierInvoice, VoidSupplierInvoiceHandler>();
@@ -438,7 +439,7 @@ public static class CommandEndpoints
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
         typeof(RegisterSupplierInvoiceHandler), typeof(RegisterExpenseInvoiceHandler), typeof(CreateExpensePurchaseOrderHandler), typeof(UpdateExpensePurchaseOrderDraftHandler), typeof(CloseExpensePurchaseOrderHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
-        typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
+        typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(SetExpenseCategoryIsrTypeHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RegisterCustomsDeclarationHandler),
         typeof(AcceptUnbilledDeliveriesHandler), typeof(ImportReceivedDocumentsHandler), typeof(RespondToSupplierDocumentHandler), typeof(SendSupplierDocumentResponseHandler), typeof(CaptureSupplierDocumentFromQrHandler), typeof(DiscardSupplierDocumentHandler),
         typeof(ReverseCustomsDeclarationHandler), typeof(PrepareImportSettlementHandler), typeof(UpdateImportSettlementDraftHandler), typeof(CancelImportSettlementHandler),

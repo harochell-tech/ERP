@@ -10,6 +10,15 @@ namespace Rochell.Procurement.Expenses;
 /// <summary>Shared rules of the expense category commands (E-GAS-2, E-GAS-01-3/4, E-GAS-03-1…3).</summary>
 internal static partial class ExpenseCategories
 {
+    /// <summary>E-X1-02-1: the 606 ISR withholding type, "1"…"9", or none.</summary>
+    public static string? IsrType(string? value)
+    {
+        var text = value?.Trim();
+        return string.IsNullOrEmpty(text) ? null
+            : text is [>= '1' and <= '9'] ? text
+            : throw new DomainException(ExpenseErrors.CategoryInvalid, "The ISR withholding type is one of the 606's types, 1 to 9.");
+    }
+
     public const string Aggregate = "ExpenseCategory";
 
     public sealed record Row(Guid Id, string Code, string Name, string Status, Guid PreparedBy, Guid? ApprovedBy, long Version);
@@ -103,6 +112,7 @@ public sealed class PrepareExpenseCategoryHandler : ICommandHandler<PrepareExpen
         }
 
         var (name, goodsType, lineClass) = ExpenseCategories.Validate(command.Name, command.GoodsType606, command.LineClass);
+        var isrType = ExpenseCategories.IsrType(command.IsrWithholdingType);
         var account = (await Reading.ListAsync(
             context.Connection,
             context.Transaction,
@@ -126,7 +136,7 @@ public sealed class PrepareExpenseCategoryHandler : ICommandHandler<PrepareExpen
                 ExpenseCategories.Aggregate,
                 context.ResultRef,
                 1,
-                JsonSerializer.Serialize(new { expenseCategoryId = context.ResultRef, code, name, accountId = command.AccountId, goodsType606 = goodsType, lineClass }),
+                JsonSerializer.Serialize(new { expenseCategoryId = context.ResultRef, code, name, accountId = command.AccountId, goodsType606 = goodsType, lineClass, isrWithholdingType = isrType }),
                 Publish: true),
             cancellationToken).ConfigureAwait(false);
         try
@@ -135,10 +145,12 @@ public sealed class PrepareExpenseCategoryHandler : ICommandHandler<PrepareExpen
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO pur.expense_category (expense_category_id, company_id, code, name, account_id, goods_type_606, line_class, status, prepared_by, approved_by, version)
-                VALUES (@id, @c, @code, @name, @account, @type, @class, 'DRAFT', @by, NULL, 1)
+                INSERT INTO pur.expense_category (expense_category_id, company_id, code, name, account_id, goods_type_606, line_class, status, prepared_by, approved_by, version,
+                  isr_withholding_type)
+                VALUES (@id, @c, @code, @name, @account, @type, @class, 'DRAFT', @by, NULL, 1, @isr)
                 """,
                 cancellationToken,
+                ("isr", isrType),
                 ("id", context.ResultRef),
                 ("c", context.CompanyId),
                 ("code", code),
@@ -168,6 +180,7 @@ public sealed class UpdateExpenseCategoryDraftHandler : ICommandHandler<UpdateEx
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var (name, goodsType, lineClass) = ExpenseCategories.Validate(command.Name, command.GoodsType606, command.LineClass);
+        var isrType = ExpenseCategories.IsrType(command.IsrWithholdingType);
         var row = await ExpenseCategories.LockAsync(context, command.ExpenseCategoryId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         if (row.Status != "DRAFT")
         {
@@ -190,11 +203,19 @@ public sealed class UpdateExpenseCategoryDraftHandler : ICommandHandler<UpdateEx
         await context.AppendEventAsync(
             new EventDraft(
                 "ExpenseCategoryDraftUpdated", 1, ExpenseCategories.Aggregate, row.Id, version,
-                JsonSerializer.Serialize(new { expenseCategoryId = row.Id, name, goodsType606 = goodsType, lineClass }), Publish: true),
+                JsonSerializer.Serialize(new { expenseCategoryId = row.Id, name, goodsType606 = goodsType, lineClass, isrWithholdingType = isrType }), Publish: true),
             cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(
-            context.Connection, context.Transaction, "UPDATE pur.expense_category SET name = @n, goods_type_606 = @t, line_class = @l, version = @v WHERE expense_category_id = @id",
-            cancellationToken, ("n", name), ("t", goodsType), ("l", lineClass), ("v", version), ("id", row.Id)).ConfigureAwait(false);
+            context.Connection,
+            context.Transaction,
+            "UPDATE pur.expense_category SET name = @n, goods_type_606 = @t, line_class = @l, isr_withholding_type = @isr, version = @v WHERE expense_category_id = @id",
+            cancellationToken,
+            ("n", name),
+            ("t", goodsType),
+            ("l", lineClass),
+            ("isr", isrType),
+            ("v", version),
+            ("id", row.Id)).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { expenseCategoryId = row.Id, version });
     }
 }
@@ -293,5 +314,29 @@ public sealed class ReactivateExpenseCategoryHandler : ICommandHandler<Reactivat
 
         var version = await ExpenseCategories.TransitionAsync(context, row, "ACTIVE", "ExpenseCategoryReactivated", null, CommandType, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { expenseCategoryId = row.Id, status = "ACTIVE", version });
+    }
+}
+
+[RequiresPermission("expense_category:approve", StepUp = true)]
+public sealed class SetExpenseCategoryIsrTypeHandler : ICommandHandler<SetExpenseCategoryIsrType>
+{
+    public string CommandType => "Procurement.SetExpenseCategoryIsrType";
+
+    public async Task<string> HandleAsync(SetExpenseCategoryIsrType command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var isrType = ExpenseCategories.IsrType(command.IsrWithholdingType);
+        var row = await ExpenseCategories.LockAsync(context, command.ExpenseCategoryId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
+        var version = row.Version + 1;
+        await context.AppendEventAsync(
+            new EventDraft(
+                "ExpenseCategoryIsrTypeSet", 1, ExpenseCategories.Aggregate, row.Id, version, JsonSerializer.Serialize(new { expenseCategoryId = row.Id, isrWithholdingType = isrType }),
+                Publish: true),
+            cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection, context.Transaction, "UPDATE pur.expense_category SET isr_withholding_type = @isr, version = @v WHERE expense_category_id = @id", cancellationToken,
+            ("isr", isrType), ("v", version), ("id", row.Id)).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { expenseCategoryId = row.Id, isrWithholdingType = isrType, version });
     }
 }
