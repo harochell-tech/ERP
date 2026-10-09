@@ -4,7 +4,7 @@ namespace Rochell.Tax;
 /// One line to tax: its net amount and the item's category. An expense line (E-GAS-02-4) has no item: it names its tax type
 /// (<paramref name="TaxTypeRuleId"/>) and its scope says whether its category is a service or a good.
 /// </summary>
-public sealed record TaxableLine(Guid LineId, string ItemCategory, decimal NetAmount, Guid? TaxTypeRuleId = null, string Scope = TaxLineScopes.Inventory);
+public sealed record TaxableLine(Guid LineId, string ItemCategory, decimal NetAmount, Guid? TaxTypeRuleId = null, string Scope = TaxLineScopes.Inventory, string? IsrWithholdingType = null);
 
 /// <summary>An applicable rule version. <paramref name="RuleId"/> is what an expense line's tax type names.</summary>
 public sealed record ApplicableRule(Guid RuleVersionId, string RuleCode, FiscalRuleDefinition Definition, Guid? RuleId = null);
@@ -15,7 +15,7 @@ public sealed record DeterminedTax(Guid LineId, Guid RuleVersionId, string TaxCo
 /// <summary>§30: a pure function from context to determination. No I/O, no clock, no normative literal.</summary>
 public static class TaxCalculator
 {
-    public static IReadOnlyList<DeterminedTax> Determine(string partyTaxType, IReadOnlyList<TaxableLine> lines, IReadOnlyList<ApplicableRule> rules)
+    public static IReadOnlyList<DeterminedTax> Determine(string partyTaxType, IReadOnlyList<TaxableLine> lines, IReadOnlyList<ApplicableRule> rules, string? documentSeries = null)
     {
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(rules);
@@ -35,7 +35,7 @@ public static class TaxCalculator
             // E-GAS-02-5: a withholding on ITBIS is on the line's ITBIS, not on its selective tax, other taxes or tip.
             var itbisAmount = itbis.Where(t => t.Effect is TaxEffects.RecoverableInput or TaxEffects.NonRecoverableInput or TaxEffects.Output).Sum(t => t.Amount);
             result.AddRange(rules.Where(r => r.Definition.Kind == FiscalRuleKinds.PurchaseWithholding && (r.Definition.AppliesTo?.Contains(line.Scope) ?? true))
-                .Select(r => Withholding(r, line, partyTaxType, itbisAmount))
+                .Select(r => Withholding(r, line, partyTaxType, itbisAmount, documentSeries))
                 .OfType<DeterminedTax>());
         }
 
@@ -63,11 +63,26 @@ public static class TaxCalculator
             : (rule.Definition.Components ?? []).Select(c => new DeterminedTax(line.LineId, rule.RuleVersionId, c.TaxCode, net, c.Rate, Money(net * c.Rate), c.Effect));
     }
 
-    public static DeterminedTax? Withholding(ApplicableRule rule, TaxableLine line, string partyTaxType, decimal itbisAmount)
+    /// <summary>
+    /// E-X1-02-1: an ISR withholding naming a 606 type withholds only on expense lines of categories of that type; E-X1-02-3: one naming document
+    /// series only on invoices of those series (unknown series, as in a preview, withholds).
+    /// </summary>
+    public static DeterminedTax? Withholding(ApplicableRule rule, TaxableLine line, string partyTaxType, decimal itbisAmount, string? documentSeries = null)
     {
         ArgumentNullException.ThrowIfNull(rule);
         ArgumentNullException.ThrowIfNull(line);
         if (!rule.Definition.PartyTypes.Contains(partyTaxType) || !(rule.Definition.AppliesTo?.Contains(line.Scope) ?? true))
+        {
+            return null;
+        }
+
+        // Inventory lines have no category: their withholdings follow the rule's applies_to, as before.
+        if (rule.Definition.IsrWithholdingType is { } type && line.Scope != TaxLineScopes.Inventory && line.IsrWithholdingType != type)
+        {
+            return null;
+        }
+
+        if (rule.Definition.DocumentSeries is { } series && documentSeries is not null && !series.Contains(documentSeries))
         {
             return null;
         }

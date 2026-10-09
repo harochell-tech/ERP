@@ -62,6 +62,14 @@ describe("purchase tax types in the guided form (E-GAS-07-5)", () => {
     form.appliesTo = ["EXPENSE_SERVICE"];
     expect(JSON.parse(buildFiscalDefinition("PURCHASE_WITHHOLDING", form)).applies_to).toEqual(["EXPENSE_SERVICE"]);
   });
+
+  it("keeps a withholding to B-series invoices when it says so (X1-02, E-X1-02-3)", () => {
+    const form = parseFiscalDefinition("PURCHASE_WITHHOLDING", DEFINITION_TEMPLATES.PURCHASE_WITHHOLDING).form!;
+    form.documentSeries = ["B"];
+    const built = buildFiscalDefinition("PURCHASE_WITHHOLDING", form);
+    expect(JSON.parse(built).document_series).toEqual(["B"]);
+    expect(parseFiscalDefinition("PURCHASE_WITHHOLDING", built).form!.documentSeries).toEqual(["B"]);
+  });
 });
 
 describe("expense lines (E-GAS-07-2/3)", () => {

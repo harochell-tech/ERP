@@ -4,6 +4,7 @@ import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { ConfirmAction, ErrorBox, Field, LineTable, Loading, NoPermission, StatusBadge, useFieldErrors } from "@/components/ui";
 import { categoryCode, LINE_CLASS_LABELS } from "@/lib/expenses";
+import { ISR_WITHHOLDING_TYPES, isrWithholdingTypeLabel } from "@/lib/fiscalRuleForm";
 import { GOODS_TYPES } from "@/lib/fiscalReports";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -25,9 +26,11 @@ interface Draft {
   accountId: string;
   goodsType606: string;
   lineClass: string;
+  /** X1-02 (E-X1-02-1): the 606 ISR withholding type of its purchases; "" = none. */
+  isrWithholdingType: string;
 }
 
-const EMPTY: Draft = { expenseCategoryId: null, version: 0, name: "", accountId: "", goodsType606: "", lineClass: "SERVICE" };
+const EMPTY: Draft = { expenseCategoryId: null, version: 0, name: "", accountId: "", goodsType606: "", lineClass: "SERVICE", isrWithholdingType: "" };
 
 export default function ExpenseCategories() {
   const { companyId, can, isMyUserId } = useSession();
@@ -47,6 +50,7 @@ export default function ExpenseCategories() {
   const approve = useCommand("approve-expense-categories", "/api/v1/companies/{companyId}/procurement/approve-expense-categories");
   const deactivate = useCommand("deactivate-expense-category", "/api/v1/companies/{companyId}/procurement/deactivate-expense-category");
   const reactivate = useCommand("reactivate-expense-category", "/api/v1/companies/{companyId}/procurement/reactivate-expense-category");
+  const setIsr = useCommand("set-expense-category-isr", "/api/v1/companies/{companyId}/procurement/set-expense-category-isr-type");
   const fe = useFieldErrors<string>();
 
   if (!readable) {
@@ -62,7 +66,7 @@ export default function ExpenseCategories() {
     (a) => a.status === "ACTIVE" && !a.isControl && (a.accountClass === "EXPENSE" || a.code.startsWith("6") || a.accountClass === "ASSET"),
   );
   const assetIds = new Set(expenseAccounts.filter((a) => a.accountClass === "ASSET").map((a) => a.accountId));
-  const busy = prepare.busy || update.busy || approve.busy || deactivate.busy || reactivate.busy;
+  const busy = prepare.busy || update.busy || approve.busy || deactivate.busy || reactivate.busy || setIsr.busy;
   const toggle = (id: string) =>
     setSelected((s) => {
       const next = new Set(s);
@@ -90,12 +94,26 @@ export default function ExpenseCategories() {
     }
     const response = draft.expenseCategoryId
       ? await update.run(
-          { expenseCategoryId: draft.expenseCategoryId, expectedVersion: draft.version, name: draft.name.trim(), goodsType606: draft.goodsType606, lineClass: draft.lineClass },
+          {
+            expenseCategoryId: draft.expenseCategoryId,
+            expectedVersion: draft.version,
+            name: draft.name.trim(),
+            goodsType606: draft.goodsType606,
+            lineClass: draft.lineClass,
+            isrWithholdingType: draft.isrWithholdingType || null,
+          },
           undefined,
           `Categoría ${draft.name.trim()} corregida.`,
         )
       : await prepare.run(
-          { code: categoryCode(draft.name), name: draft.name.trim(), accountId: draft.accountId, goodsType606: draft.goodsType606, lineClass: draft.lineClass },
+          {
+            code: categoryCode(draft.name),
+            name: draft.name.trim(),
+            accountId: draft.accountId,
+            goodsType606: draft.goodsType606,
+            lineClass: draft.lineClass,
+            isrWithholdingType: draft.isrWithholdingType || null,
+          },
           undefined,
           `Categoría ${draft.name.trim()} preparada; la aprueba el Controller.`,
         );
@@ -186,6 +204,7 @@ export default function ExpenseCategories() {
               ))}
             </select>
           </Field>
+          <IsrTypeField value={draft.isrWithholdingType} onChange={(isrWithholdingType) => setDraft({ ...draft, isrWithholdingType })} />
           <div className="actions">
             <button type="button" className="primary" disabled={busy} onClick={() => void save()}>
               {draft.expenseCategoryId ? "Guardar corrección" : "Preparar"}
@@ -196,7 +215,7 @@ export default function ExpenseCategories() {
           </div>
         </section>
       ) : null}
-      <ErrorBox error={prepare.error ?? update.error ?? approve.error ?? deactivate.error ?? reactivate.error ?? accounts.error} />
+      <ErrorBox error={prepare.error ?? update.error ?? approve.error ?? deactivate.error ?? reactivate.error ?? setIsr.error ?? accounts.error} />
       <LineTable testId="expense-categories">
         <thead>
           <tr>
@@ -205,6 +224,7 @@ export default function ExpenseCategories() {
             <th>Cuenta</th>
             <th>606</th>
             <th>Clase</th>
+            <th>Retención ISR</th>
             <th>Estado</th>
             <th>Preparó / aprobó</th>
             <th />
@@ -230,6 +250,35 @@ export default function ExpenseCategories() {
               <td title={GOODS_TYPES[c.goodsType606]}>{c.goodsType606}</td>
               <td>{LINE_CLASS_LABELS[c.lineClass] ?? c.lineClass}</td>
               <td>
+                {canApprove && c.status === "ACTIVE" ? (
+                  <select
+                    aria-label={`Retención ISR de ${c.name}`}
+                    value={c.isrWithholdingType ?? ""}
+                    disabled={busy}
+                    onChange={(e) =>
+                      void setIsr
+                        .run(
+                          { expenseCategoryId: c.expenseCategoryId, expectedVersion: c.version, isrWithholdingType: e.target.value || null },
+                          undefined,
+                          `Retención de ISR de ${c.name} cambiada.`,
+                        )
+                        .then((r) => r && list.reload())
+                    }
+                  >
+                    <option value="">Ninguna</option>
+                    {ISR_WITHHOLDING_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {isrWithholdingTypeLabel(t)}
+                      </option>
+                    ))}
+                  </select>
+                ) : c.isrWithholdingType ? (
+                  isrWithholdingTypeLabel(c.isrWithholdingType)
+                ) : (
+                  "—"
+                )}
+              </td>
+              <td>
                 <StatusBadge status={c.status} label={STATUS_LABELS[c.status]} testId={`category-status:${c.code}`} />
               </td>
               <td>
@@ -241,7 +290,15 @@ export default function ExpenseCategories() {
                   <button
                     type="button"
                     onClick={() =>
-                      setDraft({ expenseCategoryId: c.expenseCategoryId, version: c.version, name: c.name, accountId: c.accountId, goodsType606: c.goodsType606, lineClass: c.lineClass })
+                      setDraft({
+                        expenseCategoryId: c.expenseCategoryId,
+                        version: c.version,
+                        name: c.name,
+                        accountId: c.accountId,
+                        goodsType606: c.goodsType606,
+                        lineClass: c.lineClass,
+                        isrWithholdingType: c.isrWithholdingType ?? "",
+                      })
                     }
                   >
                     Corregir
@@ -278,5 +335,21 @@ export default function ExpenseCategories() {
         </tbody>
       </LineTable>
     </>
+  );
+}
+
+/** X1-02 (E-X1-02-1): an ISR withholding rule of a type withholds only on the categories of that type. */
+function IsrTypeField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <Field label="Retención de ISR (606)" hint="Honorarios, alquileres u otras rentas: la regla de retención de ese tipo se aplica solo a las compras de esta categoría.">
+      <select aria-label="Retención de ISR (606)" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Ninguna</option>
+        {ISR_WITHHOLDING_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {isrWithholdingTypeLabel(t)}
+          </option>
+        ))}
+      </select>
+    </Field>
   );
 }

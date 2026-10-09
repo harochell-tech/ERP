@@ -182,7 +182,9 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
         // Fiscal gate and determination at the invoice date (E-PR13-5); a closed gate rejects (SI-07).
         var determination = await _tax.DetermineAsync(
             context,
-            new TaxRequest("SupplierInvoice", header.Id, header.DocDate, header.PartyId, lines.Select(l => new TaxLineInput(l.Id, po[l.PurchaseOrderLineId].ItemId, l.NetAmount)).ToList()),
+            new TaxRequest(
+                "SupplierInvoice", header.Id, header.DocDate, header.PartyId, lines.Select(l => new TaxLineInput(l.Id, po[l.PurchaseOrderLineId].ItemId, l.NetAmount)).ToList(),
+                DocumentSeries: Expenses.ExpenseInvoices.SeriesOf(header.FiscalNumber)),
             cancellationToken).ConfigureAwait(false);
 
         if (determination.HasNonRecoverableInput)

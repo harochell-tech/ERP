@@ -85,13 +85,15 @@ public sealed class PurchaseTaxTypeTests(PostgresFixture postgres)
         var cement = await h.CreateActiveItemAsync("CEMENTO-GRIS", "t", "CEMENTO");
 
         var raw = await Determine(h, "d-1", individual, new TaxLineInput(Guid.CreateVersion7(), cement, 1000m));
-        var service = await Determine(h, "d-2", individual, Expense(telecom, 5000m));
-        var goods = await Determine(h, "d-3", individual, Expense(telecom, 5000m, TaxLineScopes.ExpenseGoods));
+        var service = await Determine(h, "d-2", individual, Expense(telecom, 5000m) with { IsrWithholdingType = "2" });
+        var goods = await Determine(h, "d-3", individual, Expense(telecom, 5000m, TaxLineScopes.ExpenseGoods) with { IsrWithholdingType = "2" });
+        var otherType = await Determine(h, "d-4", individual, Expense(telecom, 5000m) with { IsrWithholdingType = "1" }); // E-X1-02-1
 
         // The ISR withholding is for services only; the one on ITBIS is on the line's ITBIS (900.00), never on its ISC or CDT.
         Assert.Equal("ITBIS:180.00:RECOVERABLE_INPUT,RET_ITBIS:54.00:WITHHOLDING", Taxes(raw));
         Assert.Equal("ITBIS:900.00:RECOVERABLE_INPUT,ISC:500.00:SELECTIVE_TAX,CDT:100.00:OTHER_TAX,RET_ISR:500.00:WITHHOLDING,RET_ITBIS:270.00:WITHHOLDING", Taxes(service));
         Assert.Equal("ITBIS:900.00:RECOVERABLE_INPUT,ISC:500.00:SELECTIVE_TAX,CDT:100.00:OTHER_TAX,RET_ITBIS:270.00:WITHHOLDING", Taxes(goods));
+        Assert.Equal("ITBIS:900.00:RECOVERABLE_INPUT,ISC:500.00:SELECTIVE_TAX,CDT:100.00:OTHER_TAX,RET_ITBIS:270.00:WITHHOLDING", Taxes(otherType));
     }
 
     [Fact]

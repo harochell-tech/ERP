@@ -32,7 +32,7 @@ internal static class ExpenseInvoices
     /// <summary>An expense line; a USD line (E-USD1-03-4) has no tax type and keeps its USD price and net besides the peso ones.</summary>
     public sealed record Line(
         Guid Id, int LineNo, string Description, decimal Quantity, decimal UnitPrice, decimal Net, Guid? TaxTypeId, Guid CategoryId, Guid AccountId, string Category, string Scope, Guid? PoLineId,
-        decimal? UnitPriceFc = null, decimal? NetFc = null);
+        decimal? UnitPriceFc = null, decimal? NetFc = null, string? IsrWithholdingType = null);
 
     public static async Task<IReadOnlyList<Line>> LinesAsync(CommandContext context, Guid siId, CancellationToken cancellationToken)
         => await Reading.ListAsync(
@@ -40,16 +40,19 @@ internal static class ExpenseInvoices
             context.Transaction,
             """
             SELECT l.si_line_id, l.line_no, l.description, l.qty, l.unit_price, l.net_amount, l.tax_rule_id, c.expense_category_id, c.account_id, c.code,
-                   CASE c.line_class WHEN 'SERVICE' THEN 'EXPENSE_SERVICE' ELSE 'EXPENSE_GOODS' END, l.po_line_id, l.unit_price_fc, l.net_amount_fc
+                   CASE c.line_class WHEN 'SERVICE' THEN 'EXPENSE_SERVICE' ELSE 'EXPENSE_GOODS' END, l.po_line_id, l.unit_price_fc, l.net_amount_fc, c.isr_withholding_type
             FROM pur.supplier_invoice_line l JOIN pur.expense_category c ON c.expense_category_id = l.expense_category_id
             WHERE l.si_id = @s ORDER BY l.line_no
             """,
             r => new Line(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4), r.GetDecimal(5), r.IsDBNull(6) ? null : r.GetGuid(6), r.GetGuid(7), r.GetGuid(8), r.GetString(9), r.GetString(10), r.IsDBNull(11) ? null : r.GetGuid(11),
-                r.IsDBNull(12) ? null : r.GetDecimal(12), r.IsDBNull(13) ? null : r.GetDecimal(13)),
+                r.IsDBNull(12) ? null : r.GetDecimal(12), r.IsDBNull(13) ? null : r.GetDecimal(13), r.IsDBNull(14) ? null : r.GetString(14)),
             cancellationToken,
             ("s", siId)).ConfigureAwait(false);
 
-    private static List<TaxLineInput> TaxLines(IEnumerable<Line> lines) => [.. lines.Select(l => new TaxLineInput(l.Id, null, l.Net, l.TaxTypeId, l.Scope))];
+    private static List<TaxLineInput> TaxLines(IEnumerable<Line> lines) => [.. lines.Select(l => new TaxLineInput(l.Id, null, l.Net, l.TaxTypeId, l.Scope, l.IsrWithholdingType))];
+
+    /// <summary>E-X1-02-3: B for a series-B NCF, E for an e-CF; a foreign supplier's own number has no series.</summary>
+    public static string? SeriesOf(string fiscalNumber) => fiscalNumber is ['B', ..] ? "B" : fiscalNumber is ['E', ..] && fiscalNumber.Length == 13 ? "E" : null;
 
     /// <summary>
     /// E-GAS-04-2/3: the invoice's total — the net plus every tax of its lines' types in force on its date — against the policy's
@@ -116,7 +119,7 @@ internal static class ExpenseInvoices
         }
 
         var determination = await tax.DetermineAsync(
-            context, new TaxRequest("SupplierInvoice", header.Id, header.DocDate, header.PartyId, TaxLines(lines)), cancellationToken).ConfigureAwait(false);
+            context, new TaxRequest("SupplierInvoice", header.Id, header.DocDate, header.PartyId, TaxLines(lines), DocumentSeries: SeriesOf(header.FiscalNumber)), cancellationToken).ConfigureAwait(false);
         decimal Sum(string effect) => determination.Taxes.Where(t => t.Effect == effect).Sum(t => t.Amount);
         var (itbis, selective, other, tip, withholding) = (Sum(TaxEffects.RecoverableInput), Sum(TaxEffects.SelectiveTax), Sum(TaxEffects.OtherTax), Sum(TaxEffects.LegalTip), determination.Withholding);
         var net = lines.Sum(l => l.Net);

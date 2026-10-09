@@ -35,6 +35,12 @@ export const TAX_EFFECT_LABELS: Readonly<Record<string, string>> = {
 };
 
 /** GAS1-02 (E-GAS-01-7): the lines a withholding rule may be limited to. */
+/** X1-02 (E-X1-02-3): the supplier documents a withholding applies to; none marked = both (NG 02-2026). */
+export const DOCUMENT_SERIES_LABELS: Readonly<Record<string, string>> = {
+  B: "Facturas serie B (NCF)",
+  E: "Facturas electrónicas (e-CF)",
+};
+
 export const WITHHOLDING_SCOPE_LABELS: Readonly<Record<string, string>> = {
   INVENTORY: "Materias primas (inventario)",
   EXPENSE_SERVICE: "Gastos que son servicios",
@@ -105,6 +111,8 @@ export interface FiscalRuleForm {
   amount: string;
   /** PURCHASE_WITHHOLDING (E-GAS-01-7): the lines it applies to; absent or empty = every line. */
   appliesTo?: string[];
+  /** PURCHASE_WITHHOLDING (E-X1-02-3): B, E; absent or empty = both. */
+  documentSeries?: string[];
   /** PURCHASE_TAX_TYPE (E-GAS-07-5): the name shown in the lines' list. */
   label?: string;
   /** PURCHASE_TAX_TYPE: each tax the type charges on the net; none for an exempt type. */
@@ -123,7 +131,7 @@ export interface TaxComponentRow {
 export const TAX_TYPE_EFFECTS = ["RECOVERABLE_INPUT", "SELECTIVE_TAX", "OTHER_TAX", "LEGAL_TIP"] as const;
 
 const ITBIS_KEYS = ["tax_code", "rate", "effect", "exempt_item_categories"];
-const WITHHOLDING_KEYS = ["tax_code", "rate", "base", "party_types", "isr_withholding_type", "applies_to"];
+const WITHHOLDING_KEYS = ["tax_code", "rate", "base", "party_types", "isr_withholding_type", "applies_to", "document_series"];
 
 function blankForm(): FiscalRuleForm {
   return { taxCode: "", ratePercent: "", effect: "", exemptItemCategories: [], base: "", partyTypes: [], isrWithholdingType: "", classes: {}, amount: "" };
@@ -183,7 +191,7 @@ export function parseFiscalDefinition(kind: string, json: string): { form: Fisca
       return { form: null, error: `"${key}" debe ser texto.` };
     }
   }
-  for (const key of ["exempt_item_categories", "party_types", "applies_to"]) {
+  for (const key of ["exempt_item_categories", "party_types", "applies_to", "document_series"]) {
     if (obj[key] !== undefined && !isStringArray(obj[key])) {
       return { form: null, error: `"${key}" debe ser una lista de textos.` };
     }
@@ -199,6 +207,9 @@ export function parseFiscalDefinition(kind: string, json: string): { form: Fisca
   form.isrWithholdingType = (obj.isr_withholding_type as string | undefined) ?? "";
   if (obj.applies_to !== undefined) {
     form.appliesTo = [...(obj.applies_to as string[])];
+  }
+  if (obj.document_series !== undefined) {
+    form.documentSeries = [...(obj.document_series as string[])];
   }
   return { form, error: null };
 }
@@ -280,6 +291,9 @@ export function buildFiscalDefinition(kind: FiscalRuleKind | string, form: Fisca
     }
     if (form.appliesTo && form.appliesTo.length > 0) {
       definition.applies_to = inOrder(form.appliesTo, Object.keys(WITHHOLDING_SCOPE_LABELS));
+    }
+    if (form.documentSeries && form.documentSeries.length > 0) {
+      definition.document_series = inOrder(form.documentSeries, Object.keys(DOCUMENT_SERIES_LABELS));
     }
     return JSON.stringify(definition, null, 2);
   }
@@ -395,6 +409,9 @@ export function describeFiscalDefinition(kind: string, json: string): string[] {
     }
     if (form.appliesTo && form.appliesTo.length > 0) {
       lines.push(`Aplica solo a: ${form.appliesTo.map((s) => WITHHOLDING_SCOPE_LABELS[s] ?? s).join(", ")}`);
+    }
+    if (form.documentSeries && form.documentSeries.length > 0) {
+      lines.push(`Solo en: ${form.documentSeries.map((s) => DOCUMENT_SERIES_LABELS[s] ?? s).join(", ")}`);
     }
   } else {
     lines.push(TAX_EFFECT_LABELS[form.effect] ?? form.effect);

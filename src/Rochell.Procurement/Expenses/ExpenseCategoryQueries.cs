@@ -10,7 +10,7 @@ public sealed record ListExpenseCategories(Guid CompanyId, Guid SessionId, strin
 
 public sealed record ExpenseCategoryView(
     Guid ExpenseCategoryId, string Code, string Name, Guid AccountId, string AccountCode, string AccountName, string GoodsType606, string LineClass, string Status,
-    Guid PreparedBy, string? PreparedByName, Guid? ApprovedBy, string? ApprovedByName, long Version);
+    Guid PreparedBy, string? PreparedByName, Guid? ApprovedBy, string? ApprovedByName, long Version, string? IsrWithholdingType = null);
 
 public sealed record ExpenseCategoryList(IReadOnlyList<ExpenseCategoryView> Items);
 
@@ -33,7 +33,7 @@ public sealed class ListExpenseCategoriesHandler : IQueryHandler<ListExpenseCate
             context.Transaction,
             """
             SELECT c.expense_category_id, c.code, c.name, c.account_id, a.code, a.name, c.goods_type_606, c.line_class, c.status,
-                   c.prepared_by, coalesce(p.display_name, p.email), c.approved_by, coalesce(v.display_name, v.email), c.version
+                   c.prepared_by, coalesce(p.display_name, p.email), c.approved_by, coalesce(v.display_name, v.email), c.version, c.isr_withholding_type
             FROM pur.expense_category c
             JOIN fin.account a ON a.account_id = c.account_id
             JOIN iam.user p ON p.user_id = c.prepared_by
@@ -43,7 +43,7 @@ public sealed class ListExpenseCategoriesHandler : IQueryHandler<ListExpenseCate
             """,
             r => new ExpenseCategoryView(
                 r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetString(5), r.GetString(6), r.GetString(7), r.GetString(8),
-                r.GetGuid(9), r.NullableString(10), r.IsDBNull(11) ? null : r.GetGuid(11), r.NullableString(12), r.GetInt64(13)),
+                r.GetGuid(9), r.NullableString(10), r.IsDBNull(11) ? null : r.GetGuid(11), r.NullableString(12), r.GetInt64(13), r.NullableString(14)),
             cancellationToken,
             ("c", context.CompanyId),
             ("s", query.Status)).ConfigureAwait(false);
