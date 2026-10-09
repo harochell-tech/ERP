@@ -1424,6 +1424,26 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-NAV-11 | NAV-01 | Auditoría and Seguridad become Administración (Usuarios y roles, Solicitudes de rol, Verificar integridad, Respaldos diarios inalterables); Apertura de inventario moves to Configuración (used once). |
 | E-NAV-12 | NAV-01 | «Ir a…» search at the top of the menu (Ctrl+K / ⌘K on a computer): finds the screens the user may see by label or group, ignoring case and accents; Enter opens the first match. |
 | E-NAV-13 | NAV-01 | Favourites: a star on each menu item keeps it under «Favoritos» at the top, in this browser only (localStorage); nothing is stored on the server. |
+| E-X1-1 | X-1 | Freight on our invoices stays **exempt** (owner's decision 2026-10-09): Block Rochell registers bulk-material transport (transporte de agregados) as an economic activity with the DGII and bills the transport as such. The research found that art. 339.1 and Reglamento 293-11 art. 10 count freight accessory to a taxed sale in the ITBIS base (DGII help answers); the owner takes that position knowingly. PRS-04 is unchanged. Sources: `docs/fiscal/x1-dossier-2026-10.md`. |
+| E-X1-2 | X-1 | Sand and gravel are exempt only in their natural state (DGII CA119); washed or crushed aggregates stay taxed until the accountant rules otherwise. |
+| E-X1-3 | X-1 | ITBIS on sales arises at the invoice or the delivery, whichever comes first (art. 338.1, Reglamento art. 7): the monthly close warns of and requires invoicing the month's deliveries before closing. |
+| E-X1-4 | X-1 | Collections before delivery (proformas) are customer deposits without ITBIS until delivery or invoice; FIS-1b already works so. Closed. |
+| E-X1-5 | X-1 | A credit note issued more than 30 calendar days after the credited e-CF carries no ITBIS, only the price (art. 338 Párrafo, Reglamento arts. 8, 28), with `IndicadorNotaCredito` 1. Replaces E-VS3-06-2 for those notes. |
+| E-X1-6 | X-1 | A consumer e-CF 32 identifies its buyer from RD$250,000.00 (DGII e-CF format); below it is optional. The CONSUMER_ID_THRESHOLD value is 250,000.00. |
+| E-X1-7 | X-1 | The sale of a used fixed asset carries 18 % ITBIS on the full price (art. 336.2, DGII). |
+| E-X1-8 | X-1 | ISR withholding rates from 2026-07-01 (Ley 30-26, IR-17-2026): fees to individuals 15 %, rentals 15 %, other income 15 %, technical services 3 %, State suppliers 5 % (applied to us). Loaded as rules. |
+| E-X1-9 | X-1 | After NG 02-2026: no 30 % ITBIS withholding on companies invoicing with e-CF; 100 % still on individuals' services, e-CF 41 purchases, construction and RST suppliers; security services pending the accountant. The withholding rule gains the dimension supplier document B-series vs e-CF. |
+| E-X1-10 | X-1 | Payments abroad: ISR 27 % final (15 % royalties, software, online advertising, data storage); an e-CF 47 is issued and the 609 filed. New work. |
+| E-X1-11 | X-1 | No 607 / 608 for an e-CF-only issuer; the 606 includes e-CF received; a withholding paid in a later month is reported again in the payment month (E-FIS2-02-11 confirmed). Closed. |
+| E-X1-12 | X-1 | Customs ITBIS (DUA) is not in the 606; it goes to the IT-1 imports (E-USD1-06-5 confirmed). Closed. |
+| E-X1-13 | X-1 | The 2 % card-acquirer withholding applies (NG 06-23): an ITBIS advance credited on the month's IT-1. New flow, recorded from the bank's settlement. |
+| E-X1-14 | X-1 | Exchange differences count for ISR at fiscal year-end at the DGII's published rate (art. 293); the monthly revaluation is accounting only. No change. |
+| E-X1-15 | X-1 | Telecommunications: ITBIS 18 % on the service without ISC, ISC 10 % (art. 381), CDT 2 % (Ley 153-98). The pack is right; its citations are corrected. |
+| E-X1-16 | X-1 | Insurance: ISC 16 % without ITBIS (art. 383); life insurance ISC 11 % in 2027, 6 % in 2028, none after (Ley 30-26 art. 48): a «Seguro de vida» tax type with those versions. |
+| E-X1-17 | X-1 | The 10 % legal tip is outside the ITBIS base (art. 339.3) and computed on the price before ITBIS. No change. |
+| E-X1-18 | X-1 | ITBIS on category-1 assets (buildings) is not deductible and goes to the asset's cost; categories 2 and 3 are deductible. Building cards are adjusted. |
+| E-X1-19 | X-1 | Tax depreciation (5 / 25 / 15 %, pooled declining balance, art. 287, Reglamento 139-98) is a later report; books stay straight-line. |
+| E-X1-20 | X-1 | CONFOTUR: e-CF 44 without ITBIS, the number in additional information; an authorization without its own validity date is valid **180 days** from its issue (DGII CA3462; owner's decision). |
 | E-OCR-1 | OCR-1 | Supplier invoices stop being typed from scratch. Three sources, in this order: e-CF received through Alanube, the QR of a printed e-CF, a photo or scan read by AI (OCR). Each source only prepares a **draft** that a person reviews and approves; nothing is registered or posted on its own. Approved 2026-10-09. |
 | E-OCR-2 | OCR-1 | Core polls Alanube's received documents every hour and prepares a draft from each one's XML. New inbox: Compras › Comprobantes recibidos. |
 | E-OCR-3 | OCR-1 | The commercial response to the DGII (accept / reject) is given from that inbox: registering the invoice accepts it; rejecting needs a reason. |
