@@ -30,10 +30,14 @@ CREATE INDEX supplier_document_reading_file ON pur.supplier_document_reading (co
 CREATE INDEX supplier_document_reading_month ON pur.supplier_document_reading (company_id, read_at);
 CREATE TRIGGER supplier_document_reading_append_only BEFORE UPDATE OR DELETE ON pur.supplier_document_reading FOR EACH ROW EXECUTE FUNCTION core.reject_mutation();
 
+-- A count (readings) is a unit of its own on the policy screens.
+ALTER TABLE acc.policy_parameter_definition DROP CONSTRAINT policy_parameter_definition_unit,
+  ADD CONSTRAINT policy_parameter_definition_unit CHECK (unit IS NULL OR unit IN ('PERCENT', 'AMOUNT', 'DAYS', 'HOURS', 'MINUTES', 'OPTION', 'COUNT'));
+
 INSERT INTO acc.policy_parameter_definition (param_code, policy_code, value_type, min_value, max_value, allowed_values, description, label, unit, example, affects) VALUES
   ('ocr_monthly_readings', 'PURCHASING', 'INTEGER', 0, 100000, NULL,
    'Lecturas de fotos o PDF de facturas por IA permitidas por mes calendario (E-OCR1-04-3)',
-   'Lecturas por IA al mes', NULL, '500',
+   'Lecturas por IA al mes', 'COUNT', '500 lecturas',
    'Cuántas fotos o PDF de facturas de proveedor se pueden leer con IA en un mes. Al llegar al tope, se capturan a mano.');
 
 ALTER TABLE pur.supplier_document_reading ENABLE ROW LEVEL SECURITY;
