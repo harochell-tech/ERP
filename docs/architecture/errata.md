@@ -1411,6 +1411,19 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-LAB1-01-15 | LAB1-01 | `qa.legacy_lot` and the import of the history go in LAB1-04's migration, not in LAB1-01's. |
 | E-LAB1-01-16 | LAB1-01 | TST-01's marker `test:` (the resource of the test permissions) counts only where a permission code starts; a production resource that ends in «test» is allowed, so `lab_test:record` (E-LAB1-9) stays. Approved 2026-10-08. |
 | E-LAB1-01-17 | LAB1-01 | A break date or an absorption test date after today is refused, as one before the lot's production date is (E-LAB1-01-6). Approved 2026-10-08. |
+| E-NAV-1 | NAV-01 | The menu follows the business in 12 groups: Ventas → Despacho → Facturación y cobros → Compras → Almacén → Producción → Calidad → Tesorería → Contabilidad → Fiscal → Administración → Configuración. Maestros disappears: each catalogue sits with the work that uses it. Only the menu moves; routes, screens and labels stay. |
+| E-NAV-2 | NAV-01 | Ventas: Clientes, Cotizaciones, Pedidos, Venta de contado, Listas de precios, Zonas de entrega. |
+| E-NAV-3 | NAV-01 | Despacho: Tablero de despacho, Vehículos y choferes. |
+| E-NAV-4 | NAV-01 | Facturación y cobros (Facturación and Cobros together): Por facturar, Proformas, Facturas, Notas de crédito, Recibos, Depósitos, Estado de cuenta, Cuentas por cobrar por antigüedad. |
+| E-NAV-5 | NAV-01 | Compras (with Cuentas por pagar): Proveedores, Órdenes de compra, Facturas de proveedor, DUA, Liquidaciones de importación, Antigüedad de CxP, Categorías de gasto. |
+| E-NAV-6 | NAV-01 | Almacén: Por recibir, Recepciones, Correcciones, Materias primas, Productos terminados. |
+| E-NAV-7 | NAV-01 | Producción: the day's work first (Producción del día, Curado y liberación, Portal de máquinas, Eficiencia, Mantenimiento preventivo), then its set-up (Recetas, Máquinas y turnos, Costos estándar, Costos de producción). |
+| E-NAV-8 | NAV-01 | Tesorería: Propuesta de pago, Pagos, Transferencias, Extractos, Conciliación bancaria, Cuentas bancarias de la empresa, Tasas de cambio. |
+| E-NAV-9 | NAV-01 | Contabilidad (with Cierre): Diario de ajustes, Activos fijos, Revaluación de saldos en dólares, Balanza, Mayor, Estados financieros, Períodos y cierre, Conciliaciones. |
+| E-NAV-10 | NAV-01 | Fiscal: e-CF, Rangos e-NCF, Autorizaciones fiscales, Reportes fiscales, Padrón RNC (DGII). |
+| E-NAV-11 | NAV-01 | Auditoría and Seguridad become Administración (Usuarios y roles, Solicitudes de rol, Verificar integridad, Respaldos diarios inalterables); Apertura de inventario moves to Configuración (used once). |
+| E-NAV-12 | NAV-01 | «Ir a…» search at the top of the menu (Ctrl+K / ⌘K on a computer): finds the screens the user may see by label or group, ignoring case and accents; Enter opens the first match. |
+| E-NAV-13 | NAV-01 | Favourites: a star on each menu item keeps it under «Favoritos» at the top, in this browser only (localStorage); nothing is stored on the server. |
 
 Implementation rules derived from the above (no architectural change):
 
