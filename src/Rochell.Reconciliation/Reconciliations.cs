@@ -330,7 +330,17 @@ public static class Reconciliations
             UNION ALL
             SELECT 'aged:' || ex.id::text, ex.a, (@cutoff - gl.since)::numeric, 'UNBILLED_AGED', 'WARNING', NULL
             FROM ex JOIN gl ON gl.id = ex.id
-            WHERE CAST(@udays AS integer) IS NOT NULL AND ex.a > 0 AND gl.since < @cutoff - CAST(@udays AS integer)) f
+            WHERE CAST(@udays AS integer) IS NOT NULL AND ex.a > 0 AND gl.since < @cutoff - CAST(@udays AS integer)
+            UNION ALL
+            -- E-X1-3, E-X1-01-6: at a month-end cutoff, a line delivered by then and not invoiced holds the close — unless the Controller
+            -- accepted it for that month (E-X1-01b-1).
+            SELECT 'unbilled:' || ex.id::text, ex.a, NULL, 'UNBILLED_AT_CLOSE', 'ERROR', 'AR-REC'
+            FROM ex JOIN gl ON gl.id = ex.id
+            WHERE ex.a > 0 AND gl.since <= @cutoff AND @cutoff = (date_trunc('month', @cutoff) + interval '1 month - 1 day')::date
+              AND NOT EXISTS (SELECT 1 FROM sal.unbilled_acceptance_line al
+                              JOIN sal.unbilled_acceptance ac ON ac.acceptance_id = al.acceptance_id
+                              JOIN fin.period p ON p.period_id = ac.period_id
+                              WHERE al.delivery_line_id = ex.id AND p.ends_on = @cutoff)) f
             """,
             """
             SELECT (SELECT coalesce(sum(CASE WHEN dl.qty_invoiced >= dl.qty_delivered THEN 0

@@ -5,6 +5,7 @@ using Rochell.Reconciliation;
 using Rochell.Sales.CreditNotes;
 using Rochell.Sales.Invoices;
 using Rochell.Tax.Authorizations;
+using Rochell.Sales.Deliveries;
 using Rochell.TestInfrastructure;
 using Xunit;
 
@@ -61,7 +62,10 @@ public sealed class FiscalAuthorizationReconciliationTests(PostgresFixture postg
         clock.Advance(TimeSpan.FromDays(40));
         await new LedgerSealer(h.Sealer, h.Clock).SealAllAsync(CancellationToken.None);
         var period = await h.ScalarAsync<Guid>("SELECT period_id FROM fin.period WHERE company_id = @c AND @d BETWEEN starts_on AND ends_on", ("c", h.CompanyId), ("d", month));
-        await h.RunAsync(new CloseComponent(h.CompanyId, await h.SessionWithRolesAsync("CONTROLLER"), "close", period, "AR-REC"), new CloseComponentHandler());
+        var controller = await h.SessionWithRolesAsync("CONTROLLER");
+        // X1-01b (E-X1-01-6): the 100 blocks of the voided invoice were delivered and are not invoiced; the Controller accepts them.
+        await h.RunAsync(new AcceptUnbilledDeliveries(h.CompanyId, controller, "accept", period, "Factura anulada, se refactura en el mes siguiente"), new AcceptUnbilledDeliveriesHandler());
+        await h.RunAsync(new CloseComponent(h.CompanyId, controller, "close", period, "AR-REC"), new CloseComponentHandler());
 
         // E-FIS1-05-6: the detail lists what consumed it — 600 blocks, the credit note's 1,000.00, 100 blocks and the void returning them.
         var detail = System.Text.Json.JsonDocument.Parse(await h.QueryAsync(
@@ -104,6 +108,7 @@ public sealed class FiscalAuthorizationReconciliationTests(PostgresFixture postg
         await new LedgerSealer(h.Sealer, h.Clock).SealAllAsync(CancellationToken.None);
         var period = await h.ScalarAsync<Guid>("SELECT period_id FROM fin.period WHERE company_id = @c AND @d BETWEEN starts_on AND ends_on", ("c", h.CompanyId), ("d", month));
         var controller = await h.SessionWithRolesAsync("CONTROLLER"); // the month's sessions expired
+        await h.RunAsync(new AcceptUnbilledDeliveries(h.CompanyId, controller, "accept", period, "Factura anulada, se refactura en el mes siguiente"), new AcceptUnbilledDeliveriesHandler());
         var blocked = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new CloseComponent(h.CompanyId, controller, "close", period, "AR-REC"), new CloseComponentHandler()));
 
         Assert.Equal("AUTH-CONSUMPTION:EXCEPTIONS,AUTH-EXPIRY:FAILED,EXEMPT-WITHOUT-AUTH:EXCEPTIONS", Statuses(run));
