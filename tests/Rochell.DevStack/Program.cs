@@ -50,6 +50,7 @@ internal static class DevStackProgram
             using var host = new DevApiHost(harness, idp, webRoot is null ? null : Path.GetFullPath(webRoot));
             host.UseKestrel(port);
             host.StartServer();
+            await ReceivedSeed.RunAsync(harness, host.Services); // OCR1-03: suppliers' e-CF in the simulated Alanube
 
             Console.WriteLine($"Rochell dev stack listening on http://localhost:{port} (browser origin {publicOrigin}).");
             Console.WriteLine($"Company {harness.CompanyId}; sign in at {publicOrigin}/ with one of:");

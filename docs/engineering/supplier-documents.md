@@ -48,3 +48,30 @@ the e-CF not yet answered on behalf of who posts; `VoidSupplierInvoice` and `Rev
 **Worker** — `ReceivedDocumentsService` (API, when the gateway is not Off): every `Rochell:Ecf:Interval`, per company, sends the answers
 kept and, every `Rochell:Ecf:ReceptionInterval` (1 h) or at once after Alanube's webhook (`ReceptionNudge`, E-OCR1-02-7), reads the
 received documents, again while a reading says there is more. 297 commands.
+
+## OCR1-03 — inbox, pass to invoice, QR (migration 0107, E-OCR1-03-1…10)
+
+**Server.** Migration 0107: `qr_url` (only `https://ecf.dgii.gov.do/` or `https://fc.dgii.gov.do/`) and `qr_total_amount` on
+`pur.supplier_document`. `EcfStampUrl.Parse` (`Rochell.Tax/Ecf/EcfStamp.cs`) reads the DGII stamp link of a printed e-CF's QR (issuer and
+buyer RNC, e-NCF, issue date, total, signature time → UTC, security code); anything else is null.
+- `CaptureSupplierDocumentFromQr` (`supplier_document:capture`): refuses a link that is not the DGII's (`SUPPLIER_DOCUMENT_QR_INVALID`) or
+  whose buyer is not the company (`SUPPLIER_DOCUMENT_NOT_OURS`); joins the live document of that issuer and e-NCF (the QR replaces what the
+  AI read of date, total and buyer); refuses one already on an invoice (`SUPPLIER_DOCUMENT_ALREADY_INVOICED`); else captures a new one
+  with the registry's name and the ACTIVE supplier of that RNC.
+- `DiscardSupplierDocument` (`supplier_document:capture`): CAPTURED → DISCARDED with a reason.
+- `RegisterSupplierInvoice` / `RegisterExpenseInvoice` take `supplierDocumentId`: the document must be CAPTURED, registrable (not a note
+  33 / 34 / B03 / B04, received, not rejected) and of the same supplier RNC and number (`SUPPLIER_DOCUMENT_MISMATCH`); it becomes
+  REGISTERED in the same transaction.
+- Queries (`supplier_invoice:read`): `ListSupplierDocuments` (status, search by RNC / name / number, `unsentOver24Hours`), `GetSupplierDocument`
+  (lines — the XML's, else the AI's —, files, checks `LINES_DO_NOT_ADD_UP`, `RNC_NOT_IN_REGISTRY`, `QR_TOTAL_DIFFERS`, `SUPPLIER_NOT_IN_CORE`,
+  `NOT_RECEIVED`, `NOTE_NOT_REGISTERED`, `RESPONSE_UNSENT`, the linked invoice, the history, and the category and tax type of the supplier's
+  latest expense invoice as suggestion), `GetSupplierDocumentFile` (the XML, base64). 299 commands.
+
+**Screens.** Compras › Comprobantes recibidos (`/compras/comprobantes/`): tabs Pendientes / Registrados / Descartados / Todos, search,
+«Escanear QR» (`QrScan`: the camera, a photo of the QR or its pasted link, decoded in the browser with `jsQR`). The detail
+(`/compras/comprobante/?id=`): the flags in red, header and lines with «leído por IA» marks, Aceptar / Rechazar ante la DGII (step-up),
+«Pasar a factura de gastos / de inventario» (`?documento=` on both forms: supplier, NCF, date, printed total; the expense form also takes
+the lines and the suggestion), «Crear proveedor» (the supplier form opens with the RNC and the registry's name), «Descartar»,
+«Verificar en la DGII», «Descargar XML», history. Inicio: «Comprobantes recibidos por registrar» and «Respuestas a la DGII sin enviar hace
+más de 24 horas». Dev stack: `ReceivedSeed` (an e-CF 31 and a 34 of «Agregados del Este»; the company's RNC 131925332). Playwright:
+`e2e/supplier-documents-journey.spec.ts`.

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { query } from "@/api/client";
 import { checkExpenseLines, ExpenseLinesEditor, ExpenseTotals, useExpenseMasters, useExpensePreview } from "@/components/ExpenseLines";
 import { ErrorBox, Field, Loading, NoPermission, useFieldErrors } from "@/components/ui";
@@ -11,6 +11,7 @@ import { EMPTY_EXPENSE_LINE, type ExpenseLine } from "@/lib/expenses";
 import { addDays, todayInDominicanRepublic } from "@/lib/labels";
 import { allSuppliers } from "@/lib/paging";
 import { useSession } from "@/lib/session";
+import { type SupplierDocument, trimDecimal } from "@/lib/supplierDocuments";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { SearchSelect, partyOption } from "@/components/SearchSelect";
@@ -19,6 +20,8 @@ import { SearchSelect, partyOption } from "@/components/SearchSelect";
 // what was bought, its category and its tax type; the server prices it while it is typed. «Registrar y cotejar» registers it and
 // matches it at once: below the approval amount (or within the order) it is ready to post, otherwise the Controller approves it.
 // USD1-07a (E-USD1-07-3): a foreign supplier's invoice is in USD — its own number, no tax type, the day's rate and pesos from the server.
+// OCR1-03 (E-OCR1-03-3/4): from a captured document (?documento=…) the form starts with its supplier, number, date, total and lines,
+// category and tax type proposed from the supplier's latest expense invoice; registering links the document.
 
 interface Values {
   partyId: string;
@@ -31,23 +34,51 @@ interface Values {
   lines: ExpenseLine[];
 }
 
-export default function NewExpenseInvoice() {
+/** The form's first values from a captured document (E-OCR1-03-3). */
+function fromDocument(doc: SupplierDocument): Values {
+  const s = doc.suggestion;
+  return {
+    partyId: doc.supplierId ?? "",
+    plantId: "",
+    fiscalNumber: doc.fiscalNumber,
+    docDate: doc.docDate ?? todayInDominicanRepublic(),
+    dueDate: "",
+    purchaseOrderId: "",
+    printedTotal: doc.totalAmount ? trimDecimal(doc.totalAmount) : "",
+    lines:
+      doc.lines.length > 0
+        ? doc.lines.map((l) => ({
+            description: l.description.slice(0, 200),
+            expenseCategoryId: s?.expenseCategoryId ?? "",
+            taxTypeId: s?.taxTypeId ?? "",
+            quantity: trimDecimal(l.quantity),
+            unitPrice: trimDecimal(l.unitPrice),
+          }))
+        : [{ ...EMPTY_EXPENSE_LINE }],
+  };
+}
+
+function NewExpenseInvoice({ document }: { document: SupplierDocument | null }) {
   const { companyId, can, plantName } = useSession();
   const router = useRouter();
-  const register = useCommand<"/api/v1/companies/{companyId}/procurement/register-expense-invoice", Values>("register-expense-invoice", "/api/v1/companies/{companyId}/procurement/register-expense-invoice");
+  const formId = document ? `register-expense-invoice:${document.supplierDocumentId}` : "register-expense-invoice";
+  const register = useCommand<"/api/v1/companies/{companyId}/procurement/register-expense-invoice", Values>(formId, "/api/v1/companies/{companyId}/procurement/register-expense-invoice");
   const match = useCommand("register-expense-invoice-match", "/api/v1/companies/{companyId}/procurement/match-supplier-invoice");
   const [values, setValues] = useState<Values>(
     () =>
-      register.restored ?? {
-        partyId: "",
-        plantId: "",
-        fiscalNumber: "",
-        docDate: todayInDominicanRepublic(),
-        dueDate: "",
-        purchaseOrderId: "",
-        printedTotal: "",
-        lines: [{ ...EMPTY_EXPENSE_LINE }],
-      },
+      register.restored ??
+      (document
+        ? fromDocument(document)
+        : {
+            partyId: "",
+            plantId: "",
+            fiscalNumber: "",
+            docDate: todayInDominicanRepublic(),
+            dueDate: "",
+            purchaseOrderId: "",
+            printedTotal: "",
+            lines: [{ ...EMPTY_EXPENSE_LINE }],
+          }),
   );
   const fe = useFieldErrors<string>();
   const allowed = can("supplier_invoice:register");
@@ -138,6 +169,7 @@ export default function NewExpenseInvoice() {
         })),
         printedTotal: printedTotal || null,
         purchaseOrderId: values.purchaseOrderId || null,
+        supplierDocumentId: document?.supplierDocumentId ?? null,
       },
       values,
       `Factura de gastos ${fiscalNumber} registrada.`,
@@ -155,6 +187,12 @@ export default function NewExpenseInvoice() {
         <Link href="/cxp/facturas/nueva/">Factura de inventario (con orden y recepción)</Link> · <strong>Factura de gastos</strong>
       </p>
       <h1>Registrar factura de gastos</h1>
+      {document ? (
+        <p className="notice" data-testid="from-document">
+          Desde el comprobante {document.fiscalNumber}
+          {document.aiFields.length > 0 ? " (leído por IA)" : ""}: revise cada línea, su categoría y su tipo de impuesto antes de registrar.
+        </p>
+      ) : null}
       <p className="muted">
         Para gastos y servicios que no entran a almacén. Sin orden de compra, desde el monto de la política la aprueba el Controller antes de contabilizarse.
       </p>
@@ -233,5 +271,28 @@ export default function NewExpenseInvoice() {
       </div>
       <ErrorBox error={register.error ?? match.error} />
     </>
+  );
+}
+
+function FromDocument() {
+  const { companyId, can } = useSession();
+  const id = useSearchParams().get("documento");
+  const doc = useLoad(
+    id && can("supplier_invoice:read")
+      ? () => query("/api/v1/companies/{companyId}/procurement/supplier-documents/{supplierDocumentId}", { path: { companyId, supplierDocumentId: id } })
+      : null,
+    [companyId, id],
+  );
+  if (id && doc.data === null) {
+    return <Loading error={doc.error} />;
+  }
+  return <NewExpenseInvoice key={doc.data?.supplierDocumentId ?? "new"} document={doc.data} />;
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <FromDocument />
+    </Suspense>
   );
 }

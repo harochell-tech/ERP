@@ -21,9 +21,9 @@ namespace Rochell.Procurement.Tests;
 [Collection(PostgresTestGroup.Name)]
 public sealed class ReceivedDocumentTests(PostgresFixture postgres)
 {
-    private sealed record Scene(TestHarness H, ExpenseInvoiceTests.World W, SimulatedEcfProvider Alanube, Guid Process, string Supplier, string Company);
+    internal sealed record Scene(TestHarness H, ExpenseInvoiceTests.World W, SimulatedEcfProvider Alanube, Guid Process, string Supplier, string Company);
 
-    private static async Task<Scene> SceneAsync(TestHarness h)
+    internal static async Task<Scene> SceneAsync(TestHarness h)
     {
         var w = await ExpenseInvoiceTests.WorldAsync(h);
         await h.AdminRequireAsync(
@@ -35,7 +35,7 @@ public sealed class ReceivedDocumentTests(PostgresFixture postgres)
     }
 
     /// <summary>An e-CF 31 of the supplier: 10 sacos de cemento at 500.00 + ITBIS 900.00 = 5,900.00, signed 10:30 in Santo Domingo.</summary>
-    private static ReceivedDocument Send(Scene s, string encf, string? buyer = null, string? issuer = null, string status = ReceivedStatuses.Received, string response = ReceivedStatuses.NotDeclared)
+    internal static ReceivedDocument Send(Scene s, string encf, string? buyer = null, string? issuer = null, string status = ReceivedStatuses.Received, string response = ReceivedStatuses.NotDeclared)
     {
         var today = ExpenseInvoiceTests.Today(s.H);
         var xml = SimulatedEcfProvider.SampleXml(
@@ -44,7 +44,7 @@ public sealed class ReceivedDocumentTests(PostgresFixture postgres)
         return s.Alanube.AddReceived(issuer ?? s.Supplier, buyer ?? s.Company, encf, new DateTimeOffset(today.ToDateTime(new TimeOnly(14, 30)), TimeSpan.Zero), "5900.00", xml, status, response);
     }
 
-    private static async Task<JsonElement> ImportAsync(Scene s, string key)
+    internal static async Task<JsonElement> ImportAsync(Scene s, string key)
         => JsonDocument.Parse((await s.H.RunAsync(new ImportReceivedDocuments(s.H.CompanyId, s.Process, key), new ImportReceivedDocumentsHandler(s.Alanube))).ResultPayload).RootElement;
 
     private static Task<string?> DocumentAsync(TestHarness h, string encf)
@@ -60,7 +60,7 @@ public sealed class ReceivedDocumentTests(PostgresFixture postgres)
             """,
             ("n", encf));
 
-    private static async Task<Guid> ExpenseInvoiceAsync(Scene s, string key, string ncf)
+    internal static async Task<Guid> ExpenseInvoiceAsync(Scene s, string key, string ncf)
         => (await s.H.RunAsync(
             new RegisterExpenseInvoice(s.H.CompanyId, s.W.Clerk, key, s.W.S.Purchasing.SupplierId, ncf, ExpenseInvoiceTests.Today(s.H), ExpenseInvoiceTests.Today(s.H).AddDays(30), s.W.Plant,
                 [ExpenseInvoiceTests.Line(s.W, "Cemento gris 42.5 kg", "REPARACIONES", "ITBIS_18", 10m, 500m)]),
