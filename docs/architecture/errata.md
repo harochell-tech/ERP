@@ -1510,6 +1510,8 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-X1-03-9 | X1-03 | The expense category carries «Pago al exterior»: General (27 %) or Digital (15 %: royalties, software, online advertising, data); the rates are a new fiscal rule citing Ley 30-26. |
 | E-X1-03-10 | X1-03 | Treasury keeps its module graph (E-VS2-02-1): at release it records the withholding, reading the rate in force with a query; the daily process, from Procurement, issues the e-CF 47 of released foreign payments through Alanube; without an ACTIVE type-47 range the payment shows «e-CF 47 pendiente» on Inicio. |
 | E-X1-03-11 | X1-03 | X1-03 is built after 2026-11-01; until then a payment abroad is recorded by hand with the accountant. |
+| E-X1-04-1 | X1-04a | Activating a version whose start falls inside an earlier ACTIVE version of the same rule brings that version's end forward to the new start, even when it already had an end; ACTIVE versions starting on or after it are retired as before. If a document was already taxed under the old version on the days that change hands, the activation is refused and names the day. Approved 2026-10-09. |
+| E-X1-04-2 | X1-04a | `ITBIS_VENTAS` exempting TRANSPORTE from 2026-10-09: the pack's version moves to that date; loaded on staging, the Especialista fiscal activates it and it retires the 2026-10-10 version. |
 
 Implementation rules derived from the above (no architectural change):
 

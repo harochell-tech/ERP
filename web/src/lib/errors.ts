@@ -320,6 +320,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   FISCAL_RULE_VERSION_NOT_CONFIGURABLE: "La versión ya está activa o retirada; configure una nueva versión.",
   FISCAL_RULE_VERSION_NOT_READY: "La versión no está lista para activar: necesita una fuente oficial vigente y una corrida de pruebas aprobada.",
   ACTIVATOR_IS_CONFIGURER: "Quien configuró la versión de la regla fiscal no puede activarla; otra persona debe hacerlo.",
+  FISCAL_RULE_DAYS_IN_USE: "Ya hay documentos con impuesto calculado por la versión anterior en esos días; esta versión no puede empezar antes.",
   ANOTHER_ITBIS_RULE_ACTIVE: "Ya hay otra regla activa de ese tipo (ITBIS o clasificación del 606) para esa fecha; retírela antes de activar esta.",
   FISCAL_PRODUCTION_SOURCE_REQUIRED: "En producción la versión solo se activa con al menos una fuente oficial de producción vinculada.",
   FISCAL_SOURCE_INVALID: "La fuente no es válida: complete los textos, el SHA-256 del documento (64 caracteres), el ambiente, una consulta que no esté en el futuro y una vigencia final posterior a la inicial.",
