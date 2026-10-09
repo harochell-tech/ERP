@@ -56,7 +56,7 @@ function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | und
   const fe = useFieldErrors<"toLocationId" | "reason" | "scrapLocationId" | "quantity">();
   const release = useCommand(`release-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/release-lot");
   const block = useCommand(`block-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/block-lot", `Lote ${lot.lotCode} bloqueado.`);
-  const unblock = useCommand(`unblock-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/unblock-lot", `Lote ${lot.lotCode} desbloqueado; vuelve a curado.`);
+  const unblock = useCommand(`unblock-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/unblock-lot", `Lote ${lot.lotCode} desbloqueado; vuelve al estado que tenía.`);
   const scrap = useCommand(`scrap-lot:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/scrap-lot");
   const busy = release.busy || block.busy || unblock.busy || scrap.busy;
   const available = lotActions(lot.status, can, lot.curingDone);
@@ -201,7 +201,7 @@ function LotActions({ lot, plant, onDone }: { lot: Lot; plant: PlantOption | und
                   </>
                 ) : null}
                 {action === "block" ? <p>El lote queda bloqueado: no se libera ni se despacha hasta que Calidad lo desbloquee.</p> : null}
-                {action === "unblock" ? <p>El lote vuelve a curado y se podrá liberar.</p> : null}
+                {action === "unblock" ? <p>El lote vuelve al estado que tenía antes del bloqueo.</p> : null}
                 {action === "scrap" ? (
                   <>
                     <p>Las unidades salen del inventario y se contabiliza la pérdida. No se puede deshacer.</p>
@@ -320,6 +320,7 @@ function Lots() {
           <option value="CURING">En curado</option>
           <option value="BLOCKED">Bloqueado</option>
           <option value="RELEASED">Liberado</option>
+          <option value="FINAL_RELEASED">Liberación final</option>
           <option value="SCRAPPED">Desechado</option>
           <option value="VOIDED">Anulado</option>
         </select>

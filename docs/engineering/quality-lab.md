@@ -74,7 +74,66 @@ of one date with the server's strength before saving, void with a reason, absorp
 (`/calidad/requisitos/`, also the machines' short codes) and Parámetros (`/calidad/parametros/`, parameters, initial age factors,
 failure types, history). They need a connection. Journey: `e2e/lab-journey.spec.ts`.
 
-### Not in LAB1-01
+## LAB1-02 — evaluation, final release, automatic block, recall (E-LAB1-02-1…15; migration 0106)
 
-The lot's evaluation, `FINAL_RELEASED`, the automatic block and the recall (LAB1-02); certificate, rack label and scan at the
-gate-out (LAB1-03); control chart and the history before Core, `qa.legacy_lot` (LAB1-04, E-LAB1-01-15).
+### The lot's evaluation (baseline §4.2)
+
+- `qa.lot_evaluation`: one row per evaluation, never changed; the latest of a lot is in force (E-LAB1-02-1). A lot is evaluated in
+  the same transaction every time one of its tests is recorded or voided (`cause` TESTS), and when Calidad asks with `ReevaluateLot`
+  (`lab_spec:manage`, `cause` REEVALUATION): new requirements or parameters never judge past lots by themselves (E-LAB1-02-2).
+- Over the lot's valid specimens: number, minimum and maximum age, average, minimum, maximum, sample deviation (`stddev_samp` in
+  PostgreSQL) and CV = deviation ÷ average. Early age = the minimum age of 1 day or more below the age that counts as 28 days
+  (E-LAB1-02-3/4: specimens of age 0 count for the indicators and never for an estimate).
+- 28-day strength: **REAL** = average (and minimum) of the specimens at the 28-day age when there are any; otherwise **ESTIMATED** =
+  average (and minimum) at the early age ÷ the factor of that age.
+- Verdict: `NO_SPEC` (the item has no minimum average), `NO_DATA` (a requirement but no 28-day strength, E-LAB1-02-5), `COMPLIES`
+  (strength ≥ minimum average and, when there is one, minimum ≥ individual minimum) or `FAILS`.
+- Alerts: `NO_TESTS`, `FEW_SPECIMENS` (below `MIN_SPECIMENS`), `HIGH_CV` (above `MAX_CV`), `HIGH_ABSORPTION` (the lot's average
+  absorption above the limit of its density class).
+- Age curve (E-LAB1-02-13): `qa.own_age_factors(company)` gives, per early age, the average of the factors (early average ÷ 28-day
+  average) of the lots that have both; `qa.age_factor(company, age)` returns the own factor when at least `OWN_FACTOR_MIN_LOTS` lots
+  have it, else the initial one (`AGE_FACTOR_nn`). One curve for every product and machine. Evaluations keep the factor they used.
+
+### Lot statuses (baseline §7)
+
+```
+CURING ──ReleaseLot──▶ RELEASED ──FinalReleaseLot──▶ FINAL_RELEASED
+any of the three ──BlockLot / a NO CUMPLE──▶ BLOCKED ──UnblockLot──▶ the status it came from
+```
+
+- `mfg.fg_lot` keeps `block_cause` (MANUAL or LAB), `blocked_from`, `block_evaluation_id`, `final_released_by` / `_at`.
+- **Automatic block** (E-LAB1-4/5, E-LAB1-02-6/7): an evaluation that gives `FAILS` — real or estimated — blocks a CURING, RELEASED or
+  FINAL_RELEASED lot inside the command that recorded the test, with cause LAB, the evaluation and a reason in words; its racks
+  follow. A lot with no stock left is blocked too; a SCRAPPED one keeps its status.
+- It blocks once per verdict (E-LAB1-02-9): again only when the verdict becomes `FAILS` from another one, or goes from estimated to
+  real. Nothing unblocks by itself (E-LAB1-02-8) — not a voided test, not a later real CUMPLE: Calidad uses `UnblockLot` with a reason.
+- `BlockLot` / `UnblockLot` (`fg_lot:release`) now work on released lots; unblocking returns the lot to `blocked_from`.
+- `FinalReleaseLot` (`fg_lot:final_release`, step-up, E-LAB1-02-10): only from RELEASED with the evaluation in force `COMPLIES` on
+  REAL data; otherwise `LAB_FINAL_RELEASE_REFUSED`. Alerts do not prevent it and stay in the event. 296 commands.
+
+### Dispatch (E-LAB1-02-11/12)
+
+The gate-out's FIFO (`Deliveries.FifoAsync`, Sales) skips lots whose `mfg.fg_lot.status` is BLOCKED — read through SQL, no module
+reference. Lots without a production record are unaffected. When the location covers the quantity only with blocked lots the error is
+`STOCK_BLOCKED_BY_QUALITY`. Sales has no availability query of its own today (orders do not reserve stock), so nothing else changes.
+
+### Recall (baseline §4.7, E-LAB1-02-14; `lab:read`)
+
+- `GetLotRecall` (`GET …/manufacturing/lab/lots/{lotId}/recall`): the deliveries that took the lot (delivery, gate-out, status,
+  customer, order, site address, quantity, invoices not voided), the stock left per location, totals and the number of customers.
+- `GetDeliveryRecall` (`GET …/manufacturing/lab/deliveries/{deliveryId}/recall`): the delivery's lots with machine, shift, run,
+  recipe version, the shift summary's consumption (real and theoretical) and the lot's verdict; lots without a production record by
+  their code.
+- `ListLabLots` gains `view` (`BLOCKED_BY_LAB`, `READY_FINAL`), the verdict per lot and the two counts Inicio shows; `GetLabLot`
+  returns the evaluation in force.
+
+### Web (E-LAB1-02-15)
+
+Calidad › Lotes y veredicto (`/calidad/lotes/`): the list with verdict, 28-day strength and alerts; the lot with its evaluation, the
+recall and Calidad's actions (final release, block, unblock, evaluate again). Laboratorio shows the verdict after saving. Inicio:
+«Lotes bloqueados por laboratorio» (`fg_lot:release`) and «Lotes listos para liberación final» (`fg_lot:final_release`).
+
+### Not yet
+
+Certificate, rack label and scan at the gate-out (LAB1-03); control chart, the age curve on screen and the history before Core,
+`qa.legacy_lot` (LAB1-04, E-LAB1-01-15).

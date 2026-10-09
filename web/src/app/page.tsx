@@ -344,6 +344,21 @@ const TASKS: readonly Task[] = [
       (await query("/api/v1/companies/{companyId}/manufacturing/lots", { path: { companyId }, query: { plantId, status: "CURING", limit: COUNT_LIMIT } })).items.filter(isReadyToRelease)
         .length,
   },
+  // LAB1-02 (E-LAB1-02-15): what the lab left for Calidad — lots it blocked and lots ready for their final release.
+  {
+    href: "/calidad/lotes/#bloqueados",
+    label: "Lotes bloqueados por laboratorio",
+    permission: "fg_lot:release",
+    countPermission: "lab:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/lab/lots", { path: { companyId }, query: { limit: 1 } })).blockedByLab,
+  },
+  {
+    href: "/calidad/lotes/#liberacion-final",
+    label: "Lotes listos para liberación final",
+    permission: "fg_lot:final_release",
+    countPermission: "lab:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/lab/lots", { path: { companyId }, query: { limit: 1 } })).readyForFinalRelease,
+  },
   // UX4-03 (G-15): configuration waiting for its approver, counted from the configuration screens' own lists (configuration:read).
   {
     href: "/contabilidad/politicas/",

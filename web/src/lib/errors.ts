@@ -422,6 +422,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   LAB_TEST_INVALID: "Revise el ensayo: la fecha no puede ser anterior a la producción del lote ni futura; medidas, pesos y carga mayores que cero; en absorción, el peso saturado mayor que el sumergido y no menor que el seco.",
   LAB_SPEC_MISSING: "A esta probeta le faltan medidas y el ítem aún no tiene requisitos con sus medidas nominales. Escriba las medidas o pida a Calidad que cargue los requisitos del ítem.",
   LAB_SPEC_INVALID: "Revise los requisitos: prefijo de 1 a 4 letras o números, medidas nominales mayores que cero, área neta entre 0 y 1, y el mínimo individual solo junto al mínimo del promedio. El código corto de máquina tiene de 1 a 6 letras o números.",
+  LAB_FINAL_RELEASE_REFUSED: "La liberación final necesita que el lote cumpla con roturas reales a 28 días (no por estimación) y que el ítem tenga su requisito.",
+  STOCK_BLOCKED_BY_QUALITY: "En esa ubicación solo queda producto de lotes bloqueados por Calidad. Cargue desde otra ubicación o pida a Calidad que revise el lote.",
   LAB_PARAMETER_INVALID: "Ese valor no es válido para el parámetro o el tipo de falla (vea el rango permitido).",
   IDEAL_CYCLE_INVALID: "El ciclo ideal va de más de 0 a 3,600 segundos, para una máquina y un producto terminado; si ya hay uno desde esa fecha, use una fecha posterior.",
   DELIVERY_LINK_INVALID: "Este enlace de entrega no es válido. Pida a Despacho que reimprima el conduce.",

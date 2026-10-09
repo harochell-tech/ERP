@@ -103,6 +103,7 @@ export const NAV: readonly NavGroup[] = [
     title: "Calidad",
     items: [
       { href: "/calidad/laboratorio/", label: "Laboratorio", permission: "lab:read" },
+      { href: "/calidad/lotes/", label: "Lotes y veredicto", permission: "lab:read" }, // LAB1-02 (E-LAB1-02-15)
       { href: "/calidad/requisitos/", label: "Requisitos por ítem", permission: "lab:read" },
       { href: "/calidad/parametros/", label: "Parámetros", permission: "lab:read" },
     ],
