@@ -4,7 +4,8 @@ namespace Rochell.Tax;
 /// One line to tax: its net amount and the item's category. An expense line (E-GAS-02-4) has no item: it names its tax type
 /// (<paramref name="TaxTypeRuleId"/>) and its scope says whether its category is a service or a good.
 /// </summary>
-public sealed record TaxableLine(Guid LineId, string ItemCategory, decimal NetAmount, Guid? TaxTypeRuleId = null, string Scope = TaxLineScopes.Inventory, string? IsrWithholdingType = null);
+public sealed record TaxableLine(
+    Guid LineId, string ItemCategory, decimal NetAmount, Guid? TaxTypeRuleId = null, string Scope = TaxLineScopes.Inventory, string? IsrWithholdingType = null, bool ItbisToCost = false);
 
 /// <summary>An applicable rule version. <paramref name="RuleId"/> is what an expense line's tax type names.</summary>
 public sealed record ApplicableRule(Guid RuleVersionId, string RuleCode, FiscalRuleDefinition Definition, Guid? RuleId = null);
@@ -60,7 +61,9 @@ public static class TaxCalculator
         var net = Money(line.NetAmount);
         return net <= 0
             ? []
-            : (rule.Definition.Components ?? []).Select(c => new DeterminedTax(line.LineId, rule.RuleVersionId, c.TaxCode, net, c.Rate, Money(net * c.Rate), c.Effect));
+            : (rule.Definition.Components ?? []).Select(c => new DeterminedTax(
+                line.LineId, rule.RuleVersionId, c.TaxCode, net, c.Rate, Money(net * c.Rate),
+                line.ItbisToCost && c.Effect == TaxEffects.RecoverableInput ? TaxEffects.NonRecoverableInput : c.Effect)); // E-X1-02-4
     }
 
     /// <summary>

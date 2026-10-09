@@ -12,8 +12,9 @@ and the `CreditNoteIssued` event carry `withoutItbis`. The e-CF 34 already sends
 
 **CONFOTUR** (E-X1-20, E-X1-01-4): an authorization registered or updated without `validUntil` is valid until `issuedOn` + 180 days.
 
-**Pack** (E-X1-01-5): `deploy/fiscal/x1-2026-10.json` — «Seguro de vida» in four dated versions and `IDENTIFICACION_CONSUMIDOR`
-(CONSUMER_ID_THRESHOLD 250,000.00). The loader now takes several versions of one rule, one per effective date in date order (a version of
+**Pack** (E-X1-01-5): `deploy/fiscal/x1-2026-10.json` — «Seguro de vida» in four dated versions, `IDENTIFICACION_CONSUMIDOR`
+(CONSUMER_ID_THRESHOLD 250,000.00) and, from X1-02b, `ITBIS_VENTAS` from 2026-10-10 exempting TRANSPORTE (E-X1-1, E-SRV1-16), which lets
+freight ride orders once the Especialista fiscal activates it. The loader now takes several versions of one rule, one per effective date in date order (a version of
 the same date that differs, or a later one already there, is left as it is); its step keys carry the date. Two sources — DGII Aviso
 10-26 and the e-CF format v1.0 — are PDFs the DGII site will not hand to a program: a person saves them as
 `docs/fiscal/fuentes/aviso-10-26.pdf` and `docs/fiscal/fuentes/ecf-formato-v1.0.pdf`; until then the loader reports them MISSING_FILE
@@ -31,7 +32,7 @@ AR-REC while CONTRACT-ASSET has blocking errors. 300 commands, 156 permissions.
 ## X1-02 — withholdings by what is bought and by the supplier's document series (migration 0110, E-X1-02-1…3)
 
 - `pur.expense_category.isr_withholding_type` (606 ISR types 1–9): set when preparing or correcting a draft, or by the Controller on an
-  approved category with `SetExpenseCategoryIsrType` (`expense_category:approve`, step-up; proposed as E-X1-02-5, to be ratified). An
+  approved category with `SetExpenseCategoryIsrType` (`expense_category:approve`, step-up; E-X1-02-5). An
   ISR withholding rule that names a type withholds only on the expense lines of categories of that type; inventory lines, which have
   no category, follow the rule's `applies_to` as before.
 - A withholding rule may carry `document_series` (`["B"]`, `["E"]`); the engine gets the series from the supplier's fiscal number
@@ -39,3 +40,10 @@ AR-REC while CONTRACT-ASSET has blocking errors. 300 commands, 156 permissions.
   without a number, withhold as before. The determination records the series and each line's ISR type.
 - Screens: Compras › Categorías de gasto (column and field «Retención ISR»), Fiscal › Reglas (withholding «Comprobantes del proveedor»).
   301 commands.
+
+## X1-02b — the ITBIS of buildings goes to their cost (migration 0111, E-X1-18, E-X1-02-4)
+
+`fa.asset_class.tax_category` (1 buildings, 2, 3; art. 287), set when the class is prepared (Contabilidad › Activos fijos › Clases asks
+for it; classes prepared before have none and keep their ITBIS deductible). An expense line whose category's ACTIVE class is of category 1
+is determined with `ItbisToCost`: its ITBIS components become NON_RECOVERABLE_INPUT (the 606's «ITBIS llevado al costo»); P-37 adds that
+ITBIS to the line's asset account instead of ITBIS_RECOVERABLE, the payable is unchanged, and the card's cost includes it.

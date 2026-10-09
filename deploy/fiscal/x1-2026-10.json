@@ -2,6 +2,16 @@
   "pack": "x1-2026-10",
   "sources": [
     {
+      "key": "CT-TITULO-III",
+      "file": "titulo3.pdf",
+      "officialSource": "DGII",
+      "documentTitle": "Código Tributario (Ley 11-92), Título III — ITBIS",
+      "documentVersion": "Texto con la Ley 253-12 (2012-11-09)",
+      "publicationDate": "2012-11-09",
+      "effectiveFrom": "2013-01-01",
+      "url": "https://dgii.gov.do/legislacion/codigotributario/cdigo%20tributario/titulo3.pdf"
+    },
+    {
       "key": "CT-TITULO-IV",
       "file": "titulo4.pdf",
       "officialSource": "DGII",
@@ -37,41 +47,179 @@
       "code": "SEGURO_VIDA",
       "kind": "PURCHASE_TAX_TYPE",
       "effectiveFrom": "2026-10-01",
-      "definition": { "label": "Seguro de vida (ISC 16 %, sin ITBIS)", "components": [{ "tax_code": "ISC", "rate": "0.16", "effect": "SELECTIVE_TAX" }] },
-      "sources": ["CT-TITULO-IV"],
-      "cases": [{ "caseId": "vida-20000-2026", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00", "expected": [{ "taxCode": "ISC", "amount": "3200.00", "effect": "SELECTIVE_TAX" }] }]
+      "definition": {
+        "label": "Seguro de vida (ISC 16 %, sin ITBIS)",
+        "components": [
+          {
+            "tax_code": "ISC",
+            "rate": "0.16",
+            "effect": "SELECTIVE_TAX"
+          }
+        ]
+      },
+      "sources": [
+        "CT-TITULO-IV"
+      ],
+      "cases": [
+        {
+          "caseId": "vida-20000-2026",
+          "partyType": "COMPANY",
+          "itemCategory": "",
+          "netAmount": "20000.00",
+          "itbisAmount": "0.00",
+          "expected": [
+            {
+              "taxCode": "ISC",
+              "amount": "3200.00",
+              "effect": "SELECTIVE_TAX"
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "SEGURO_VIDA",
       "kind": "PURCHASE_TAX_TYPE",
       "effectiveFrom": "2027-01-01",
-      "definition": { "label": "Seguro de vida (ISC 11 %, sin ITBIS)", "components": [{ "tax_code": "ISC", "rate": "0.11", "effect": "SELECTIVE_TAX" }] },
-      "sources": ["CT-TITULO-IV", "AVISO-10-26"],
-      "cases": [{ "caseId": "vida-20000-2027", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00", "expected": [{ "taxCode": "ISC", "amount": "2200.00", "effect": "SELECTIVE_TAX" }] }]
+      "definition": {
+        "label": "Seguro de vida (ISC 11 %, sin ITBIS)",
+        "components": [
+          {
+            "tax_code": "ISC",
+            "rate": "0.11",
+            "effect": "SELECTIVE_TAX"
+          }
+        ]
+      },
+      "sources": [
+        "CT-TITULO-IV",
+        "AVISO-10-26"
+      ],
+      "cases": [
+        {
+          "caseId": "vida-20000-2027",
+          "partyType": "COMPANY",
+          "itemCategory": "",
+          "netAmount": "20000.00",
+          "itbisAmount": "0.00",
+          "expected": [
+            {
+              "taxCode": "ISC",
+              "amount": "2200.00",
+              "effect": "SELECTIVE_TAX"
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "SEGURO_VIDA",
       "kind": "PURCHASE_TAX_TYPE",
       "effectiveFrom": "2028-01-01",
-      "definition": { "label": "Seguro de vida (ISC 6 %, sin ITBIS)", "components": [{ "tax_code": "ISC", "rate": "0.06", "effect": "SELECTIVE_TAX" }] },
-      "sources": ["CT-TITULO-IV", "AVISO-10-26"],
-      "cases": [{ "caseId": "vida-20000-2028", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00", "expected": [{ "taxCode": "ISC", "amount": "1200.00", "effect": "SELECTIVE_TAX" }] }]
+      "definition": {
+        "label": "Seguro de vida (ISC 6 %, sin ITBIS)",
+        "components": [
+          {
+            "tax_code": "ISC",
+            "rate": "0.06",
+            "effect": "SELECTIVE_TAX"
+          }
+        ]
+      },
+      "sources": [
+        "CT-TITULO-IV",
+        "AVISO-10-26"
+      ],
+      "cases": [
+        {
+          "caseId": "vida-20000-2028",
+          "partyType": "COMPANY",
+          "itemCategory": "",
+          "netAmount": "20000.00",
+          "itbisAmount": "0.00",
+          "expected": [
+            {
+              "taxCode": "ISC",
+              "amount": "1200.00",
+              "effect": "SELECTIVE_TAX"
+            }
+          ]
+        }
+      ]
     },
     {
       "code": "SEGURO_VIDA",
       "kind": "PURCHASE_TAX_TYPE",
       "effectiveFrom": "2029-01-01",
-      "definition": { "label": "Seguro de vida (sin ISC ni ITBIS)", "components": [] },
-      "sources": ["AVISO-10-26"],
-      "cases": [{ "caseId": "vida-20000-2029", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00", "expected": [] }]
+      "definition": {
+        "label": "Seguro de vida (sin ISC ni ITBIS)",
+        "components": []
+      },
+      "sources": [
+        "AVISO-10-26"
+      ],
+      "cases": [
+        {
+          "caseId": "vida-20000-2029",
+          "partyType": "COMPANY",
+          "itemCategory": "",
+          "netAmount": "20000.00",
+          "itbisAmount": "0.00",
+          "expected": []
+        }
+      ]
     },
     {
       "code": "IDENTIFICACION_CONSUMIDOR",
       "kind": "CONSUMER_ID_THRESHOLD",
       "effectiveFrom": "2026-10-01",
-      "definition": { "amount": "250000.00" },
-      "sources": ["ECF-FORMATO-V1"],
+      "definition": {
+        "amount": "250000.00"
+      },
+      "sources": [
+        "ECF-FORMATO-V1"
+      ],
       "cases": []
+    },
+    {
+      "code": "ITBIS_VENTAS",
+      "kind": "SALES_ITBIS",
+      "effectiveFrom": "2026-10-10",
+      "definition": {
+        "tax_code": "ITBIS",
+        "rate": "0.18",
+        "effect": "OUTPUT",
+        "exempt_item_categories": [
+          "TRANSPORTE"
+        ]
+      },
+      "sources": [
+        "CT-TITULO-III"
+      ],
+      "cases": [
+        {
+          "caseId": "bloques-1000",
+          "partyType": "COMPANY",
+          "itemCategory": "BLOQUE",
+          "netAmount": "1000.00",
+          "itbisAmount": "0.00",
+          "expected": [
+            {
+              "taxCode": "ITBIS",
+              "amount": "180.00",
+              "effect": "OUTPUT"
+            }
+          ]
+        },
+        {
+          "caseId": "flete-exento",
+          "partyType": "COMPANY",
+          "itemCategory": "TRANSPORTE",
+          "netAmount": "500.00",
+          "itbisAmount": "0.00",
+          "expected": []
+        }
+      ]
     }
   ]
 }

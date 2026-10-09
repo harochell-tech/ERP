@@ -11,9 +11,10 @@ namespace Rochell.FixedAssets.Classes;
 /// under 100, 2 decimals), the accumulated depreciation account (asset) and the depreciation account (expense or cost). A category
 /// with an ACTIVE class gets a new version, which replaces it when approved.
 /// </summary>
+/// <remarks>E-X1-02-4: <paramref name="TaxCategory"/> is the class's category of art. 287 (1 buildings, 2, 3); on category 1 the ITBIS goes to cost.</remarks>
 public sealed record PrepareAssetClass(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ExpenseCategoryId, int UsefulLifeMonths, decimal ResidualPct, Guid AccumulatedAccountId,
-    Guid ExpenseAccountId) : ICommand;
+    Guid ExpenseAccountId, int? TaxCategory = null) : ICommand;
 
 /// <summary>E-AF-2: the Controller approves a DRAFT class (step-up), never who prepared it; the category's ACTIVE class becomes SUPERSEDED.</summary>
 public sealed record ApproveAssetClass(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid AssetClassId, long ExpectedVersion) : ICommand;
@@ -72,6 +73,11 @@ public sealed class PrepareAssetClassHandler : ICommandHandler<PrepareAssetClass
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
+        if (command.TaxCategory is not (null or 1 or 2 or 3))
+        {
+            throw new DomainException(FixedAssetErrors.ClassInvalid, "The tax category is 1 (buildings), 2 or 3 (Código Tributario art. 287).");
+        }
+
         if (command.UsefulLifeMonths is < 1 or > MaxLifeMonths)
         {
             throw new DomainException(FixedAssetErrors.ClassInvalid, "The useful life is 1 to 600 months.");
@@ -143,10 +149,11 @@ public sealed class PrepareAssetClassHandler : ICommandHandler<PrepareAssetClass
                 context.Transaction,
                 """
                 INSERT INTO fa.asset_class (asset_class_id, company_id, expense_category_id, class_version, useful_life_months, residual_pct, accumulated_account_id,
-                                            expense_account_id, status, prepared_by, version)
-                VALUES (@id, @c, @cat, @cv, @life, @pct, @acc, @exp, 'DRAFT', @by, 1)
+                                            expense_account_id, status, prepared_by, version, tax_category)
+                VALUES (@id, @c, @cat, @cv, @life, @pct, @acc, @exp, 'DRAFT', @by, 1, @tax)
                 """,
                 cancellationToken,
+                ("tax", command.TaxCategory is { } taxCategory ? (object)(short)taxCategory : null),
                 ("id", context.ResultRef),
                 ("c", context.CompanyId),
                 ("cat", command.ExpenseCategoryId),
