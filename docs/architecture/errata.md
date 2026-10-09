@@ -1424,6 +1424,24 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-NAV-11 | NAV-01 | Auditoría and Seguridad become Administración (Usuarios y roles, Solicitudes de rol, Verificar integridad, Respaldos diarios inalterables); Apertura de inventario moves to Configuración (used once). |
 | E-NAV-12 | NAV-01 | «Ir a…» search at the top of the menu (Ctrl+K / ⌘K on a computer): finds the screens the user may see by label or group, ignoring case and accents; Enter opens the first match. |
 | E-NAV-13 | NAV-01 | Favourites: a star on each menu item keeps it under «Favoritos» at the top, in this browser only (localStorage); nothing is stored on the server. |
+| E-OCR-1 | OCR-1 | Supplier invoices stop being typed from scratch. Three sources, in this order: e-CF received through Alanube, the QR of a printed e-CF, a photo or scan read by AI (OCR). Each source only prepares a **draft** that a person reviews and approves; nothing is registered or posted on its own. Approved 2026-10-09. |
+| E-OCR-2 | OCR-1 | Core polls Alanube's received documents every hour and prepares a draft from each one's XML. New inbox: Compras › Comprobantes recibidos. |
+| E-OCR-3 | OCR-1 | The commercial response to the DGII (accept / reject) is given from that inbox: registering the invoice accepts it; rejecting needs a reason. |
+| E-OCR-4 | OCR-1 | «Escanear QR» on phone and computer reads the printed e-CF's QR, fills the header (supplier RNC, e-NCF, date, total, security code) and links the received XML when it has already arrived. |
+| E-OCR-5 | OCR-1 | OCR sends only the invoice's image to an external service (Anthropic's API). The API key lives on the server, never in git. A switch Off / On, like the mail mode. |
+| E-OCR-6 | OCR-1 | Every field the AI read is marked «leído por IA»; lines that do not add up, an NCF of the wrong format or an RNC missing from the registry are flagged in red. Nothing is approved without a person's review. |
+| E-OCR-7 | OCR-1 | The photo or scan is kept in the private B2 bucket (the evidence store of ENT-1) and can be opened from the invoice. |
+| E-OCR-8 | OCR-1 | Order: received e-CF and QR first (no cost, useful from 2026-11-01); OCR afterwards. |
+| E-OCR1-01-1 | OCR1-01 | Every source creates a **captured supplier document**, not a supplier invoice (the XML has neither the PO line nor the expense category). «Pasar a factura» opens the usual form (inventory PO or expense) prefilled; the person assigns the PO line or the category. One document gives one invoice and stays linked to it. Approved 2026-10-09. |
+| E-OCR1-01-2 | OCR1-01 | The e-CF is accepted to the DGII when its invoice is **posted**, not when the draft is registered (a draft may still be voided); it can also be accepted by hand from the inbox. Refines E-OCR-3. |
+| E-OCR1-01-3 | OCR1-01 | Received credit notes (34) and debit notes (33) appear in the inbox and can be accepted / rejected, marked «sin registro en Core» for the accountant; supplier notes need their own baseline. |
+| E-OCR1-01-4 | OCR1-01 | An issuer that is not a Core supplier: the document shows the RNC and the registry's name with «Crear proveedor» prefilling the form; it goes to an invoice only once the supplier is ACTIVE. |
+| E-OCR1-01-5 | OCR1-01 | One live document per issuer RNC and fiscal number: a second source adds to it (its XML, its photo). If the fiscal number is already on a registered invoice, a notice is shown and no document is created. |
+| E-OCR1-01-6 | OCR1-01 | A QR or XML whose buyer RNC is not Block Rochell's is refused. |
+| E-OCR1-01-7 | OCR1-01 | The XML is kept in the database, append-only, like `tax.ecf_file`; photos, scans and PDFs in B2. Up to 10 MB, JPG / PNG / PDF; the photo is reduced on the phone as in ENT-1. |
+| E-OCR1-01-8 | OCR1-01 | `supplier_document:capture` (capture, scan, upload, pass to an invoice) for Cuentas por pagar; `supplier_document:respond` (accept / reject to the DGII, step-up) for Cuentas por pagar and the Contador. Reading uses `supplier_invoice:read`, which the Contador role gains to see what it answers. |
+| E-OCR1-01-9 | OCR1-01 | Received documents are read every hour as the daily process, only while the gateway is not Off: the first time the last 30 days, then from the last good reading less one day. |
+| E-OCR1-01-10 | OCR1-01 | OCR model: Claude Sonnet 5.5 through Anthropic's API; the key in `secrets/ocr/anthropic-key` on the server; a simulated reader in tests and in the local stack (OCR1-04). |
 
 Implementation rules derived from the above (no architectural change):
 
