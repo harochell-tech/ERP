@@ -54,6 +54,11 @@ public static class ProcurementErrors
     public const string SupplierDocumentAlreadyInvoiced = "SUPPLIER_DOCUMENT_ALREADY_INVOICED";
     public const string SupplierDocumentNotRegistrable = "SUPPLIER_DOCUMENT_NOT_REGISTRABLE";
     public const string SupplierDocumentMismatch = "SUPPLIER_DOCUMENT_MISMATCH";
+    public const string SupplierDocumentFileInvalid = "SUPPLIER_DOCUMENT_FILE_INVALID";
+    public const string SupplierDocumentStoreMissing = "SUPPLIER_DOCUMENT_STORE_MISSING";
+    public const string SupplierDocumentReaderOff = "SUPPLIER_DOCUMENT_READER_OFF";
+    public const string SupplierDocumentReadingLimit = "SUPPLIER_DOCUMENT_READING_LIMIT";
+    public const string SupplierDocumentReadFailed = "SUPPLIER_DOCUMENT_READ_FAILED";
 }
 
 public static class PurchaseOrderStatus

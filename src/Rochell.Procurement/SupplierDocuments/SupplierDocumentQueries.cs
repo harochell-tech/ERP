@@ -293,10 +293,11 @@ public sealed class GetSupplierDocumentHandler : IQueryHandler<GetSupplierDocume
 }
 
 [RequiresPermission("supplier_invoice:read")]
-public sealed class GetSupplierDocumentFileHandler : IQueryHandler<GetSupplierDocumentFile>
+public sealed class GetSupplierDocumentFileHandler(Rochell.Platform.Files.IEvidenceStore? store = null) : IQueryHandler<GetSupplierDocumentFile>
 {
     public string QueryType => "Procurement.GetSupplierDocumentFile";
 
+    /// <summary>The XML from the database; a photo, scan or PDF from the evidence store (E-OCR1-01-7).</summary>
     public async Task<string> HandleAsync(GetSupplierDocumentFile query, QueryContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -305,16 +306,32 @@ public sealed class GetSupplierDocumentFileHandler : IQueryHandler<GetSupplierDo
             context.Connection,
             context.Transaction,
             """
-            SELECT d.fiscal_number, f.content_type, f.content
+            SELECT d.fiscal_number, f.kind, f.content_type, f.content, f.storage_key
             FROM pur.supplier_document_file f JOIN pur.supplier_document d ON d.supplier_document_id = f.supplier_document_id
-            WHERE d.company_id = @c AND f.supplier_document_id = @d AND f.file_id = @f AND f.kind = 'XML'
+            WHERE d.company_id = @c AND f.supplier_document_id = @d AND f.file_id = @f
             """,
-            r => new SupplierDocumentFileContent(r.GetString(0) + ".xml", r.GetString(1), Convert.ToBase64String(r.GetFieldValue<byte[]>(2))),
+            r => (Number: r.GetString(0), Kind: r.GetString(1), Type: r.GetString(2), Content: r.IsDBNull(3) ? null : r.GetFieldValue<byte[]>(3), Key: r.NullableString(4)),
             cancellationToken,
             ("c", context.CompanyId),
             ("d", query.SupplierDocumentId),
-            ("f", query.FileId)).ConfigureAwait(false)).SingleOrDefault()
-            ?? throw new DomainException(QueryErrors.NotFound, "The file does not exist.");
-        return ApiJson.Serialize(file);
+            ("f", query.FileId)).ConfigureAwait(false)).SingleOrDefault();
+        if (file.Number is null)
+        {
+            throw new DomainException(QueryErrors.NotFound, "The file does not exist.");
+        }
+
+        var bytes = file.Content;
+        if (bytes is null && file.Key is { } key && store is not null)
+        {
+            bytes = (await store.GetAsync(key, cancellationToken).ConfigureAwait(false))?.Content;
+        }
+
+        if (bytes is null)
+        {
+            throw new DomainException(QueryErrors.NotFound, "The file is not in the evidence store.");
+        }
+
+        var extension = file.Kind switch { "XML" => "xml", "PDF" => "pdf", _ => file.Type == "image/png" ? "png" : "jpg" };
+        return ApiJson.Serialize(new SupplierDocumentFileContent($"{file.Number}.{extension}", file.Type, Convert.ToBase64String(bytes)));
     }
 }

@@ -115,12 +115,10 @@ function DocumentDetail() {
   const ai = new Set(doc.aiFields);
   const read = (field: string) => (ai.has(field) ? <span className="badge tone-attention"> leído por IA</span> : null);
   const xml = doc.files.find((f) => f.kind === "XML");
-  const download = async () => {
-    if (!xml) {
-      return;
-    }
+  const pictures = doc.files.filter((f) => f.kind !== "XML");
+  const download = async (fileId: string) => {
     const file = await query("/api/v1/companies/{companyId}/procurement/supplier-documents/{supplierDocumentId}/files/{fileId}", {
-      path: { companyId, supplierDocumentId: doc.supplierDocumentId, fileId: xml.fileId },
+      path: { companyId, supplierDocumentId: doc.supplierDocumentId, fileId },
     });
     downloadBase64(file.fileName, file.contentBase64, file.contentType);
   };
@@ -201,10 +199,15 @@ function DocumentDetail() {
           </a>
         ) : null}
         {xml ? (
-          <button type="button" onClick={() => void download()}>
+          <button type="button" onClick={() => void download(xml.fileId)}>
             Descargar XML
           </button>
         ) : null}
+        {pictures.map((f, i) => (
+          <button key={f.fileId} type="button" onClick={() => void download(f.fileId)}>
+            {f.kind === "PDF" ? "Descargar PDF" : pictures.length > 1 ? `Descargar foto ${i + 1}` : "Descargar foto"}
+          </button>
+        ))}
       </div>
       <h2>Líneas{read("lines")}</h2>
       {doc.lines.length === 0 ? (

@@ -52,6 +52,9 @@ public sealed class ApiOptions
     /// <summary>ENT1-02: the drivers' page (Off without a link key).</summary>
     public Rochell.Api.Deliveries.DeliveriesSettings Deliveries { get; set; } = new();
 
+    /// <summary>OCR1-04 (E-OCR-5): reading supplier invoices from photos by AI.</summary>
+    public Rochell.Api.Ocr.OcrSettings Ocr { get; set; } = new();
+
     public ReverseProxySettings ReverseProxy { get; set; } = new();
 }
 

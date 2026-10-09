@@ -75,3 +75,19 @@ the lines and the suggestion), «Crear proveedor» (the supplier form opens with
 «Verificar en la DGII», «Descargar XML», history. Inicio: «Comprobantes recibidos por registrar» and «Respuestas a la DGII sin enviar hace
 más de 24 horas». Dev stack: `ReceivedSeed` (an e-CF 31 and a 34 of «Agregados del Este»; the company's RNC 131925332). Playwright:
 `e2e/supplier-documents-journey.spec.ts`.
+
+## OCR1-04 — photos and PDFs read by AI (migration 0112, E-OCR1-04-1…4)
+
+- `CaptureSupplierDocumentFromImage` (`supplier_document:capture`): a JPG / PNG photo or a PDF (≤ 10 MB, ≤ 3 pages; recognised by its
+  first bytes). The same file (SHA-256) is never read twice: its reading is reused. Otherwise, within PURCHASING `ocr_monthly_readings`
+  (`SUPPLIER_DOCUMENT_READING_LIMIT`), `ISupplierDocumentReader` reads it; every reading is a `pur.supplier_document_reading` row (READ /
+  UNREADABLE, what it read, model, tokens); a reader that does not answer (retried once) records nothing (`SUPPLIER_DOCUMENT_READ_FAILED`).
+  Without an RNC or NCF it could read, the result asks for them (`needsInput`) and the person types them; what was typed is not «leído por
+  IA». The file goes to the evidence store (`supplier-documents/{company}/{sha}.{ext}`) and a document is captured or completed (never
+  over an XML or a QR) with AI lines and `ai_fields`. Reader off: `SUPPLIER_DOCUMENT_READER_OFF`; no store: `SUPPLIER_DOCUMENT_STORE_MISSING`.
+- Reader: `AnthropicSupplierDocumentReader` (Messages API, the file as an image or document block, the forced tool `record_invoice` whose
+  answer `InvoiceReadingFormat.Parse` keeps only well-formed values; amounts are strings parsed as decimals). Settings `Rochell:Ocr:Mode`
+  (OFF / ANTHROPIC / SIMULATED), `Model` (`claude-sonnet-5-5`), `ApiKeyFile` (`secrets/ocr/anthropic-key` on the server), `Timeout`.
+  The evidence store is now configured on its own (B2 bucket, or a folder in Development / Test), not only with the drivers' link key.
+- `/api/v1/environment` says `ocrEnabled`; the inbox shows «Subir foto o PDF» (photos reduced on the phone to 2400 px JPEG), the detail
+  «Descargar foto / PDF». `GetSupplierDocumentFile` serves photos and PDFs from the store. 302 commands.
