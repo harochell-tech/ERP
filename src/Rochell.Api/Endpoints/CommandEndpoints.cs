@@ -307,6 +307,7 @@ public static class CommandEndpoints
         sales.MapCommand<CancelQuote, CancelQuoteHandler>();
         sales.MapCommand<CopyQuote, CopyQuoteHandler>();
         sales.MapCommand<ConvertQuote, ConvertQuoteHandler>();
+        sales.MapCommand<AcceptUnbilledDeliveries, AcceptUnbilledDeliveriesHandler>(); // X1-01b (E-X1-01-6)
         sales.MapCommand<PlanDelivery, PlanDeliveryHandler>();
         sales.MapCommand<StartLoading, StartLoadingHandler>();
         sales.MapCommand<ConfirmLoaded, ConfirmLoadedHandler>();
@@ -439,7 +440,7 @@ public static class CommandEndpoints
         typeof(RegisterSupplierInvoiceHandler), typeof(RegisterExpenseInvoiceHandler), typeof(CreateExpensePurchaseOrderHandler), typeof(UpdateExpensePurchaseOrderDraftHandler), typeof(CloseExpensePurchaseOrderHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
         typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RegisterCustomsDeclarationHandler),
-        typeof(ImportReceivedDocumentsHandler), typeof(RespondToSupplierDocumentHandler), typeof(SendSupplierDocumentResponseHandler), typeof(CaptureSupplierDocumentFromQrHandler), typeof(DiscardSupplierDocumentHandler),
+        typeof(AcceptUnbilledDeliveriesHandler), typeof(ImportReceivedDocumentsHandler), typeof(RespondToSupplierDocumentHandler), typeof(SendSupplierDocumentResponseHandler), typeof(CaptureSupplierDocumentFromQrHandler), typeof(DiscardSupplierDocumentHandler),
         typeof(ReverseCustomsDeclarationHandler), typeof(PrepareImportSettlementHandler), typeof(UpdateImportSettlementDraftHandler), typeof(CancelImportSettlementHandler),
         typeof(ApproveImportSettlementHandler), typeof(ReverseImportSettlementHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),

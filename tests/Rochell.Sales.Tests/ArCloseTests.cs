@@ -3,6 +3,7 @@ using Rochell.Audit;
 using Rochell.Platform.Commands;
 using Rochell.Reconciliation;
 using Rochell.Sales.CreditNotes;
+using Rochell.Sales.Deliveries;
 using Rochell.Sales.Invoices;
 using Rochell.Sales.Orders;
 using Rochell.Sales.Receipts;
@@ -74,12 +75,15 @@ public sealed class ArCloseTests(PostgresFixture postgres)
         await new LedgerSealer(h.Sealer, h.Clock).SealAllAsync(CancellationToken.None);
         var (controller, cobros) = (await h.SessionWithRolesAsync("CONTROLLER"), await h.SessionWithRolesAsync("COBROS")); // the month's sessions expired
         var period = await h.ScalarAsync<Guid>("SELECT period_id FROM fin.period WHERE company_id = @c AND @d BETWEEN starts_on AND ends_on", ("c", h.CompanyId), ("d", month));
+        // X1-01b (E-X1-01-6): the 200 blocks delivered and not invoiced hold the close until the Controller accepts them.
+        var held = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new CloseComponent(h.CompanyId, controller, "close-0", period, "AR-REC"), new CloseComponentHandler()));
+        await h.RunAsync(new AcceptUnbilledDeliveries(h.CompanyId, controller, "accept", period, "Entrega del día 30 facturada en el mes siguiente"), new AcceptUnbilledDeliveriesHandler());
         var closed = await h.RunAsync(new CloseComponent(h.CompanyId, controller, "close", period, "AR-REC"), new CloseComponentHandler());
         var late = await h.RunAsync(
             new RecordReceipt(h.CompanyId, cobros, "late", w.S.Customer, "TRANSFER", 100.00m, month, w.Bank), new RecordReceiptHandler());
 
         Assert.Equal("ACC-EVIDENCE:MATCHED,AR-GL:MATCHED,CONTRACT-ASSET:MATCHED,FISC-DOC:MATCHED,RECEIPT-APPL:MATCHED", Statuses(run));
-        Assert.Null(await FindingsAsync(h));
+        Assert.Contains("CONTRACT-ASSET", held.Message, StringComparison.Ordinal);
         Assert.Equal("PAID:0.00", await h.ScalarAsync<string>(
             "SELECT i.commercial_status || ':' || a.open_amount::numeric(19,2)::text FROM sal.invoice i JOIN fin.ar_document a ON a.ar_doc_id = i.ar_doc_id WHERE i.invoice_id = @i", ("i", w.Invoice)));
         Assert.Contains("snapshotHash", closed.ResultPayload, StringComparison.Ordinal);
@@ -98,6 +102,45 @@ public sealed class ArCloseTests(PostgresFixture postgres)
         // A receipt dated in the closed month goes to the next open date (AR-REC also required by P-23).
         Assert.Equal("true", await h.ScalarAsync<string>(
             "SELECT j.late_entry::text FROM fin.gl_journal j JOIN fin.receipt r ON r.posting_event_id = j.source_event_id WHERE r.receipt_id = @r", ("r", late.ResultRef)));
+    }
+
+    /// <summary>X1-01b (E-X1-3, E-X1-01-6, E-X1-01b-1): at the month's end a delivery not invoiced is an error until the Controller accepts it; a later one holds again.</summary>
+    [Fact]
+    public async Task The_months_deliveries_not_invoiced_hold_its_end_until_the_Controller_accepts_them()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await ReceiptTests.WorldAsync(h);
+        var (order, orderLine) = await DeliveryTests.ConfirmedOrderAsync(h, w.S, DeliveryTerms.PickupAtPlant, 200m, "o2");
+        await DeliveryTests.DispatchAsync(h, w.S, order, orderLine, 100m, own: false, "d2");
+        var today = ReceiptTests.Today(h);
+        var monthEnd = new DateOnly(today.Year, today.Month, 1).AddMonths(1).AddDays(-1);
+        var period = await h.ScalarAsync<Guid>("SELECT period_id FROM fin.period WHERE company_id = @c AND @d BETWEEN starts_on AND ends_on", ("c", h.CompanyId), ("d", today));
+        async Task<string?> Unbilled(string key, DateOnly cutoff)
+        {
+            var run = await h.RunAsync(new RunReconciliation(h.CompanyId, w.Controller, key, ["CONTRACT-ASSET"], cutoff), new RunReconciliationHandler());
+            return await h.ScalarAsync<string>(
+                """
+                SELECT count(x.exception_id)::text || ':' || coalesce(sum(x.value_a), 0)::numeric(19,2)::text
+                FROM rec.recon_run r LEFT JOIN rec.recon_exception x ON x.run_id = r.run_id AND x.classification = 'UNBILLED_AT_CLOSE'
+                WHERE r.command_id = @cmd
+                """,
+                ("cmd", run.CommandId));
+        }
+
+        var atEnd = await Unbilled("end-1", monthEnd);
+        var notMonthEnd = await Unbilled("mid", monthEnd.AddDays(-1));
+        var noReason = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new AcceptUnbilledDeliveries(h.CompanyId, w.Controller, "a0", period, " "), new AcceptUnbilledDeliveriesHandler()));
+        var accepted = JsonDocument.Parse((await h.RunAsync(new AcceptUnbilledDeliveries(h.CompanyId, w.Controller, "a1", period, "Se factura el día 1"), new AcceptUnbilledDeliveriesHandler())).ResultPayload).RootElement;
+        var afterAcceptance = await Unbilled("end-2", monthEnd);
+        await DeliveryTests.DispatchAsync(h, w.S, order, orderLine, 100m, own: false, "d3");
+        var afterNewDelivery = await Unbilled("end-3", monthEnd);
+
+        Assert.Equal("1:5000.00", atEnd);
+        Assert.Equal("0:0.00", notMonthEnd); // not a month's end: nothing to hold
+        Assert.Equal(SalesErrors.FieldRequired, noReason.Code);
+        Assert.Equal("1|5000.00", $"{accepted.GetProperty("lines").GetInt32()}|{accepted.GetProperty("unbilled").GetString()}");
+        Assert.Equal("0:0.00", afterAcceptance);
+        Assert.Equal("1:5000.00", afterNewDelivery);
     }
 
     [Fact]

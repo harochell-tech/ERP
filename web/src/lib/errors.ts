@@ -342,6 +342,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   SUPPLIER_DOCUMENT_NOT_OURS: "Ese e-CF no está a nombre de la empresa (el RNC del comprador es otro o no tiene).",
   SUPPLIER_DOCUMENT_ALREADY_INVOICED: "Ese comprobante ya está registrado como factura de proveedor.",
   SUPPLIER_DOCUMENT_NOT_REGISTRABLE: "Ese comprobante no se puede pasar a factura: es una nota, Alanube no lo recibió, fue rechazado o ya tiene factura.",
+  NOTHING_TO_ACCEPT: "El mes no tiene entregas sin facturar por aceptar: las diferencias que frenan el cierre son otras (vea la conciliación).",
   SUPPLIER_DOCUMENT_MISMATCH: "El proveedor y el NCF deben ser los del comprobante.",
   LINE_KIND_NOT_SUPPORTED: "Ese tipo de línea no se puede facturar: cada línea debe facturar una línea de inventario de una orden de compra.",
   NOTHING_TO_REPOST: "El evento no tiene un asiento contabilizado de esa regla para recontabilizar.",

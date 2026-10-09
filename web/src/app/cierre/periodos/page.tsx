@@ -51,7 +51,13 @@ function ComponentActions({
   );
   const approve = useCommand(`approve-reopen:${tag}`, "/api/v1/companies/{companyId}/reconciliation/approve-reopen", `${componentName} reabierto para ${periodName}.`);
   const reject = useCommand(`reject-reopen:${tag}`, "/api/v1/companies/{companyId}/reconciliation/reject-reopen", `Reapertura de ${componentName} (${periodName}) rechazada.`);
-  const busy = close.busy || verify.busy || request.busy || approve.busy || reject.busy;
+  // X1-01b (E-X1-01-6): the Controller accepts the month's deliveries not invoiced, with a reason, so AR-REC can close.
+  const accept = useCommand(`accept-unbilled:${tag}`, "/api/v1/companies/{companyId}/sales/accept-unbilled-deliveries", (r) => {
+    const result = r.result as { lines?: number } | null;
+    return `${result?.lines ?? 0} entregas sin facturar aceptadas para ${periodName}; verifique de nuevo.`;
+  });
+  const unbilled = state.component === "AR-REC" && (readiness?.reconciliations.find((x) => x.reconCode === "CONTRACT-ASSET")?.blockingErrors ?? 0) > 0;
+  const busy = close.busy || verify.busy || request.busy || approve.busy || reject.busy || accept.busy;
   const pending = period.reopenRequests.find((r) => r.component === state.component && r.status === "REQUESTED");
   const availability = closeAvailability(state.status, readiness);
   const codes = readiness ? blockingCodes(readiness) : [];
@@ -72,6 +78,16 @@ function ComponentActions({
           >
             {verify.busy ? "Verificando…" : "Verificar ahora"}
           </button>
+        ) : null}
+        {availability !== "closed" && unbilled && can("unbilled_delivery:accept") ? (
+          <ReasonAction
+            label="Aceptar conduces sin facturar"
+            consequence={`El mes cierra con las entregas que hoy siguen sin facturar (el ITBIS nació con la entrega, art. 338.1). Si aparece otra entrega del mes, el cierre se frena de nuevo. Lo normal es facturarlas desde Facturación › Por facturar.`}
+            minLength={3}
+            stepUp
+            busy={busy}
+            onConfirm={async (reason) => after(await accept.run({ periodId: period.periodId, reason }))}
+          />
         ) : null}
         {availability === "ready" && can("period_component:close") ? (
           <ConfirmAction
@@ -120,7 +136,7 @@ function ComponentActions({
           Reapertura solicitada por {pending.requestedBy ?? "—"} el {formatDateTime(pending.requestedAt)}: {pending.reason}
         </div>
       ) : null}
-      <ErrorBox error={close.error ?? verify.error ?? request.error ?? approve.error ?? reject.error} />
+      <ErrorBox error={close.error ?? verify.error ?? request.error ?? approve.error ?? reject.error ?? accept.error} />
     </>
   );
 }

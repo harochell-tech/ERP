@@ -18,3 +18,12 @@ the same date that differs, or a later one already there, is left as it is); its
 10-26 and the e-CF format v1.0 — are PDFs the DGII site will not hand to a program: a person saves them as
 `docs/fiscal/fuentes/aviso-10-26.pdf` and `docs/fiscal/fuentes/ecf-formato-v1.0.pdf`; until then the loader reports them MISSING_FILE
 and skips the rules that cite them.
+
+## X1-01b — the month's deliveries not invoiced hold its close (migration 0109, E-X1-01-6, E-X1-01b-1/2)
+
+CONTRACT-ASSET adds UNBILLED_AT_CLOSE (ERROR, AR-REC) at a month-end cutoff — the close runs its reconciliations at the period's end — for
+each delivery line with control transferred by then (its first CONTRACT_ASSET / UNBILLED_RECEIVABLE entry) and not fully invoiced,
+unless an acceptance of that period lists it. `AcceptUnbilledDeliveries` (`unbilled_delivery:accept`, Controller, step-up, reason 3–500)
+records `sal.unbilled_acceptance` with the lines unbilled at that moment (`sal.unbilled_acceptance_line`, append-only); a line delivered
+later holds the close again; nothing left → `NOTHING_TO_ACCEPT`. Contabilidad › Períodos y cierre: «Aceptar conduces sin facturar» on
+AR-REC while CONTRACT-ASSET has blocking errors. 300 commands, 156 permissions.
