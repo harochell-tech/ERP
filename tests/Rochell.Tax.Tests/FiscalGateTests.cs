@@ -137,6 +137,30 @@ public sealed class FiscalGateTests(PostgresFixture postgres)
         Assert.Equal("ACTIVE", await Status(h, v3));
     }
 
+    /// <summary>E-X1-04-1: a version may start before its predecessor's set end; days already taxed under the old version never change hands.</summary>
+    [Fact]
+    public async Task A_version_starting_before_a_closed_predecessor_ends_shortens_it_unless_those_days_were_taxed()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var actors = await h.FiscalActorsAsync();
+        var v1 = await h.ActivateRuleAsync(actors, "v1", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition, From);
+        var v2 = await h.ActivateRuleAsync(actors, "v2", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition, new DateOnly(2026, 7, 1));
+        var v3 = await h.ActivateRuleAsync(actors, "v3", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition, new DateOnly(2026, 6, 1));
+        await h.AdminRequireAsync(
+            $"""
+            INSERT INTO tax.tax_determination (determination_id, company_id, subject_type, subject_id, determination_date, rule_version_ids, inputs, determined_at)
+            VALUES (gen_random_uuid(), '{h.CompanyId}', 'TEST', gen_random_uuid(), DATE '2026-05-10', ARRAY['{v1}'::uuid], jsonb_build_object(), now())
+            """);
+
+        var taxed = await Assert.ThrowsAsync<DomainException>(
+            () => h.ActivateRuleAsync(actors, "v4", "ITBIS-COMPRAS", FiscalRuleKinds.PurchaseItbis, TaxSetup.ItbisDefinition, new DateOnly(2026, 5, 1)));
+
+        Assert.Equal("ACTIVE|2026-06-01", await h.ScalarAsync<string>("SELECT status || '|' || effective_to FROM tax.fiscal_rule_version WHERE rule_version_id = @v", ("v", v1)));
+        Assert.Equal("RETIRED", await Status(h, v2));
+        Assert.Equal("ACTIVE", await Status(h, v3));
+        Assert.Equal(TaxErrors.RuleDaysInUse, taxed.Code);
+    }
+
     [Fact]
     public async Task Only_one_purchase_ITBIS_rule_applies_at_a_time()
     {

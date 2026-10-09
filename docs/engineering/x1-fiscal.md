@@ -13,7 +13,7 @@ and the `CreditNoteIssued` event carry `withoutItbis`. The e-CF 34 already sends
 **CONFOTUR** (E-X1-20, E-X1-01-4): an authorization registered or updated without `validUntil` is valid until `issuedOn` + 180 days.
 
 **Pack** (E-X1-01-5): `deploy/fiscal/x1-2026-10.json` — «Seguro de vida» in four dated versions, `IDENTIFICACION_CONSUMIDOR`
-(CONSUMER_ID_THRESHOLD 250,000.00) and, from X1-02b, `ITBIS_VENTAS` from 2026-10-10 exempting TRANSPORTE (E-X1-1, E-SRV1-16), which lets
+(CONSUMER_ID_THRESHOLD 250,000.00) and, from X1-02b, `ITBIS_VENTAS` from 2026-10-09 exempting TRANSPORTE (E-X1-1, E-SRV1-16, E-X1-04-2), which lets
 freight ride orders once the Especialista fiscal activates it. The loader now takes several versions of one rule, one per effective date in date order (a version of
 the same date that differs, or a later one already there, is left as it is); its step keys carry the date. Two sources — DGII Aviso
 10-26 and the e-CF format v1.0 — are PDFs the DGII site will not hand to a program: a person saves them as
@@ -47,3 +47,14 @@ AR-REC while CONTRACT-ASSET has blocking errors. 300 commands, 156 permissions.
 for it; classes prepared before have none and keep their ITBIS deductible). An expense line whose category's ACTIVE class is of category 1
 is determined with `ItbisToCost`: its ITBIS components become NON_RECOVERABLE_INPUT (the 606's «ITBIS llevado al costo»); P-37 adds that
 ITBIS to the line's asset account instead of ITBIS_RECOVERABLE, the payable is unchanged, and the card's cost includes it.
+
+## X1-04a — a version that starts before its predecessor's end (migration 0113, E-X1-04-1/2)
+
+- `ActivateFiscalRuleVersion` takes every ACTIVE version of the same rule still in force on the new version's start: one starting earlier
+  ends there (also when it already had an end), the ones starting on or after it are RETIRED. When a version with a set end would lose days,
+  a `tax.tax_determination` citing it on those days refuses the activation (`FISCAL_RULE_DAYS_IN_USE`): nothing already taxed changes.
+- Migration 0113: the activation gate lets an ACTIVE version's end move earlier, never later.
+- Pack `x1-2026-10.json`: `ITBIS_VENTAS` exempting TRANSPORTE from 2026-10-09 (the owner's decision); on staging its activation retires the
+  2026-10-10 version.
+
+Tests: `FiscalGateTests.A_version_starting_before_a_closed_predecessor_ends_shortens_it_unless_those_days_were_taxed`.

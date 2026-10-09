@@ -184,7 +184,7 @@
     {
       "code": "ITBIS_VENTAS",
       "kind": "SALES_ITBIS",
-      "effectiveFrom": "2026-10-10",
+      "effectiveFrom": "2026-10-09",
       "definition": {
         "tax_code": "ITBIS",
         "rate": "0.18",
