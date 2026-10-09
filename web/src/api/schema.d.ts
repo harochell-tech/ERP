@@ -9163,6 +9163,8 @@ export interface components {
             /** Format: uuid */
             invoiceIssuedById: null | string;
             ecf?: null | components["schemas"]["EcfStampView"];
+            /** Format: date */
+            itbisUntil?: null | string;
         };
         CreditNoteFiscalPackage: {
             creditNoteNo: string;

@@ -1,0 +1,77 @@
+{
+  "pack": "x1-2026-10",
+  "sources": [
+    {
+      "key": "CT-TITULO-IV",
+      "file": "titulo4.pdf",
+      "officialSource": "DGII",
+      "documentTitle": "Código Tributario (Ley 11-92), Título IV — Impuesto Selectivo al Consumo",
+      "documentVersion": "Texto con las Leyes 495-06 y 253-12 (2012-11-09)",
+      "publicationDate": "2012-11-09",
+      "effectiveFrom": "2013-01-01",
+      "url": "https://dgii.gov.do/legislacion/codigotributario/cdigo%20tributario/titulo4.pdf"
+    },
+    {
+      "key": "AVISO-10-26",
+      "file": "aviso-10-26.pdf",
+      "officialSource": "DGII",
+      "documentTitle": "Aviso Informativo 10-26 — Disposiciones de la Ley 30-26",
+      "documentVersion": "2026-06-26",
+      "publicationDate": "2026-06-26",
+      "effectiveFrom": "2026-07-01",
+      "url": "https://dgii.gov.do/publicacionesOficiales/avisosInformativos/Documents/2026/10-26.pdf"
+    },
+    {
+      "key": "ECF-FORMATO-V1",
+      "file": "ecf-formato-v1.0.pdf",
+      "officialSource": "DGII",
+      "documentTitle": "Formato Comprobante Fiscal Electrónico (e-CF) v1.0",
+      "documentVersion": "Octubre 2025",
+      "publicationDate": "2025-10-01",
+      "effectiveFrom": "2025-10-01",
+      "url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Formatos%20XML/Formato%20Comprobante%20Fiscal%20Electr%C3%B3nico%20(e-CF)%20v1.0.pdf"
+    }
+  ],
+  "rules": [
+    {
+      "code": "SEGURO_VIDA",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "label": "Seguro de vida (ISC 16 %, sin ITBIS)", "components": [{ "tax_code": "ISC", "rate": "0.16", "effect": "SELECTIVE_TAX" }] },
+      "sources": ["CT-TITULO-IV"],
+      "cases": [{ "caseId": "vida-20000-2026", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00", "expected": [{ "taxCode": "ISC", "amount": "3200.00", "effect": "SELECTIVE_TAX" }] }]
+    },
+    {
+      "code": "SEGURO_VIDA",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2027-01-01",
+      "definition": { "label": "Seguro de vida (ISC 11 %, sin ITBIS)", "components": [{ "tax_code": "ISC", "rate": "0.11", "effect": "SELECTIVE_TAX" }] },
+      "sources": ["CT-TITULO-IV", "AVISO-10-26"],
+      "cases": [{ "caseId": "vida-20000-2027", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00", "expected": [{ "taxCode": "ISC", "amount": "2200.00", "effect": "SELECTIVE_TAX" }] }]
+    },
+    {
+      "code": "SEGURO_VIDA",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2028-01-01",
+      "definition": { "label": "Seguro de vida (ISC 6 %, sin ITBIS)", "components": [{ "tax_code": "ISC", "rate": "0.06", "effect": "SELECTIVE_TAX" }] },
+      "sources": ["CT-TITULO-IV", "AVISO-10-26"],
+      "cases": [{ "caseId": "vida-20000-2028", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00", "expected": [{ "taxCode": "ISC", "amount": "1200.00", "effect": "SELECTIVE_TAX" }] }]
+    },
+    {
+      "code": "SEGURO_VIDA",
+      "kind": "PURCHASE_TAX_TYPE",
+      "effectiveFrom": "2029-01-01",
+      "definition": { "label": "Seguro de vida (sin ISC ni ITBIS)", "components": [] },
+      "sources": ["AVISO-10-26"],
+      "cases": [{ "caseId": "vida-20000-2029", "partyType": "COMPANY", "itemCategory": "", "netAmount": "20000.00", "itbisAmount": "0.00", "expected": [] }]
+    },
+    {
+      "code": "IDENTIFICACION_CONSUMIDOR",
+      "kind": "CONSUMER_ID_THRESHOLD",
+      "effectiveFrom": "2026-10-01",
+      "definition": { "amount": "250000.00" },
+      "sources": ["ECF-FORMATO-V1"],
+      "cases": []
+    }
+  ]
+}

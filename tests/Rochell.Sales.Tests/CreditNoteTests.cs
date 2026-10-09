@@ -91,6 +91,33 @@ public sealed class CreditNoteTests(PostgresFixture postgres)
         Assert.Equal(2L, await h.ScalarAsync<long>("SELECT count(*) FROM core.document_link WHERE link_type = 'FISCALIZES'"));
     }
 
+    /// <summary>X1-01 (E-X1-5, E-X1-01-1…3): issued more than 30 calendar days after its invoice, a note credits the price only.</summary>
+    [Theory]
+    [InlineData(30, "900.00", "5900.00", "53100.00", "-8100.00", false)]
+    [InlineData(31, "0.00", "5000.00", "54000.00", "-9000.00", true)]
+    public async Task A_credit_note_issued_after_30_days_carries_no_ITBIS(int daysAgo, string tax, string total, string open, string itbisPayable, bool without)
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        var invoiced = Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow).AddDays(-daysAgo);
+        await h.AdminRequireAsync(
+            $"DO $$ BEGIN PERFORM set_config('session_replication_role', 'replica', true); UPDATE sal.invoice SET invoice_date = DATE '{invoiced:yyyy-MM-dd}' WHERE invoice_id = '{w.Invoice}'; END $$");
+        var note = JsonDocument.Parse((await Create(h, w, "nc", 5000.00m)).ResultPayload).RootElement.GetProperty("creditNoteId").GetGuid();
+        var draft = JsonDocument.Parse(await h.QueryAsync(new GetCreditNote(h.CompanyId, w.S.Seller, note), new GetCreditNoteHandler())).RootElement;
+
+        var issued = JsonDocument.Parse((await Issue(h, w, note, "nc-issue")).ResultPayload).RootElement;
+
+        Assert.Equal(invoiced.AddDays(30).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), draft.GetProperty("itbisUntil").GetString());
+        Assert.Equal(without, issued.GetProperty("withoutItbis").GetBoolean());
+        Assert.Equal(
+            $"{tax}|{total}|{tax}",
+            await h.ScalarAsync<string>(
+                "SELECT n.tax_total::numeric(19,2) || '|' || n.total::numeric(19,2) || '|' || (SELECT sum(itbis)::numeric(19,2) FROM sal.credit_note_line l WHERE l.credit_note_id = n.credit_note_id) FROM sal.credit_note n WHERE n.credit_note_id = @n",
+                ("n", note)));
+        Assert.Equal($"CONFIRMED:{open}", await InvoiceState(h, w));
+        Assert.Equal($"ITBIS_PAYABLE={itbisPayable}", await DeliveryTests.Balances(h, w.S, "ITBIS_PAYABLE"));
+    }
+
     [Fact]
     public async Task Crediting_the_rest_takes_the_remaining_ITBIS_marks_the_invoice_CREDITED_and_nothing_more_can_be_credited()
     {

@@ -71,7 +71,7 @@ public sealed record CreditNoteLineView(int LineNo, Guid InvoiceLineId, int Invo
 /// <summary>E-UX3-9: <see cref="InvoiceIssuedById"/> is the user who issued the invoice; the credit note's issuer must be someone else.</summary>
 public sealed record CreditNoteDetail(
     CreditNoteSummary Header, string? CreatedBy, string? IssuedBy, Guid? PostingEventId, IReadOnlyList<CreditNoteLineView> Lines, ExternalFiscalRecordView? FiscalRecord, IReadOnlyList<StateChange> History,
-    Guid? InvoiceIssuedById, EcfStampView? Ecf = null);
+    Guid? InvoiceIssuedById, EcfStampView? Ecf = null, DateOnly? ItbisUntil = null);
 
 internal static class CreditNoteLines
 {
@@ -96,7 +96,7 @@ public sealed class GetCreditNoteHandler : IQueryHandler<GetCreditNote>
 {
     public string QueryType => "Sales.GetCreditNote";
 
-    private sealed record Extra(string? CreatedBy, string? IssuedBy, Guid? PostingEventId, Guid? InvoiceIssuedById);
+    private sealed record Extra(string? CreatedBy, string? IssuedBy, Guid? PostingEventId, Guid? InvoiceIssuedById, DateOnly? InvoiceDate);
 
     public async Task<string> HandleAsync(GetCreditNote query, QueryContext context, CancellationToken cancellationToken)
     {
@@ -110,12 +110,12 @@ public sealed class GetCreditNoteHandler : IQueryHandler<GetCreditNote>
             context.Connection,
             context.Transaction,
             """
-            SELECT coalesce(c.display_name, c.email), coalesce(u.display_name, u.email), n.posting_event_id, i.issued_by FROM sal.credit_note n
+            SELECT coalesce(c.display_name, c.email), coalesce(u.display_name, u.email), n.posting_event_id, i.issued_by, i.invoice_date FROM sal.credit_note n
             JOIN sal.invoice i ON i.invoice_id = n.invoice_id
             LEFT JOIN iam.user c ON c.user_id = n.created_by LEFT JOIN iam.user u ON u.user_id = n.issued_by
             WHERE n.credit_note_id = @n
             """,
-            r => new Extra(r.NullableString(0), r.NullableString(1), r.NullableGuid(2), r.NullableGuid(3)),
+            r => new Extra(r.NullableString(0), r.NullableString(1), r.NullableGuid(2), r.NullableGuid(3), r.IsDBNull(4) ? null : r.Date(4)),
             cancellationToken,
             ("n", query.CreditNoteId)).ConfigureAwait(false))!;
         var fiscal = await Reading.SingleOrDefaultAsync(
@@ -128,7 +128,9 @@ public sealed class GetCreditNoteHandler : IQueryHandler<GetCreditNote>
         var lines = await CreditNoteLines.ReadAsync(context, query.CreditNoteId, cancellationToken).ConfigureAwait(false);
         var history = await StateHistory.ReadAsync(context, "CreditNote", query.CreditNoteId, cancellationToken).ConfigureAwait(false);
         var ecf = await EcfStamps.LatestAsync(context, query.CreditNoteId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(new CreditNoteDetail(header, extra.CreatedBy, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, extra.InvoiceIssuedById, ecf));
+        // E-X1-01-2: the last day a note of this invoice still carries ITBIS.
+        return ApiJson.Serialize(new CreditNoteDetail(
+            header, extra.CreatedBy, extra.IssuedBy, extra.PostingEventId, lines, fiscal, history, extra.InvoiceIssuedById, ecf, extra.InvoiceDate?.AddDays(Rochell.Sales.CreditNotes.CreditNoteRules.ItbisDays)));
     }
 }
 

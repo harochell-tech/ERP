@@ -32,9 +32,12 @@ public sealed record FiscalRulePack(string Pack, IReadOnlyList<PackSource> Sourc
         }
 
         var keys = pack.Sources.Select(s => s.Key).ToHashSet(StringComparer.Ordinal);
-        if (keys.Count != pack.Sources.Count || pack.Rules.Select(r => r.Code).Distinct(StringComparer.Ordinal).Count() != pack.Rules.Count)
+        // E-X1-01-5: a rule may come several times, once per effective date, in date order.
+        var dated = pack.Rules.Select(r => (r.Code, r.EffectiveFrom)).ToList();
+        if (keys.Count != pack.Sources.Count || dated.Distinct().Count() != dated.Count
+            || pack.Rules.GroupBy(r => r.Code, StringComparer.Ordinal).Any(g => !g.Select(r => r.EffectiveFrom).SequenceEqual(g.Select(r => r.EffectiveFrom).Order())))
         {
-            throw new FormatException("Source keys and rule codes are unique in a pack.");
+            throw new FormatException("Source keys are unique in a pack, and each rule comes once per effective date, in date order.");
         }
 
         foreach (var rule in pack.Rules)
@@ -115,10 +118,13 @@ public sealed class FiscalRulePackLoader(CommandPipeline pipeline, DbDataSource 
             var definition = rule.Definition.ToJsonString();
             var versions = await VersionsAsync(companyId, rule.Code, cancellationToken).ConfigureAwait(false);
             var live = versions.Where(v => v.Status is "BLOCKED_PENDING_SOURCE" or "READY" or "ACTIVE").ToList();
+            // E-X1-01-5: a pack may carry later versions of a rule (one per date); a version of the same date that differs, or a later one
+            // already there, is left as it is.
             var same = live.FirstOrDefault(v => v.EffectiveFrom == rule.EffectiveFrom && Canonical(v.Definition) == Canonical(definition));
-            if (same is null && live.Count > 0)
+            var conflict = live.FirstOrDefault(v => v.EffectiveFrom >= rule.EffectiveFrom && v != same);
+            if (same is null && conflict is not null)
             {
-                steps.Add(new PackStep(rule.Code, "DIFFERENT", $"The rule already has a version ({live[0].Status}, from {live[0].EffectiveFrom:yyyy-MM-dd}) that differs from the pack: left as it is."));
+                steps.Add(new PackStep(rule.Code, "DIFFERENT", $"The rule already has a version ({conflict.Status}, from {conflict.EffectiveFrom:yyyy-MM-dd}) that differs from the pack: left as it is."));
                 continue;
             }
 
@@ -132,7 +138,7 @@ public sealed class FiscalRulePackLoader(CommandPipeline pipeline, DbDataSource 
             if (same is null)
             {
                 versionId = (await pipeline.ExecuteAsync(
-                    new ConfigureFiscalRuleVersion(companyId, sessionId, Key("rule-" + rule.Code), rule.Code, rule.Kind, definition, rule.EffectiveFrom), new ConfigureFiscalRuleVersionHandler(),
+                    new ConfigureFiscalRuleVersion(companyId, sessionId, Key(string.Create(CultureInfo.InvariantCulture, $"rule-{rule.Code}-{rule.EffectiveFrom:yyyyMMdd}")), rule.Code, rule.Kind, definition, rule.EffectiveFrom), new ConfigureFiscalRuleVersionHandler(),
                     Guid.CreateVersion7(), cancellationToken).ConfigureAwait(false)).ResultRef;
             }
             else
@@ -148,7 +154,7 @@ public sealed class FiscalRulePackLoader(CommandPipeline pipeline, DbDataSource 
                 if (linked != true)
                 {
                     await pipeline.ExecuteAsync(
-                        new LinkFiscalSource(companyId, sessionId, Key($"link-{rule.Code}-{key}"), versionId, sourceIds[key]), new LinkFiscalSourceHandler(), Guid.CreateVersion7(), cancellationToken)
+                        new LinkFiscalSource(companyId, sessionId, Key(string.Create(CultureInfo.InvariantCulture, $"link-{rule.Code}-{rule.EffectiveFrom:yyyyMMdd}-{key}")), versionId, sourceIds[key]), new LinkFiscalSourceHandler(), Guid.CreateVersion7(), cancellationToken)
                         .ConfigureAwait(false);
                 }
             }
@@ -157,7 +163,7 @@ public sealed class FiscalRulePackLoader(CommandPipeline pipeline, DbDataSource 
             {
                 var cases = rule.Cases.Select(c => new FiscalTestCase(
                     c.CaseId, c.PartyType, c.ItemCategory, Amount(c.NetAmount), Amount(c.ItbisAmount), [.. c.Expected.Select(e => new ExpectedTax(e.TaxCode, Amount(e.Amount), e.Effect))])).ToList();
-                await pipeline.ExecuteAsync(new RunFiscalRuleTests(companyId, sessionId, Key("tests-" + rule.Code), versionId, cases), new RunFiscalRuleTestsHandler(), Guid.CreateVersion7(), cancellationToken)
+                await pipeline.ExecuteAsync(new RunFiscalRuleTests(companyId, sessionId, Key(string.Create(CultureInfo.InvariantCulture, $"tests-{rule.Code}-{rule.EffectiveFrom:yyyyMMdd}")), versionId, cases), new RunFiscalRuleTestsHandler(), Guid.CreateVersion7(), cancellationToken)
                     .ConfigureAwait(false);
             }
 

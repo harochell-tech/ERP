@@ -78,6 +78,34 @@ public sealed class FiscalRulePackTests(PostgresFixture postgres)
         Assert.Equal((2L, 3L, 2L), (await h.CountAsync("tax.fiscal_rule_source"), await h.CountAsync("tax.fiscal_rule_version"), await h.CountAsync("tax.fiscal_rule_test_run")));
     }
 
+    /// <summary>
+    /// X1-01 (E-X1-01-5): the X-1 pack carries four dated versions of «Seguro de vida» and the consumer identification amount. Until a
+    /// person saves the two DGII documents the site will not hand to a program, only what the Code backs is prepared.
+    /// </summary>
+    [Fact]
+    public async Task The_X1_pack_prepares_dated_versions_and_waits_for_the_documents_it_lacks()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        await h.FiscalActorsAsync();
+        var session = await ServiceSessionAsync(h);
+        var pack = FiscalRulePack.Parse(File.ReadAllText(Path.Combine(Root(), "deploy", "fiscal", "x1-2026-10.json")));
+        Task<IReadOnlyList<PackStep>> Load(Func<string, byte[]?> read)
+            => new FiscalRulePackLoader(h.Pipeline, h.App).LoadAsync(h.CompanyId, session, pack, read, FiscalSourceEnvironments.Test, h.Clock.UtcNow.AddSeconds(-1));
+
+        var partial = await Load(Document);
+        var complete = await Load(file => Document(file) ?? System.Text.Encoding.UTF8.GetBytes("saved by a person: " + file));
+
+        Assert.Equal(
+            "CT-TITULO-IV:REGISTERED,AVISO-10-26:MISSING_FILE,ECF-FORMATO-V1:MISSING_FILE,SEGURO_VIDA:READY,SEGURO_VIDA:SKIPPED,SEGURO_VIDA:SKIPPED,SEGURO_VIDA:SKIPPED,IDENTIFICACION_CONSUMIDOR:SKIPPED",
+            Outcomes(partial));
+        Assert.Equal(
+            "CT-TITULO-IV:EXISTS,AVISO-10-26:REGISTERED,ECF-FORMATO-V1:REGISTERED,SEGURO_VIDA:READY,SEGURO_VIDA:READY,SEGURO_VIDA:READY,SEGURO_VIDA:READY,IDENTIFICACION_CONSUMIDOR:READY",
+            Outcomes(complete));
+        Assert.Equal(
+            "IDENTIFICACION_CONSUMIDOR:1:READY:true,SEGURO_VIDA:1:READY:true,SEGURO_VIDA:2:READY:true,SEGURO_VIDA:3:READY:true,SEGURO_VIDA:4:READY:true",
+            await RulesAsync(h));
+    }
+
     [Fact]
     public async Task What_a_person_configured_is_completed_when_it_matches_and_left_alone_when_it_differs()
     {
