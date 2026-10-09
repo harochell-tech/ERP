@@ -20,7 +20,11 @@ public static class FixedAssetCards
 
     /// <summary>The invoice's fixed-asset lines without a live card: category of 606 type 04 whose account is an asset.</summary>
     private const string AssetLinesSql = """
-        SELECT l.si_line_id, left(l.description, 200), l.qty, l.net_amount, l.expense_category_id, si.plant_id, si.doc_date
+        SELECT l.si_line_id, left(l.description, 200), l.qty,
+               -- E-X1-02-4: a category-1 asset's ITBIS is part of its cost.
+               l.net_amount + coalesce((SELECT sum(d.amount) FROM tax.tax_determination_line d
+                                        WHERE d.determination_id = si.tax_determination_id AND d.subject_line_id = l.si_line_id AND d.effect = 'NON_RECOVERABLE_INPUT'), 0),
+               l.expense_category_id, si.plant_id, si.doc_date
         FROM pur.supplier_invoice_line l
         JOIN pur.supplier_invoice si ON si.si_id = l.si_id
         JOIN pur.expense_category c ON c.expense_category_id = l.expense_category_id

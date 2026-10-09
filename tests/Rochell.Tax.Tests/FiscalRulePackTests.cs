@@ -79,7 +79,8 @@ public sealed class FiscalRulePackTests(PostgresFixture postgres)
     }
 
     /// <summary>
-    /// X1-01 (E-X1-01-5): the X-1 pack carries four dated versions of «Seguro de vida» and the consumer identification amount. Until a
+    /// X1-01 (E-X1-01-5): the X-1 pack carries four dated versions of «Seguro de vida», the consumer identification amount and the sales
+    /// ITBIS that exempts freight (E-X1-1). Until a
     /// person saves the two DGII documents the site will not hand to a program, only what the Code backs is prepared.
     /// </summary>
     [Fact]
@@ -96,13 +97,13 @@ public sealed class FiscalRulePackTests(PostgresFixture postgres)
         var complete = await Load(file => Document(file) ?? System.Text.Encoding.UTF8.GetBytes("saved by a person: " + file));
 
         Assert.Equal(
-            "CT-TITULO-IV:REGISTERED,AVISO-10-26:MISSING_FILE,ECF-FORMATO-V1:MISSING_FILE,SEGURO_VIDA:READY,SEGURO_VIDA:SKIPPED,SEGURO_VIDA:SKIPPED,SEGURO_VIDA:SKIPPED,IDENTIFICACION_CONSUMIDOR:SKIPPED",
+            "CT-TITULO-III:REGISTERED,CT-TITULO-IV:REGISTERED,AVISO-10-26:MISSING_FILE,ECF-FORMATO-V1:MISSING_FILE,SEGURO_VIDA:READY,SEGURO_VIDA:SKIPPED,SEGURO_VIDA:SKIPPED,SEGURO_VIDA:SKIPPED,IDENTIFICACION_CONSUMIDOR:SKIPPED,ITBIS_VENTAS:READY",
             Outcomes(partial));
         Assert.Equal(
-            "CT-TITULO-IV:EXISTS,AVISO-10-26:REGISTERED,ECF-FORMATO-V1:REGISTERED,SEGURO_VIDA:READY,SEGURO_VIDA:READY,SEGURO_VIDA:READY,SEGURO_VIDA:READY,IDENTIFICACION_CONSUMIDOR:READY",
+            "CT-TITULO-III:EXISTS,CT-TITULO-IV:EXISTS,AVISO-10-26:REGISTERED,ECF-FORMATO-V1:REGISTERED,SEGURO_VIDA:READY,SEGURO_VIDA:READY,SEGURO_VIDA:READY,SEGURO_VIDA:READY,IDENTIFICACION_CONSUMIDOR:READY,ITBIS_VENTAS:READY",
             Outcomes(complete));
         Assert.Equal(
-            "IDENTIFICACION_CONSUMIDOR:1:READY:true,SEGURO_VIDA:1:READY:true,SEGURO_VIDA:2:READY:true,SEGURO_VIDA:3:READY:true,SEGURO_VIDA:4:READY:true",
+            "IDENTIFICACION_CONSUMIDOR:1:READY:true,ITBIS_VENTAS:1:READY:true,SEGURO_VIDA:1:READY:true,SEGURO_VIDA:2:READY:true,SEGURO_VIDA:3:READY:true,SEGURO_VIDA:4:READY:true",
             await RulesAsync(h));
     }
 

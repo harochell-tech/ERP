@@ -66314,6 +66314,13 @@
           "expenseAccountId": {
             "type": "string",
             "format": "uuid"
+          },
+          "taxCategory": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         },
         "additionalProperties": false

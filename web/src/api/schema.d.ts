@@ -12009,6 +12009,8 @@ export interface components {
             accumulatedAccountId: string;
             /** Format: uuid */
             expenseAccountId: string;
+            /** Format: int32 */
+            taxCategory?: null | number;
         };
         PrepareAssetDisposal: {
             /** Format: uuid */
