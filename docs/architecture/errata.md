@@ -1505,6 +1505,11 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-X1-03-4 | X1-03 | No e-CF 47 for imported goods (DUA) nor goods lines: services only. |
 | E-X1-03-5 | X1-03 | A DGII e-NCF range for type 47 is needed, as for 31; without an ACTIVE range the payment is held and says why. |
 | E-X1-03-6 | X1-03 | Fiscal › Reportes fiscales › 609 of the month as CSV in the DGII tool's order; the e-CF 47 also goes in the 606 under the company's RNC. |
+| E-X1-03-7 | X1-03 | The payment settles the whole USD invoice; the bank pays 73 % (or 85 %) and the difference goes to «ISR withheld payable» in pesos at the payment's rate: a new version of P-41 the Controller approves. Approved 2026-10-09. |
+| E-X1-03-8 | X1-03 | When Alanube rejects the e-CF 47 the payment stays released; the e-CF 47 is corrected and resent like a rejected invoice; the payment is not reversed. |
+| E-X1-03-9 | X1-03 | The expense category carries «Pago al exterior»: General (27 %) or Digital (15 %: royalties, software, online advertising, data); the rates are a new fiscal rule citing Ley 30-26. |
+| E-X1-03-10 | X1-03 | Treasury keeps its module graph (E-VS2-02-1): at release it records the withholding, reading the rate in force with a query; the daily process, from Procurement, issues the e-CF 47 of released foreign payments through Alanube; without an ACTIVE type-47 range the payment shows «e-CF 47 pendiente» on Inicio. |
+| E-X1-03-11 | X1-03 | X1-03 is built after 2026-11-01; until then a payment abroad is recorded by hand with the accountant. |
 
 Implementation rules derived from the above (no architectural change):
 
