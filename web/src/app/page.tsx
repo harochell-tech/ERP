@@ -65,6 +65,23 @@ const TASKS: readonly Task[] = [
   },
   { href: "/cxp/facturas/nueva/", label: "Registrar una factura de proveedor", permission: "supplier_invoice:register" },
   { href: "/cxp/facturas/gasto/", label: "Registrar una factura de gastos", permission: "supplier_invoice:register" },
+  // OCR1-03 (E-OCR1-03-8): supplier documents waiting to become invoices, and answers to the DGII stuck for a day.
+  {
+    href: "/compras/comprobantes/?estado=CAPTURED",
+    label: "Comprobantes recibidos por registrar",
+    permission: "supplier_invoice:register",
+    countPermission: "supplier_invoice:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/procurement/supplier-documents", { path: { companyId }, query: { status: "CAPTURED", limit: COUNT_LIMIT } })).items.length,
+  },
+  {
+    href: "/compras/comprobantes/?sinEnviar=1",
+    label: "Respuestas a la DGII sin enviar hace más de 24 horas",
+    permission: "supplier_document:respond",
+    countPermission: "supplier_invoice:read",
+    count: async (companyId) =>
+      (await query("/api/v1/companies/{companyId}/procurement/supplier-documents", { path: { companyId }, query: { unsentOver24Hours: "true", limit: COUNT_LIMIT } })).items.length,
+  },
   // GAS1-07 (E-GAS-07-7): expense categories waiting for the Controller.
   {
     href: "/maestros/categorias-gasto/",

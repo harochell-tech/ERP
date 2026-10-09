@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { type Schemas } from "@/api/client";
 import { PartyImportPanel } from "@/components/PartyImportPanel";
 import { RncHint, useRncLookup } from "@/components/RncLookup";
@@ -18,11 +19,20 @@ type Supplier = Schemas["SupplierView"];
 // E-B03-15-4: suppliers — list, create (supplier:create), edit (supplier:update), activate (supplier:activate).
 // IMP-02 (E-IMP-1, E-IMP-7): import the ADM Cloud export (supplier:import) and activate the selected drafts (supplier:activate).
 
-function CreateSupplier({ onDone }: { onDone: () => void }) {
+/** OCR1-03 (E-OCR1-01-4): from a received document, the form opens with its RNC and the registry's name. */
+function CreateSupplier({ onDone, initialRnc = "" }: { onDone: () => void; initialRnc?: string }) {
   const create = useCommand("create-supplier", "/api/v1/companies/{companyId}/master-data/create-supplier");
-  const [rnc, setRnc] = useState("");
+  const [rnc, setRnc] = useState(initialRnc);
   const [legalName, setLegalName] = useState("");
   const registry = useRncLookup((name) => setLegalName((current) => (current.trim() ? current : name)));
+  const { lookUp } = registry;
+  const lookedUp = useRef(false);
+  useEffect(() => {
+    if (initialRnc && !lookedUp.current) {
+      lookedUp.current = true;
+      void lookUp(initialRnc);
+    }
+  }, [initialRnc, lookUp]);
   const fe = useFieldErrors<"rnc" | "legalName">();
   return (
     <form
@@ -217,15 +227,16 @@ function SupplierRow({ supplier, onDone, selected, onSelect }: { supplier: Suppl
   );
 }
 
-export default function Page() {
+function Suppliers() {
   const { companyId, can } = useSession();
+  const fromDocument = useSearchParams().get("rnc") ?? "";
   const { data, error, reload } = useLoad(
     can("master_data:read") ? () => allSuppliers(companyId) : null,
     [companyId],
   );
 
   const [search, setSearch] = useState("");
-  const [creating, setCreating] = useState<"LOCAL" | "FOREIGN" | null>(null);
+  const [creating, setCreating] = useState<"LOCAL" | "FOREIGN" | null>(fromDocument ? "LOCAL" : null);
   const [importing, setImporting] = useState(false);
   const [onlyDrafts, setOnlyDrafts] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -247,6 +258,7 @@ export default function Page() {
       {can("supplier:create") ? (
         creating === "LOCAL" ? (
           <CreateSupplier
+            initialRnc={fromDocument}
             onDone={() => {
               setCreating(null);
               reload();
@@ -361,5 +373,13 @@ export default function Page() {
         </table></div>
       )}
     </>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <Suppliers />
+    </Suspense>
   );
 }

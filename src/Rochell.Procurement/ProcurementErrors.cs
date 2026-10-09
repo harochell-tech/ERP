@@ -45,6 +45,15 @@ public static class ProcurementErrors
     public const string NothingToRepost = "NOTHING_TO_REPOST";
     public const string RepostRuleIncompatible = "REPOST_RULE_INCOMPATIBLE";
     public const string NotOrphanResidual = "NOT_AN_ORPHAN_RESIDUAL";
+    public const string SupplierDocumentNotFound = "SUPPLIER_DOCUMENT_NOT_FOUND";
+    public const string SupplierDocumentNotAnswerable = "SUPPLIER_DOCUMENT_NOT_ANSWERABLE";
+    public const string SupplierDocumentRejected = "SUPPLIER_DOCUMENT_REJECTED";
+    public const string SupplierDocumentPosted = "SUPPLIER_DOCUMENT_POSTED";
+    public const string SupplierDocumentQrInvalid = "SUPPLIER_DOCUMENT_QR_INVALID";
+    public const string SupplierDocumentNotOurs = "SUPPLIER_DOCUMENT_NOT_OURS";
+    public const string SupplierDocumentAlreadyInvoiced = "SUPPLIER_DOCUMENT_ALREADY_INVOICED";
+    public const string SupplierDocumentNotRegistrable = "SUPPLIER_DOCUMENT_NOT_REGISTRABLE";
+    public const string SupplierDocumentMismatch = "SUPPLIER_DOCUMENT_MISMATCH";
 }
 
 public static class PurchaseOrderStatus

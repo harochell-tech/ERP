@@ -835,3 +835,8 @@ label and permission, so links, Inicio counters and the journeys' `nav()` are un
 store (`localStorage` key `rochell.menu.favorites`, read through `useSyncExternalStore`, empty in the exported HTML). The star's
 accessible name is the generic «Favorito» (the item is in its `title`): a name holding the item's label would also answer the
 forms' `getByLabel("Proveedor")`. Tests: `tests/unit/menu.test.ts`, `e2e/menu-journey.spec.ts` (desktop and phone).
+
+## OCR1-03 — supplier documents (E-OCR1-03-1…10)
+
+Compras › Comprobantes recibidos and its detail, «Escanear QR» (`components/QrScan.tsx`, `jsqr`), «Pasar a factura» through `?documento=`
+on `/cxp/facturas/gasto/` and `/cxp/facturas/nueva/`, the supplier form opened with `?rnc=`, two Inicio counters: `supplier-documents.md`.
