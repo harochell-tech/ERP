@@ -24,7 +24,7 @@ test("the menu's groups, «Ir a…» and favourites (NAV-01)", async ({ browser 
   await expect(menu.getByRole("link", { name: "Períodos y cierre", exact: true })).toBeVisible();
 
   // E-NAV-12: typing finds the screen; Enter opens the first match.
-  const search = menu.getByRole("searchbox", { name: "Ir a una pantalla" });
+  const search = menu.getByRole("textbox", { name: "Ir a una pantalla" });
   await search.fill("BALANZA");
   await expect(menu.getByTestId("menu-search-results").getByRole("link")).toHaveCount(1);
   await search.press("Enter");
@@ -45,6 +45,7 @@ test("the menu's groups, «Ir a…» and favourites (NAV-01)", async ({ browser 
   await star.click();
   await expect(menu.getByTestId("menu-favorites").getByRole("link", { name: "Mayor", exact: true })).toBeVisible();
   await contador.reload();
+  await expect(contador.getByTestId("user-email")).toBeAttached(); // the shell is back before the menu is opened
   await openMenu();
   await expect(menu.getByTestId("menu-favorites").getByRole("link", { name: "Mayor", exact: true })).toBeVisible();
   await menu.getByRole("listitem").filter({ has: contador.getByRole("link", { name: "Mayor", exact: true }) }).getByRole("button", { name: "Favorito" }).click();

@@ -402,8 +402,8 @@ function SideMenu({
           </button>
         ) : null}
       </div>
+      {/* A text field, not a search box: the list pages keep the only searchbox role (the journeys find theirs by role). */}
       <form
-        role="search"
         className="menu-search"
         onSubmit={(e) => {
           e.preventDefault();
@@ -417,7 +417,8 @@ function SideMenu({
       >
         <input
           ref={searchRef}
-          type="search"
+          type="text"
+          enterKeyHint="go"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => {
