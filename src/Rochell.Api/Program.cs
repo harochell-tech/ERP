@@ -109,6 +109,7 @@ switch (settings.Ecf.Mode)
 {
     case EcfModes.Off:
         services.AddSingleton<IEcfProvider>(OffEcfProvider.Instance);
+        services.AddSingleton<IEcfReception>(OffEcfProvider.Instance);
         break;
     case EcfModes.Simulated:
         if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment(RochellEnvironments.Test))
@@ -118,11 +119,14 @@ switch (settings.Ecf.Mode)
 
         services.AddSingleton<SimulatedEcfProvider>();
         services.AddSingleton<IEcfProvider>(sp => sp.GetRequiredService<SimulatedEcfProvider>());
+        services.AddSingleton<IEcfReception>(sp => sp.GetRequiredService<SimulatedEcfProvider>());
         break;
     case EcfModes.Sandbox or EcfModes.Production:
         Required(settings.Ecf.BaseUrl, "Ecf:BaseUrl");
         Required(settings.Ecf.Token, "Ecf:Token");
-        services.AddHttpClient<IEcfProvider, AlanubeProvider>(client => client.Timeout = settings.Ecf.CallTimeout + TimeSpan.FromSeconds(5));
+        services.AddHttpClient<AlanubeProvider>(client => client.Timeout = settings.Ecf.CallTimeout + TimeSpan.FromSeconds(5));
+        services.AddTransient<IEcfProvider>(sp => sp.GetRequiredService<AlanubeProvider>());
+        services.AddTransient<IEcfReception>(sp => sp.GetRequiredService<AlanubeProvider>());
         break;
     default:
         throw new InvalidOperationException($"Ecf:Mode is OFF, SANDBOX, PRODUCTION or SIMULATED, not {settings.Ecf.Mode}.");
@@ -132,7 +136,13 @@ if (settings.Ecf.Enabled)
 {
     services.AddSingleton<EcfService>();
     services.AddHostedService(sp => sp.GetRequiredService<EcfService>());
+
+    // OCR1-02 (E-OCR1-01-9, E-OCR1-02-3): suppliers' e-CF read every hour, and the commercial responses sent.
+    services.AddSingleton<ReceivedDocumentsService>();
+    services.AddHostedService(sp => sp.GetRequiredService<ReceivedDocumentsService>());
 }
+
+services.AddSingleton<ReceptionNudge>();
 
 // MFG2-02 (E-MFG2-1): the machines' portal, read every 15 min when configured; its key is a file on the server.
 services.AddSingleton(settings.Portal);

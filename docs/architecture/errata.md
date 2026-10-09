@@ -1442,6 +1442,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-OCR1-01-8 | OCR1-01 | `supplier_document:capture` (capture, scan, upload, pass to an invoice) for Cuentas por pagar; `supplier_document:respond` (accept / reject to the DGII, step-up) for Cuentas por pagar and the Contador. Reading uses `supplier_invoice:read`, which the Contador role gains to see what it answers. |
 | E-OCR1-01-9 | OCR1-01 | Received documents are read every hour as the daily process, only while the gateway is not Off: the first time the last 30 days, then from the last good reading less one day. |
 | E-OCR1-01-10 | OCR1-01 | OCR model: Claude Sonnet 5.5 through Anthropic's API; the key in `secrets/ocr/anthropic-key` on the server; a simulated reader in tests and in the local stack (OCR1-04). |
+| E-OCR1-02-1 | OCR1-02 | The hourly reading runs with `ecf:process`, which the daily process already holds; no new permission. Approved 2026-10-09. |
+| E-OCR1-02-2 | OCR1-02 | Every received document is read, also those answered in Alanube's portal (the inbox shows the real answer). Those Alanube marks «not received» (invalid XML) are shown with the error and cannot become an invoice. |
+| E-OCR1-02-3 | OCR1-02 | The response is kept in Core at once and the worker sends it to Alanube at the next pass, retried at each pass until Alanube takes it; unsent after 24 hours it is flagged in the inbox and on Inicio. |
+| E-OCR1-02-4 | OCR1-02 | Posting the invoice accepts its e-CF on behalf of whoever posts, if nobody answered it. An invoice whose e-CF was rejected before the DGII cannot be posted. |
+| E-OCR1-02-5 | OCR1-02 | The document goes to the ACTIVE supplier with that RNC; with several, none is chosen and the person picks (the RNC is unique per company, so this cannot happen today). |
+| E-OCR1-02-6 | OCR1-02 | An e-CF in USD: Core takes the XML's amounts in pesos; the other currency's amounts are information only. |
+| E-OCR1-02-7 | OCR1-02 | Alanube's webhook brings the reading forward, through the same address and secret as VS#4's webhook. |
+| E-OCR1-02-8 | OCR1-02 | When the XML arrives after the QR or the photo, its header and lines replace what was read and the «leído por IA» marks go; if the XML's total differs from the QR's it is flagged in red. |
+| E-OCR1-02-9 | OCR1-02 | A voided or reversed invoice returns its document to the inbox to be registered again; an acceptance already given to the DGII stays. |
+| E-OCR1-02-10 | OCR1-02 | The simulated Alanube of the local stack and the tests also produces received documents. |
 
 Implementation rules derived from the above (no architectural change):
 

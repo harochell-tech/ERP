@@ -27,6 +27,9 @@ public sealed class EcfSettings
     /// <summary>E-VS4-02-1: how often the worker takes the queue.</summary>
     public TimeSpan Interval { get; set; } = TimeSpan.FromSeconds(15);
 
+    /// <summary>E-OCR1-01-9: how often the received documents are read (a webhook brings it forward).</summary>
+    public TimeSpan ReceptionInterval { get; set; } = TimeSpan.FromHours(1);
+
     /// <summary>E-VS4-02-3: a call that takes longer has an unknown outcome.</summary>
     public TimeSpan CallTimeout { get; set; } = TimeSpan.FromSeconds(30);
 

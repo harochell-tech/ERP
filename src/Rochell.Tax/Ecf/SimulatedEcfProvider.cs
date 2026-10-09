@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Security;
 using System.Text;
 using System.Text.Json.Nodes;
 
@@ -16,11 +17,13 @@ namespace Rochell.Tax.Ecf;
 /// <item><c>[SIM:SLOW]</c> — waits for the DGII three queries before accepting;</item>
 /// <item><c>[SIM:INVALID]</c> — refused as a data error.</item>
 /// </list>
-/// <see cref="Down"/> makes every call fail as if Alanube did not answer (contingency).
+/// <see cref="Down"/> makes every call fail as if Alanube did not answer (contingency). OCR1-02 (E-OCR1-02-10): suppliers' e-CF are
+/// added with <see cref="AddReceived"/> and listed, read and answered as Alanube does.
 /// </summary>
-public sealed class SimulatedEcfProvider : IEcfProvider
+public sealed class SimulatedEcfProvider : IEcfProvider, IEcfReception
 {
     private readonly ConcurrentDictionary<string, Entry> _byEncf = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ReceivedDocument> _received = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _encfById = new(StringComparer.Ordinal);
     private int _sequence;
 
@@ -123,6 +126,104 @@ public sealed class SimulatedEcfProvider : IEcfProvider
 
     public Task<byte[]?> DownloadAsync(string url, CancellationToken cancellationToken)
         => Task.FromResult<byte[]?>(Down ? null : Encoding.UTF8.GetBytes($"simulated {url}"));
+
+    /// <summary>The commercial responses received, for the tests.</summary>
+    public List<(string Id, bool Accept, string? Reason)> Responses { get; } = [];
+
+    /// <summary>E-OCR1-02-10: a supplier's e-CF arrives (<paramref name="xml"/> is the e-CF itself, see <see cref="SampleXml"/>).</summary>
+    public ReceivedDocument AddReceived(
+        string issuerRnc, string buyerRnc, string encf, DateTimeOffset signed, string totalAmount, string xml, string status = ReceivedStatuses.Received,
+        string commercialResponse = ReceivedStatuses.NotDeclared)
+    {
+        ArgumentNullException.ThrowIfNull(encf);
+        var document = new ReceivedDocument(
+            NewId(), issuerRnc, buyerRnc, encf.Substring(1, 2), encf, status, status == ReceivedStatuses.Received ? null : "Simulado: firma inválida.", commercialResponse, signed,
+            totalAmount, xml);
+        _received[document.Id] = document;
+        return document;
+    }
+
+    public Task<ReceivedListOutcome> ListReceivedAsync(ReceivedListRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (Down)
+        {
+            return Task.FromResult(new ReceivedListOutcome(false, null, [], null, "Simulated: Alanube does not answer."));
+        }
+
+        var page = _received.Values
+            .Where(d => d.Status == request.Status && d.CommercialResponse == request.CommercialResponse)
+            .Where(d => d.SignatureDate is { } at && DateOnly.FromDateTime(at.UtcDateTime) >= request.Start && DateOnly.FromDateTime(at.UtcDateTime) <= request.End)
+            .OrderByDescending(d => d.SignatureDate).ThenBy(d => d.Id, StringComparer.Ordinal)
+            .Skip((request.Page - 1) * request.Limit).Take(request.Limit)
+            .Select(d => d with { Xml = null })
+            .ToList();
+        return Task.FromResult(new ReceivedListOutcome(true, 200, page, null, null));
+    }
+
+    public Task<ReceivedGetOutcome> GetReceivedAsync(string providerId, CancellationToken cancellationToken)
+        => Task.FromResult(
+            Down ? new ReceivedGetOutcome(QueryKind.Transient, null, null, null, "Simulated: Alanube does not answer.")
+            : _received.TryGetValue(providerId, out var document) ? new ReceivedGetOutcome(QueryKind.Found, 200, document, null, null)
+            : new ReceivedGetOutcome(QueryKind.NotFound, 404, null, "AP3009", "Simulated: not found."));
+
+    public Task<SubmitOutcome> RespondAsync(string providerId, bool accept, string? reason, CancellationToken cancellationToken)
+    {
+        if (Down)
+        {
+            return Task.FromResult(new SubmitOutcome(SubmitKind.Transient, null, null, null, null, "Simulated: Alanube does not answer."));
+        }
+
+        if (!_received.TryGetValue(providerId, out var document))
+        {
+            return Task.FromResult(new SubmitOutcome(SubmitKind.Invalid, 404, null, null, "AP3009", "Simulated: not found."));
+        }
+
+        if (document.CommercialResponse != ReceivedStatuses.NotDeclared)
+        {
+            return Task.FromResult(new SubmitOutcome(SubmitKind.Invalid, 400, null, null, "AP3020", "Simulated: the document was already answered."));
+        }
+
+        Responses.Add((providerId, accept, reason));
+        _received[providerId] = document with { CommercialResponse = accept ? ReceivedStatuses.Accepted : ReceivedStatuses.Rejected };
+        return Task.FromResult(new SubmitOutcome(SubmitKind.Registered, 200, NewId(), null, null, null));
+    }
+
+    /// <summary>
+    /// A received e-CF in the DGII's XML format, with what Core reads: issuer, buyer, e-NCF, date, lines (code, name, quantity, unit,
+    /// unit price, amount, billing indicator 1 taxed / 4 exempt), taxed amount, ITBIS, total, signature date and value. Amounts are
+    /// the caller's invariant text.
+    /// </summary>
+    public static string SampleXml(
+        string issuerRnc, string issuerName, string buyerRnc, string encf, DateOnly issued, DateTime signedLocal,
+        IReadOnlyList<(string Name, string Quantity, string UnitPrice, string Amount, bool Taxed)> lines, string taxedAmount, string itbis, string total)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        ArgumentNullException.ThrowIfNull(encf);
+        var items = new StringBuilder();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var l = lines[i];
+            items.Append(CultureInfo.InvariantCulture, $"<Item><NumeroLinea>{i + 1}</NumeroLinea>")
+                .Append(CultureInfo.InvariantCulture, $"<TablaCodigosItem><CodigosItem><TipoCodigo>INTERNA</TipoCodigo><CodigoItem>P{i + 1}</CodigoItem></CodigosItem></TablaCodigosItem>")
+                .Append(CultureInfo.InvariantCulture, $"<IndicadorFacturacion>{(l.Taxed ? 1 : 4)}</IndicadorFacturacion><NombreItem>{SecurityElement.Escape(l.Name)}</NombreItem>")
+                .Append(CultureInfo.InvariantCulture, $"<IndicadorBienoServicio>1</IndicadorBienoServicio><CantidadItem>{l.Quantity}</CantidadItem><UnidadMedida>43</UnidadMedida>")
+                .Append(CultureInfo.InvariantCulture, $"<PrecioUnitarioItem>{l.UnitPrice}</PrecioUnitarioItem><MontoItem>{l.Amount}</MontoItem></Item>");
+        }
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <ECF><Encabezado><Version>1.0</Version><IdDoc><TipoeCF>{encf.Substring(1, 2)}</TipoeCF><eNCF>{encf}</eNCF></IdDoc>
+            <Emisor><RNCEmisor>{issuerRnc}</RNCEmisor><RazonSocialEmisor>{SecurityElement.Escape(issuerName)}</RazonSocialEmisor><FechaEmision>{issued:dd-MM-yyyy}</FechaEmision></Emisor>
+            <Comprador><RNCComprador>{buyerRnc}</RNCComprador></Comprador>
+            <Totales><MontoGravadoTotal>{taxedAmount}</MontoGravadoTotal><TotalITBIS>{itbis}</TotalITBIS><MontoTotal>{total}</MontoTotal></Totales></Encabezado>
+            <DetallesItems>{items}</DetallesItems>
+            <FechaHoraFirma>{signedLocal:dd-MM-yyyy HH:mm:ss}</FechaHoraFirma>
+            <Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignatureValue>SIMxyzABCDEF0123</SignatureValue></Signature></ECF>
+            """);
+    }
 
     private string NewId()
     {
