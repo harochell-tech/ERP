@@ -19,11 +19,15 @@ public sealed class LedgerMaintenanceTests(PostgresFixture postgres)
     private static string Account(string code) =>
         $"(SELECT coalesce(sum(e.debit - e.credit), 0) FROM fin.gl_entry e JOIN fin.account a USING (account_id) WHERE a.code = '{code}')";
 
-    /// <summary>Moves GRNI from its current account to a new one from today: the "wrong mapping" of AT-06 gets fixed.</summary>
-    private static async Task RemapGrniAsync(TestHarness h)
+    /// <summary>
+    /// Moves GRNI from its current account to a new one from the receipt's business date: the "wrong mapping" of AT-06 gets fixed.
+    /// The receipt is dated five minutes back, so just after midnight in Santo Domingo its date is yesterday, not today.
+    /// </summary>
+    private static async Task RemapGrniAsync(TestHarness h, Guid postingEvent)
     {
-        await h.AdminRequireAsync($"UPDATE fin.account_role_map SET effective_to = '{Today(h):yyyy-MM-dd}' WHERE account_role = 'GRNI' AND status = 'ACTIVE'");
-        await h.CreateActiveMapAsync("GRNI", await h.CreateAccountAsync("2106", "Recibido no facturado (correcta)", isControl: false), from: Today(h));
+        var from = DateOnly.FromDateTime(await h.ScalarAsync<DateTime>("SELECT business_date FROM core.domain_event WHERE event_id = @e", ("e", postingEvent)));
+        await h.AdminRequireAsync($"UPDATE fin.account_role_map SET effective_to = '{from:yyyy-MM-dd}' WHERE account_role = 'GRNI' AND status = 'ACTIVE'");
+        await h.CreateActiveMapAsync("GRNI", await h.CreateAccountAsync("2106", "Recibido no facturado (correcta)", isControl: false), from: from);
     }
 
     private static Task<CommandResult> Repost(TestHarness h, Guid session, Guid sourceEvent, string rule, string key)
@@ -37,7 +41,7 @@ public sealed class LedgerMaintenanceTests(PostgresFixture postgres)
         var s = await h.CreateInvoicingSetupAsync();                 // receipt 6 t × 1 500 on GRNI account 2105
         await h.EnableReallocationAsync();
         var postingEvent = await h.ScalarAsync<Guid>("SELECT posting_event_id FROM pur.goods_receipt");
-        await RemapGrniAsync(h);
+        await RemapGrniAsync(h, postingEvent);
 
         var result = JsonDocument.Parse((await Repost(h, s.Purchasing.Controller, postingEvent, "R-01", "repost")).ResultPayload).RootElement;
 
