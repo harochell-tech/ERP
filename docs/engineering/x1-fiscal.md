@@ -32,7 +32,8 @@ AR-REC while CONTRACT-ASSET has blocking errors. 300 commands, 156 permissions.
 
 - `pur.expense_category.isr_withholding_type` (606 ISR types 1–9): set when preparing or correcting a draft, or by the Controller on an
   approved category with `SetExpenseCategoryIsrType` (`expense_category:approve`, step-up; proposed as E-X1-02-5, to be ratified). An
-  ISR withholding rule that names a type withholds only on the lines of categories of that type (inventory lines have none).
+  ISR withholding rule that names a type withholds only on the expense lines of categories of that type; inventory lines, which have
+  no category, follow the rule's `applies_to` as before.
 - A withholding rule may carry `document_series` (`["B"]`, `["E"]`); the engine gets the series from the supplier's fiscal number
   (`B…` / `E` + 12) and leaves out the rule when it does not match (NG 02-2026: the 30 % to companies on B-series only). Previews,
   without a number, withhold as before. The determination records the series and each line's ISR type.

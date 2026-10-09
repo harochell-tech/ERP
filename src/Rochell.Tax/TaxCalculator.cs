@@ -64,7 +64,7 @@ public static class TaxCalculator
     }
 
     /// <summary>
-    /// E-X1-02-1: an ISR withholding naming a 606 type withholds only on lines of categories of that type; E-X1-02-3: one naming document
+    /// E-X1-02-1: an ISR withholding naming a 606 type withholds only on expense lines of categories of that type; E-X1-02-3: one naming document
     /// series only on invoices of those series (unknown series, as in a preview, withholds).
     /// </summary>
     public static DeterminedTax? Withholding(ApplicableRule rule, TaxableLine line, string partyTaxType, decimal itbisAmount, string? documentSeries = null)
@@ -76,7 +76,8 @@ public static class TaxCalculator
             return null;
         }
 
-        if (rule.Definition.IsrWithholdingType is { } type && line.IsrWithholdingType != type)
+        // Inventory lines have no category: their withholdings follow the rule's applies_to, as before.
+        if (rule.Definition.IsrWithholdingType is { } type && line.Scope != TaxLineScopes.Inventory && line.IsrWithholdingType != type)
         {
             return null;
         }
