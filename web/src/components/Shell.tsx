@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { actAs, loginUrl, logout, query, stopActingAs } from "@/api/client";
 import { ErrorBox } from "./ui";
@@ -10,6 +10,7 @@ import { useSession } from "@/lib/session";
 import { identityLabel, showIdentitySelector, type TestIdentityOption } from "@/lib/identities";
 import { environmentBadge, type EnvironmentBadge } from "@/lib/environment";
 import { ROLES } from "@/lib/labels";
+import { favoritesStore, saveFavorites, searchMenu, toggleFavorite } from "@/lib/menu";
 
 interface NavItem {
   href: string;
@@ -24,56 +25,50 @@ interface NavGroup {
 
 // E-UI-1 / E-PR18b-8: a side menu grouped by area; an item shows only with its read permission, a group only with a visible item.
 // Journals are reached from the documents' "ver asientos" links; Auditoría and Seguridad came with UI-01.
+// NAV-01 (E-NAV-1…11): the groups follow the business — sell, dispatch, bill and collect, buy, store, produce, test, pay, account,
+// report to the DGII, administer, configure; each catalogue sits with the work that uses it. Only the menu moved: routes stay.
 export const NAV: readonly NavGroup[] = [
-  {
-    title: "Maestros",
-    items: [
-      { href: "/maestros/proveedores/", label: "Proveedores", permission: "master_data:read" },
-      { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
-      { href: "/maestros/cuentas-bancarias/", label: "Cuentas bancarias de la empresa", permission: "bank:read" },
-      { href: "/maestros/productos-terminados/", label: "Productos terminados", permission: "master_data:read" },
-      { href: "/maestros/costos-estandar/", label: "Costos estándar", permission: "sales:read" },
-      { href: "/maestros/precios/", label: "Listas de precios", permission: "sales:read" }, // PRS-05 (E-PRS-05-1)
-      { href: "/maestros/zonas/", label: "Zonas de entrega", permission: "sales:read" }, // PRS-05 (E-PRS-05-2)
-      { href: "/maestros/flota/", label: "Vehículos y choferes", permission: "sales:read" },
-      { href: "/maestros/categorias-gasto/", label: "Categorías de gasto", permission: "master_data:read" }, // GAS1-07 (E-GAS-07-1)
-      { href: "/maestros/padron-rnc/", label: "Padrón RNC (DGII)", permission: "rnc:read" },
-    ],
-  },
   {
     title: "Ventas",
     items: [
+      { href: "/ventas/clientes/", label: "Clientes", permission: "sales:read" },
       { href: "/ventas/cotizaciones/", label: "Cotizaciones", permission: "sales:read" }, // QUO1-04 (E-QUO1-04-1)
       { href: "/ventas/pedidos/", label: "Pedidos", permission: "sales:read" },
       { href: "/ventas/contado/", label: "Venta de contado", permission: "cash_sale:create" }, // CF1-05 (E-CF1-05-1)
-      { href: "/ventas/clientes/", label: "Clientes", permission: "sales:read" },
-      { href: "/ventas/antiguedad/", label: "Cuentas por cobrar por antigüedad", permission: "sales:read" },
-      { href: "/ventas/estado-de-cuenta/", label: "Estado de cuenta", permission: "sales:read" },
+      { href: "/maestros/precios/", label: "Listas de precios", permission: "sales:read" }, // PRS-05 (E-PRS-05-1)
+      { href: "/maestros/zonas/", label: "Zonas de entrega", permission: "sales:read" }, // PRS-05 (E-PRS-05-2)
     ],
   },
-  { title: "Despacho", items: [{ href: "/despacho/tablero/", label: "Tablero de despacho", permission: "sales:read" }] },
   {
-    title: "Facturación",
+    title: "Despacho",
+    items: [
+      { href: "/despacho/tablero/", label: "Tablero de despacho", permission: "sales:read" },
+      { href: "/maestros/flota/", label: "Vehículos y choferes", permission: "sales:read" },
+    ],
+  },
+  {
+    title: "Facturación y cobros",
     items: [
       { href: "/facturacion/por-facturar/", label: "Por facturar", permission: "sales:read" },
       { href: "/facturacion/proformas/", label: "Proformas", permission: "sales:read" }, // FIS1b-07 (E-FIS1b-9)
       { href: "/facturacion/facturas/", label: "Facturas", permission: "sales:read" },
       { href: "/facturacion/notas/", label: "Notas de crédito", permission: "sales:read" },
-    ],
-  },
-  {
-    title: "Cobros",
-    items: [
       { href: "/cobros/recibos/", label: "Recibos", permission: "sales:read" },
       { href: "/cobros/depositos/", label: "Depósitos", permission: "sales:read" },
+      { href: "/ventas/estado-de-cuenta/", label: "Estado de cuenta", permission: "sales:read" },
+      { href: "/ventas/antiguedad/", label: "Cuentas por cobrar por antigüedad", permission: "sales:read" },
     ],
   },
   {
     title: "Compras",
     items: [
+      { href: "/maestros/proveedores/", label: "Proveedores", permission: "master_data:read" },
       { href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" },
+      { href: "/cxp/facturas/", label: "Facturas de proveedor", permission: "supplier_invoice:read" },
       { href: "/compras/dua/", label: "DUA (aduana)", permission: "supplier_invoice:read" }, // USD1-07a (E-USD1-07-4)
       { href: "/compras/liquidaciones/", label: "Liquidaciones de importación", permission: "supplier_invoice:read" },
+      { href: "/cxp/antiguedad/", label: "Antigüedad de CxP", permission: "payment:read" },
+      { href: "/maestros/categorias-gasto/", label: "Categorías de gasto", permission: "master_data:read" }, // GAS1-07 (E-GAS-07-1)
     ],
   },
   {
@@ -82,19 +77,22 @@ export const NAV: readonly NavGroup[] = [
       { href: "/almacen/por-recibir/", label: "Por recibir", permission: "goods_receipt:post" }, // UX3-02 (E-UX3-5)
       { href: "/almacen/recepciones/", label: "Recepciones", permission: "goods_receipt:read" },
       { href: "/almacen/correcciones/", label: "Correcciones", permission: "goods_receipt:read" },
+      { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
+      { href: "/maestros/productos-terminados/", label: "Productos terminados", permission: "master_data:read" },
     ],
   },
   {
-    // MFG1-07 (E-MFG1-07-1)
+    // MFG1-07 (E-MFG1-07-1); NAV-01 (E-NAV-7): the day's work first, then its set-up.
     title: "Producción",
     items: [
       { href: "/produccion/dia/", label: "Producción del día", permission: "production:read" },
       { href: "/produccion/lotes/", label: "Curado y liberación", permission: "production:read" },
-      { href: "/produccion/recetas/", label: "Recetas", permission: "production:read" },
-      { href: "/produccion/maquinas/", label: "Máquinas y turnos", permission: "production:read" },
       { href: "/produccion/portal/", label: "Portal de máquinas", permission: "production:read" }, // MFG2-03
       { href: "/produccion/eficiencia/", label: "Eficiencia", permission: "production:read" }, // MFG3-04
       { href: "/produccion/mantenimiento/", label: "Mantenimiento preventivo", permission: "production:read" },
+      { href: "/produccion/recetas/", label: "Recetas", permission: "production:read" },
+      { href: "/produccion/maquinas/", label: "Máquinas y turnos", permission: "production:read" },
+      { href: "/maestros/costos-estandar/", label: "Costos estándar", permission: "sales:read" },
       { href: "/produccion/costos/", label: "Costos de producción", permission: "production:read" },
     ],
   },
@@ -108,13 +106,6 @@ export const NAV: readonly NavGroup[] = [
     ],
   },
   {
-    title: "Cuentas por pagar",
-    items: [
-      { href: "/cxp/facturas/", label: "Facturas de proveedor", permission: "supplier_invoice:read" },
-      { href: "/cxp/antiguedad/", label: "Antigüedad de CxP", permission: "payment:read" },
-    ],
-  },
-  {
     title: "Tesorería",
     items: [
       { href: "/tesoreria/propuesta/", label: "Propuesta de pago", permission: "payment:read" },
@@ -122,49 +113,41 @@ export const NAV: readonly NavGroup[] = [
       { href: "/tesoreria/transferencias/", label: "Transferencias entre cuentas", permission: "payment:read" }, // USD1-07b (E-USD1-07-5)
       { href: "/tesoreria/extractos/", label: "Extractos bancarios", permission: "bank:read" },
       { href: "/tesoreria/conciliacion/", label: "Conciliación bancaria", permission: "bank:read" },
+      { href: "/maestros/cuentas-bancarias/", label: "Cuentas bancarias de la empresa", permission: "bank:read" },
+      { href: "/contabilidad/tasas/", label: "Tasas de cambio", permission: "exchange_rate:read" }, // USD1-07a (E-USD1-07-1)
     ],
   },
   {
     title: "Contabilidad",
     items: [
       { href: "/contabilidad/ajustes/", label: "Diario de ajustes", permission: "ledger:read" },
-      { href: "/contabilidad/tasas/", label: "Tasas de cambio", permission: "exchange_rate:read" }, // USD1-07a (E-USD1-07-1)
-      { href: "/contabilidad/revaluacion/", label: "Revaluación de saldos en dólares", permission: "exchange_rate:read" }, // USD1-07b (E-USD1-07-6)
       { href: "/contabilidad/activos/", label: "Activos fijos", permission: "ledger:read" }, // AF1-05 (E-AF1-05-1)
+      { href: "/contabilidad/revaluacion/", label: "Revaluación de saldos en dólares", permission: "exchange_rate:read" }, // USD1-07b (E-USD1-07-6)
       { href: "/contabilidad/balanza/", label: "Balanza", permission: "ledger:read" },
       { href: "/contabilidad/mayor/", label: "Mayor", permission: "ledger:read" },
       { href: "/contabilidad/estados/", label: "Estados financieros", permission: "ledger:read" },
-      { href: "/contabilidad/apertura/", label: "Apertura de inventario", permission: "configuration:read" },
-    ],
-  },
-  {
-    title: "Fiscal",
-    items: [
-      { href: "/fiscal/autorizaciones/", label: "Autorizaciones fiscales", permission: "sales:read" }, // FIS1-05 (E-FIS1-05-1)
-      { href: "/fiscal/ecf/", label: "e-CF", permission: "sales:read" }, // VS4-04 (E-VS4-04-2)
-      { href: "/fiscal/rangos/", label: "Rangos e-NCF", permission: "fiscal_report:read" }, // VS4-04 (E-VS4-04-1)
-      { href: "/fiscal/reportes/", label: "Reportes fiscales", permission: "fiscal_report:read" }, // FIS2-03 (E-FIS2-03-1)
-    ],
-  },
-  {
-    title: "Cierre",
-    items: [
       { href: "/cierre/periodos/", label: "Períodos y cierre", permission: "period:read" },
       { href: "/cierre/conciliaciones/", label: "Conciliaciones", permission: "reconciliation:read" },
     ],
   },
   {
-    title: "Auditoría",
+    title: "Fiscal",
     items: [
-      { href: "/auditoria/verificar/", label: "Verificar integridad", permission: "hash:verify" },
-      { href: "/auditoria/digests/", label: "Respaldos diarios inalterables", permission: "audit:read" },
+      { href: "/fiscal/ecf/", label: "e-CF", permission: "sales:read" }, // VS4-04 (E-VS4-04-2)
+      { href: "/fiscal/rangos/", label: "Rangos e-NCF", permission: "fiscal_report:read" }, // VS4-04 (E-VS4-04-1)
+      { href: "/fiscal/autorizaciones/", label: "Autorizaciones fiscales", permission: "sales:read" }, // FIS1-05 (E-FIS1-05-1)
+      { href: "/fiscal/reportes/", label: "Reportes fiscales", permission: "fiscal_report:read" }, // FIS2-03 (E-FIS2-03-1)
+      { href: "/maestros/padron-rnc/", label: "Padrón RNC (DGII)", permission: "rnc:read" },
     ],
   },
   {
-    title: "Seguridad",
+    // NAV-01 (E-NAV-11): Auditoría and Seguridad together.
+    title: "Administración",
     items: [
       { href: "/seguridad/usuarios/", label: "Usuarios y roles", permission: "iam:read" },
       { href: "/seguridad/solicitudes/", label: "Solicitudes de rol", permission: "iam:read" },
+      { href: "/auditoria/verificar/", label: "Verificar integridad", permission: "hash:verify" },
+      { href: "/auditoria/digests/", label: "Respaldos diarios inalterables", permission: "audit:read" },
     ],
   },
   {
@@ -175,6 +158,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/configuracion/empresa/", label: "Empresa", permission: "configuration:read" },
       { href: "/configuracion/formatos/", label: "Formatos de impresión", permission: "configuration:read" }, // PRT-02
       { href: "/maestros/plantas/", label: "Plantas y ubicaciones", permission: "master_data:read" },
+      { href: "/contabilidad/apertura/", label: "Apertura de inventario", permission: "configuration:read" }, // NAV-01 (E-NAV-11): once
       { href: "/contabilidad/cuentas/", label: "Catálogo de cuentas", permission: "configuration:read" },
       { href: "/contabilidad/estructuras/", label: "Estructuras de reporte", permission: "configuration:read" },
       { href: "/contabilidad/mapas/", label: "Cuentas por rol", permission: "configuration:read" }, // UX4-03 (G-13)
@@ -309,6 +293,52 @@ function SideMenu({
 
   const toggle = (title: string) => setOpened({ path: pathname, group: openGroup === title ? null : title });
 
+  // NAV-01 (E-NAV-12): «Ir a…» finds a screen among the visible ones; Ctrl+K (⌘K) jumps to it, Enter opens the first match.
+  const router = useRouter();
+  const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const visible = NAV.flatMap((g) => g.items.filter((item) => can(item.permission)).map((item) => ({ ...item, group: g.title })));
+  const found = searchMenu(visible, search);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" && !mobile) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobile]);
+
+  // NAV-01 (E-NAV-13): favourites kept in this browser (none in the exported HTML).
+  const favorites = useSyncExternalStore(favoritesStore.subscribe, favoritesStore.snapshot, favoritesStore.serverSnapshot);
+  const flip = (href: string) => saveFavorites(toggleFavorite(favorites, href));
+  const favoriteItems = favorites.flatMap((href) => visible.filter((item) => item.href === href));
+  const link = (item: NavItem, star: boolean) => {
+    const active = isActive(pathname, item.href);
+    const favorite = favorites.includes(item.href);
+    return (
+      <li key={item.href} className="menu-item">
+        <Link href={item.href} className={active ? "active" : undefined} aria-current={active ? "page" : undefined}>
+          {item.label}
+        </Link>
+        {star ? (
+          <button
+            type="button"
+            className={`menu-star${favorite ? " on" : ""}`}
+            aria-pressed={favorite}
+            title={favorite ? `Quitar ${item.label} de favoritos` : `Agregar ${item.label} a favoritos`}
+            onClick={() => flip(item.href)}
+          >
+            {/* The name stays generic: a label holding the item's name would answer the forms' getByLabel("Proveedor"). */}
+            <span aria-hidden="true">{favorite ? "★" : "☆"}</span>
+            <span className="sr-only">Favorito</span>
+          </button>
+        ) : null}
+      </li>
+    );
+  };
+
   // The open panel keeps the focus inside (Tab cycles), Escape closes it.
   useEffect(() => {
     if (!mobile || !open) {
@@ -372,16 +402,71 @@ function SideMenu({
           </button>
         ) : null}
       </div>
-      <ul>
+      {/* A text field, not a search box: the list pages keep the only searchbox role (the journeys find theirs by role). */}
+      <form
+        className="menu-search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const first = found[0];
+          if (first) {
+            setSearch("");
+            onClose();
+            router.push(first.href);
+          }
+        }}
+      >
+        <input
+          ref={searchRef}
+          type="text"
+          enterKeyHint="go"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && search) {
+              e.stopPropagation();
+              setSearch("");
+            }
+          }}
+          placeholder={mobile ? "Ir a…" : "Ir a… (Ctrl+K)"}
+          aria-label="Ir a una pantalla"
+          autoComplete="off"
+        />
+      </form>
+      {search.trim() ? (
+        <div className="menu-group" data-testid="menu-search-results">
+          <h2>Resultados</h2>
+          {found.length === 0 ? (
+            <p className="menu-empty">Ninguna pantalla con «{search.trim()}».</p>
+          ) : (
+            <ul>
+              {found.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href} onClick={() => setSearch("")}>
+                    {item.label}
+                    <span className="menu-hint">{item.group}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+      <ul hidden={Boolean(search.trim())}>
         <li>
           <Link href="/" className={pathname === "/" ? "active" : undefined}>
             Inicio
           </Link>
         </li>
       </ul>
+      {!search.trim() && favoriteItems.length > 0 ? (
+        <div className="menu-group" data-testid="menu-favorites">
+          <h2>Favoritos</h2>
+          <ul>{favoriteItems.map((item) => link(item, false))}</ul>
+        </div>
+      ) : null}
       {NAV.map((group) => {
         const items = group.items.filter((item) => can(item.permission));
-        if (items.length === 0) {
+        if (items.length === 0 || search.trim()) {
           return null;
         }
         const folded = openGroup !== group.title;
@@ -397,13 +482,7 @@ function SideMenu({
               </button>
             </h2>
             <ul id={listId} hidden={folded}>
-              {items.map((item) => (
-                <li key={item.href}>
-                  <Link href={item.href} className={isActive(pathname, item.href) ? "active" : undefined} aria-current={isActive(pathname, item.href) ? "page" : undefined}>
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
+              {items.map((item) => link(item, true))}
             </ul>
           </div>
         );
