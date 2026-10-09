@@ -1424,6 +1424,14 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-NAV-11 | NAV-01 | Auditoría and Seguridad become Administración (Usuarios y roles, Solicitudes de rol, Verificar integridad, Respaldos diarios inalterables); Apertura de inventario moves to Configuración (used once). |
 | E-NAV-12 | NAV-01 | «Ir a…» search at the top of the menu (Ctrl+K / ⌘K on a computer): finds the screens the user may see by label or group, ignoring case and accents; Enter opens the first match. |
 | E-NAV-13 | NAV-01 | Favourites: a star on each menu item keeps it under «Favoritos» at the top, in this browser only (localStorage); nothing is stored on the server. |
+| E-OCR-1 | OCR-1 | Supplier invoices stop being typed from scratch. Three sources, in this order: e-CF received through Alanube, the QR of a printed e-CF, a photo or scan read by AI (OCR). Each source only prepares a **draft** that a person reviews and approves; nothing is registered or posted on its own. Approved 2026-10-09. |
+| E-OCR-2 | OCR-1 | Core polls Alanube's received documents every hour and prepares a draft from each one's XML. New inbox: Compras › Comprobantes recibidos. |
+| E-OCR-3 | OCR-1 | The commercial response to the DGII (accept / reject) is given from that inbox: registering the invoice accepts it; rejecting needs a reason. |
+| E-OCR-4 | OCR-1 | «Escanear QR» on phone and computer reads the printed e-CF's QR, fills the header (supplier RNC, e-NCF, date, total, security code) and links the received XML when it has already arrived. |
+| E-OCR-5 | OCR-1 | OCR sends only the invoice's image to an external service (Anthropic's API). The API key lives on the server, never in git. A switch Off / On, like the mail mode. |
+| E-OCR-6 | OCR-1 | Every field the AI read is marked «leído por IA»; lines that do not add up, an NCF of the wrong format or an RNC missing from the registry are flagged in red. Nothing is approved without a person's review. |
+| E-OCR-7 | OCR-1 | The photo or scan is kept in the private B2 bucket (the evidence store of ENT-1) and can be opened from the invoice. |
+| E-OCR-8 | OCR-1 | Order: received e-CF and QR first (no cost, useful from 2026-11-01); OCR afterwards. |
 
 Implementation rules derived from the above (no architectural change):
 
