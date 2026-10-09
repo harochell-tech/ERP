@@ -406,6 +406,7 @@ public sealed class VoidSupplierInvoiceHandler : ICommandHandler<VoidSupplierInv
             cancellationToken,
             reason,
             ", accounting_status = 'NOT_POSTED'").ConfigureAwait(false);
+        await SupplierDocuments.SupplierDocumentLinks.ReleaseAsync(context, header.Id, CommandType, reason, cancellationToken).ConfigureAwait(false); // E-OCR1-02-9
         return JsonSerializer.Serialize(new { supplierInvoiceId = header.Id, status = SupplierInvoiceStatus.Voided, version });
     }
 }

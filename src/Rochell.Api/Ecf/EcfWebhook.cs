@@ -12,8 +12,8 @@ namespace Rochell.Api.Ecf;
 
 /// <summary>
 /// E-VS4-02-5: Alanube's webhook. Only a request carrying our secret in <see cref="EcfModes.WebhookHeader"/> counts; its content is
-/// never believed — at most it names the e-CF (Alanube's id) whose status query is moved forward, else every e-CF in flight is. It
-/// changes nothing by itself. Exempt from the anti-CSRF header (it has its own secret, and no session).
+/// never believed — at most it names the e-CF (Alanube's id) whose status query is moved forward, else every e-CF in flight is; the next
+/// reading of received documents is brought forward too (E-OCR1-02-7). It changes nothing by itself. Exempt from the anti-CSRF header (it has its own secret, and no session).
 /// </summary>
 public static class EcfWebhook
 {
@@ -30,8 +30,8 @@ public static class EcfWebhook
             .Produces(StatusCodes.Status404NotFound);
 
     private static async Task<IResult> HandleAsync(
-        HttpContext http, EcfSettings settings, AppDatabase database, SessionService sessions, CommandPipeline pipeline, NudgeEcfDocumentsHandler handler, ILoggerFactory loggers,
-        CancellationToken cancellationToken)
+        HttpContext http, EcfSettings settings, AppDatabase database, SessionService sessions, CommandPipeline pipeline, NudgeEcfDocumentsHandler handler, ReceptionNudge reception,
+        ILoggerFactory loggers, CancellationToken cancellationToken)
     {
         var logger = loggers.CreateLogger("Rochell.Api.Ecf.EcfWebhook");
         if (!settings.Enabled || string.IsNullOrEmpty(settings.WebhookSecret))
@@ -47,6 +47,8 @@ public static class EcfWebhook
             return Results.Unauthorized();
         }
 
+        // E-OCR1-02-7: a notice may also be of a supplier's e-CF: the next reading of received documents comes at once.
+        reception.Nudge();
         var providerId = await ProviderIdAsync(http.Request, cancellationToken).ConfigureAwait(false);
         List<Guid> companies;
         await using (var connection = await database.DataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
