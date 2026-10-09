@@ -9,8 +9,8 @@ import { SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { EcfStampBlock } from "@/components/EcfGateway";
 import { AccountingStatus, ConfirmAction, ErrorBox, Money, NoPermission, StatusBadge } from "@/components/ui";
-import { formatDecimal, formatPercent } from "@/lib/decimal";
-import { formatDate, formatDateTime } from "@/lib/labels";
+import { formatDecimal, formatPercent, isPositiveDecimal } from "@/lib/decimal";
+import { formatDate, formatDateTime, todayInDominicanRepublic } from "@/lib/labels";
 import { creditNoteReasonLabel } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -93,6 +93,14 @@ function NoteDetail() {
       {h.commercialStatus === "DRAFT" && can("credit_note:issue") && isMyUserId(data.invoiceIssuedById) ? (
         <p className="notice" data-testid="credit-note-own-invoice">
           Usted emitió la factura {h.invoiceNo}: otra persona con permiso de emitir notas de crédito debe emitir esta nota.
+        </p>
+      ) : null}
+      {/* X1-01 (E-X1-5, E-X1-01-2): after 30 days from the invoice the note credits the price only. */}
+      {h.commercialStatus === "DRAFT" && data.itbisUntil && isPositiveDecimal(h.taxTotal ?? "0", 4) ? (
+        <p className="notice" data-testid="credit-note-itbis-until">
+          {todayInDominicanRepublic() > data.itbisUntil
+            ? `Ya pasaron 30 días desde la factura: al emitirla, la nota va sin ITBIS y acredita solo el precio (art. 338 del Código Tributario).`
+            : `Si se emite después del ${formatDate(data.itbisUntil)}, la nota va sin ITBIS y acredita solo el precio (art. 338 del Código Tributario).`}
         </p>
       ) : null}
       {h.commercialStatus === "DRAFT" && can("credit_note:issue") && !isMyUserId(data.invoiceIssuedById) ? (

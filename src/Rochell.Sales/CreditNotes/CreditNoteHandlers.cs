@@ -80,6 +80,14 @@ internal static class Crediting
     }
 
     public static string M(decimal value) => value.ToString(CultureInfo.InvariantCulture);
+
+    public static bool Late(DateOnly invoiceDate, DateOnly issued) => issued > invoiceDate.AddDays(CreditNoteRules.ItbisDays);
+}
+
+/// <summary>E-X1-5, E-X1-01-1: a note issued more than 30 calendar days after its invoice carries no ITBIS (the e-CF 34's IndicadorNotaCredito 1).</summary>
+public static class CreditNoteRules
+{
+    public const int ItbisDays = 30;
 }
 
 [RequiresPermission("credit_note:create")]
@@ -235,13 +243,26 @@ public sealed class IssueCreditNoteHandler(EcfSwitch? gateway = null) : ICommand
             throw new DomainException(CreditNoteErrors.ExceedsCreditable, "Another credit note took part of these invoice lines; prepare this one again.");
         }
 
+        // E-X1-5, E-X1-01-1/2: issued more than 30 calendar days after its invoice, the note credits the price only — its ITBIS is lost.
+        var today = SalesSql.Today(context);
+        var invoiceDate = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT invoice_date FROM sal.invoice WHERE invoice_id = @i AND invoice_date IS NOT NULL", r => (DateOnly?)r.Date(0), cancellationToken,
+            ("i", invoiceId)).ConfigureAwait(false)).SingleOrDefault();
+        var withoutItbis = note.Tax > 0m && invoiceDate is { } invoiced && Crediting.Late(invoiced, today);
+        if (withoutItbis)
+        {
+            await Sql.ExecuteAsync(
+                context.Connection, context.Transaction, "UPDATE sal.credit_note_line SET itbis = 0 WHERE credit_note_id = @n AND itbis <> 0", cancellationToken, ("n", command.CreditNoteId))
+                .ConfigureAwait(false);
+            note = note with { Tax = 0m, Total = note.Net };
+        }
+
         var open = await SalesSql.ScalarAsync<decimal?>(context, "SELECT open_amount FROM fin.ar_document WHERE ar_doc_id = @a FOR UPDATE", cancellationToken, ("a", invoice.ArDocId!.Value)).ConfigureAwait(false) ?? 0m;
         if (note.Total > open)
         {
             throw new DomainException(CreditNoteErrors.ExceedsOpenReceivable, $"The note ({Crediting.M(note.Total)}) exceeds the invoice's open receivable ({Crediting.M(open)}); credit balances and refunds are out of VS#3 (E-VS3-06-3).");
         }
 
-        var today = SalesSql.Today(context);
         // E-VS4-03-1: through Alanube when the gateway is on and e-CF 34 has an ACTIVE range; else the manual channel.
         var viaGateway = await EcfQueue.UsesGatewayAsync(context, _gateway, SalesEcf.CreditNoteType, cancellationToken).ConfigureAwait(false);
         var fiscal = viaGateway ? "ECF_SENDING" : "PENDING_EXTERNAL";
@@ -266,7 +287,7 @@ public sealed class IssueCreditNoteHandler(EcfSwitch? gateway = null) : ICommand
                 Crediting.Aggregate,
                 command.CreditNoteId,
                 version,
-                JsonSerializer.Serialize(new { creditNoteId = command.CreditNoteId, creditNoteNo = note.No, invoiceId, invoiceNo = invoice.InvoiceNo, invoiceEncf = invoice.Encf, total = Crediting.M(note.Total) }),
+                JsonSerializer.Serialize(new { creditNoteId = command.CreditNoteId, creditNoteNo = note.No, invoiceId, invoiceNo = invoice.InvoiceNo, invoiceEncf = invoice.Encf, total = Crediting.M(note.Total), withoutItbis }),
                 Publish: true,
                 BusinessDate: today),
             cancellationToken).ConfigureAwait(false);
@@ -278,10 +299,12 @@ public sealed class IssueCreditNoteHandler(EcfSwitch? gateway = null) : ICommand
             context.Transaction,
             """
             UPDATE sal.credit_note SET commercial_status = 'CONFIRMED', accounting_status = 'POSTED', fiscal_status = @fiscal, credit_date = @d, posting_event_id = @e,
-              issued_by = @by, version = @v
+              issued_by = @by, version = @v, tax_total = @tax, total = @total
             WHERE credit_note_id = @n
             """,
             cancellationToken,
+            ("tax", note.Tax),
+            ("total", note.Total),
             ("fiscal", fiscal),
             ("d", today),
             ("e", eventId),
@@ -311,6 +334,7 @@ public sealed class IssueCreditNoteHandler(EcfSwitch? gateway = null) : ICommand
             ecfNumber = queued?.Encf,
             invoiceStatus,
             journalId = journal.JournalId,
+            withoutItbis,
             version,
         });
     }

@@ -55481,6 +55481,13 @@
                 "$ref": "#/components/schemas/EcfStampView"
               }
             ]
+          },
+          "itbisUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         },
         "additionalProperties": false
