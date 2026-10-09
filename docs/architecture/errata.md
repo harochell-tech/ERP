@@ -1452,6 +1452,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-OCR1-02-8 | OCR1-02 | When the XML arrives after the QR or the photo, its header and lines replace what was read and the «leído por IA» marks go; if the XML's total differs from the QR's it is flagged in red. |
 | E-OCR1-02-9 | OCR1-02 | A voided or reversed invoice returns its document to the inbox to be registered again; an acceptance already given to the DGII stays. |
 | E-OCR1-02-10 | OCR1-02 | The simulated Alanube of the local stack and the tests also produces received documents. |
+| E-OCR1-03-1 | OCR1-03 | Inbox Compras › Comprobantes recibidos: tabs Pendientes / Registrados / Descartados / Todos; columns date, supplier (RNC and name), NCF / e-NCF, total, source (XML / QR / photo), DGII response, status; search by RNC, name or number. Approved 2026-10-09. |
+| E-OCR1-03-2 | OCR1-03 | «Pasar a factura» with an inventory purchase order: the usual form with supplier, NCF, date and printed total filled in; the XML's lines are shown beside it as reference and the person picks the PO lines. |
+| E-OCR1-03-3 | OCR1-03 | «Pasar a factura» of expenses: lines from the XML (description, quantity, price); category and tax type proposed from the supplier's latest expense invoice, else chosen by the person. |
+| E-OCR1-03-4 | OCR1-03 | Registering the invoice from a document links it in the same step; supplier and NCF must match the document's. |
+| E-OCR1-03-5 | OCR1-03 | «Descartar» with a reason (duplicates, not ours); for an e-CF it also offers to reject it before the DGII. |
+| E-OCR1-03-6 | OCR1-03 | «Escanear QR» with the camera on phone and computer; on a computer without a camera, upload a photo of the QR or paste its link. The QR is decoded in the browser with `jsQR` (open source; the image goes to no service). |
+| E-OCR1-03-7 | OCR1-03 | From the QR Core keeps issuer and buyer RNC, e-NCF, date, total and security code, and the QR's total to compare with the XML (E-OCR1-02-8); a QR that is not the DGII's, or whose buyer is not Block Rochell, is refused; «Verificar en la DGII» opens the official stamp page. Migration 0107. |
+| E-OCR1-03-8 | OCR1-03 | Inicio: «Comprobantes recibidos por registrar» and «Respuestas a la DGII sin enviar hace más de 24 horas». |
+| E-OCR1-03-9 | OCR1-03 | Detail: header, lines (XML or AI, flags in red), XML download, Accept / Reject before the DGII, the linked invoice and the history; notes 33 / 34 marked «sin registro en Core», without «Pasar a factura». |
+| E-OCR1-03-10 | OCR1-03 | Playwright journey: a simulated e-CF arrives in the local stack, is passed to an expense invoice, posted and accepted; a QR is captured by pasting its link. |
 
 Implementation rules derived from the above (no architectural change):
 

@@ -11,7 +11,8 @@ public sealed record SupplierInvoiceLineInput(Guid PurchaseOrderLineId, decimal 
 /// <summary>
 /// T-06 (§11.4): registers a DRAFT invoice of an ACTIVE supplier with its fiscal number (E-PR13-4) and dates (E-PR13-5).
 /// E-UX4-7: <paramref name="PrintedTotal"/> is the total printed on the supplier's document (ITBIS included), kept to compare with
-/// the determined gross once the invoice is posted.
+/// the determined gross once the invoice is posted. E-OCR1-03-4: <paramref name="SupplierDocumentId"/> is the captured document it is
+/// registered from, linked in the same step.
 /// </summary>
 public sealed record RegisterSupplierInvoice(
     Guid CompanyId,
@@ -22,7 +23,8 @@ public sealed record RegisterSupplierInvoice(
     DateOnly DocDate,
     DateOnly DueDate,
     IReadOnlyList<SupplierInvoiceLineInput> Lines,
-    decimal? PrintedTotal = null) : ICommand;
+    decimal? PrintedTotal = null,
+    Guid? SupplierDocumentId = null) : ICommand;
 
 /// <summary>
 /// E-GAS-04-1: one line of an expense invoice — what was bought (free text), its expense category (the account and the 606 type),
@@ -36,7 +38,8 @@ public sealed record ExpenseLineInput(string Description, Guid ExpenseCategoryId
 /// goes through the same match (against the approval amount, E-GAS-04-2), exception approval, posting (P-37), void and reversal as
 /// any supplier invoice. <paramref name="PlantId"/> is mandatory (E-GAS-01-8).
 /// For a foreign supplier (E-USD1-03-3): <paramref name="SupplierFiscalNumber"/> is the supplier's own invoice number, prices are in USD,
-/// lines carry no tax type, and the invoice takes the rate of its date (E-USD1-03-4).
+/// lines carry no tax type, and the invoice takes the rate of its date (E-USD1-03-4). E-OCR1-03-4: <paramref name="SupplierDocumentId"/> as
+/// on <see cref="RegisterSupplierInvoice"/>.
 /// </summary>
 public sealed record RegisterExpenseInvoice(
     Guid CompanyId,
@@ -49,7 +52,8 @@ public sealed record RegisterExpenseInvoice(
     Guid PlantId,
     IReadOnlyList<ExpenseLineInput> Lines,
     decimal? PrintedTotal = null,
-    Guid? PurchaseOrderId = null) : ICommand;
+    Guid? PurchaseOrderId = null,
+    Guid? SupplierDocumentId = null) : ICommand;
 
 public static class SupplierInvoiceClasses
 {

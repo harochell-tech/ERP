@@ -65,6 +65,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/maestros/proveedores/", label: "Proveedores", permission: "master_data:read" },
       { href: "/compras/ordenes/", label: "Órdenes de compra", permission: "purchase_order:read" },
       { href: "/cxp/facturas/", label: "Facturas de proveedor", permission: "supplier_invoice:read" },
+      { href: "/compras/comprobantes/", label: "Comprobantes recibidos", permission: "supplier_invoice:read" }, // OCR1-03 (E-OCR-2)
       { href: "/compras/dua/", label: "DUA (aduana)", permission: "supplier_invoice:read" }, // USD1-07a (E-USD1-07-4)
       { href: "/compras/liquidaciones/", label: "Liquidaciones de importación", permission: "supplier_invoice:read" },
       { href: "/cxp/antiguedad/", label: "Antigüedad de CxP", permission: "payment:read" },
@@ -176,6 +177,7 @@ const DETAIL_PARENTS: Readonly<Record<string, string>> = {
   "/almacen/recepcion/": "/almacen/recepciones/",
   "/almacen/recibir/": "/almacen/por-recibir/",
   "/cxp/factura/": "/cxp/facturas/",
+  "/compras/comprobante/": "/compras/comprobantes/",
   "/cierre/conciliacion/": "/cierre/conciliaciones/",
   "/tesoreria/pago/": "/tesoreria/pagos/",
   "/maestros/proveedor/": "/maestros/proveedores/",

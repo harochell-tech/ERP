@@ -68,6 +68,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 16px 0 8px; }
 .tabs button { border: none; background: none; min-height: 40px; padding: 0 14px; font: inherit; font-size: 14px; color: var(--muted); border-bottom: 3px solid transparent; cursor: pointer; }
 .tabs button[aria-selected="true"] { color: var(--fg); font-weight: 700; border-bottom-color: var(--accent); }
+/* OCR1-03: tabs that are links (the inbox of supplier documents). */
+.tabs a, .tabs span { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; font-size: 14px; color: var(--muted); border-bottom: 3px solid transparent; text-decoration: none; }
+.tabs [aria-current="page"] { color: var(--fg); font-weight: 700; border-bottom-color: var(--accent); }
+.qr-scan { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 12px 0; }
+.qr-camera video { width: 100%; max-width: 480px; border-radius: 8px; background: #000; }
 
 /* Status badges (colour + text, E-UI-5). */
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }

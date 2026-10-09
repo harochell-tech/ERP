@@ -724,6 +724,8 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
             pesos[largest] += ExchangeRateBook.ToPesos(totalUsd!.Value, x) - pesos.Sum();
         }
 
+        var document = await SupplierDocuments.SupplierDocumentRegistration.CheckAsync(context, command.SupplierDocumentId, command.PartyId, fiscalNumber, cancellationToken)
+            .ConfigureAwait(false); // E-OCR1-03-4
         var total = pesos.Sum();
         var creator = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         var siId = context.ResultRef;
@@ -808,6 +810,7 @@ public sealed class RegisterExpenseInvoiceHandler : ICommandHandler<RegisterExpe
                 ("pol", command.Lines[i].PurchaseOrderLineId)).ConfigureAwait(false);
         }
 
+        await SupplierDocuments.SupplierDocumentRegistration.LinkAsync(context, document, siId, CommandType, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new
         {
             supplierInvoiceId = siId,
