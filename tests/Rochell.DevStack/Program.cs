@@ -128,6 +128,9 @@ internal sealed class DevApiHost(TestHarness harness, SimulatedIdp idp, string? 
         builder.UseSetting("Rochell:Deliveries:LinkKey", Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
         builder.UseSetting("Rochell:Deliveries:EvidenceRoot", Directory.CreateTempSubdirectory("rochell-evidence-").FullName);
 
+        // OCR1-04: invoice photos read by the simulated reader (nothing leaves the machine), kept in the same temporary folder.
+        builder.UseSetting("Rochell:Ocr:Mode", "SIMULATED");
+
         builder.ConfigureTestServices(services =>
         {
             services.Configure<OpenIdConnectOptions>(OidcAuthentication.Scheme, o => o.BackchannelHttpHandler = idp.Backchannel);

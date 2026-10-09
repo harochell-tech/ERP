@@ -1495,6 +1495,16 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-OCR1-03-8 | OCR1-03 | Inicio: «Comprobantes recibidos por registrar» and «Respuestas a la DGII sin enviar hace más de 24 horas». |
 | E-OCR1-03-9 | OCR1-03 | Detail: header, lines (XML or AI, flags in red), XML download, Accept / Reject before the DGII, the linked invoice and the history; notes 33 / 34 marked «sin registro en Core», without «Pasar a factura». |
 | E-OCR1-03-10 | OCR1-03 | Playwright journey: a simulated e-CF arrives in the local stack, is passed to an expense invoice, posted and accepted; a QR is captured by pasting its link. |
+| E-OCR1-04-1 | OCR1-04 | Only the photo or PDF goes to be read (≤ 10 MB, up to 3 pages), asked for in a fixed shape: RNC, name, NCF, date, lines, ITBIS and total. Approved 2026-10-09. |
+| E-OCR1-04-2 | OCR1-04 | When the AI cannot read well, the document keeps the empty fields marked to complete by hand; a failed reading is retried once. |
+| E-OCR1-04-3 | OCR1-04 | A monthly limit of readings in the configuration (PURCHASING `ocr_monthly_readings`, e.g. 500); at the limit the button says so and the invoice is captured by hand. |
+| E-OCR1-04-4 | OCR1-04 | «Subir foto o PDF» in the inbox; on a phone it opens the camera. |
+| E-X1-03-1 | X1-03 | The e-CF 47 is issued when a services invoice of a foreign supplier is **paid**; the withholding is made at payment (art. 305). Approved 2026-10-09. |
+| E-X1-03-2 | X1-03 | The withholding is taken from the payment: the supplier receives the invoice less the ISR; the ISR goes to withholdings payable for the IR-17. |
+| E-X1-03-3 | X1-03 | 27 % in general; 15 % for royalties, software, online advertising and data storage (Ley 30-26); the expense category says which, and the rates are new fiscal rules with their source. |
+| E-X1-03-4 | X1-03 | No e-CF 47 for imported goods (DUA) nor goods lines: services only. |
+| E-X1-03-5 | X1-03 | A DGII e-NCF range for type 47 is needed, as for 31; without an ACTIVE range the payment is held and says why. |
+| E-X1-03-6 | X1-03 | Fiscal › Reportes fiscales › 609 of the month as CSV in the DGII tool's order; the e-CF 47 also goes in the 606 under the company's RNC. |
 
 Implementation rules derived from the above (no architectural change):
 

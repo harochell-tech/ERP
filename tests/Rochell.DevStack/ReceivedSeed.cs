@@ -9,7 +9,8 @@ namespace Rochell.DevStack;
 /// <summary>
 /// OCR1-03 (E-OCR1-02-10, E-OCR1-03-10): two e-CF that «Agregados del Este» (RNC 101000011) sends the company through the simulated
 /// Alanube — an invoice of cement, and a credit note — read at once by the worker. The company gets the RNC of Block Rochell, so the
-/// QRs the journeys paste name it as buyer. A development world, never a migration.
+/// QRs the journeys paste name it as buyer; the PURCHASING policy allows 500 readings by AI a month (OCR1-04). A development world, never a
+/// migration.
 /// </summary>
 internal static class ReceivedSeed
 {
@@ -20,6 +21,17 @@ internal static class ReceivedSeed
     {
         await h.AdminRequireAsync(
             $"DO $$ BEGIN PERFORM set_config('session_replication_role', 'replica', true); UPDATE md.company SET rnc = '{CompanyRnc}' WHERE company_id = '{h.CompanyId}'; END $$");
+        // OCR1-04 (E-OCR1-04-3): 500 readings a month in the PURCHASING policy in force.
+        await h.AdminRequireAsync(
+            $"""
+            DO $$ BEGIN
+              PERFORM set_config('session_replication_role', 'replica', true);
+              INSERT INTO acc.accounting_policy_parameter (company_id, policy_version_id, param_code, value)
+              SELECT company_id, policy_version_id, 'ocr_monthly_readings', to_jsonb('500'::text)
+              FROM acc.accounting_policy_version WHERE company_id = '{h.CompanyId}' AND policy_code = 'PURCHASING' AND status = 'ACTIVE'
+              ON CONFLICT DO NOTHING;
+            END $$
+            """);
         var alanube = services.GetRequiredService<SimulatedEcfProvider>();
         var today = BusinessCalendar.DefaultBusinessDate(DateTime.UtcNow);
         var signed = DateTimeOffset.UtcNow.AddMinutes(-30);

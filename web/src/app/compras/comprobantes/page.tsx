@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query } from "@/api/client";
+import { MissingKeys, prepareInvoiceFile, useOcrEnabled } from "@/components/InvoicePhoto";
 import { QrScan } from "@/components/QrScan";
 import { ErrorBox, Loading, NoPermission } from "@/components/ui";
 import { formatDecimal } from "@/lib/decimal";
@@ -27,6 +28,11 @@ function Inbox() {
   const [applied, setApplied] = useState("");
   const [scanning, setScanning] = useState(false);
   const capture = useCommand("capture-qr", "/api/v1/companies/{companyId}/procurement/capture-supplier-document-from-qr");
+  // OCR1-04 (E-OCR1-04-1…4): a photo, scan or PDF read by AI.
+  const ocr = useOcrEnabled();
+  const photo = useCommand("capture-photo", "/api/v1/companies/{companyId}/procurement/capture-supplier-document-from-image");
+  const [pending, setPending] = useState<{ content: string; needs: string[] } | null>(null);
+  const [photoProblem, setPhotoProblem] = useState<string | null>(null);
   const { data, error } = useLoad(
     can("supplier_invoice:read")
       ? () =>
@@ -52,6 +58,32 @@ function Inbox() {
     }
   };
 
+  const sendPhoto = async (content: string, rnc: string | null, ncf: string | null) => {
+    const response = await photo.run({ contentBase64: content, issuerRnc: rnc, fiscalNumber: ncf }, undefined, (r) =>
+      (r.result as { supplierDocumentId?: string | null } | null)?.supplierDocumentId ? "Factura leída: revise lo que leyó la IA." : "Falta un dato de la factura.",
+    );
+    const result = response?.result as { supplierDocumentId?: string | null; needsInput?: string[] } | null;
+    if (result?.supplierDocumentId) {
+      setPending(null);
+      router.push(`/compras/comprobante/?id=${result.supplierDocumentId}`);
+    } else if (result?.needsInput && result.needsInput.length > 0) {
+      setPending({ content, needs: result.needsInput });
+    }
+  };
+
+  const fromFile = async (file: File | undefined) => {
+    setPhotoProblem(null);
+    if (!file) {
+      return;
+    }
+    const prepared = await prepareInvoiceFile(file);
+    if ("problem" in prepared) {
+      setPhotoProblem(prepared.problem);
+      return;
+    }
+    await sendPhoto(prepared.content, null, null);
+  };
+
   return (
     <>
       <h1>Comprobantes recibidos</h1>
@@ -64,8 +96,31 @@ function Inbox() {
           <button type="button" className="primary" onClick={() => setScanning((s) => !s)}>
             {scanning ? "Cerrar" : "Escanear QR"}
           </button>
+          {ocr ? (
+            <label className="button">
+              {photo.busy ? "Leyendo la factura…" : "Subir foto o PDF"}
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                hidden
+                disabled={photo.busy}
+                aria-label="Foto o PDF de la factura"
+                onChange={(e) => {
+                  void fromFile(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          ) : null}
         </div>
       ) : null}
+      {pending ? <MissingKeys needs={pending.needs} busy={photo.busy} onSend={(rnc, ncf) => void sendPhoto(pending.content, rnc, ncf)} /> : null}
+      {photoProblem ? (
+        <p className="error" role="alert">
+          {photoProblem}
+        </p>
+      ) : null}
+      <ErrorBox error={photo.error} />
       {scanning ? <QrScan busy={capture.busy} onLink={(link) => void fromQr(link)} /> : null}
       <ErrorBox error={capture.error} />
       <nav className="tabs" aria-label="Estado">

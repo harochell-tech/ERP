@@ -6,6 +6,9 @@ import { confirmAction, expectFits, nav, pick, signIn, submit } from "./support"
 // invoice to an expense invoice already filled from its XML, posts it — which accepts the e-CF before the DGII — and captures a printed
 // e-CF by pasting its QR's link. The credit note stays marked «sin registro en Core».
 
+// A 1×1 PNG: the page reduces it to a JPEG as it would a camera photo.
+const PHOTO = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==", "base64");
+
 function today(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santo_Domingo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
@@ -83,5 +86,16 @@ test("a received e-CF becomes an expense invoice, posting accepts it, and a QR i
   await expect(payables.getByRole("heading", { name: `Crédito fiscal ${encf}` })).toBeVisible();
   await expect(payables.getByTestId("document-total")).toHaveText("2,360.00");
   await expect(payables.getByRole("link", { name: "Verificar en la DGII" })).toHaveAttribute("href", /ConsultaTimbre/);
+  await expectFits(payables);
+
+  // OCR1-04: a photo of a paper invoice, read by the (simulated) AI: what it read is marked, the lines add up, the photo is kept.
+  await nav(payables, "Comprobantes recibidos");
+  await payables.getByLabel("Foto o PDF de la factura").setInputFiles({ name: "factura.png", mimeType: "image/png", buffer: PHOTO });
+  await expect(payables).toHaveURL(/\/compras\/comprobante\/\?id=/);
+  await expect(payables.getByRole("heading", { name: /^Crédito fiscal B01/ })).toBeVisible();
+  await expect(payables.getByText("leído por IA").first()).toBeVisible();
+  await expect(payables.getByTestId("document-lines")).toContainText("Arena lavada");
+  await expect(payables.getByTestId("document-total")).toHaveText("2,360.00");
+  await expect(payables.getByRole("button", { name: "Descargar foto" })).toBeVisible();
   await expectFits(payables);
 });
