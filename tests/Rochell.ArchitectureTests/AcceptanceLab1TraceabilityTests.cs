@@ -10,10 +10,10 @@ namespace Rochell.ArchitectureTests;
 /// </summary>
 public sealed partial class AcceptanceLab1TraceabilityTests
 {
-    /// <summary>IDs whose test is still to come — LAB1-02: LAB-03…09, 11, 14; LAB1-03: LAB-13, 15; LAB1-04: LAB-16, E2E-L1. A tagged ID listed here fails.</summary>
+    /// <summary>IDs whose test is still to come — LAB1-03: LAB-13, 15; LAB1-04: LAB-16, E2E-L1. A tagged ID listed here fails.</summary>
     private static readonly IReadOnlySet<string> Pending = new HashSet<string>(StringComparer.Ordinal)
     {
-        "LAB-03", "LAB-04", "LAB-05", "LAB-06", "LAB-07", "LAB-08", "LAB-09", "LAB-11", "LAB-13", "LAB-14", "LAB-15", "LAB-16", "E2E-L1",
+        "LAB-13", "LAB-15", "LAB-16", "E2E-L1",
     };
 
     private static IReadOnlySet<string> BaselineIds()

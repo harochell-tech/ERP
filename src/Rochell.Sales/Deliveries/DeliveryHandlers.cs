@@ -17,6 +17,9 @@ public static class DeliveryErrors
     public const string TransportRequired = "TRANSPORT_REQUIRED";
     public const string LocationInvalid = "LOCATION_INVALID";
     public const string InsufficientStock = "INSUFFICIENT_STOCK";
+
+    /// <summary>LAB1-02 (E-LAB1-02-11): the location has the units, but in lots the quality lab blocked.</summary>
+    public const string StockBlocked = "STOCK_BLOCKED_BY_QUALITY";
     public const string WeighingInvalid = "WEIGHING_INVALID";
     public const string OverCapacity = "VEHICLE_OVER_CAPACITY";
     public const string EvidenceInvalid = "EVIDENCE_INVALID";
@@ -117,23 +120,27 @@ internal static class Deliveries
         return location;
     }
 
-    /// <summary>The lots of an item in a location, oldest code first (E-VS3-04-5), covering <paramref name="baseQuantity"/>.</summary>
+    /// <summary>
+    /// The lots of an item in a location, oldest code first (E-VS3-04-5), covering <paramref name="baseQuantity"/>. A lot Calidad or the
+    /// lab blocked is never taken, even with stock in the yard (E-LAB1-4, E-LAB1-02-11: its status is read from Manufacturing's table).
+    /// </summary>
     public static async Task<List<(Guid LotId, decimal Quantity)>> FifoAsync(CommandContext context, Guid locationId, Guid itemId, decimal baseQuantity, CancellationToken cancellationToken)
     {
         var lots = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
             """
-            SELECT s.lot_id, s.quantity FROM inv.inv_stock_balance s JOIN inv.lot l ON l.lot_id = s.lot_id
+            SELECT s.lot_id, s.quantity, EXISTS (SELECT 1 FROM mfg.fg_lot f WHERE f.lot_id = s.lot_id AND f.status = 'BLOCKED')
+            FROM inv.inv_stock_balance s JOIN inv.lot l ON l.lot_id = s.lot_id
             WHERE s.location_id = @loc AND s.item_id = @i AND s.quantity > 0 ORDER BY l.lot_code, l.lot_id
             """,
-            r => (r.GetGuid(0), r.GetDecimal(1)),
+            r => (LotId: r.GetGuid(0), Quantity: r.GetDecimal(1), Blocked: r.GetBoolean(2)),
             cancellationToken,
             ("loc", locationId),
             ("i", itemId)).ConfigureAwait(false);
         var picked = new List<(Guid, decimal)>();
         var remaining = baseQuantity;
-        foreach (var (lot, available) in lots)
+        foreach (var (lot, available, _) in lots.Where(l => !l.Blocked))
         {
             if (remaining <= 0m)
             {
@@ -145,9 +152,14 @@ internal static class Deliveries
             remaining -= take;
         }
 
-        return remaining <= 0m
-            ? picked
-            : throw new DomainException(DeliveryErrors.InsufficientStock, $"The location holds less than the {baseQuantity} base units to dispatch.");
+        if (remaining <= 0m)
+        {
+            return picked;
+        }
+
+        throw lots.Where(l => l.Blocked).Sum(l => l.Quantity) >= remaining
+            ? new DomainException(DeliveryErrors.StockBlocked, $"The location holds the {baseQuantity} base units to dispatch only counting lots blocked by quality.")
+            : new DomainException(DeliveryErrors.InsufficientStock, $"The location holds less than the {baseQuantity} base units to dispatch.");
     }
 
     /// <summary>Splits <paramref name="quantity"/> over a line's lots (in their FIFO order), consuming what earlier splits took.</summary>

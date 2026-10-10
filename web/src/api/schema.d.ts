@@ -4925,6 +4925,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/manufacturing/reevaluate-lot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ReevaluateLot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/final-release-lot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["FinalReleaseLot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/identity/request-role-assignment": {
         parameters: {
             query?: never;
@@ -5685,6 +5717,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetLabLot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/lab/lots/{lotId}/recall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetLotRecall"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/lab/deliveries/{deliveryId}/recall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetDeliveryRecall"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9714,6 +9778,17 @@ export interface components {
             /** Format: decimal */
             baseQuantity: string;
         };
+        DeliveryRecall: {
+            /** Format: uuid */
+            deliveryId: string;
+            deliveryNo: string;
+            status: string;
+            customerName: string;
+            orderNo: string;
+            siteAddress: null | string;
+            lots: components["schemas"]["RecallLot"][];
+            otherLots: string[];
+        };
         DeliverySummary: {
             /** Format: uuid */
             deliveryId: string;
@@ -10340,6 +10415,14 @@ export interface components {
             racks: number;
             /** Format: int32 */
             curingHoursRemaining: number;
+        };
+        FinalReleaseLot: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            lotId: string;
+            /** Format: int64 */
+            expectedVersion: number;
         };
         FiscalAuthorizationConsumptionView: {
             /** Format: uuid */
@@ -11134,11 +11217,16 @@ export interface components {
             compression: components["schemas"]["CompressionTestView"][];
             absorption: components["schemas"]["AbsorptionTestView"][];
             absorptionSummary: null | components["schemas"]["AbsorptionSummary"];
+            evaluation: null | components["schemas"]["LotEvaluationView"];
         };
         LabLotList: {
             items: components["schemas"]["LabLotView"][];
             /** Format: int32 */
             withoutFieldCode: number;
+            /** Format: int32 */
+            blockedByLab: number;
+            /** Format: int32 */
+            readyForFinalRelease: number;
         };
         LabLotView: {
             /** Format: uuid */
@@ -11164,6 +11252,16 @@ export interface components {
             absorptionTests: number;
             /** Format: date */
             lastBreakDate: null | string;
+            /** Format: int64 */
+            version: number;
+            verdict: null | string;
+            basis: null | string;
+            /** Format: decimal */
+            strength28d: null | string;
+            alerts: string[];
+            blockCause: null | string;
+            blockReason: null | string;
+            readyForFinalRelease: boolean;
         };
         LabParameterChange: {
             code: string;
@@ -11290,6 +11388,61 @@ export interface components {
             name?: null | string;
             /** @default ACTIVE */
             status?: string;
+        };
+        LotEvaluationView: {
+            /** Format: uuid */
+            evaluationId: string;
+            /** Format: int32 */
+            specimens: number;
+            /** Format: int32 */
+            ageMin: null | number;
+            /** Format: int32 */
+            ageMax: null | number;
+            /** Format: decimal */
+            avgStrength: null | string;
+            /** Format: decimal */
+            minStrength: null | string;
+            /** Format: decimal */
+            maxStrength: null | string;
+            /** Format: decimal */
+            stdDev: null | string;
+            /** Format: decimal */
+            cv: null | string;
+            /** Format: int32 */
+            earlyAge: null | number;
+            /** Format: decimal */
+            earlyAvg: null | string;
+            /** Format: decimal */
+            realAvg28d: null | string;
+            /** Format: decimal */
+            factorUsed: null | string;
+            factorSource: null | string;
+            /** Format: decimal */
+            strength28d: null | string;
+            /** Format: decimal */
+            min28d: null | string;
+            basis: null | string;
+            /** Format: int32 */
+            specVersion: null | number;
+            /** Format: decimal */
+            minAvgRequired: null | string;
+            /** Format: decimal */
+            minIndividualRequired: null | string;
+            verdict: string;
+            alerts: string[];
+            /** Format: date-time */
+            evaluatedAt: string;
+        };
+        LotRecall: {
+            lot: components["schemas"]["LabLotView"];
+            deliveries: components["schemas"]["RecallDelivery"][];
+            stock: components["schemas"]["RecallStock"][];
+            /** Format: decimal */
+            dispatched: string;
+            /** Format: decimal */
+            inStock: string;
+            /** Format: int32 */
+            customers: number;
         };
         MachineEfficiency: {
             /** Format: date */
@@ -13017,6 +13170,47 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        RecallConsumption: {
+            materialCode: string;
+            materialDescription: string;
+            uom: string;
+            /** Format: decimal */
+            qty: string;
+            /** Format: decimal */
+            theoreticalQty: string;
+        };
+        RecallDelivery: {
+            /** Format: uuid */
+            deliveryId: string;
+            deliveryNo: string;
+            status: string;
+            /** Format: date-time */
+            gateOutAt: null | string;
+            /** Format: uuid */
+            customerId: string;
+            customerName: string;
+            orderNo: string;
+            siteAddress: null | string;
+            itemCode: string;
+            /** Format: decimal */
+            baseQuantity: string;
+            invoiceNos: null | string;
+        };
+        RecallLot: {
+            lot: components["schemas"]["LabLotView"];
+            /** Format: decimal */
+            baseQuantity: string;
+            runNo: string;
+            /** Format: int32 */
+            recipeVersion: number;
+            consumption: components["schemas"]["RecallConsumption"][];
+        };
+        RecallStock: {
+            plantCode: string;
+            locationCode: string;
+            /** Format: decimal */
+            quantity: string;
+        };
         ReceiptAllocationView: {
             /** Format: uuid */
             allocationId: string;
@@ -13439,6 +13633,12 @@ export interface components {
             freshScrapUnits: string;
             consumption: components["schemas"]["ConsumptionInput"][];
             consumptionReason?: null | string;
+        };
+        ReevaluateLot: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            lotId: string;
         };
         RefundToMatch: {
             /** Format: uuid */
@@ -38523,6 +38723,158 @@ export interface operations {
             };
         };
     };
+    ReevaluateLot: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReevaluateLot"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    FinalReleaseLot: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinalReleaseLot"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RequestRoleAssignment: {
         parameters: {
             query?: never;
@@ -41098,6 +41450,7 @@ export interface operations {
             query?: {
                 search?: string;
                 limit?: number;
+                view?: string;
             };
             header?: never;
             path: {
@@ -41164,6 +41517,124 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LabLotDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetLotRecall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                lotId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LotRecall"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetDeliveryRecall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryRecall"];
                 };
             };
             /** @description Bad Request */

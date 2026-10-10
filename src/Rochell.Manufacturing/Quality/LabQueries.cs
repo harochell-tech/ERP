@@ -9,7 +9,8 @@ namespace Rochell.Manufacturing.Quality;
 // LAB1-01 (E-LAB1-01-13/14): what the lab's screens read, with lab:read.
 
 /// <summary>The lots the lab can test (every status but VOIDED), newest first; <c>Search</c> matches the field code or the internal code.</summary>
-public sealed record ListLabLots(Guid CompanyId, Guid SessionId, string? Search = null, int Limit = 100) : IQuery;
+/// <remarks><c>View</c> (LAB1-02): BLOCKED_BY_LAB or READY_FINAL (RELEASED with CUMPLE on real data) narrows the list; anything else lists all.</remarks>
+public sealed record ListLabLots(Guid CompanyId, Guid SessionId, string? Search = null, int Limit = 100, string? View = null) : IQuery;
 
 /// <remarks>
 /// <c>FieldCodeWaitsFor</c> (E-LAB1-01-4), when the lot has no field code yet: ITEM_PREFIX (the item has no requirements),
@@ -17,9 +18,21 @@ public sealed record ListLabLots(Guid CompanyId, Guid SessionId, string? Search 
 /// </remarks>
 public sealed record LabLotView(
     Guid LotId, Guid PlantId, string? FieldCode, string LotCode, Guid ItemId, string ItemCode, string ItemDescription, string MachineCode, string? MachineShortCode, string ShiftCode,
-    DateOnly ProductionDate, string Status, string? FieldCodeWaitsFor, int CompressionTests, int AbsorptionTests, DateOnly? LastBreakDate);
+    DateOnly ProductionDate, string Status, string? FieldCodeWaitsFor, int CompressionTests, int AbsorptionTests, DateOnly? LastBreakDate,
+    long Version, string? Verdict, string? Basis, decimal? Strength28d, IReadOnlyList<string> Alerts, string? BlockCause, string? BlockReason, bool ReadyForFinalRelease);
 
-public sealed record LabLotList(IReadOnlyList<LabLotView> Items, int WithoutFieldCode);
+/// <remarks><c>BlockedByLab</c> and <c>ReadyForFinalRelease</c> count every lot of the company (Inicio, E-LAB1-02-15), not only the page.</remarks>
+public sealed record LabLotList(IReadOnlyList<LabLotView> Items, int WithoutFieldCode, int BlockedByLab, int ReadyForFinalRelease);
+
+/// <remarks>
+/// LAB1-02 (baseline §4.2, E-LAB1-02-1…5): the evaluation in force. <c>Verdict</c> COMPLIES, FAILS, NO_SPEC or NO_DATA; <c>Basis</c> REAL
+/// (breaks at the 28-day age) or ESTIMATED (early average ÷ <c>FactorUsed</c>, OWN or INITIAL); <c>Cv</c> a fraction; <c>Alerts</c>
+/// NO_TESTS, FEW_SPECIMENS, HIGH_CV, HIGH_ABSORPTION.
+/// </remarks>
+public sealed record LotEvaluationView(
+    Guid EvaluationId, int Specimens, int? AgeMin, int? AgeMax, decimal? AvgStrength, decimal? MinStrength, decimal? MaxStrength, decimal? StdDev, decimal? Cv, int? EarlyAge, decimal? EarlyAvg,
+    decimal? RealAvg28d, decimal? FactorUsed, string? FactorSource, decimal? Strength28d, decimal? Min28d, string? Basis, int? SpecVersion, decimal? MinAvgRequired,
+    decimal? MinIndividualRequired, string Verdict, IReadOnlyList<string> Alerts, DateTime EvaluatedAt);
 
 public sealed record GetLabLot(Guid CompanyId, Guid SessionId, Guid LotId) : IQuery;
 
@@ -45,7 +58,31 @@ public sealed record AbsorptionTestView(
 public sealed record AbsorptionSummary(int Blocks, decimal AbsorptionKgm3, decimal AbsorptionFraction, decimal DensityKgm3, string DensityClass, decimal AbsorptionLimitKgm3, bool AboveLimit);
 
 public sealed record LabLotDetail(
-    LabLotView Lot, ItemSpecView? Spec, IReadOnlyList<CompressionTestView> Compression, IReadOnlyList<AbsorptionTestView> Absorption, AbsorptionSummary? AbsorptionSummary);
+    LabLotView Lot, ItemSpecView? Spec, IReadOnlyList<CompressionTestView> Compression, IReadOnlyList<AbsorptionTestView> Absorption, AbsorptionSummary? AbsorptionSummary,
+    LotEvaluationView? Evaluation);
+
+/// <summary>LAB1-02 (baseline §4.7, E-LAB1-02-14): where a lot went — its deliveries with customer, site and invoice — and what is left of it.</summary>
+public sealed record GetLotRecall(Guid CompanyId, Guid SessionId, Guid LotId) : IQuery;
+
+/// <remarks><c>GateOutAt</c> is null while the truck has not left; <c>InvoiceNos</c> the invoices of that delivery line, comma separated.</remarks>
+public sealed record RecallDelivery(
+    Guid DeliveryId, string DeliveryNo, string Status, DateTime? GateOutAt, Guid CustomerId, string CustomerName, string OrderNo, string? SiteAddress, string ItemCode, decimal BaseQuantity,
+    string? InvoiceNos);
+
+public sealed record RecallStock(string PlantCode, string LocationCode, decimal Quantity);
+
+public sealed record LotRecall(LabLotView Lot, IReadOnlyList<RecallDelivery> Deliveries, IReadOnlyList<RecallStock> Stock, decimal Dispatched, decimal InStock, int Customers);
+
+/// <summary>Backward (E-LAB1-02-14): the lots a delivery took, each with its run, shift, machine, recipe, the shift's consumption and its verdict.</summary>
+public sealed record GetDeliveryRecall(Guid CompanyId, Guid SessionId, Guid DeliveryId) : IQuery;
+
+public sealed record RecallConsumption(string MaterialCode, string MaterialDescription, string Uom, decimal Qty, decimal TheoreticalQty);
+
+public sealed record RecallLot(LabLotView Lot, decimal BaseQuantity, string RunNo, int RecipeVersion, IReadOnlyList<RecallConsumption> Consumption);
+
+/// <remarks><c>OtherLots</c>: lots of the delivery without a production record (opening stock), by their code.</remarks>
+public sealed record DeliveryRecall(
+    Guid DeliveryId, string DeliveryNo, string Status, string CustomerName, string OrderNo, string? SiteAddress, IReadOnlyList<RecallLot> Lots, IReadOnlyList<string> OtherLots);
 
 /// <summary>Every finished good with its requirements in force (<c>Version</c> null while it has none).</summary>
 public sealed record ListItemSpecs(Guid CompanyId, Guid SessionId) : IQuery;
@@ -90,13 +127,16 @@ internal static class LabReads
              WHEN m.short_code IS NULL THEN 'MACHINE_SHORT_CODE' ELSE 'DUPLICATE' END,
         (SELECT count(*) FROM qa.compression_test t WHERE t.lot_id = f.lot_id AND t.status = 'RECORDED')::int,
         (SELECT count(*) FROM qa.absorption_test t WHERE t.lot_id = f.lot_id AND t.status = 'RECORDED')::int,
-        (SELECT max(t.break_date) FROM qa.compression_test t WHERE t.lot_id = f.lot_id AND t.status = 'RECORDED')
+        (SELECT max(t.break_date) FROM qa.compression_test t WHERE t.lot_id = f.lot_id AND t.status = 'RECORDED'),
+        f.version, ev.verdict, ev.basis, ev.strength_28d, coalesce(ev.alerts, ARRAY[]::text[]), f.block_cause, f.block_reason,
+        coalesce(f.status = 'RELEASED' AND ev.verdict = 'COMPLIES' AND ev.basis = 'REAL', false)
         """;
 
     public const string LotFrom =
         """
         FROM mfg.fg_lot f JOIN inv.lot l ON l.lot_id = f.lot_id JOIN mfg.production_run r ON r.run_id = f.run_id JOIN md.item i ON i.item_id = r.item_id
         JOIN md.machine m ON m.machine_id = r.machine_id JOIN mfg.shift sh ON sh.shift_id = r.shift_id
+        LEFT JOIN LATERAL (SELECT e.* FROM qa.lot_evaluation e WHERE e.company_id = f.company_id AND e.lot_id = f.lot_id ORDER BY e.seq DESC LIMIT 1) ev ON true
         """;
 
     public const string SpecColumns =
@@ -114,7 +154,8 @@ internal static class LabReads
 
     public static LabLotView Lot(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetGuid(1), r.NullableString(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.GetString(6), r.GetString(7), r.NullableString(8), r.GetString(9), r.Date(10),
-            r.GetString(11), r.NullableString(12), r.GetInt32(13), r.GetInt32(14), r.IsDBNull(15) ? null : r.Date(15));
+            r.GetString(11), r.NullableString(12), r.GetInt32(13), r.GetInt32(14), r.IsDBNull(15) ? null : r.Date(15),
+            r.GetInt64(16), r.NullableString(17), r.NullableString(18), r.NullableDecimal(19), r.GetFieldValue<string[]>(20), r.NullableString(21), r.NullableString(22), r.GetBoolean(23));
 
     public static ItemSpecView Spec(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetInt32(3), r.NullableString(4), r.NullableDecimal(5), r.NullableDecimal(6), r.NullableDecimal(7),
@@ -139,6 +180,8 @@ public sealed class ListLabLotsHandler : IQueryHandler<ListLabLots>
             {LabReads.LotFrom}
             WHERE f.company_id = @c AND f.status <> 'VOIDED'
               AND (CAST(@q AS text) IS NULL OR f.field_code ILIKE '%' || CAST(@q AS text) || '%' OR l.lot_code ILIKE '%' || CAST(@q AS text) || '%')
+              AND (CAST(@view AS text) IS DISTINCT FROM 'BLOCKED_BY_LAB' OR (f.status = 'BLOCKED' AND f.block_cause = 'LAB'))
+              AND (CAST(@view AS text) IS DISTINCT FROM 'READY_FINAL' OR (f.status = 'RELEASED' AND ev.verdict = 'COMPLIES' AND ev.basis = 'REAL'))
             ORDER BY r.business_date DESC, f.field_code, l.lot_code
             LIMIT @n
             """,
@@ -146,11 +189,25 @@ public sealed class ListLabLotsHandler : IQueryHandler<ListLabLots>
             cancellationToken,
             ("c", context.CompanyId),
             ("q", search),
+            ("view", query.View),
             ("n", Math.Clamp(query.Limit, 1, 500))).ConfigureAwait(false);
         var waiting = await Lab.ScalarAsync<long?>(
             context.Connection, context.Transaction, "SELECT count(*) FROM mfg.fg_lot WHERE company_id = @c AND status <> 'VOIDED' AND field_code IS NULL", cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false) ?? 0;
-        return ApiJson.Serialize(new LabLotList(items, (int)waiting));
+        var blocked = await Lab.ScalarAsync<long?>(
+            context.Connection, context.Transaction, "SELECT count(*) FROM mfg.fg_lot WHERE company_id = @c AND status = 'BLOCKED' AND block_cause = 'LAB'", cancellationToken,
+            ("c", context.CompanyId)).ConfigureAwait(false) ?? 0;
+        var ready = await Lab.ScalarAsync<long?>(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT count(*) FROM mfg.fg_lot f
+            WHERE f.company_id = @c AND f.status = 'RELEASED'
+              AND (SELECT e.verdict = 'COMPLIES' AND e.basis = 'REAL' FROM qa.lot_evaluation e WHERE e.lot_id = f.lot_id ORDER BY e.seq DESC LIMIT 1)
+            """,
+            cancellationToken,
+            ("c", context.CompanyId)).ConfigureAwait(false) ?? 0;
+        return ApiJson.Serialize(new LabLotList(items, (int)waiting, (int)blocked, (int)ready));
     }
 }
 
@@ -234,8 +291,25 @@ public sealed class GetLabLotHandler : IQueryHandler<GetLabLot>
             cancellationToken,
             ("c", context.CompanyId),
             ("l", query.LotId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new LabLotDetail(lot, spec, compression, absorption, summary));
+        var evaluation = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT evaluation_id, specimens, age_min, age_max, avg_strength, min_strength, max_strength, std_dev, cv, early_age, early_avg, real_avg_28d, factor_used, factor_source, strength_28d,
+                   min_28d, basis, spec_version, min_avg_required, min_individual_required, verdict, alerts, evaluated_at
+            FROM qa.lot_evaluation WHERE company_id = @c AND lot_id = @l ORDER BY seq DESC LIMIT 1
+            """,
+            r => new LotEvaluationView(
+                r.GetGuid(0), r.GetInt32(1), Int(r, 2), Int(r, 3), r.NullableDecimal(4), r.NullableDecimal(5), r.NullableDecimal(6), r.NullableDecimal(7), r.NullableDecimal(8), Int(r, 9),
+                r.NullableDecimal(10), r.NullableDecimal(11), r.NullableDecimal(12), r.NullableString(13), r.NullableDecimal(14), r.NullableDecimal(15), r.NullableString(16), Int(r, 17),
+                r.NullableDecimal(18), r.NullableDecimal(19), r.GetString(20), r.GetFieldValue<string[]>(21), r.Utc(22)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("l", query.LotId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new LabLotDetail(lot, spec, compression, absorption, summary, evaluation));
     }
+
+    private static int? Int(System.Data.Common.DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);
 }
 
 [RequiresPermission("lab:read")]
@@ -340,5 +414,127 @@ public sealed class PreviewCompressionTestsHandler : IQueryHandler<PreviewCompre
         }
 
         return ApiJson.Serialize(new CompressionPreview(age, age == 0, lines));
+    }
+}
+
+[RequiresPermission("lab:read")]
+public sealed class GetLotRecallHandler : IQueryHandler<GetLotRecall>
+{
+    public string QueryType => "Manufacturing.GetLotRecall";
+
+    public async Task<string> HandleAsync(GetLotRecall query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var lot = await Reading.SingleOrDefaultAsync(
+            context.Connection, context.Transaction, $"SELECT {LabReads.LotColumns} {LabReads.LotFrom} WHERE f.company_id = @c AND f.lot_id = @l", LabReads.Lot, cancellationToken,
+            ("c", context.CompanyId), ("l", query.LotId)).ConfigureAwait(false)
+            ?? throw new DomainException(ManufacturingErrors.NotFound, "The finished-goods lot does not exist.");
+
+        // E-LAB1-01-1: Sales' tables are read here, read-only; the module graph does not change.
+        var deliveries = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT d.delivery_id, d.delivery_no, d.status, d.gate_out_at, p.party_id, p.legal_name, o.order_no, o.site_address, i.code, dl.base_quantity,
+                   (SELECT string_agg(DISTINCT v.invoice_no, ', ' ORDER BY v.invoice_no) FROM sal.invoice_line il JOIN sal.invoice v ON v.invoice_id = il.invoice_id
+                    WHERE il.delivery_line_id = l.delivery_line_id AND v.commercial_status <> 'VOIDED')
+            FROM log.delivery_line_lot dl
+            JOIN log.delivery_line l ON l.delivery_line_id = dl.delivery_line_id
+            JOIN log.delivery d ON d.delivery_id = l.delivery_id
+            JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id
+            JOIN md.party p ON p.party_id = o.party_id
+            JOIN md.item i ON i.item_id = l.item_id
+            WHERE dl.company_id = @c AND dl.lot_id = @l
+            ORDER BY d.gate_out_at, d.delivery_no
+            """,
+            r => new RecallDelivery(
+                r.GetGuid(0), r.GetString(1), r.GetString(2), r.NullableUtc(3), r.GetGuid(4), r.GetString(5), r.GetString(6), r.NullableString(7), r.GetString(8), r.GetDecimal(9), r.NullableString(10)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("l", query.LotId)).ConfigureAwait(false);
+        var stock = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT p.code, l.code, b.quantity FROM inv.inv_stock_balance b JOIN md.location l ON l.location_id = b.location_id JOIN md.plant p ON p.plant_id = l.plant_id
+            WHERE b.lot_id = @l AND b.quantity > 0 ORDER BY p.code, l.code
+            """,
+            r => new RecallStock(r.GetString(0), r.GetString(1), r.GetDecimal(2)),
+            cancellationToken,
+            ("l", query.LotId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new LotRecall(
+            lot, deliveries, stock, deliveries.Sum(d => d.BaseQuantity), stock.Sum(x => x.Quantity), deliveries.Select(d => d.CustomerId).Distinct().Count()));
+    }
+}
+
+[RequiresPermission("lab:read")]
+public sealed class GetDeliveryRecallHandler : IQueryHandler<GetDeliveryRecall>
+{
+    private sealed record Header(Guid DeliveryId, string DeliveryNo, string Status, string CustomerName, string OrderNo, string? SiteAddress);
+
+    private sealed record Taken(Guid LotId, string LotCode, decimal BaseQuantity, Guid? SummaryId, string? RunNo, int? RecipeVersion);
+
+    public string QueryType => "Manufacturing.GetDeliveryRecall";
+
+    public async Task<string> HandleAsync(GetDeliveryRecall query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var header = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT d.delivery_id, d.delivery_no, d.status, p.legal_name, o.order_no, o.site_address
+            FROM log.delivery d JOIN sal.sales_order o ON o.sales_order_id = d.sales_order_id JOIN md.party p ON p.party_id = o.party_id
+            WHERE d.company_id = @c AND d.delivery_id = @d
+            """,
+            r => new Header(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.NullableString(5)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("d", query.DeliveryId)).ConfigureAwait(false)
+            ?? throw new DomainException(ManufacturingErrors.NotFound, "The delivery does not exist.");
+        var taken = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT dl.lot_id, il.lot_code, sum(dl.base_quantity), f.summary_id, r.run_no, rv.version
+            FROM log.delivery_line_lot dl
+            JOIN log.delivery_line l ON l.delivery_line_id = dl.delivery_line_id
+            JOIN inv.lot il ON il.lot_id = dl.lot_id
+            LEFT JOIN mfg.fg_lot f ON f.lot_id = dl.lot_id
+            LEFT JOIN mfg.production_run r ON r.run_id = f.run_id
+            LEFT JOIN mfg.recipe_version rv ON rv.recipe_version_id = r.recipe_version_id
+            WHERE dl.company_id = @c AND l.delivery_id = @d
+            GROUP BY dl.lot_id, il.lot_code, f.summary_id, r.run_no, rv.version
+            ORDER BY il.lot_code
+            """,
+            r => new Taken(r.GetGuid(0), r.GetString(1), r.GetDecimal(2), r.NullableGuid(3), r.NullableString(4), r.IsDBNull(5) ? null : r.GetInt32(5)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("d", query.DeliveryId)).ConfigureAwait(false);
+        var lots = new List<RecallLot>();
+        foreach (var t in taken.Where(x => x.SummaryId is not null))
+        {
+            var lot = (await Reading.SingleOrDefaultAsync(
+                context.Connection, context.Transaction, $"SELECT {LabReads.LotColumns} {LabReads.LotFrom} WHERE f.company_id = @c AND f.lot_id = @l", LabReads.Lot, cancellationToken,
+                ("c", context.CompanyId), ("l", t.LotId)).ConfigureAwait(false))!;
+            var consumption = await Reading.ListAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                SELECT i.code, i.description, i.base_uom, c.qty, c.theoretical_qty FROM mfg.material_consumption c JOIN md.item i ON i.item_id = c.material_item_id
+                WHERE c.company_id = @c AND c.summary_id = @s ORDER BY i.code
+                """,
+                r => new RecallConsumption(r.GetString(0), r.GetString(1), r.GetString(2), r.GetDecimal(3), r.GetDecimal(4)),
+                cancellationToken,
+                ("c", context.CompanyId),
+                ("s", t.SummaryId)).ConfigureAwait(false);
+            lots.Add(new RecallLot(lot, t.BaseQuantity, t.RunNo!, t.RecipeVersion!.Value, consumption));
+        }
+
+        return ApiJson.Serialize(new DeliveryRecall(
+            header.DeliveryId, header.DeliveryNo, header.Status, header.CustomerName, header.OrderNo, header.SiteAddress, lots,
+            [.. taken.Where(x => x.SummaryId is null).Select(x => x.LotCode)]));
     }
 }

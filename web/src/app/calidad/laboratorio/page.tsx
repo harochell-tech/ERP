@@ -5,7 +5,7 @@ import { query, type Schemas } from "@/api/client";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, Field, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
 import { formatDecimal, formatPercent, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
-import { BLOCK_CONDITION, FIELD_CODE_WAITS, specimenBody, todayIso, type SpecimenDraft } from "@/lib/lab";
+import { alertsText, BLOCK_CONDITION, FIELD_CODE_WAITS, specimenBody, todayIso, verdictBadge, type SpecimenDraft } from "@/lib/lab";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
@@ -447,6 +447,13 @@ export default function Page() {
             <dt>Estado</dt>
             <dd>
               <StatusBadge status={lot.status} />
+            </dd>
+            <dt>Veredicto</dt>
+            <dd data-testid="lab-lot-verdict">
+              <span className={`badge ${verdictBadge(lot.verdict, lot.basis).tone}`}>{verdictBadge(lot.verdict, lot.basis).label}</span>
+              {lot.strength28d ? ` ${formatDecimal(lot.strength28d)} kg/cm² a 28 d` : ""}
+              {lot.alerts.length > 0 ? <span className="muted"> · {alertsText(lot.alerts)}</span> : null}
+              {lot.status === "BLOCKED" && lot.blockCause === "LAB" ? <div className="muted">El lote quedó bloqueado: no se despacha hasta que Calidad lo revise.</div> : null}
             </dd>
             <dt>Medidas nominales</dt>
             <dd>
