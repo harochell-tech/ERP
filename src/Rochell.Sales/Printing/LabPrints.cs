@@ -53,8 +53,12 @@ public static class LabPrints
     /// <summary>E-LAB1-03-8: the public page a certificate's QR opens (no sign-in).</summary>
     public static string VerifyPath(Guid companyId, string publicCode) => $"/verificar/certificado/?c={companyId:D}&k={publicCode}";
 
-    /// <summary>E-LAB1-03-10: the lot in Core with its rack — the phone opens it (with a session); Dispatch's scanner takes the lot from it.</summary>
-    public static string LotPath(Guid lotId, int rackNo) => string.Create(CultureInfo.InvariantCulture, $"/calidad/lotes/?lote={lotId:D}&rack={rackNo}");
+    /// <summary>
+    /// E-LAB1-03-10: the lot in Core with its rack — the phone opens it (with a session); Dispatch's scanner takes the lot from it, and the
+    /// code to show what was scanned.
+    /// </summary>
+    public static string LotPath(Guid lotId, int rackNo, string code)
+        => string.Create(CultureInfo.InvariantCulture, $"/calidad/lotes/?lote={lotId:D}&rack={rackNo}&codigo={Uri.EscapeDataString(code)}");
 
     private static readonly Dictionary<string, string> Conditions = new(StringComparer.Ordinal)
     {
@@ -199,7 +203,7 @@ public static class LabPrints
             ["emisor"] = new Dictionary<string, object?> { ["nombre"] = issuer },
             ["etiquetas"] = racks.Where(r => rackNo is null || r.RackNo == rackNo).Select(r =>
             {
-                var url = Url(baseUrl, LotPath(lot.LotId, r.RackNo))!;
+                var url = Url(baseUrl, LotPath(lot.LotId, r.RackNo, lot.Code))!;
                 return (object?)new Dictionary<string, object?>
                 {
                     ["codigo"] = lot.Code,

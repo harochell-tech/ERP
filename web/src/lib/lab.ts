@@ -92,3 +92,29 @@ export function qualityActions(lot: { status: string; readyForFinalRelease: bool
   }
   return actions;
 }
+
+/** LAB1-03 (E-LAB1-03-10): a rack label's QR — `/calidad/lotes/?lote=<id>&rack=<n>&codigo=<field code>` — or null when the text is not one. */
+export function parseRackQr(text: string): { lotId: string; rackNo: number | null; code: string | null } | null {
+  let url: URL;
+  try {
+    url = new URL(text.trim(), "https://rochell.invalid");
+  } catch {
+    return null;
+  }
+  const lotId = url.searchParams.get("lote") ?? "";
+  if (!url.pathname.endsWith("/calidad/lotes/") || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lotId)) {
+    return null;
+  }
+  const rack = Number.parseInt(url.searchParams.get("rack") ?? "", 10);
+  return { lotId: lotId.toLowerCase(), rackNo: Number.isInteger(rack) && rack >= 1 ? rack : null, code: url.searchParams.get("codigo") };
+}
+
+/** E-LAB1-03-2/4: the break dates a certificate can be issued for — dates with at least one valid specimen, newest first. */
+export function certifiableDates(tests: Pick<Schemas["CompressionTestView"], "breakDate" | "status">[]): string[] {
+  return [...new Set(tests.filter((t) => t.status === "RECORDED").map((t) => t.breakDate))].sort().reverse();
+}
+
+/** E-LAB1-03-5: why a certificate is void, in words. */
+export function certificateVoidText(cause: string | null | undefined): string {
+  return cause === "SPECIMEN_VOIDED" ? "anulado porque se anuló una de sus probetas" : cause === "MANUAL" ? "anulado por Calidad" : "";
+}

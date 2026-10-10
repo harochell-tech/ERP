@@ -20,7 +20,7 @@ type Settings = Schemas["PrintSettings"];
 type Column = Schemas["PrintColumnSetting"];
 type TypeView = Schemas["PrintFormatTypeView"];
 
-const PAPERS: Record<string, string> = { CARTA: "Carta", MEDIA_CARTA: "Media carta", TICKET_80: "Ticket de 80 mm" };
+const PAPERS: Record<string, string> = { CARTA: "Carta", MEDIA_CARTA: "Media carta", TICKET_80: "Ticket de 80 mm", ETIQUETA_100X150: "Etiqueta de 100 × 150 mm" };
 const ALIGN: Record<string, string> = { IZQUIERDA: "Izquierda", CENTRO: "Centro", DERECHA: "Derecha" };
 const STATUS: Record<string, string> = { DRAFT: "Borrador", ACTIVE: "Activo", RETIRED: "Retirado" };
 

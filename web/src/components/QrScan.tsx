@@ -76,7 +76,7 @@ function Camera({ onRead, onStop }: { onRead: (text: string) => void; onStop: (p
 }
 
 /** «Escanear QR»: calls <paramref name="onLink"/> with the link the QR holds. */
-export function QrScan({ onLink, busy }: { onLink: (link: string) => void; busy: boolean }) {
+export function QrScan({ onLink, busy, placeholder = "https://ecf.dgii.gov.do/…", testId = "qr-scan" }: { onLink: (link: string) => void; busy: boolean; placeholder?: string; testId?: string }) {
   const [camera, setCamera] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [pasted, setPasted] = useState("");
@@ -107,7 +107,7 @@ export function QrScan({ onLink, busy }: { onLink: (link: string) => void; busy:
   };
 
   return (
-    <section className="qr-scan" data-testid="qr-scan">
+    <section className="qr-scan" data-testid={testId}>
       <div className="actions">
         <button type="button" disabled={busy} onClick={() => setCamera((c) => !c)}>
           {camera ? "Cerrar la cámara" : "Escanear QR con la cámara"}
@@ -137,7 +137,7 @@ export function QrScan({ onLink, busy }: { onLink: (link: string) => void; busy:
           }
         }}
       >
-        <input type="url" aria-label="Enlace del QR" placeholder="https://ecf.dgii.gov.do/…" value={pasted} onChange={(e) => setPasted(e.target.value)} />
+        <input type="url" aria-label="Enlace del QR" placeholder={placeholder} value={pasted} onChange={(e) => setPasted(e.target.value)} />
         <button type="submit" disabled={busy || !pasted.trim()}>
           Usar enlace
         </button>

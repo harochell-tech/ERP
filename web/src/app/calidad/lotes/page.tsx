@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ConfirmAction, ErrorBox, Field, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
 import { formatDecimal, formatPercent, formatQuantity } from "@/lib/decimal";
-import { alertsText, qualityActions, verdictBadge } from "@/lib/lab";
+import { alertsText, certifiableDates, certificateVoidText, qualityActions, verdictBadge } from "@/lib/lab";
 import { statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -14,6 +15,8 @@ import { useLoad } from "@/lib/useQuery";
 // LAB1-02 (E-LAB1-4, 5; E-LAB1-02-1…15): Calidad › Lotes. Every lot with the lab's verdict — 28-day strength real or estimated — and its
 // alerts. A NO CUMPLE has already blocked the lot when it shows here; Calidad unblocks with a reason, blocks by hand, gives the final
 // release (only on a CUMPLE with real breaks) and sees the recall: which deliveries and customers got the lot and what is left of it.
+// LAB1-03 (E-LAB1-03-2…10): the lot's certificates — issue one per break date, with a delivery's customer or none; print; void — and
+// the rack labels. A rack label's QR opens this page on its lot (`?lote=`).
 
 type Lot = Schemas["LabLotView"];
 
@@ -24,6 +27,121 @@ function initialView(): string {
     return "";
   }
   return window.location.hash === "#bloqueados" ? "BLOCKED_BY_LAB" : window.location.hash === "#liberacion-final" ? "READY_FINAL" : "";
+}
+
+/** E-LAB1-03-10: a rack label's QR opens the page on its lot. */
+function initialLot(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const lot = new URLSearchParams(window.location.search).get("lote");
+  return lot && /^[0-9a-f-]{36}$/i.test(lot) ? lot.toLowerCase() : null;
+}
+
+type Detail = Schemas["LabLotDetail"];
+type Recall = Schemas["LotRecall"];
+
+function Certificates({ detail, recall, onDone }: { detail: Detail; recall: Recall; onDone: () => void }) {
+  const { can } = useSession();
+  const lot = detail.lot;
+  const name = lot.fieldCode ?? lot.lotCode;
+  const dates = certifiableDates(detail.compression);
+  const deliveries = [...new Map(recall.deliveries.map((d) => [d.deliveryId, d])).values()];
+  const [breakDate, setBreakDate] = useState(dates[0] ?? "");
+  const [deliveryId, setDeliveryId] = useState("");
+  const issue = useCommand(`issue-certificate:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/issue-lab-certificate", `Lote ${name}: certificado emitido.`);
+  const voidOne = useCommand(`void-certificate:${lot.lotId}`, "/api/v1/companies/{companyId}/manufacturing/void-lab-certificate", "Certificado anulado.");
+  const canIssue = can("fg_lot:final_release");
+  return (
+    <>
+      <h2>Certificados</h2>
+      <div className="table-wrap">
+        <table data-testid="lot-certificates">
+          <thead>
+            <tr>
+              <th>Número</th>
+              <th>Rotura</th>
+              <th className="num">Probetas</th>
+              <th>Conduce y cliente</th>
+              <th>Estado</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {detail.certificates.map((c) => (
+              <tr key={c.certificateId} data-testid={`lot-certificate:${c.certificateNo}`}>
+                <td className="mono">{c.certificateNo}</td>
+                <td>{c.breakDate}</td>
+                <td className="num">{c.specimens}</td>
+                <td className="wrap">{c.deliveryNo ? `${c.deliveryNo} · ${c.customerName ?? ""}` : "Sin conduce"}</td>
+                <td className="wrap">
+                  <StatusBadge status={c.status} />
+                  {c.status === "VOIDED" ? <div className="muted">{`${certificateVoidText(c.voidCause)}: ${c.voidReason ?? ""}`}</div> : null}
+                </td>
+                <td className="actions">
+                  <Link href={`/calidad/certificado/?id=${c.certificateId}`}>Imprimir</Link>
+                  {canIssue && c.status === "ISSUED" ? (
+                    <ReasonAction
+                      label="Anular"
+                      stepUp
+                      busy={voidOne.busy}
+                      consequence={`El certificado ${c.certificateNo} queda anulado y su verificación pública lo dirá.`}
+                      onConfirm={async (reason) => (await voidOne.run({ plantId: lot.plantId, certificateId: c.certificateId, reason })) && onDone()}
+                    />
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+            {detail.certificates.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="muted">
+                  Este lote no tiene certificados.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+      {canIssue ? (
+        lot.fieldCode === null || lot.fieldCode === undefined ? (
+          <p className="muted">Para emitir un certificado el lote necesita su código de campo.</p>
+        ) : dates.length === 0 ? (
+          <p className="muted">Para emitir un certificado el lote necesita al menos una probeta válida.</p>
+        ) : (
+          <div className="inline-form" data-testid="issue-certificate">
+            <Field label="Fecha de rotura">
+              <select value={breakDate} onChange={(e) => setBreakDate(e.target.value)}>
+                {dates.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Cliente y obra del conduce">
+              <select value={deliveryId} onChange={(e) => setDeliveryId(e.target.value)}>
+                <option value="">Sin conduce (no muestra cliente ni obra)</option>
+                {deliveries.map((d) => (
+                  <option key={d.deliveryId} value={d.deliveryId}>
+                    {d.deliveryNo} · {d.customerName}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <ConfirmAction
+              label="Emitir certificado"
+              className="primary"
+              stepUp
+              busy={issue.busy}
+              consequence={`Se emite el certificado de las probetas válidas del lote ${name} rotas el ${breakDate}, con los resultados ensayados (nunca la estimación a 28 días). Queda como una foto: si después se anula una de sus probetas, el certificado se anula solo.`}
+              onConfirm={async () => (await issue.run({ plantId: lot.plantId, lotId: lot.lotId, breakDate, deliveryId: deliveryId || null })) && onDone()}
+            />
+          </div>
+        )
+      ) : null}
+      <ErrorBox error={issue.error ?? voidOne.error} />
+    </>
+  );
 }
 
 function Verdict({ lot }: { lot: Pick<Lot, "verdict" | "basis" | "lotId"> }) {
@@ -88,7 +206,7 @@ function Actions({ lot, onDone }: { lot: Lot; onDone: () => void }) {
 }
 
 function LotDetail({ lotId, onBack, onChanged }: { lotId: string; onBack: () => void; onChanged: () => void }) {
-  const { companyId } = useSession();
+  const { companyId, can } = useSession();
   const { data, error, reload } = useLoad(
     async () => {
       const [detail, recall] = await Promise.all([
@@ -140,6 +258,11 @@ function LotDetail({ lotId, onBack, onChanged }: { lotId: string; onBack: () => 
           onChanged();
         }}
       />
+      {can("production:read") ? (
+        <p>
+          <Link href={`/produccion/etiquetas/?lote=${lot.lotId}`}>Imprimir etiquetas de los racks</Link>
+        </p>
+      ) : null}
       {e ? (
         <>
           <h2>Evaluación</h2>
@@ -172,6 +295,14 @@ function LotDetail({ lotId, onBack, onChanged }: { lotId: string; onBack: () => 
       ) : (
         <p className="muted">Este lote todavía no tiene ensayos.</p>
       )}
+      <Certificates
+        detail={detail}
+        recall={recall}
+        onDone={() => {
+          reload();
+          onChanged();
+        }}
+      />
       <h2>Recall: a dónde fue el lote</h2>
       <p data-testid="quality-lot-recall-summary">
         Despachado: {formatQuantity(recall.dispatched)} un a {recall.customers} cliente(s) · En existencia: {formatQuantity(recall.inStock)} un
@@ -224,7 +355,7 @@ export default function Page() {
   const allowed = can("lab:read");
   const [view, setView] = useState(initialView);
   const [search, setSearch] = useState("");
-  const [lotId, setLotId] = useState<string | null>(null);
+  const [lotId, setLotId] = useState<string | null>(initialLot);
   const { data, error, reload } = useLoad(
     allowed ? () => query("/api/v1/companies/{companyId}/manufacturing/lab/lots", { path: { companyId }, query: { search: search.trim() || undefined, view: view || undefined, limit: 200 } }) : null,
     [companyId, view, search],

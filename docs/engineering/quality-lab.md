@@ -163,7 +163,7 @@ recall and Calidad's actions (final release, block, unblock, evaluate again). La
   `GET …/manufacturing/lots/{lotId}/rack-labels?rack=` — every live rack, or one. `GetPrintDocument` (`sales:read`) refuses both types.
 - A format of either type is activated only when the example shows what is mandatory: the certificate's number, its QR, the gross-area
   note and «ANULADO» on a voided one; the label's field code and QR.
-- The label's QR: `/calidad/lotes/?lote=<lotId>&rack=<n>`.
+- The label's QR: `/calidad/lotes/?lote=<lotId>&rack=<n>&codigo=<field code>`.
 - The conduce (screen and print) shows each lot's field code when it has one, else its internal code (E-LAB1-03-13).
 
 ### Scan at loading (E-LAB1-03-11/12/16)
@@ -174,7 +174,18 @@ recall and Calidad's actions (final release, block, unblock, evaluate again). La
 - `RecordGateOut` takes the scanned lots first, in that order and up to their stock, then FIFO for the rest. A scanned lot blocked
   after loading stops the gate-out (`STOCK_BLOCKED_BY_QUALITY`): the truck carries it; Dispatch cancels the delivery and plans it again.
 
+### Web (LAB1-03b)
+
+- Despacho › conduce, «Confirmar carga»: per line, «Escanear rack» (camera, photo or pasted link, the `QrScan` of Compras) lists the
+  racks read (`parseRackQr`: the lot, its rack and its code); «Quitar» drops one. Without scans the line leaves FIFO.
+- Calidad › Lotes: a rack label's QR opens the lot (`?lote=`). The lot shows «Imprimir etiquetas de los racks»
+  (`/produccion/etiquetas/?lote=&rack=`, `production:read`) and its certificates: number, break date, specimens, delivery and customer,
+  status with why it is void; «Imprimir» (`/calidad/certificado/?id=`, `lab:read`) and «Anular» with a reason (step-up). Calidad issues
+  one from the break dates with a valid specimen and a delivery that took the lot, or none (step-up).
+- Configuración › Formatos de impresión gains «Certificado de laboratorio» and «Etiqueta de rack» (paper «Etiqueta de 100 × 150 mm»).
+  Journey: `e2e/print-formats-journey.spec.ts`.
+
 ### Not yet
 
-The screens and the public verification page (LAB1-03b); control chart, the age curve on screen and the history before Core,
+The public verification page (waits for E-LAB1-03-15); control chart, the age curve on screen and the history before Core,
 `qa.legacy_lot` (LAB1-04, E-LAB1-01-15).
