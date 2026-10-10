@@ -252,7 +252,13 @@ The gateway is **OFF** until `ECF_MODE` and `ECF_BASE_URL` are set as **variable
 ```
 ECF_MODE=SANDBOX
 ECF_BASE_URL=https://sandbox.alanube.co/dom/v1/
+ECF_SANDBOX_RNC=132109122
 ```
+
+`ECF_SANDBOX_RNC` (E-VS4-06-1) is the test company Alanube's sandbox account is registered with: every e-CF goes out with it as
+the sender, because Alanube refuses any other (AP1016). Delete it before `ECF_MODE=PRODUCTION` — the API refuses to start with
+both. Then, in Fiscal › Rangos e-NCF, prepare and approve the test range E31 9820501–9821000, due 2028-12-31 (E-VS4-06-2); the
+contract test uses the numbers below.
 
 The token and the webhook secret never go to GitHub, the `.env` or the chat: they are files on the server, read by the API at
 start (`secrets/ecf`, mounted read-only at `/run/secrets/ecf`). On the server, once (and again to rotate the token):

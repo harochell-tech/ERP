@@ -33,7 +33,7 @@ public sealed partial class AlanubeProvider(HttpClient http, EcfSettings setting
     {
         ArgumentNullException.ThrowIfNull(payload);
         using var request = Request(HttpMethod.Post, PathOf(ecfType));
-        request.Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
+        request.Content = new StringContent(ForSandbox(payload, "sender", "rnc").ToJsonString(), Encoding.UTF8, "application/json");
         var (status, body, failure) = await SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (failure is not null || status is null || (int)status >= 500)
         {
@@ -63,7 +63,7 @@ public sealed partial class AlanubeProvider(HttpClient http, EcfSettings setting
     {
         ArgumentNullException.ThrowIfNull(payload);
         using var request = Request(HttpMethod.Post, "cancellations");
-        request.Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
+        request.Content = new StringContent(ForSandbox(payload, "header", "rncSender").ToJsonString(), Encoding.UTF8, "application/json");
         var (status, body, failure) = await SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (failure is not null || status is null || (int)status >= 500)
         {
@@ -120,6 +120,26 @@ public sealed partial class AlanubeProvider(HttpClient http, EcfSettings setting
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// E-VS4-06-1: in Sandbox with <see cref="EcfSettings.SandboxSenderRnc"/> set, a copy of the payload whose sender RNC is the test
+    /// company's — the same JSON kind (number or text) the field already had. Anywhere else the payload goes as it is.
+    /// </summary>
+    private JsonObject ForSandbox(JsonObject payload, string parent, string field)
+    {
+        if (settings.Mode != EcfModes.Sandbox || string.IsNullOrWhiteSpace(settings.SandboxSenderRnc) || payload[parent] is not JsonObject)
+        {
+            return payload;
+        }
+
+        var copy = (JsonObject)payload.DeepClone();
+        var holder = (JsonObject)copy[parent]!;
+        var rnc = settings.SandboxSenderRnc.Trim();
+        holder[field] = holder[field] is JsonValue v && v.GetValueKind() == JsonValueKind.Number && long.TryParse(rnc, NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+            ? number
+            : rnc;
+        return copy;
     }
 
     private HttpRequestMessage Request(HttpMethod method, string path)

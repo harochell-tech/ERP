@@ -101,6 +101,12 @@ if (string.IsNullOrWhiteSpace(settings.Ecf.WebhookSecret) && !string.IsNullOrWhi
     settings.Ecf.WebhookSecret = File.ReadAllText(settings.Ecf.WebhookSecretFile).Trim();
 }
 
+// E-VS4-06-1: the sandbox's test RNC never reaches Production — only a SANDBOX deployment may set it.
+if (!string.IsNullOrWhiteSpace(settings.Ecf.SandboxSenderRnc) && settings.Ecf.Mode != EcfModes.Sandbox)
+{
+    throw new InvalidOperationException($"Ecf:SandboxSenderRnc is only for Ecf:Mode SANDBOX, not {settings.Ecf.Mode} (E-VS4-06-1).");
+}
+
 services.AddSingleton(settings.Ecf);
 services.AddSingleton(new EcfSwitch(settings.Ecf.Enabled));
 services.AddSingleton<IEcfSourceUpdater, Rochell.Sales.Ecf.InvoiceEcfUpdater>();

@@ -92,6 +92,17 @@ public sealed class EcfGatewayApiTests(PostgresFixture postgres)
         Assert.Equal((false, (string?)"No pedido"), (Assert.Single(alanube.Responses).Accept, alanube.Responses[0].Reason));
     }
 
+    [Fact]
+    public async Task The_sandbox_test_rnc_stops_the_host_outside_sandbox_mode()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        using var api = new ApiHost(h, settings: new Dictionary<string, string?>(Simulated) { ["Rochell:Ecf:SandboxSenderRnc"] = "132109122" });
+
+        var error = Assert.Throws<InvalidOperationException>(() => api.CreateClient());
+
+        Assert.Contains("E-VS4-06-1", error.Message, StringComparison.Ordinal);
+    }
+
     private static Task<HttpResponseMessage> Webhook(HttpClient client, string? secret)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, EcfWebhook.Path) { Content = new StringContent("""{"id":"01SIM"}""", Encoding.UTF8, "application/json") };
