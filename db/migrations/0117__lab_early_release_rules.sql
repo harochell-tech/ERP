@@ -34,3 +34,20 @@ INSERT INTO qa.parameter_default (code, name, kind, number_value, text_value, mi
   ('FINAL_RELEASE_AGE', 'Liberación final: edad de las probetas (días)', 'NUMBER', 3, NULL, 1, 28, true, 170),
   ('DEFAULT_MIN_AVG_1D', 'Requisito sugerido: promedio mínimo a 1 día (kg/cm²)', 'NUMBER', 40, NULL, 1, 500, false, 180),
   ('DEFAULT_MIN_AVG_3D', 'Requisito sugerido: promedio mínimo a 3 días (kg/cm²)', 'NUMBER', 70, NULL, 1, 500, false, 190);
+
+-- ---------------------------------------------------------------------------------------------
+-- E-LAB1-18: the 28-day estimate comes from the latest early breaks after the initial-release ages (3 days once they exist); breaks at
+-- 1…INITIAL_RELEASE_MAX_AGE days only decide the initial release. The age curve gives each early age its own factor from every lot that
+-- has breaks at that age and at 28 days (no longer only the lot's minimum age).
+-- ---------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION qa.own_age_factors(company uuid) RETURNS TABLE (age_days integer, factor numeric, lots integer)
+  LANGUAGE sql STABLE AS $$
+  WITH p AS (SELECT qa.parameter_number(company, 'AGE_28D_MIN_DAYS') AS a28, qa.parameter_number(company, 'INITIAL_RELEASE_MAX_AGE') AS imax),
+  t AS (
+    SELECT c.lot_id, c.age_days, c.strength_kgcm2 FROM qa.compression_test c WHERE c.company_id = company AND c.status = 'RECORDED'),
+  r AS (SELECT t.lot_id, avg(t.strength_kgcm2) AS avg_28d FROM t, p WHERE t.age_days >= p.a28 GROUP BY t.lot_id),
+  e AS (
+    SELECT t.lot_id, t.age_days, avg(t.strength_kgcm2) AS early_avg FROM t, p
+    WHERE t.age_days > p.imax AND t.age_days < p.a28 GROUP BY t.lot_id, t.age_days)
+  SELECT e.age_days, round(avg(e.early_avg / r.avg_28d), 6), count(*)::integer FROM e JOIN r ON r.lot_id = e.lot_id GROUP BY e.age_days
+$$;

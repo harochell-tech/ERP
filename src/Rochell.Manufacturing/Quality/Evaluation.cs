@@ -137,9 +137,10 @@ internal static class LotEvaluator
             context.Connection,
             context.Transaction,
             """
-            WITH p AS (SELECT qa.parameter_number(@c, 'AGE_28D_MIN_DAYS') AS a28),
+            WITH p AS (SELECT qa.parameter_number(@c, 'AGE_28D_MIN_DAYS') AS a28, qa.parameter_number(@c, 'INITIAL_RELEASE_MAX_AGE') AS imax),
             t AS (SELECT age_days, strength_kgcm2 AS s FROM qa.compression_test WHERE company_id = @c AND lot_id = @l AND status = 'RECORDED'),
-            e AS (SELECT min(t.age_days) AS age FROM t, p WHERE t.age_days >= 1 AND t.age_days < p.a28)
+            -- E-LAB1-18: the latest early age after the initial-release ages; breaks at 1…imax days never estimate.
+            e AS (SELECT max(t.age_days) AS age FROM t, p WHERE t.age_days > p.imax AND t.age_days < p.a28)
             SELECT (SELECT count(*)::int FROM t), (SELECT min(age_days) FROM t), (SELECT max(age_days) FROM t),
                    (SELECT round(avg(s), 6) FROM t), (SELECT min(s) FROM t), (SELECT max(s) FROM t), (SELECT round(stddev_samp(s), 6) FROM t),
                    (SELECT age FROM e),

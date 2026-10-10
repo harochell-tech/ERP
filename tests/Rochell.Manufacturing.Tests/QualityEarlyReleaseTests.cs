@@ -88,7 +88,8 @@ public sealed class QualityEarlyReleaseTests(PostgresFixture postgres)
         // Day 1: no breaks yet, then three below 40 — the lot stays curing, not blocked.
         await DayAsync(x, 1);
         var none = await Assert.ThrowsAsync<DomainException>(() => ReleaseAsync(x, lot, "rel-0"));
-        await BreakAsync(x, lot, 1, "d1", Load(30000m), Load(30000m), Load(30000m));
+        // E-LAB1-18: breaks at 1 day never estimate the 28-day strength (38.95 ÷ 0.70 would be 55.64): «Sin dato», nothing blocked.
+        var day1 = await BreakAsync(x, lot, 1, "d1", Load(30000m), Load(30000m), Load(30000m));
         var low = await Assert.ThrowsAsync<DomainException>(() => ReleaseAsync(x, lot, "rel-1"));
         var afterDay1 = (await DetailAsync(x, lot)).GetProperty("lot").GetProperty("status").GetString();
 
@@ -100,7 +101,7 @@ public sealed class QualityEarlyReleaseTests(PostgresFixture postgres)
         await ReleaseAsync(x, lot, "rel-3");
         var initial = (await DetailAsync(x, lot)).GetProperty("evaluation");
 
-        // Day 3: three at 72.70 — the final release. (The 28-day estimate still comes from the earliest breaks: 38.95 ÷ 0.70 = 55.64 ≥ 50.)
+        // Day 3: three at 72.70 — the final release; the 28-day estimate now comes from them (E-LAB1-18): 72.70 ÷ 0.84 = 86.55 ≥ 50.
         await DayAsync(x, 3);
         var threeDays = await BreakAsync(x, lot, 3, "d3", Load(56000m), Load(56000m), Load(56000m));
         var final = Json((await FinalAsync(x, lot, "final")).ResultPayload);
@@ -115,9 +116,10 @@ public sealed class QualityEarlyReleaseTests(PostgresFixture postgres)
         Assert.Equal(QualityErrors.InitialReleaseRefused, low.Code);
         Assert.Equal(QualityErrors.InitialReleaseRefused, few.Code);
         Assert.Equal("CURING", afterDay1);
+        Assert.Equal("NO_DATA::-", $"{day1.GetProperty("verdict").GetString()}:{day1.GetProperty("basis").GetString()}:{(day1.GetProperty("blocked").GetBoolean() ? "blocked" : "-")}");
         Assert.Equal("PASS:3:45.439792", Check(initial, "initial"));
         Assert.Equal(2, initial.GetProperty("initialAge").GetInt32());
-        Assert.Equal("COMPLIES:ESTIMATED:-", $"{threeDays.GetProperty("verdict").GetString()}:{threeDays.GetProperty("basis").GetString()}:{(threeDays.GetProperty("blocked").GetBoolean() ? "blocked" : "-")}");
+        Assert.Equal("COMPLIES:ESTIMATED:86.551986:-", $"{threeDays.GetProperty("verdict").GetString()}:{threeDays.GetProperty("basis").GetString()}:{threeDays.GetProperty("strength28d").GetString()}:{(threeDays.GetProperty("blocked").GetBoolean() ? "blocked" : "-")}");
         Assert.Equal("FINAL_RELEASED:3_DAYS", $"{final.GetProperty("status").GetString()}:{final.GetProperty("basis").GetString()}");
         Assert.Equal("PASS:3:72.703668", Check(finalCheck, "final"));
         Assert.Equal("FAILS:REAL:True", $"{real.GetProperty("verdict").GetString()}:{real.GetProperty("basis").GetString()}:{real.GetProperty("blocked").GetBoolean()}");

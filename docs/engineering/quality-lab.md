@@ -211,6 +211,9 @@ recall and Calidad's actions (final release, block, unblock, evaluate again). La
   `basis` 3_DAYS or 28_DAYS. A FAIL final check blocks the lot once (cause LAB); the 28-day NO CUMPLE still blocks, also a final-released
   lot (E-LAB1-13). `ListLabLots` counts as ready for the final release a RELEASED lot with a PASS final check too.
 - No certificate for an untested item; the certificate says the age of its breaks (E-LAB1-17).
+- E-LAB1-18: the 28-day estimate now comes from the **latest** early age after `INITIAL_RELEASE_MAX_AGE` (3 days once they exist);
+  breaks at 1…2 days never estimate nor block by estimate. `qa.own_age_factors` gives each early age after 2 days its own factor from
+  every lot with breaks at that age and at 28 days.
 - Web: Requisitos por ítem — «Se ensaya en laboratorio», minimums at 1 and 3 days (40 / 70 offered), the 28-day one as verification;
   Lotes — the initial and final checks in words, «No se ensaya».
 
