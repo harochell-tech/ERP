@@ -144,10 +144,19 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
 
     public string CommandType => "Procurement.PostSupplierInvoice";
 
+    /// <summary>OCR1-02 (E-OCR1-02-4): an invoice of a rejected e-CF is not posted; posting accepts the e-CF not yet answered.</summary>
     public async Task<string> HandleAsync(PostSupplierInvoice command, CommandContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
+        await SupplierDocuments.SupplierDocumentLinks.EnsureNotRejectedAsync(context, command.SupplierInvoiceId, cancellationToken).ConfigureAwait(false);
+        var result = await PostAsync(command, context, cancellationToken).ConfigureAwait(false);
+        await SupplierDocuments.SupplierDocumentLinks.AcceptOnPostAsync(context, command.SupplierInvoiceId, CommandType, cancellationToken).ConfigureAwait(false);
+        return result;
+    }
+
+    private async Task<string> PostAsync(PostSupplierInvoice command, CommandContext context, CancellationToken cancellationToken)
+    {
 
         // N3: the invoice.
         var header = await SupplierInvoiceStore.LockAsync(context, command.SupplierInvoiceId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
@@ -173,7 +182,9 @@ public sealed class PostSupplierInvoiceHandler : ICommandHandler<PostSupplierInv
         // Fiscal gate and determination at the invoice date (E-PR13-5); a closed gate rejects (SI-07).
         var determination = await _tax.DetermineAsync(
             context,
-            new TaxRequest("SupplierInvoice", header.Id, header.DocDate, header.PartyId, lines.Select(l => new TaxLineInput(l.Id, po[l.PurchaseOrderLineId].ItemId, l.NetAmount)).ToList()),
+            new TaxRequest(
+                "SupplierInvoice", header.Id, header.DocDate, header.PartyId, lines.Select(l => new TaxLineInput(l.Id, po[l.PurchaseOrderLineId].ItemId, l.NetAmount)).ToList(),
+                DocumentSeries: Expenses.ExpenseInvoices.SeriesOf(header.FiscalNumber)),
             cancellationToken).ConfigureAwait(false);
 
         if (determination.HasNonRecoverableInput)
@@ -413,10 +424,19 @@ public sealed class ReverseSupplierInvoiceHandler : ICommandHandler<ReverseSuppl
 
     public string CommandType => "Procurement.ReverseSupplierInvoice";
 
+    /// <summary>OCR1-02 (E-OCR1-02-9): the reversed invoice's document goes back to the inbox, its answer to the DGII kept.</summary>
     public async Task<string> HandleAsync(ReverseSupplierInvoice command, CommandContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
+        var result = await ReverseAsync(command, context, cancellationToken).ConfigureAwait(false);
+        await SupplierDocuments.SupplierDocumentLinks.ReleaseAsync(context, command.SupplierInvoiceId, CommandType, PurchaseOrderStore.RequireReason(command.Reason), cancellationToken)
+            .ConfigureAwait(false);
+        return result;
+    }
+
+    private async Task<string> ReverseAsync(ReverseSupplierInvoice command, CommandContext context, CancellationToken cancellationToken)
+    {
         var reason = PurchaseOrderStore.RequireReason(command.Reason);
         var header = await SupplierInvoiceStore.LockAsync(context, command.SupplierInvoiceId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         if (header.Status != SupplierInvoiceStatus.Matched || header.AccountingStatus != "POSTED")

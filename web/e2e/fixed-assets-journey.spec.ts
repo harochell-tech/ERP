@@ -31,6 +31,7 @@ test("class, service, depreciation, sale and the initial load's preview (E2E-AF1
   await form.getByLabel("Valor residual").fill("10");
   await pick(form.getByLabel("Cuenta de depreciación acumulada"), "15390");
   await pick(form.getByLabel("Cuenta de gasto de depreciación"), "64100");
+  await form.getByLabel("Categoría fiscal").selectOption("3"); // X1-02b: a forklift is category 3 (art. 287)
   await submit(contador, "Preparar clase");
   await expect(contador.getByTestId("asset-category:MONTACARGAS")).toContainText("60 meses");
 

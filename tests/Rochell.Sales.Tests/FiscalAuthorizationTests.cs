@@ -70,6 +70,18 @@ public sealed class FiscalAuthorizationTests(PostgresFixture postgres)
         Assert.NotNull(detail.GetProperty("verifiedBy").GetString());
     }
 
+    /// <summary>X1-01 (E-X1-20, E-X1-01-4): an authorization registered without its validity lasts 180 days from its issue.</summary>
+    [Fact]
+    public async Task Without_its_validity_an_authorization_lasts_180_days_from_its_issue()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+
+        var id = (await h.RunAsync(Register(h, w, "open") with { ValidUntil = null }, new RegisterFiscalAuthorizationHandler())).ResultRef;
+
+        Assert.Equal("2027-02-28", await h.ScalarAsync<string>("SELECT valid_until::text FROM tax.fiscal_authorization WHERE authorization_id = @a", ("a", id)));
+    }
+
     [Fact]
     public async Task Registration_checks_the_customer_the_products_and_the_amounts_and_an_expired_certificate_is_not_verified()
     {

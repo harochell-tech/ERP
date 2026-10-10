@@ -53,6 +53,42 @@ public sealed class FixedAssetCardTests(PostgresFixture postgres)
         return prepared.ResultRef;
     }
 
+    /// <summary>X1-02b (E-X1-18, E-X1-02-4): a category-1 asset's ITBIS is not deductible — it goes to the asset's cost; category 2 keeps it deductible.</summary>
+    [Theory]
+    [InlineData(1, "118000.00", "0.00", "NON_RECOVERABLE_INPUT:18000.00")]
+    [InlineData(2, "100000.00", "18000.00", "RECOVERABLE_INPUT:18000.00")]
+    public async Task A_category_1_assets_ITBIS_goes_to_its_cost(int category, string cost, string recoverable, string effect)
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var f = await ForeignAsync(h);
+        var a = await AccountsAsync(h, f);
+        var contador = await h.SessionWithRolesAsync("CONTADOR");
+        var prepared = await h.RunAsync(
+            new PrepareAssetClass(h.CompanyId, contador, "k", f.Forklift, 240, 0m, a.Accumulated, a.Depreciation, category), new PrepareAssetClassHandler());
+        await h.RunAsync(new ApproveAssetClass(h.CompanyId, f.W.Controller, "k-a", prepared.ResultRef, 1), new ApproveAssetClassHandler());
+        var si = (await h.RunAsync(
+            new RegisterExpenseInvoice(
+                h.CompanyId, f.W.Clerk, "r", f.W.S.Purchasing.SupplierId, "B0100000801", Today(h), Today(h).AddDays(30), f.W.Plant,
+                [new ExpenseLineInput("Nave de curado", f.Forklift, f.W.Types["ITBIS_18"], 1m, 100000m)]),
+            new Expenses.RegisterExpenseInvoiceHandler())).ResultRef;
+        await h.RunAsync(new MatchSupplierInvoice(h.CompanyId, f.W.Clerk, "m", si, 1), new MatchSupplierInvoiceHandler());
+        await h.RunAsync(new ApproveMatchException(h.CompanyId, f.W.Controller, "x", si, 2, "Nave aprobada por la dirección"), new ApproveMatchExceptionHandler());
+        await h.RunAsync(new PostSupplierInvoice(h.CompanyId, f.W.Clerk, "p", si, 3), new PostSupplierInvoiceHandler());
+
+        Assert.Equal(cost, await h.ScalarAsync<string>("SELECT cost::numeric(19,2)::text FROM fa.asset WHERE status <> 'CANCELLED'"));
+        Assert.Equal(
+            $"{cost}|{recoverable}|-118000.00",
+            await h.ScalarAsync<string>(
+                """
+                SELECT (SELECT coalesce(sum(debit - credit), 0)::numeric(19,2) FROM fin.gl_entry e JOIN fin.account x ON x.account_id = e.account_id WHERE x.code = '15300') || '|' ||
+                       (SELECT coalesce(sum(debit - credit), 0)::numeric(19,2) FROM fin.gl_entry WHERE account_role = 'ITBIS_RECOVERABLE') || '|' ||
+                       (SELECT coalesce(sum(debit - credit), 0)::numeric(19,2) FROM fin.gl_entry WHERE account_role = 'AP_CONTROL')
+                """));
+        Assert.Equal(effect, await h.ScalarAsync<string>(
+            "SELECT l.effect || ':' || l.amount::numeric(19,2) FROM pur.supplier_invoice si JOIN tax.tax_determination_line l ON l.determination_id = si.tax_determination_id WHERE si.si_id = @s",
+            ("s", si)));
+    }
+
     [Trait("AcceptanceAf1", "AF-01")]
     [Fact]
     public async Task AF01_a_class_is_prepared_by_the_Contador_approved_by_the_Controller_and_a_new_version_replaces_it()

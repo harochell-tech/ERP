@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { query } from "@/api/client";
 import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, Loading, NoPermission, useFieldErrors } from "@/components/ui";
 import { formatDecimal, formatQuantity, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { addDays, formatDate, todayInDominicanRepublic } from "@/lib/labels";
 import { useSession } from "@/lib/session";
+import { type SupplierDocument, trimDecimal } from "@/lib/supplierDocuments";
 import { useCommand } from "@/lib/useCommand";
 import { useLoad } from "@/lib/useQuery";
 import { allSuppliers } from "@/lib/paging";
@@ -23,16 +24,29 @@ interface Values {
   lines: Record<string, { quantity: string; unitPrice: string }>;
 }
 
-/** T-06: registers a DRAFT invoice against the lines of one received purchase order. Nothing is computed on screen (E-PR18b-4). */
-export default function NewInvoice() {
+/**
+ * T-06: registers a DRAFT invoice against the lines of one received purchase order. Nothing is computed on screen (E-PR18b-4).
+ * OCR1-03 (E-OCR1-03-2/4): from a captured document the supplier, number, date and printed total are filled in and its lines are shown
+ * beside the order's as reference; registering links the document.
+ */
+function NewInvoice({ document }: { document: SupplierDocument | null }) {
   const { companyId, can } = useSession();
   const router = useRouter();
   const register = useCommand<"/api/v1/companies/{companyId}/procurement/register-supplier-invoice", Values>(
-    "register-si",
+    document ? `register-si:${document.supplierDocumentId}` : "register-si",
     "/api/v1/companies/{companyId}/procurement/register-supplier-invoice",
   );
   const [values, setValues] = useState<Values>(
-    () => register.restored ?? { partyId: "", fiscalNumber: "", docDate: todayInDominicanRepublic(), dueDate: "", purchaseOrderId: "", lines: {} },
+    () =>
+      register.restored ?? {
+        partyId: document?.supplierId ?? "",
+        fiscalNumber: document?.fiscalNumber ?? "",
+        docDate: document?.docDate ?? todayInDominicanRepublic(),
+        dueDate: "",
+        purchaseOrderId: "",
+        printedTotal: document?.totalAmount ? trimDecimal(document.totalAmount) : undefined,
+        lines: {},
+      },
   );
   const fe = useFieldErrors();
   const allowed = can("supplier_invoice:register");
@@ -98,7 +112,15 @@ export default function NewInvoice() {
     }
     const fiscalNumber = values.fiscalNumber.trim();
     const response = await register.run(
-      { partyId: values.partyId, supplierFiscalNumber: fiscalNumber, docDate: values.docDate, dueDate: values.dueDate, lines, printedTotal: printedTotal || null },
+      {
+        partyId: values.partyId,
+        supplierFiscalNumber: fiscalNumber,
+        docDate: values.docDate,
+        dueDate: values.dueDate,
+        lines,
+        printedTotal: printedTotal || null,
+        supplierDocumentId: document?.supplierDocumentId ?? null,
+      },
       values,
       `Factura de proveedor ${fiscalNumber} registrada en borrador.`,
     );
@@ -113,6 +135,18 @@ export default function NewInvoice() {
         <strong>Factura de inventario</strong> · <Link href="/cxp/facturas/gasto/">Factura de gastos (sin artículo registrado)</Link>
       </p>
       <h1>Registrar factura de proveedor</h1>
+      {document ? (
+        <div className="notice" data-testid="from-document">
+          <p>Desde el comprobante {document.fiscalNumber}: indique qué líneas de la orden factura. Sus líneas, como referencia:</p>
+          <ul>
+            {document.lines.map((l) => (
+              <li key={l.lineNo}>
+                {l.description}: {formatQuantity(l.quantity)} × {formatDecimal(l.unitPrice)} = {formatDecimal(l.amount)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div>
         <Field label="Proveedor" required error={fe.errors.partyId}>
           <SearchSelect
@@ -217,5 +251,28 @@ export default function NewInvoice() {
       </div>
       <ErrorBox error={register.error ?? orders.error ?? order.error} />
     </>
+  );
+}
+
+function FromDocument() {
+  const { companyId, can } = useSession();
+  const id = useSearchParams().get("documento");
+  const doc = useLoad(
+    id && can("supplier_invoice:read")
+      ? () => query("/api/v1/companies/{companyId}/procurement/supplier-documents/{supplierDocumentId}", { path: { companyId, supplierDocumentId: id } })
+      : null,
+    [companyId, id],
+  );
+  if (id && doc.data === null) {
+    return <Loading error={doc.error} />;
+  }
+  return <NewInvoice key={doc.data?.supplierDocumentId ?? "new"} document={doc.data} />;
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <FromDocument />
+    </Suspense>
   );
 }

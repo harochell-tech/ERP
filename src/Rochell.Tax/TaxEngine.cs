@@ -11,14 +11,21 @@ namespace Rochell.Tax;
 /// (E-GAS-02-4) has no item: it names its tax type (a PURCHASE_TAX_TYPE rule) and whether its category is a service or a good
 /// (<see cref="TaxLineScopes"/>).
 /// </summary>
-public sealed record TaxLineInput(Guid SubjectLineId, Guid? ItemId, decimal NetAmount, Guid? TaxTypeRuleId = null, string? ExpenseScope = null);
+/// <remarks>
+/// E-X1-02-1: <paramref name="IsrWithholdingType"/> is the 606 ISR type of the expense line's category. E-X1-02-4: <paramref name="ItbisToCost"/> when
+/// the line buys a category-1 asset — its ITBIS is not deductible and goes to the asset's cost.
+/// </remarks>
+public sealed record TaxLineInput(
+    Guid SubjectLineId, Guid? ItemId, decimal NetAmount, Guid? TaxTypeRuleId = null, string? ExpenseScope = null, string? IsrWithholdingType = null, bool ItbisToCost = false);
 
 /// <summary>
 /// What to determine taxes for: the subject document, its supplier or customer and the determination date. A SALE applies only
 /// SALES_ITBIS rules and a PURCHASE only the purchase rules (E-VS3-05-1).
 /// </summary>
+/// <remarks>E-X1-02-3: <paramref name="DocumentSeries"/> is the supplier document's series, B or E (null when not known yet).</remarks>
 public sealed record TaxRequest(
-    string SubjectType, Guid SubjectId, DateOnly Date, Guid PartyId, IReadOnlyList<TaxLineInput> Lines, string Direction = TaxDirections.Purchase, TaxExemption? Exemption = null);
+    string SubjectType, Guid SubjectId, DateOnly Date, Guid PartyId, IReadOnlyList<TaxLineInput> Lines, string Direction = TaxDirections.Purchase, TaxExemption? Exemption = null,
+    string? DocumentSeries = null);
 
 /// <summary>
 /// E-UX4-3: the estimated ITBIS of a draft, per line id and in total (2 decimals); both null when the fiscal gate is closed, with
@@ -76,11 +83,11 @@ public sealed class TaxEngine
         {
             lines.Add(line.ItemId is { } item
                 ? new TaxableLine(line.SubjectLineId, await ItemCategoryAsync(context, item, cancellationToken).ConfigureAwait(false), line.NetAmount)
-                : new TaxableLine(line.SubjectLineId, string.Empty, line.NetAmount, line.TaxTypeRuleId, line.ExpenseScope!));
+                : new TaxableLine(line.SubjectLineId, string.Empty, line.NetAmount, line.TaxTypeRuleId, line.ExpenseScope!, line.IsrWithholdingType, line.ItbisToCost));
         }
 
         // E-FIS1-03-3: an exempt sale keeps the gate (the rules in force are still required and recorded) and determines no ITBIS.
-        var taxes = request.Exemption is null ? TaxCalculator.Determine(partyType, lines, rules) : [];
+        var taxes = request.Exemption is null ? TaxCalculator.Determine(partyType, lines, rules, request.DocumentSeries) : [];
         var determinationId = context.Ids.NewId();
         var recorded = new Dictionary<string, object>
         {
@@ -88,9 +95,14 @@ public sealed class TaxEngine
             ["partyId"] = request.PartyId,
             ["partyTaxType"] = partyType,
             ["lines"] = lines.Select(l => l.TaxTypeRuleId is { } taxType
-                ? (object)new { lineId = l.LineId, taxType = rules.First(r => r.RuleId == taxType).RuleCode, scope = l.Scope, netAmount = l.NetAmount.ToString(CultureInfo.InvariantCulture) }
+                ? (object)new { lineId = l.LineId, taxType = rules.First(r => r.RuleId == taxType).RuleCode, scope = l.Scope, isrType = l.IsrWithholdingType, itbisToCost = l.ItbisToCost, netAmount = l.NetAmount.ToString(CultureInfo.InvariantCulture) }
                 : new { lineId = l.LineId, itemCategory = l.ItemCategory, netAmount = l.NetAmount.ToString(CultureInfo.InvariantCulture) }).ToList(),
         };
+        if (request.DocumentSeries is { } documentSeries)
+        {
+            recorded["documentSeries"] = documentSeries;
+        }
+
         if (request.Exemption is { } exemption)
         {
             recorded["exemption"] = new { authorizationId = exemption.AuthorizationId, regime = exemption.Regime, certificateNo = exemption.CertificateNo };

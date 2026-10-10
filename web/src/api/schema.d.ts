@@ -1213,6 +1213,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/procurement/set-expense-category-isr-type": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetExpenseCategoryIsrType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/match-supplier-invoice": {
         parameters: {
             query?: never;
@@ -1431,6 +1447,102 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ApproveValuationResidualAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/import-received-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ImportReceivedDocuments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/respond-to-supplier-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RespondToSupplierDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/send-supplier-document-response": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SendSupplierDocumentResponse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/capture-supplier-document-from-qr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CaptureSupplierDocumentFromQr"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/discard-supplier-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DiscardSupplierDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/capture-supplier-document-from-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CaptureSupplierDocumentFromImage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3271,6 +3383,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ConvertQuote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/accept-unbilled-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AcceptUnbilledDeliveries"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5205,6 +5333,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetSupplierInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/supplier-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListSupplierDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/supplier-documents/{supplierDocumentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSupplierDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/supplier-documents/{supplierDocumentId}/files/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSupplierDocumentFile"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7640,6 +7816,11 @@ export interface components {
             voidReason: null | string;
             voidedBy: null | string;
         };
+        AcceptUnbilledDeliveries: {
+            /** Format: uuid */
+            periodId: string;
+            reason: string;
+        };
         AccountLedger: {
             /** Format: uuid */
             accountId: string;
@@ -8560,6 +8741,14 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        CaptureSupplierDocumentFromImage: {
+            contentBase64: string;
+            issuerRnc?: null | string;
+            fiscalNumber?: null | string;
+        };
+        CaptureSupplierDocumentFromQr: {
+            qrUrl: string;
+        };
         CashSalePayment: {
             /** Format: uuid */
             receiptId: string;
@@ -9096,6 +9285,8 @@ export interface components {
             /** Format: uuid */
             invoiceIssuedById: null | string;
             ecf?: null | components["schemas"]["EcfStampView"];
+            /** Format: date */
+            itbisUntil?: null | string;
         };
         CreditNoteFiscalPackage: {
             creditNoteNo: string;
@@ -9746,6 +9937,13 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        DiscardSupplierDocument: {
+            /** Format: uuid */
+            supplierDocumentId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            reason: string;
+        };
         DocumentIssuer: {
             rnc: string;
             legalName: string;
@@ -10027,6 +10225,8 @@ export interface components {
         EnvironmentInfo: {
             badge: null | string;
             mailMode: string;
+            /** @default false */
+            ocrEnabled?: boolean;
         };
         EventJournals: {
             /** Format: uuid */
@@ -10084,6 +10284,7 @@ export interface components {
             approvedByName: null | string;
             /** Format: int64 */
             version: number;
+            isrWithholdingType?: null | string;
         };
         ExpenseLineInput: {
             description: string;
@@ -10139,6 +10340,14 @@ export interface components {
             orderDate: string;
             lines: components["schemas"]["ExpenseOrderLineInput"][];
             currency?: null | string;
+        };
+        ExpenseSuggestion: {
+            /** Format: uuid */
+            expenseCategoryId: string;
+            expenseCategoryName: string;
+            /** Format: uuid */
+            taxTypeId: null | string;
+            taxTypeCode: null | string;
         };
         ExpireFiscalAuthorizations: Record<string, never>;
         ExternalFiscalRecordView: {
@@ -10649,6 +10858,7 @@ export interface components {
             /** Format: date */
             to: string;
         };
+        ImportReceivedDocuments: Record<string, never>;
         ImportSettlementAllocationView: {
             /** Format: uuid */
             siLineId: string;
@@ -11975,6 +12185,8 @@ export interface components {
             accumulatedAccountId: string;
             /** Format: uuid */
             expenseAccountId: string;
+            /** Format: int32 */
+            taxCategory?: null | number;
         };
         PrepareAssetDisposal: {
             /** Format: uuid */
@@ -12052,6 +12264,7 @@ export interface components {
             accountId: string;
             goodsType606: string;
             lineClass: string;
+            isrWithholdingType?: null | string;
         };
         PrepareImportSettlement: {
             /** Format: uuid */
@@ -13493,6 +13706,8 @@ export interface components {
             printedTotal?: null | string;
             /** Format: uuid */
             purchaseOrderId?: null | string;
+            /** Format: uuid */
+            supplierDocumentId?: null | string;
         };
         RegisterFiscalAuthorization: {
             /** Format: uuid */
@@ -13539,6 +13754,8 @@ export interface components {
             lines: components["schemas"]["SupplierInvoiceLineInput"][];
             /** Format: decimal */
             printedTotal?: null | string;
+            /** Format: uuid */
+            supplierDocumentId?: null | string;
         };
         RegisterVehicle: {
             plate: string;
@@ -13845,6 +14062,14 @@ export interface components {
             resolution: string;
             providerId: null | string;
             note: string;
+        };
+        RespondToSupplierDocument: {
+            /** Format: uuid */
+            supplierDocumentId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            accept: boolean;
+            reason?: null | string;
         };
         RestorePrintFormat: {
             documentType: string;
@@ -14322,6 +14547,10 @@ export interface components {
             recipients: string[];
             message?: null | string;
         };
+        SendSupplierDocumentResponse: {
+            /** Format: uuid */
+            supplierDocumentId: string;
+        };
         SessionAssignment: {
             roleCode: string;
             roleName: string;
@@ -14375,6 +14604,13 @@ export interface components {
             /** Format: uuid */
             driverId: string;
             pin: string;
+        };
+        SetExpenseCategoryIsrType: {
+            /** Format: uuid */
+            expenseCategoryId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            isrWithholdingType: null | string;
         };
         SetFailureTypeStatus: {
             code: string;
@@ -14757,6 +14993,128 @@ export interface components {
             openAmount: string;
             /** Format: decimal */
             suggested: string;
+        };
+        SupplierDocumentDetail: {
+            /** Format: uuid */
+            supplierDocumentId: string;
+            issuerRnc: string;
+            issuerName: null | string;
+            registryName: null | string;
+            /** Format: uuid */
+            supplierId: null | string;
+            supplierName: null | string;
+            buyerRnc: null | string;
+            fiscalNumber: string;
+            ecfType: string;
+            /** Format: date */
+            docDate: null | string;
+            /** Format: decimal */
+            totalAmount: null | string;
+            /** Format: decimal */
+            itbisAmount: null | string;
+            securityCode: null | string;
+            /** Format: date-time */
+            signatureAt: null | string;
+            qrUrl: null | string;
+            /** Format: decimal */
+            qrTotalAmount: null | string;
+            /** Format: date-time */
+            qrScannedAt: null | string;
+            aiFields: string[];
+            status: string;
+            discardReason: null | string;
+            providerId: null | string;
+            receivedStatus: null | string;
+            commercialResponse: string;
+            responseReason: null | string;
+            respondedBy: null | string;
+            /** Format: date-time */
+            respondedAt: null | string;
+            /** Format: date-time */
+            responseSentAt: null | string;
+            /** Format: uuid */
+            supplierInvoiceId: null | string;
+            supplierInvoiceStatus: null | string;
+            registrable: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: int64 */
+            version: number;
+            lines: components["schemas"]["SupplierDocumentLineView"][];
+            files: components["schemas"]["SupplierDocumentFileView"][];
+            checks: string[];
+            suggestion: null | components["schemas"]["ExpenseSuggestion"];
+            history: components["schemas"]["StateChange"][];
+        };
+        SupplierDocumentFileContent: {
+            fileName: string;
+            contentType: string;
+            contentBase64: string;
+        };
+        SupplierDocumentFileView: {
+            /** Format: uuid */
+            fileId: string;
+            kind: string;
+            contentType: string;
+            /** Format: int32 */
+            sizeBytes: number;
+            /** Format: date-time */
+            addedAt: string;
+        };
+        SupplierDocumentLineView: {
+            source: string;
+            /** Format: int32 */
+            lineNo: number;
+            itemCode: null | string;
+            description: string;
+            /** Format: decimal */
+            quantity: string;
+            unitCode: null | string;
+            /** Format: decimal */
+            unitPrice: string;
+            /** Format: decimal */
+            itbisAmount: null | string;
+            /** Format: decimal */
+            amount: string;
+            /** Format: int32 */
+            billingIndicator: null | number;
+        };
+        SupplierDocumentList: {
+            items: components["schemas"]["SupplierDocumentSummary"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        SupplierDocumentSummary: {
+            /** Format: uuid */
+            supplierDocumentId: string;
+            /** Format: date */
+            docDate: null | string;
+            issuerRnc: string;
+            issuerName: null | string;
+            /** Format: uuid */
+            supplierId: null | string;
+            fiscalNumber: string;
+            ecfType: string;
+            /** Format: decimal */
+            totalAmount: null | string;
+            hasXml: boolean;
+            qrScanned: boolean;
+            /** Format: int32 */
+            images: number;
+            aiRead: boolean;
+            receivedStatus: null | string;
+            commercialResponse: string;
+            responseSent: boolean;
+            status: string;
+            /** Format: uuid */
+            supplierInvoiceId: null | string;
+            registrable: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: int64 */
+            version: number;
         };
         SupplierInvoiceDetail: {
             /** Format: uuid */
@@ -15160,6 +15518,7 @@ export interface components {
             name: string;
             goodsType606: string;
             lineClass: string;
+            isrWithholdingType?: null | string;
         };
         UpdateExpensePurchaseOrderDraft: {
             /** Format: uuid */
@@ -20723,6 +21082,82 @@ export interface operations {
             };
         };
     };
+    SetExpenseCategoryIsrType: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetExpenseCategoryIsrType"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     MatchSupplierInvoice: {
         parameters: {
             query?: never;
@@ -21728,6 +22163,462 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ApproveValuationResidualAdjustment"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ImportReceivedDocuments: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportReceivedDocuments"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RespondToSupplierDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RespondToSupplierDocument"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SendSupplierDocumentResponse: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendSupplierDocumentResponse"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CaptureSupplierDocumentFromQr: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureSupplierDocumentFromQr"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DiscardSupplierDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscardSupplierDocument"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    CaptureSupplierDocumentFromImage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureSupplierDocumentFromImage"];
             };
         };
         responses: {
@@ -30536,6 +31427,82 @@ export interface operations {
             };
         };
     };
+    AcceptUnbilledDeliveries: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptUnbilledDeliveries"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     PlanDelivery: {
         parameters: {
             query?: never;
@@ -39260,6 +40227,180 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SupplierInvoiceDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListSupplierDocuments: {
+        parameters: {
+            query?: {
+                status?: string;
+                search?: string;
+                unsentOver24Hours?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDocumentList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSupplierDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                supplierDocumentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDocumentDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSupplierDocumentFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                supplierDocumentId: string;
+                fileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierDocumentFileContent"];
                 };
             };
             /** @description Bad Request */

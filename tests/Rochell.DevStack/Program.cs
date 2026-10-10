@@ -50,6 +50,7 @@ internal static class DevStackProgram
             using var host = new DevApiHost(harness, idp, webRoot is null ? null : Path.GetFullPath(webRoot));
             host.UseKestrel(port);
             host.StartServer();
+            await ReceivedSeed.RunAsync(harness, host.Services); // OCR1-03: suppliers' e-CF in the simulated Alanube
 
             Console.WriteLine($"Rochell dev stack listening on http://localhost:{port} (browser origin {publicOrigin}).");
             Console.WriteLine($"Company {harness.CompanyId}; sign in at {publicOrigin}/ with one of:");
@@ -126,6 +127,9 @@ internal sealed class DevApiHost(TestHarness harness, SimulatedIdp idp, string? 
         // ENT1-02 (E-ENT-1/5): the drivers' page with a key of this run and the photos in a temporary folder.
         builder.UseSetting("Rochell:Deliveries:LinkKey", Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)));
         builder.UseSetting("Rochell:Deliveries:EvidenceRoot", Directory.CreateTempSubdirectory("rochell-evidence-").FullName);
+
+        // OCR1-04: invoice photos read by the simulated reader (nothing leaves the machine), kept in the same temporary folder.
+        builder.UseSetting("Rochell:Ocr:Mode", "SIMULATED");
 
         builder.ConfigureTestServices(services =>
         {

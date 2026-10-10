@@ -828,3 +828,17 @@ aprobar», «Bajas de activos por aprobar», «Cargas de activos por aprobar». 
 - Maestros › Flota: «PIN del QR» per driver, «Asignar PIN» / «Cambiar PIN» for `driver_pin:manage`.
 - Inicio: «Entregas con diferencias reportadas por el chofer» (`ListDeliveries` with `driverReportedDifferences`).
 - Journey: `e2e/delivery-qr-journey.spec.ts` (E2E-ENT).
+
+## NAV-01 — the menu by business flow, «Ir a…» and favourites (E-NAV-1…13)
+
+`NAV` in `web/src/components/Shell.tsx` holds 12 groups in the order of the business (E-NAV-1…11); every item kept its route,
+label and permission, so links, Inicio counters and the journeys' `nav()` are unchanged. `web/src/lib/menu.ts`: `searchMenu`
+(every typed word in the label or the group, accents and case folded, labels starting with the text first) and the favourites
+store (`localStorage` key `rochell.menu.favorites`, read through `useSyncExternalStore`, empty in the exported HTML). The star's
+accessible name is the generic «Favorito» (the item is in its `title`): a name holding the item's label would also answer the
+forms' `getByLabel("Proveedor")`. Tests: `tests/unit/menu.test.ts`, `e2e/menu-journey.spec.ts` (desktop and phone).
+
+## OCR1-03 — supplier documents (E-OCR1-03-1…10)
+
+Compras › Comprobantes recibidos and its detail, «Escanear QR» (`components/QrScan.tsx`, `jsqr`), «Pasar a factura» through `?documento=`
+on `/cxp/facturas/gasto/` and `/cxp/facturas/nueva/`, the supplier form opened with `?rnc=`, two Inicio counters: `supplier-documents.md`.

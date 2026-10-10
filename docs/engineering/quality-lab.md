@@ -74,7 +74,7 @@ of one date with the server's strength before saving, void with a reason, absorp
 (`/calidad/requisitos/`, also the machines' short codes) and Parámetros (`/calidad/parametros/`, parameters, initial age factors,
 failure types, history). They need a connection. Journey: `e2e/lab-journey.spec.ts`.
 
-## LAB1-02 — evaluation, final release, automatic block, recall (E-LAB1-02-1…15; migration 0106)
+## LAB1-02 — evaluation, final release, automatic block, recall (E-LAB1-02-1…15; migration 0114)
 
 ### The lot's evaluation (baseline §4.2)
 
@@ -109,7 +109,7 @@ any of the three ──BlockLot / a NO CUMPLE──▶ BLOCKED ──UnblockLot�
   real. Nothing unblocks by itself (E-LAB1-02-8) — not a voided test, not a later real CUMPLE: Calidad uses `UnblockLot` with a reason.
 - `BlockLot` / `UnblockLot` (`fg_lot:release`) now work on released lots; unblocking returns the lot to `blocked_from`.
 - `FinalReleaseLot` (`fg_lot:final_release`, step-up, E-LAB1-02-10): only from RELEASED with the evaluation in force `COMPLIES` on
-  REAL data; otherwise `LAB_FINAL_RELEASE_REFUSED`. Alerts do not prevent it and stay in the event. 296 commands.
+  REAL data; otherwise `LAB_FINAL_RELEASE_REFUSED`. Alerts do not prevent it and stay in the event. 304 commands.
 
 ### Dispatch (E-LAB1-02-11/12)
 

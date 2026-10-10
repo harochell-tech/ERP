@@ -34,7 +34,7 @@ export default function Page() {
   const prepare = useCommand("fa-class-prepare", "/api/v1/companies/{companyId}/fixed-assets/prepare-asset-class");
   const approve = useCommand("fa-class-approve", "/api/v1/companies/{companyId}/fixed-assets/approve-asset-class");
   const discard = useCommand("fa-class-discard", "/api/v1/companies/{companyId}/fixed-assets/discard-asset-class");
-  const [form, setForm] = useState({ categoryId: "", life: "", residual: "", accumulatedId: "", expenseId: "" });
+  const [form, setForm] = useState({ categoryId: "", life: "", residual: "", accumulatedId: "", expenseId: "", taxCategory: "" });
   if (!can("ledger:read")) {
     return <NoPermission />;
   }
@@ -144,12 +144,13 @@ export default function Page() {
                   residualPct: form.residual,
                   accumulatedAccountId: form.accumulatedId,
                   expenseAccountId: form.expenseId,
+                  taxCategory: form.taxCategory ? Number(form.taxCategory) : null,
                 },
                 undefined,
                 "Clase preparada; el Controller la aprueba.",
               )
             ) {
-              setForm({ categoryId: "", life: "", residual: "", accumulatedId: "", expenseId: "" });
+              setForm({ categoryId: "", life: "", residual: "", accumulatedId: "", expenseId: "", taxCategory: "" });
               data.reload();
             }
           }}
@@ -185,8 +186,17 @@ export default function Page() {
               options={accountOptions(["EXPENSE", "COST"])}
             />
           </Field>
+          {/* X1-02b (E-X1-18, E-X1-02-4): on category 1 the ITBIS of the purchase is not deductible and goes to the asset's cost. */}
+          <Field label="Categoría fiscal (art. 287)" required hint="Categoría 1: edificaciones; su ITBIS no se descuenta y va al costo del activo. Categoría 2: vehículos livianos, equipos de oficina y computadoras. Categoría 3: lo demás.">
+            <select aria-label="Categoría fiscal" value={form.taxCategory} onChange={(e) => set({ taxCategory: e.target.value })}>
+              <option value="">Elegir…</option>
+              <option value="1">1 — Edificaciones</option>
+              <option value="2">2 — Vehículos livianos, oficina y computadoras</option>
+              <option value="3">3 — Otros bienes depreciables</option>
+            </select>
+          </Field>
           <div className="actions">
-            <button type="submit" className="primary" disabled={prepare.busy}>
+            <button type="submit" className="primary" disabled={prepare.busy || !form.taxCategory}>
               Preparar clase
             </button>
           </div>

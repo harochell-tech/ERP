@@ -88,6 +88,9 @@ internal static class AuthorizationStore
         return JsonSerializer.Serialize(new { authorizationId = row.Id, status = to, version = next });
     }
 
+    /// <summary>E-X1-20: days an authorization without its own validity date lasts from its issue.</summary>
+    public const int DefaultValidityDays = 180;
+
     public static Header ValidateHeader(string? certificateNo, DateOnly issuedOn, DateOnly? validUntil, string? projectName, string? resolutionNo, DateOnly? projectTermEndsOn, Guid? salesOrderId)
     {
         static string Text(string? value, int max, string what)
@@ -101,6 +104,8 @@ internal static class AuthorizationStore
             throw new DomainException(TaxErrors.AuthorizationFieldInvalid, "The certificate is valid until a date on or after its issue.");
         }
 
+        // E-X1-20, E-X1-01-4: an authorization without its own validity is valid 180 days from its issue (DGII CA3462).
+        validUntil ??= issuedOn.AddDays(DefaultValidityDays);
         return new Header(Text(certificateNo, 60, "The certificate number"), issuedOn, validUntil, Text(projectName, 200, "The project name"), Text(resolutionNo, 60, "The CONFOTUR resolution number"), projectTermEndsOn, salesOrderId);
     }
 

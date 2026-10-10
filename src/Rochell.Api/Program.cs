@@ -109,6 +109,7 @@ switch (settings.Ecf.Mode)
 {
     case EcfModes.Off:
         services.AddSingleton<IEcfProvider>(OffEcfProvider.Instance);
+        services.AddSingleton<IEcfReception>(OffEcfProvider.Instance);
         break;
     case EcfModes.Simulated:
         if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment(RochellEnvironments.Test))
@@ -118,11 +119,14 @@ switch (settings.Ecf.Mode)
 
         services.AddSingleton<SimulatedEcfProvider>();
         services.AddSingleton<IEcfProvider>(sp => sp.GetRequiredService<SimulatedEcfProvider>());
+        services.AddSingleton<IEcfReception>(sp => sp.GetRequiredService<SimulatedEcfProvider>());
         break;
     case EcfModes.Sandbox or EcfModes.Production:
         Required(settings.Ecf.BaseUrl, "Ecf:BaseUrl");
         Required(settings.Ecf.Token, "Ecf:Token");
-        services.AddHttpClient<IEcfProvider, AlanubeProvider>(client => client.Timeout = settings.Ecf.CallTimeout + TimeSpan.FromSeconds(5));
+        services.AddHttpClient<AlanubeProvider>(client => client.Timeout = settings.Ecf.CallTimeout + TimeSpan.FromSeconds(5));
+        services.AddTransient<IEcfProvider>(sp => sp.GetRequiredService<AlanubeProvider>());
+        services.AddTransient<IEcfReception>(sp => sp.GetRequiredService<AlanubeProvider>());
         break;
     default:
         throw new InvalidOperationException($"Ecf:Mode is OFF, SANDBOX, PRODUCTION or SIMULATED, not {settings.Ecf.Mode}.");
@@ -132,7 +136,13 @@ if (settings.Ecf.Enabled)
 {
     services.AddSingleton<EcfService>();
     services.AddHostedService(sp => sp.GetRequiredService<EcfService>());
+
+    // OCR1-02 (E-OCR1-01-9, E-OCR1-02-3): suppliers' e-CF read every hour, and the commercial responses sent.
+    services.AddSingleton<ReceivedDocumentsService>();
+    services.AddHostedService(sp => sp.GetRequiredService<ReceivedDocumentsService>());
 }
+
+services.AddSingleton<ReceptionNudge>();
 
 // MFG2-02 (E-MFG2-1): the machines' portal, read every 15 min when configured; its key is a file on the server.
 services.AddSingleton(settings.Portal);
@@ -153,23 +163,53 @@ else
 // B2 bucket (its key id and secret as files on the server), or a folder in Development and Test.
 var linkKey = settings.Deliveries.LinkKey
     ?? (!string.IsNullOrWhiteSpace(settings.Deliveries.LinkKeyFile) && File.Exists(settings.Deliveries.LinkKeyFile) ? File.ReadAllText(settings.Deliveries.LinkKeyFile).Trim() : null);
+// The evidence store (ENT-1 photos and signatures, OCR1-04 invoice photos): the private B2 bucket, or a folder in Development and Test.
+var evidenceStore = false;
+if (!string.IsNullOrWhiteSpace(settings.Deliveries.Evidence.Bucket))
+{
+    Required(settings.Deliveries.Evidence.AccessKeyIdFile, "Deliveries:Evidence:AccessKeyIdFile");
+    Required(settings.Deliveries.Evidence.SecretAccessKeyFile, "Deliveries:Evidence:SecretAccessKeyFile");
+    services.AddSingleton<Rochell.Platform.Files.IEvidenceStore>(_ => Rochell.Api.Deliveries.S3EvidenceStore.Create(settings.Deliveries.Evidence));
+    evidenceStore = true;
+}
+else if (!string.IsNullOrWhiteSpace(settings.Deliveries.EvidenceRoot) && (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment(RochellEnvironments.Test)))
+{
+    services.AddSingleton<Rochell.Platform.Files.IEvidenceStore>(new Rochell.Api.Deliveries.FileSystemEvidenceStore(settings.Deliveries.EvidenceRoot));
+    evidenceStore = true;
+}
+
 if (!string.IsNullOrWhiteSpace(linkKey))
 {
     services.AddSingleton(new Rochell.Sales.Deliveries.DriverLinkKey(Convert.FromBase64String(linkKey)));
-    if (!string.IsNullOrWhiteSpace(settings.Deliveries.Evidence.Bucket))
-    {
-        Required(settings.Deliveries.Evidence.AccessKeyIdFile, "Deliveries:Evidence:AccessKeyIdFile");
-        Required(settings.Deliveries.Evidence.SecretAccessKeyFile, "Deliveries:Evidence:SecretAccessKeyFile");
-        services.AddSingleton<Rochell.Platform.Files.IEvidenceStore>(_ => Rochell.Api.Deliveries.S3EvidenceStore.Create(settings.Deliveries.Evidence));
-    }
-    else if (!string.IsNullOrWhiteSpace(settings.Deliveries.EvidenceRoot) && (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment(RochellEnvironments.Test)))
-    {
-        services.AddSingleton<Rochell.Platform.Files.IEvidenceStore>(new Rochell.Api.Deliveries.FileSystemEvidenceStore(settings.Deliveries.EvidenceRoot));
-    }
-    else
+    if (!evidenceStore)
     {
         throw new InvalidOperationException("Deliveries:LinkKey is set but no evidence store: configure Deliveries:Evidence (B2) or, in Development / Test, Deliveries:EvidenceRoot.");
     }
+}
+
+// OCR1-04 (E-OCR-5, E-OCR1-01-10): reading invoice photos by AI, Off by default; the key is a file on the server.
+services.AddSingleton(settings.Ocr);
+switch (settings.Ocr.Mode)
+{
+    case Rochell.Api.Ocr.OcrModes.Off:
+        break;
+    case Rochell.Api.Ocr.OcrModes.Simulated:
+        if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment(RochellEnvironments.Test))
+        {
+            throw new InvalidOperationException("Ocr:Mode SIMULATED is only for Development and Test.");
+        }
+
+        services.AddSingleton<Rochell.Procurement.SupplierDocuments.SimulatedSupplierDocumentReader>();
+        services.AddSingleton<Rochell.Procurement.SupplierDocuments.ISupplierDocumentReader>(sp => sp.GetRequiredService<Rochell.Procurement.SupplierDocuments.SimulatedSupplierDocumentReader>());
+        break;
+    case Rochell.Api.Ocr.OcrModes.Anthropic:
+        settings.Ocr.ApiKey ??= FromFile(settings.Ocr.ApiKeyFile, "Ocr:ApiKeyFile")?.Trim();
+        Required(settings.Ocr.ApiKey, "Ocr:ApiKey");
+        services.AddHttpClient<Rochell.Procurement.SupplierDocuments.ISupplierDocumentReader, Rochell.Api.Ocr.AnthropicSupplierDocumentReader>(
+            client => client.Timeout = settings.Ocr.Timeout + TimeSpan.FromSeconds(10));
+        break;
+    default:
+        throw new InvalidOperationException($"Ocr:Mode is OFF, ANTHROPIC or SIMULATED, not {settings.Ocr.Mode}.");
 }
 
 // E-PR18-5: the sealer and the digest connect as rochell_sealer and are switched on by configuration.
@@ -237,7 +277,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment(RochellEnvi
 }
 
 app.MapAuthEndpoints();
-app.MapGet("/api/v1/environment", () => Results.Json(new EnvironmentInfo(string.IsNullOrWhiteSpace(settings.EnvironmentBadge) ? null : settings.EnvironmentBadge.Trim(), settings.Mail.Mode.ToString().ToUpperInvariant())))
+app.MapGet("/api/v1/environment", () => Results.Json(new EnvironmentInfo(string.IsNullOrWhiteSpace(settings.EnvironmentBadge) ? null : settings.EnvironmentBadge.Trim(), settings.Mail.Mode.ToString().ToUpperInvariant(), settings.Ocr.Enabled)))
     .WithTags("Auth")
     .WithName("GetEnvironment")
     .WithSummary("E-PAR-3: the deployment's label for the top bar (null: the web decides from the host name) and, E-MAIL-01-4, whether it sends mail (OFF, REDIRECT, LIVE). No sign-in needed.")
@@ -267,4 +307,5 @@ static string? FromFile(string? path, string key)
 public partial class Program;
 
 /// <summary>E-PAR-3: what the web shows in its top bar for this deployment.</summary>
-public sealed record EnvironmentInfo(string? Badge, string MailMode);
+/// <remarks>OCR1-04: <paramref name="OcrEnabled"/> — whether invoice photos are read by AI here (the button is shown only then).</remarks>
+public sealed record EnvironmentInfo(string? Badge, string MailMode, bool OcrEnabled = false);

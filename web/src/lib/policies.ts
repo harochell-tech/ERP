@@ -24,7 +24,7 @@ export interface PolicyVersion {
   parameters: Record<string, string>;
 }
 
-export type PolicyUnit = "PERCENT" | "AMOUNT" | "DAYS" | "HOURS" | "MINUTES" | "OPTION" | "NUMBER";
+export type PolicyUnit = "PERCENT" | "AMOUNT" | "DAYS" | "HOURS" | "MINUTES" | "OPTION" | "COUNT" | "NUMBER";
 
 /** The unit of a parameter (E-UX2-2); a parameter a later migration added without texts falls back on its value type. */
 export function policyUnit(definition: PolicyParameterDefinition): PolicyUnit {
@@ -35,6 +35,7 @@ export function policyUnit(definition: PolicyParameterDefinition): PolicyUnit {
     case "HOURS":
     case "MINUTES":
     case "OPTION":
+    case "COUNT":
       return definition.unit;
   }
   switch (definition.valueType) {
@@ -58,6 +59,7 @@ export const UNIT_SUFFIX: Readonly<Record<PolicyUnit, string>> = {
   HOURS: "horas",
   MINUTES: "minutos",
   OPTION: "",
+  COUNT: "lecturas",
   NUMBER: "",
 };
 
@@ -114,6 +116,8 @@ export function formatParameterValue(definition: PolicyParameterDefinition | und
       return `${stored} ${stored === "1" ? "hora" : "horas"}`;
     case "MINUTES":
       return `${stored} ${stored === "1" ? "minuto" : "minutos"}`;
+    case "COUNT":
+      return `${stored} ${stored === "1" ? "lectura" : "lecturas"}`;
     default:
       return stored;
   }
@@ -151,7 +155,7 @@ export function validateParameter(definition: PolicyParameterDefinition, typed: 
     }
   } else if (definition.valueType === "INTEGER" || unit === "DAYS" || unit === "HOURS" || unit === "MINUTES") {
     if (!/^\d+$/.test(text)) {
-      return `Escriba un número entero de ${unit === "HOURS" ? "horas" : unit === "MINUTES" ? "minutos" : unit === "DAYS" ? "días" : "unidades"}${example}.`;
+      return `Escriba un número entero de ${unit === "HOURS" ? "horas" : unit === "MINUTES" ? "minutos" : unit === "DAYS" ? "días" : unit === "COUNT" ? "lecturas" : "unidades"}${example}.`;
     }
   } else if (!isDecimal(text, 6) || text.startsWith("-")) {
     return `Escriba un número con punto decimal${example}.`;

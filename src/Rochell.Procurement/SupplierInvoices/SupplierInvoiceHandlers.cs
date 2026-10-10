@@ -170,6 +170,8 @@ public sealed class RegisterSupplierInvoiceHandler : ICommandHandler<RegisterSup
             await SupplierInvoiceLineHandlers.For(line.LineKind).ValidateAsync(context, command.PartyId, line, cancellationToken).ConfigureAwait(false);
         }
 
+        var document = await SupplierDocuments.SupplierDocumentRegistration.CheckAsync(context, command.SupplierDocumentId, command.PartyId, fiscalNumber, cancellationToken)
+            .ConfigureAwait(false); // E-OCR1-03-4
         var nets = command.Lines.Select(l => decimal.Round(l.Quantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero)).ToList();
         var total = nets.Sum();
         var creator = await PurchaseOrderStore.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
@@ -243,6 +245,7 @@ public sealed class RegisterSupplierInvoiceHandler : ICommandHandler<RegisterSup
                 ("net", nets[i])).ConfigureAwait(false);
         }
 
+        await SupplierDocuments.SupplierDocumentRegistration.LinkAsync(context, document, siId, CommandType, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { supplierInvoiceId = siId, status = SupplierInvoiceStatus.Draft, totalAmount = total.ToString(CultureInfo.InvariantCulture), version = 1 });
     }
 }
@@ -406,6 +409,7 @@ public sealed class VoidSupplierInvoiceHandler : ICommandHandler<VoidSupplierInv
             cancellationToken,
             reason,
             ", accounting_status = 'NOT_POSTED'").ConfigureAwait(false);
+        await SupplierDocuments.SupplierDocumentLinks.ReleaseAsync(context, header.Id, CommandType, reason, cancellationToken).ConfigureAwait(false); // E-OCR1-02-9
         return JsonSerializer.Serialize(new { supplierInvoiceId = header.Id, status = SupplierInvoiceStatus.Voided, version });
     }
 }

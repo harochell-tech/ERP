@@ -31,6 +31,7 @@ using Rochell.Procurement.GoodsReceipts;
 using Rochell.Procurement.Ledger;
 using Rochell.Procurement.PurchaseOrders;
 using Rochell.Procurement.ReceiptCorrections;
+using Rochell.Procurement.SupplierDocuments;
 using Rochell.Procurement.SupplierInvoices;
 using Rochell.Reconciliation;
 using Rochell.Sales.CreditNotes;
@@ -150,6 +151,7 @@ public static class CommandEndpoints
         procurement.MapCommand<ApproveExpenseCategories, ApproveExpenseCategoriesHandler>();
         procurement.MapCommand<DeactivateExpenseCategory, DeactivateExpenseCategoryHandler>();
         procurement.MapCommand<ReactivateExpenseCategory, ReactivateExpenseCategoryHandler>();
+        procurement.MapCommand<SetExpenseCategoryIsrType, SetExpenseCategoryIsrTypeHandler>(); // X1-02 (E-X1-02-1)
         procurement.MapCommand<MatchSupplierInvoice, MatchSupplierInvoiceHandler>();
         procurement.MapCommand<ApproveMatchException, ApproveMatchExceptionHandler>();
         procurement.MapCommand<VoidSupplierInvoice, VoidSupplierInvoiceHandler>();
@@ -164,6 +166,12 @@ public static class CommandEndpoints
         procurement.MapCommand<ReverseImportSettlement, ReverseImportSettlementHandler>();
         procurement.MapCommand<RepostEvent, RepostEventHandler>();
         procurement.MapCommand<ApproveValuationResidualAdjustment, ApproveValuationResidualAdjustmentHandler>();
+        procurement.MapCommand<ImportReceivedDocuments, ImportReceivedDocumentsHandler>(); // OCR1-02 (E-OCR1-02-1…10)
+        procurement.MapCommand<RespondToSupplierDocument, RespondToSupplierDocumentHandler>();
+        procurement.MapCommand<SendSupplierDocumentResponse, SendSupplierDocumentResponseHandler>();
+        procurement.MapCommand<CaptureSupplierDocumentFromQr, CaptureSupplierDocumentFromQrHandler>(); // OCR1-03 (E-OCR1-03-5/7)
+        procurement.MapCommand<DiscardSupplierDocument, DiscardSupplierDocumentHandler>();
+        procurement.MapCommand<CaptureSupplierDocumentFromImage, CaptureSupplierDocumentFromImageHandler>(); // OCR1-04 (E-OCR1-04-1…4)
 
         // AF1-02 (E-AF1-01-1): fixed assets — classes, cards, service and transfers.
         var fixedAssets = company.MapGroup("/fixed-assets").WithTags("FixedAssets");
@@ -301,6 +309,7 @@ public static class CommandEndpoints
         sales.MapCommand<CancelQuote, CancelQuoteHandler>();
         sales.MapCommand<CopyQuote, CopyQuoteHandler>();
         sales.MapCommand<ConvertQuote, ConvertQuoteHandler>();
+        sales.MapCommand<AcceptUnbilledDeliveries, AcceptUnbilledDeliveriesHandler>(); // X1-01b (E-X1-01-6)
         sales.MapCommand<PlanDelivery, PlanDeliveryHandler>();
         sales.MapCommand<StartLoading, StartLoadingHandler>();
         sales.MapCommand<ConfirmLoaded, ConfirmLoadedHandler>();
@@ -433,8 +442,9 @@ public static class CommandEndpoints
         typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
         typeof(RegisterSupplierInvoiceHandler), typeof(RegisterExpenseInvoiceHandler), typeof(CreateExpensePurchaseOrderHandler), typeof(UpdateExpensePurchaseOrderDraftHandler), typeof(CloseExpensePurchaseOrderHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
-        typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
+        typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(SetExpenseCategoryIsrTypeHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),
         typeof(PostSupplierInvoiceHandler), typeof(ReverseSupplierInvoiceHandler), typeof(RegisterCustomsDeclarationHandler),
+        typeof(AcceptUnbilledDeliveriesHandler), typeof(ImportReceivedDocumentsHandler), typeof(RespondToSupplierDocumentHandler), typeof(SendSupplierDocumentResponseHandler), typeof(CaptureSupplierDocumentFromQrHandler), typeof(DiscardSupplierDocumentHandler), typeof(CaptureSupplierDocumentFromImageHandler),
         typeof(ReverseCustomsDeclarationHandler), typeof(PrepareImportSettlementHandler), typeof(UpdateImportSettlementDraftHandler), typeof(CancelImportSettlementHandler),
         typeof(ApproveImportSettlementHandler), typeof(ReverseImportSettlementHandler), typeof(RepostEventHandler), typeof(ApproveValuationResidualAdjustmentHandler),
         typeof(PrepareAccountRoleMapHandler), typeof(ApproveAccountRoleMapHandler), typeof(ApprovePostingRuleVersionHandler), typeof(PrepareAccountingPolicyVersionHandler),

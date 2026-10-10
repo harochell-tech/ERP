@@ -160,6 +160,8 @@ public sealed class ExpenseInvoiceTests(PostgresFixture postgres)
         await h.ActivateRuleAsync(
             await h.FiscalActorsAsync(initEnvironment: false), "isr", "RET_ISR_SERVICIOS", FiscalRuleKinds.PurchaseWithholding,
             """{"tax_code":"RET_ISR","rate":"0.10","base":"NET","party_types":["INDIVIDUAL"],"isr_withholding_type":"2","applies_to":["EXPENSE_SERVICE"]}""", new DateOnly(2026, 1, 1));
+        // E-X1-02-1: the ISR rule of type 2 withholds on the categories of type 2 only — the repair, not the filter.
+        await h.RunAsync(new SetExpenseCategoryIsrType(h.CompanyId, w.Controller, "isr-type", w.Categories["REPARACIONES"], 2, "2"), new SetExpenseCategoryIsrTypeHandler());
         var mechanic = await h.CreateActiveSupplierAsync("00112345678", "Pedro Mecánico");
         var si = await RegisterAsync(
             h, w, "r", mechanic, "B1100000001",
@@ -173,6 +175,41 @@ public sealed class ExpenseInvoiceTests(PostgresFixture postgres)
         // (540.00 + 54.00) = 1,594.00, none of ISR on the filter (a good). Payable 11,000 + 1,980 − 1,594 = 11,386.00.
         Assert.Equal("11386.00", posted.GetProperty("payable").GetString());
         Assert.Equal("1980.00|0.00|0.00|0.00|-1594.00|-11386.00|63700:10000.00,66150:1000.00|11386.00/11386.00", await BooksAsync(h));
+    }
+
+    /// <summary>
+    /// X1-02 (E-X1-8/9, E-X1-02-1…3): ISR by what is bought — honorarios 15 % on the lawyer's category, nothing on a category of another
+    /// type — and the 30 % ITBIS withholding of NG 02-05 only on a company's B-series invoice, not on its e-CF (NG 02-2026).
+    /// </summary>
+    [Fact]
+    public async Task ISR_is_withheld_by_the_categorys_type_and_the_companys_ITBIS_only_on_B_series()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h, """{"tax_code":"RET_ITBIS","rate":"0.30","base":"ITBIS","party_types":["COMPANY"],"applies_to":["EXPENSE_SERVICE"],"document_series":["B"]}""");
+        await h.ActivateRuleAsync(
+            await h.FiscalActorsAsync(initEnvironment: false), "isr-hon", "RET_ISR_HONORARIOS", FiscalRuleKinds.PurchaseWithholding,
+            """{"tax_code":"RET_ISR","rate":"0.15","base":"NET","party_types":["INDIVIDUAL"],"isr_withholding_type":"2"}""", new DateOnly(2026, 7, 1));
+        await h.RunAsync(new SetExpenseCategoryIsrType(h.CompanyId, w.Controller, "t-rep", w.Categories["REPRESENTACION"], 2, "2"), new SetExpenseCategoryIsrTypeHandler());
+        var lawyer = await h.CreateActiveSupplierAsync("00198765432", "Lic. Ana Abogada");
+        async Task<string?> Withheld(string key, Guid supplier, string ncf, string category)
+        {
+            var si = await RegisterAsync(h, w, key, supplier, ncf, Line(w, "Servicio", category, "ITBIS_18", 1m, 10000m));
+            await h.RunAsync(new MatchSupplierInvoice(h.CompanyId, w.Clerk, key + "-m", si, 1), new MatchSupplierInvoiceHandler());
+            await h.RunAsync(new PostSupplierInvoice(h.CompanyId, w.Clerk, key + "-p", si, 2), new PostSupplierInvoiceHandler());
+            return await h.ScalarAsync<string>(
+                """
+                SELECT coalesce(string_agg(l.tax_code || ':' || l.amount::numeric(19,2), ',' ORDER BY l.tax_code), '-')
+                FROM pur.supplier_invoice si JOIN tax.tax_determination_line l ON l.determination_id = si.tax_determination_id
+                WHERE si.si_id = @s AND l.effect = 'WITHHOLDING'
+                """,
+                ("s", si));
+        }
+
+        Assert.Equal("RET_ISR:1500.00", await Withheld("fees", lawyer, "B1100000101", "REPRESENTACION"));
+        Assert.Equal("-", await Withheld("repair", lawyer, "B1100000102", "REPARACIONES"));
+        Assert.Equal("RET_ITBIS:540.00", await Withheld("company-b", w.S.Purchasing.SupplierId, "B0100000104", "REPARACIONES"));
+        Assert.Equal("-", await Withheld("company-e", w.S.Purchasing.SupplierId, "E310000000105", "REPARACIONES"));
+        Assert.Equal("2", await h.ScalarAsync<string>("SELECT isr_withholding_type FROM pur.expense_category WHERE expense_category_id = @c", ("c", w.Categories["REPRESENTACION"])));
     }
 
     [Trait("AcceptanceGas1", "GAS-13")]

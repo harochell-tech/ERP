@@ -32,7 +32,7 @@ export default defineConfig({
     { name: "chromium", testIgnore: /mobile-sweep\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
     {
       name: "mobile",
-      testMatch: /((sales|purchase|production|treasury|quote|configuration|home|proforma|mail|cash-sale|expense|price)-journey|mobile-sweep)\.spec\.ts/,
+      testMatch: /((sales|purchase|production|treasury|quote|configuration|home|proforma|mail|cash-sale|expense|price|menu)-journey|mobile-sweep)\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         baseURL: `http://localhost:${mobilePort}`,

@@ -22,6 +22,7 @@ using Rochell.Platform.Queries;
 using Rochell.Procurement.Expenses;
 using Rochell.Procurement.Imports;
 using Rochell.Procurement.Queries;
+using Rochell.Procurement.SupplierDocuments;
 using Rochell.Reconciliation.Queries;
 using Rochell.Sales.Customers;
 using Rochell.Sales.Deliveries;
@@ -63,7 +64,7 @@ public static class QueryEndpoints
         typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewCashSaleHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
         typeof(ListLatestReconciliationRunsHandler), typeof(SearchJournalsHandler), typeof(GetIntegrityStatusHandler),
         typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
-        typeof(ListReceiptCorrectionsHandler), typeof(ListCustomsDeclarationsHandler), typeof(ListImportSettlementsHandler), typeof(GetImportSettlementHandler), typeof(ListSupplierInvoicesHandler), typeof(ListExpenseCategoriesHandler), typeof(PreviewExpensePurchaseOrderHandler), typeof(PreviewExpenseInvoiceHandler), typeof(GetSupplierInvoiceHandler),
+        typeof(ListReceiptCorrectionsHandler), typeof(ListCustomsDeclarationsHandler), typeof(ListImportSettlementsHandler), typeof(GetImportSettlementHandler), typeof(ListSupplierInvoicesHandler), typeof(ListSupplierDocumentsHandler), typeof(GetSupplierDocumentHandler), typeof(GetSupplierDocumentFileHandler), typeof(ListExpenseCategoriesHandler), typeof(PreviewExpensePurchaseOrderHandler), typeof(PreviewExpenseInvoiceHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
         typeof(ListEventJournalsHandler), typeof(ExplainEntryHandler),
@@ -164,6 +165,17 @@ public static class QueryEndpoints
         procurement.MapGet("/supplier-invoices/{supplierInvoiceId:guid}", (HttpContext http, Guid companyId, Guid supplierInvoiceId, GetSupplierInvoiceHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new GetSupplierInvoice(companyId, s, supplierInvoiceId), handler, ct))
             .Describe<SupplierInvoiceDetail>(nameof(GetSupplierInvoice), notFound: true);
+
+        // OCR1-03 (E-OCR1-03-1/8/9): captured supplier documents.
+        procurement.MapGet("/supplier-documents", (HttpContext http, Guid companyId, string? status, string? search, bool? unsentOver24Hours, int? limit, int? offset, ListSupplierDocumentsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListSupplierDocuments(companyId, s, status, search, unsentOver24Hours ?? false, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<SupplierDocumentList>(nameof(ListSupplierDocuments));
+        procurement.MapGet("/supplier-documents/{supplierDocumentId:guid}", (HttpContext http, Guid companyId, Guid supplierDocumentId, GetSupplierDocumentHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetSupplierDocument(companyId, s, supplierDocumentId), handler, ct))
+            .Describe<SupplierDocumentDetail>(nameof(GetSupplierDocument), notFound: true);
+        procurement.MapGet("/supplier-documents/{supplierDocumentId:guid}/files/{fileId:guid}", (HttpContext http, Guid companyId, Guid supplierDocumentId, Guid fileId, GetSupplierDocumentFileHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new GetSupplierDocumentFile(companyId, s, supplierDocumentId, fileId), handler, ct))
+            .Describe<SupplierDocumentFileContent>(nameof(GetSupplierDocumentFile), notFound: true);
 
         // USD1-04 (E-USD1-04-1…7): DUAs and import settlements.
         procurement.MapGet("/customs-declarations", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListCustomsDeclarationsHandler handler, QueryRunner runner, CancellationToken ct)

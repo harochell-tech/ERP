@@ -449,54 +449,73 @@ public sealed class ActivateFiscalRuleVersionHandler : ICommandHandler<ActivateF
             }
         }
 
-        // The open predecessor of the same rule ends where this version starts (or is retired when fully superseded).
-        await using (var predecessor = Sql.Command(
+        // The active versions of the same rule from this version's start on: one that starts earlier ends where this one starts, the
+        // ones that start on or after it are retired (E-X1-04-1). Days that change hands must have no tax determined under the old version.
+        var affected = await Reading.ListAsync(
             context.Connection,
             context.Transaction,
-            "SELECT rule_version_id, effective_from, row_version FROM tax.fiscal_rule_version WHERE rule_id = @rule AND status = 'ACTIVE' AND effective_to IS NULL FOR UPDATE",
-            ("rule", version.RuleId)))
+            """
+            SELECT rule_version_id, effective_from, effective_to, row_version FROM tax.fiscal_rule_version
+            WHERE rule_id = @rule AND status = 'ACTIVE' AND (effective_to IS NULL OR effective_to > @from)
+            ORDER BY effective_from
+            FOR UPDATE
+            """,
+            r => (Id: r.GetGuid(0), From: r.GetFieldValue<DateOnly>(1), To: r.IsDBNull(2) ? (DateOnly?)null : r.GetFieldValue<DateOnly>(2), RowVersion: r.GetInt64(3)),
+            cancellationToken,
+            ("rule", version.RuleId),
+            ("from", version.EffectiveFrom)).ConfigureAwait(false);
+        foreach (var previous in affected)
         {
-            Guid? previousId = null;
-            DateOnly previousFrom = default;
-            long previousRowVersion = 0;
-            await using (var reader = await predecessor.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            var retire = previous.From >= version.EffectiveFrom;
+            if (previous.To is { } to)
             {
-                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                {
-                    previousId = reader.GetGuid(0);
-                    previousFrom = reader.GetFieldValue<DateOnly>(1);
-                    previousRowVersion = reader.GetInt64(2);
-                }
-            }
-
-            if (previousId is not null)
-            {
-                var retire = previousFrom >= version.EffectiveFrom;
-                var eventId = await context.AppendEventAsync(
-                    new EventDraft(
-                        retire ? "FiscalRuleVersionRetired" : "FiscalRuleVersionClosed",
-                        1,
-                        FiscalRuleStore.Aggregate,
-                        previousId.Value,
-                        previousRowVersion + 1,
-                        JsonSerializer.Serialize(new { ruleVersionId = previousId, supersededBy = version.Id }),
-                        Publish: true),
-                    cancellationToken).ConfigureAwait(false);
-                if (retire)
-                {
-                    await context.AppendStateAsync(FiscalRuleStore.Aggregate, previousId.Value, "DOCUMENT", FiscalRuleStatus.Active, FiscalRuleStatus.Retired, CommandType, eventId, cancellationToken).ConfigureAwait(false);
-                }
-
-                await Sql.ExecuteAsync(
+                var used = (await Reading.ListAsync(
                     context.Connection,
                     context.Transaction,
-                    retire
-                        ? "UPDATE tax.fiscal_rule_version SET status = 'RETIRED', row_version = row_version + 1 WHERE rule_version_id = @p"
-                        : "UPDATE tax.fiscal_rule_version SET effective_to = @to, row_version = row_version + 1 WHERE rule_version_id = @p",
+                    """
+                    SELECT determination_date FROM tax.tax_determination
+                    WHERE company_id = @c AND @p = ANY(rule_version_ids) AND determination_date >= @from AND determination_date < @to
+                    ORDER BY determination_date LIMIT 1
+                    """,
+                    r => r.GetFieldValue<DateOnly>(0),
                     cancellationToken,
-                    ("p", previousId.Value),
-                    ("to", version.EffectiveFrom)).ConfigureAwait(false);
+                    ("c", context.CompanyId),
+                    ("p", previous.Id),
+                    ("from", version.EffectiveFrom),
+                    ("to", to)).ConfigureAwait(false)).ToList();
+                if (used.Count > 0)
+                {
+                    var day = used[0];
+                    throw new DomainException(
+                        TaxErrors.RuleDaysInUse,
+                        $"A document of {day:yyyy-MM-dd} was already taxed with the version that applies until {to:yyyy-MM-dd}; this version cannot start on {version.EffectiveFrom:yyyy-MM-dd} (E-X1-04-1).");
+                }
             }
+
+            var eventId = await context.AppendEventAsync(
+                new EventDraft(
+                    retire ? "FiscalRuleVersionRetired" : "FiscalRuleVersionClosed",
+                    1,
+                    FiscalRuleStore.Aggregate,
+                    previous.Id,
+                    previous.RowVersion + 1,
+                    JsonSerializer.Serialize(new { ruleVersionId = previous.Id, supersededBy = version.Id }),
+                    Publish: true),
+                cancellationToken).ConfigureAwait(false);
+            if (retire)
+            {
+                await context.AppendStateAsync(FiscalRuleStore.Aggregate, previous.Id, "DOCUMENT", FiscalRuleStatus.Active, FiscalRuleStatus.Retired, CommandType, eventId, cancellationToken).ConfigureAwait(false);
+            }
+
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                retire
+                    ? "UPDATE tax.fiscal_rule_version SET status = 'RETIRED', row_version = row_version + 1 WHERE rule_version_id = @p"
+                    : "UPDATE tax.fiscal_rule_version SET effective_to = @to, row_version = row_version + 1 WHERE rule_version_id = @p",
+                cancellationToken,
+                ("p", previous.Id),
+                ("to", version.EffectiveFrom)).ConfigureAwait(false);
         }
 
         var newRowVersion = version.RowVersion + 1;

@@ -1426,6 +1426,107 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-LAB1-02-13 | LAB1-02 | One age curve for every product and machine. A lot's factor = early average ÷ 28-day average, only for lots with both. The own factor of an age is used with at least the parameter's number of lots (2); otherwise the initial one. Evaluations already made are not recomputed when the curve changes. |
 | E-LAB1-02-14 | LAB1-02 | Recall with `lab:read`. Forward: the lot's deliveries with date, status, customer, site address, quantity and invoice, and the stock left per location. Backward, from a delivery: its lots with run, shift, machine, recipe, the shift summary's consumption (material, real and theoretical) and the tests. |
 | E-LAB1-02-15 | LAB1-02 | Screen Calidad › Lotes (verdict, alerts, final release, block, recall) and the verdict on Laboratorio after saving. Inicio, for Calidad: lots blocked by the lab and lots ready for final release. |
+| E-NAV-1 | NAV-01 | The menu follows the business in 12 groups: Ventas → Despacho → Facturación y cobros → Compras → Almacén → Producción → Calidad → Tesorería → Contabilidad → Fiscal → Administración → Configuración. Maestros disappears: each catalogue sits with the work that uses it. Only the menu moves; routes, screens and labels stay. |
+| E-NAV-2 | NAV-01 | Ventas: Clientes, Cotizaciones, Pedidos, Venta de contado, Listas de precios, Zonas de entrega. |
+| E-NAV-3 | NAV-01 | Despacho: Tablero de despacho, Vehículos y choferes. |
+| E-NAV-4 | NAV-01 | Facturación y cobros (Facturación and Cobros together): Por facturar, Proformas, Facturas, Notas de crédito, Recibos, Depósitos, Estado de cuenta, Cuentas por cobrar por antigüedad. |
+| E-NAV-5 | NAV-01 | Compras (with Cuentas por pagar): Proveedores, Órdenes de compra, Facturas de proveedor, DUA, Liquidaciones de importación, Antigüedad de CxP, Categorías de gasto. |
+| E-NAV-6 | NAV-01 | Almacén: Por recibir, Recepciones, Correcciones, Materias primas, Productos terminados. |
+| E-NAV-7 | NAV-01 | Producción: the day's work first (Producción del día, Curado y liberación, Portal de máquinas, Eficiencia, Mantenimiento preventivo), then its set-up (Recetas, Máquinas y turnos, Costos estándar, Costos de producción). |
+| E-NAV-8 | NAV-01 | Tesorería: Propuesta de pago, Pagos, Transferencias, Extractos, Conciliación bancaria, Cuentas bancarias de la empresa, Tasas de cambio. |
+| E-NAV-9 | NAV-01 | Contabilidad (with Cierre): Diario de ajustes, Activos fijos, Revaluación de saldos en dólares, Balanza, Mayor, Estados financieros, Períodos y cierre, Conciliaciones. |
+| E-NAV-10 | NAV-01 | Fiscal: e-CF, Rangos e-NCF, Autorizaciones fiscales, Reportes fiscales, Padrón RNC (DGII). |
+| E-NAV-11 | NAV-01 | Auditoría and Seguridad become Administración (Usuarios y roles, Solicitudes de rol, Verificar integridad, Respaldos diarios inalterables); Apertura de inventario moves to Configuración (used once). |
+| E-NAV-12 | NAV-01 | «Ir a…» search at the top of the menu (Ctrl+K / ⌘K on a computer): finds the screens the user may see by label or group, ignoring case and accents; Enter opens the first match. |
+| E-NAV-13 | NAV-01 | Favourites: a star on each menu item keeps it under «Favoritos» at the top, in this browser only (localStorage); nothing is stored on the server. |
+| E-X1-1 | X-1 | Freight on our invoices stays **exempt** (owner's decision 2026-10-09): Block Rochell registers bulk-material transport (transporte de agregados) as an economic activity with the DGII and bills the transport as such. The research found that art. 339.1 and Reglamento 293-11 art. 10 count freight accessory to a taxed sale in the ITBIS base (DGII help answers); the owner takes that position knowingly. PRS-04 is unchanged. Sources: `docs/fiscal/x1-dossier-2026-10.md`. |
+| E-X1-2 | X-1 | Sand and gravel are exempt only in their natural state (DGII CA119); washed or crushed aggregates stay taxed until the accountant rules otherwise. |
+| E-X1-3 | X-1 | ITBIS on sales arises at the invoice or the delivery, whichever comes first (art. 338.1, Reglamento art. 7): the monthly close warns of and requires invoicing the month's deliveries before closing. |
+| E-X1-4 | X-1 | Collections before delivery (proformas) are customer deposits without ITBIS until delivery or invoice; FIS-1b already works so. Closed. |
+| E-X1-5 | X-1 | A credit note issued more than 30 calendar days after the credited e-CF carries no ITBIS, only the price (art. 338 Párrafo, Reglamento arts. 8, 28), with `IndicadorNotaCredito` 1. Replaces E-VS3-06-2 for those notes. |
+| E-X1-6 | X-1 | A consumer e-CF 32 identifies its buyer from RD$250,000.00 (DGII e-CF format); below it is optional. The CONSUMER_ID_THRESHOLD value is 250,000.00. |
+| E-X1-7 | X-1 | The sale of a used fixed asset carries 18 % ITBIS on the full price (art. 336.2, DGII). |
+| E-X1-8 | X-1 | ISR withholding rates from 2026-07-01 (Ley 30-26, IR-17-2026): fees to individuals 15 %, rentals 15 %, other income 15 %, technical services 3 %, State suppliers 5 % (applied to us). Loaded as rules. |
+| E-X1-9 | X-1 | After NG 02-2026: no 30 % ITBIS withholding on companies invoicing with e-CF; 100 % still on individuals' services, e-CF 41 purchases, construction and RST suppliers; security services pending the accountant. The withholding rule gains the dimension supplier document B-series vs e-CF. |
+| E-X1-10 | X-1 | Payments abroad: ISR 27 % final (15 % royalties, software, online advertising, data storage); an e-CF 47 is issued and the 609 filed. New work. |
+| E-X1-11 | X-1 | No 607 / 608 for an e-CF-only issuer; the 606 includes e-CF received; a withholding paid in a later month is reported again in the payment month (E-FIS2-02-11 confirmed). Closed. |
+| E-X1-12 | X-1 | Customs ITBIS (DUA) is not in the 606; it goes to the IT-1 imports (E-USD1-06-5 confirmed). Closed. |
+| E-X1-13 | X-1 | The 2 % card-acquirer withholding applies (NG 06-23): an ITBIS advance credited on the month's IT-1. New flow, recorded from the bank's settlement. |
+| E-X1-14 | X-1 | Exchange differences count for ISR at fiscal year-end at the DGII's published rate (art. 293); the monthly revaluation is accounting only. No change. |
+| E-X1-15 | X-1 | Telecommunications: ITBIS 18 % on the service without ISC, ISC 10 % (art. 381), CDT 2 % (Ley 153-98). The pack is right; its citations are corrected. |
+| E-X1-16 | X-1 | Insurance: ISC 16 % without ITBIS (art. 383); life insurance ISC 11 % in 2027, 6 % in 2028, none after (Ley 30-26 art. 48): a «Seguro de vida» tax type with those versions. |
+| E-X1-17 | X-1 | The 10 % legal tip is outside the ITBIS base (art. 339.3) and computed on the price before ITBIS. No change. |
+| E-X1-18 | X-1 | ITBIS on category-1 assets (buildings) is not deductible and goes to the asset's cost; categories 2 and 3 are deductible. Building cards are adjusted. |
+| E-X1-19 | X-1 | Tax depreciation (5 / 25 / 15 %, pooled declining balance, art. 287, Reglamento 139-98) is a later report; books stay straight-line. |
+| E-X1-20 | X-1 | CONFOTUR: e-CF 44 without ITBIS, the number in additional information; an authorization without its own validity date is valid **180 days** from its issue (DGII CA3462; owner's decision). |
+| E-X1-01-1 | X1-01 | The 30 days run in calendar days from the credited invoice's date to the credit note's issue (its e-CF 34's date): up to 30 days it carries ITBIS, from day 31 it does not. Approved 2026-10-09. |
+| E-X1-01-2 | X1-01 | A note drafted before day 30 and issued later loses its ITBIS when it is issued (recomputed then); the draft says from which date it goes without ITBIS. |
+| E-X1-01-3 | X1-01 | A note without ITBIS lowers only the revenue and the customer's receivable by the price; the invoice's ITBIS stays owed to the DGII. Shown so on the note and its e-CF (indicator 1, ITBIS 0). |
+| E-X1-01-4 | X1-01 | A CONFOTUR authorization without its own «valid until» is valid until its issue date + 180 days; the expiry warning stays as it is. |
+| E-X1-01-5 | X1-01 | Pack `deploy/fiscal/x1-2026-10.json`: «Seguro de vida» (ISC 16 % to 2026, 11 % in 2027, 6 % in 2028, none from 2029) and the 250,000.00 consumer identification amount, loaded by «Carga de configuración» and activated by a person. A pack may carry dated versions of one rule. The ISR withholding rates of E-X1-8 need withholding per expense category (a withholding rule applies today to every invoice of its party type), proposed with X1-02. |
+| E-X1-01-6 | X1-01b | The monthly close lists the month's deliveries not invoiced and does not close until they are invoiced or the Controller accepts them with a reason. |
+| E-X1-01b-1 | X1-01b | The Controller accepts the **whole month** with a reason («Aceptar conduces sin facturar»); the acceptance covers the deliveries unbilled at that moment, and a later one holds the close again. Approved 2026-10-09. |
+| E-X1-01b-2 | X1-01b | New permission `unbilled_delivery:accept`, for the Controller only, with step-up. |
+| E-X1-02-1 | X1-02 | Each expense category carries its ISR withholding type (the 606 codes 1–9: Honorarios, Alquileres, Otras rentas…); an ISR withholding rule applies only to the lines of categories of its type. Approved 2026-10-09. |
+| E-X1-02-2 | X1-02 | Ley 30-26 rates for individuals: Honorarios 15 %, Alquileres 15 %, Otras rentas 15 %; technical services 3 % (Reglamento 139-98 art. 70) under type 4 «Rentas presuntas», to be confirmed by the accountant. No ISR withholding on companies unless the accountant says otherwise. |
+| E-X1-02-3 | X1-02 | An ITBIS withholding rule states the supplier documents it applies to: B-series only, e-CF only, or both. The 30 % to companies is B-series only; the 100 % to individuals both (NG 02-2026). |
+| E-X1-02-4 | X1-02 | The asset class states its tax category (1 buildings, 2, 3); on an invoice of a category-1 asset the ITBIS is not deductible and adds to the asset's cost (E-X1-18). |
+| E-X1-02-5 | X1-02 | The Controller sets or clears the ISR withholding type of an approved expense category directly in the list, with step-up; the change is recorded with who and when. Ratified 2026-10-09. |
+| E-OCR-1 | OCR-1 | Supplier invoices stop being typed from scratch. Three sources, in this order: e-CF received through Alanube, the QR of a printed e-CF, a photo or scan read by AI (OCR). Each source only prepares a **draft** that a person reviews and approves; nothing is registered or posted on its own. Approved 2026-10-09. |
+| E-OCR-2 | OCR-1 | Core polls Alanube's received documents every hour and prepares a draft from each one's XML. New inbox: Compras › Comprobantes recibidos. |
+| E-OCR-3 | OCR-1 | The commercial response to the DGII (accept / reject) is given from that inbox: registering the invoice accepts it; rejecting needs a reason. |
+| E-OCR-4 | OCR-1 | «Escanear QR» on phone and computer reads the printed e-CF's QR, fills the header (supplier RNC, e-NCF, date, total, security code) and links the received XML when it has already arrived. |
+| E-OCR-5 | OCR-1 | OCR sends only the invoice's image to an external service (Anthropic's API). The API key lives on the server, never in git. A switch Off / On, like the mail mode. |
+| E-OCR-6 | OCR-1 | Every field the AI read is marked «leído por IA»; lines that do not add up, an NCF of the wrong format or an RNC missing from the registry are flagged in red. Nothing is approved without a person's review. |
+| E-OCR-7 | OCR-1 | The photo or scan is kept in the private B2 bucket (the evidence store of ENT-1) and can be opened from the invoice. |
+| E-OCR-8 | OCR-1 | Order: received e-CF and QR first (no cost, useful from 2026-11-01); OCR afterwards. |
+| E-OCR1-01-1 | OCR1-01 | Every source creates a **captured supplier document**, not a supplier invoice (the XML has neither the PO line nor the expense category). «Pasar a factura» opens the usual form (inventory PO or expense) prefilled; the person assigns the PO line or the category. One document gives one invoice and stays linked to it. Approved 2026-10-09. |
+| E-OCR1-01-2 | OCR1-01 | The e-CF is accepted to the DGII when its invoice is **posted**, not when the draft is registered (a draft may still be voided); it can also be accepted by hand from the inbox. Refines E-OCR-3. |
+| E-OCR1-01-3 | OCR1-01 | Received credit notes (34) and debit notes (33) appear in the inbox and can be accepted / rejected, marked «sin registro en Core» for the accountant; supplier notes need their own baseline. |
+| E-OCR1-01-4 | OCR1-01 | An issuer that is not a Core supplier: the document shows the RNC and the registry's name with «Crear proveedor» prefilling the form; it goes to an invoice only once the supplier is ACTIVE. |
+| E-OCR1-01-5 | OCR1-01 | One live document per issuer RNC and fiscal number: a second source adds to it (its XML, its photo). If the fiscal number is already on a registered invoice, a notice is shown and no document is created. |
+| E-OCR1-01-6 | OCR1-01 | A QR or XML whose buyer RNC is not Block Rochell's is refused. |
+| E-OCR1-01-7 | OCR1-01 | The XML is kept in the database, append-only, like `tax.ecf_file`; photos, scans and PDFs in B2. Up to 10 MB, JPG / PNG / PDF; the photo is reduced on the phone as in ENT-1. |
+| E-OCR1-01-8 | OCR1-01 | `supplier_document:capture` (capture, scan, upload, pass to an invoice) for Cuentas por pagar; `supplier_document:respond` (accept / reject to the DGII, step-up) for Cuentas por pagar and the Contador. Reading uses `supplier_invoice:read`, which the Contador role gains to see what it answers. |
+| E-OCR1-01-9 | OCR1-01 | Received documents are read every hour as the daily process, only while the gateway is not Off: the first time the last 30 days, then from the last good reading less one day. |
+| E-OCR1-01-10 | OCR1-01 | OCR model: Claude Sonnet 5.5 through Anthropic's API; the key in `secrets/ocr/anthropic-key` on the server; a simulated reader in tests and in the local stack (OCR1-04). |
+| E-OCR1-02-1 | OCR1-02 | The hourly reading runs with `ecf:process`, which the daily process already holds; no new permission. Approved 2026-10-09. |
+| E-OCR1-02-2 | OCR1-02 | Every received document is read, also those answered in Alanube's portal (the inbox shows the real answer). Those Alanube marks «not received» (invalid XML) are shown with the error and cannot become an invoice. |
+| E-OCR1-02-3 | OCR1-02 | The response is kept in Core at once and the worker sends it to Alanube at the next pass, retried at each pass until Alanube takes it; unsent after 24 hours it is flagged in the inbox and on Inicio. |
+| E-OCR1-02-4 | OCR1-02 | Posting the invoice accepts its e-CF on behalf of whoever posts, if nobody answered it. An invoice whose e-CF was rejected before the DGII cannot be posted. |
+| E-OCR1-02-5 | OCR1-02 | The document goes to the ACTIVE supplier with that RNC; with several, none is chosen and the person picks (the RNC is unique per company, so this cannot happen today). |
+| E-OCR1-02-6 | OCR1-02 | An e-CF in USD: Core takes the XML's amounts in pesos; the other currency's amounts are information only. |
+| E-OCR1-02-7 | OCR1-02 | Alanube's webhook brings the reading forward, through the same address and secret as VS#4's webhook. |
+| E-OCR1-02-8 | OCR1-02 | When the XML arrives after the QR or the photo, its header and lines replace what was read and the «leído por IA» marks go; if the XML's total differs from the QR's it is flagged in red. |
+| E-OCR1-02-9 | OCR1-02 | A voided or reversed invoice returns its document to the inbox to be registered again; an acceptance already given to the DGII stays. |
+| E-OCR1-02-10 | OCR1-02 | The simulated Alanube of the local stack and the tests also produces received documents. |
+| E-OCR1-03-1 | OCR1-03 | Inbox Compras › Comprobantes recibidos: tabs Pendientes / Registrados / Descartados / Todos; columns date, supplier (RNC and name), NCF / e-NCF, total, source (XML / QR / photo), DGII response, status; search by RNC, name or number. Approved 2026-10-09. |
+| E-OCR1-03-2 | OCR1-03 | «Pasar a factura» with an inventory purchase order: the usual form with supplier, NCF, date and printed total filled in; the XML's lines are shown beside it as reference and the person picks the PO lines. |
+| E-OCR1-03-3 | OCR1-03 | «Pasar a factura» of expenses: lines from the XML (description, quantity, price); category and tax type proposed from the supplier's latest expense invoice, else chosen by the person. |
+| E-OCR1-03-4 | OCR1-03 | Registering the invoice from a document links it in the same step; supplier and NCF must match the document's. |
+| E-OCR1-03-5 | OCR1-03 | «Descartar» with a reason (duplicates, not ours); for an e-CF it also offers to reject it before the DGII. |
+| E-OCR1-03-6 | OCR1-03 | «Escanear QR» with the camera on phone and computer; on a computer without a camera, upload a photo of the QR or paste its link. The QR is decoded in the browser with `jsQR` (open source; the image goes to no service). |
+| E-OCR1-03-7 | OCR1-03 | From the QR Core keeps issuer and buyer RNC, e-NCF, date, total and security code, and the QR's total to compare with the XML (E-OCR1-02-8); a QR that is not the DGII's, or whose buyer is not Block Rochell, is refused; «Verificar en la DGII» opens the official stamp page. Migration 0107. |
+| E-OCR1-03-8 | OCR1-03 | Inicio: «Comprobantes recibidos por registrar» and «Respuestas a la DGII sin enviar hace más de 24 horas». |
+| E-OCR1-03-9 | OCR1-03 | Detail: header, lines (XML or AI, flags in red), XML download, Accept / Reject before the DGII, the linked invoice and the history; notes 33 / 34 marked «sin registro en Core», without «Pasar a factura». |
+| E-OCR1-03-10 | OCR1-03 | Playwright journey: a simulated e-CF arrives in the local stack, is passed to an expense invoice, posted and accepted; a QR is captured by pasting its link. |
+| E-OCR1-04-1 | OCR1-04 | Only the photo or PDF goes to be read (≤ 10 MB, up to 3 pages), asked for in a fixed shape: RNC, name, NCF, date, lines, ITBIS and total. Approved 2026-10-09. |
+| E-OCR1-04-2 | OCR1-04 | When the AI cannot read well, the document keeps the empty fields marked to complete by hand; a failed reading is retried once. |
+| E-OCR1-04-3 | OCR1-04 | A monthly limit of readings in the configuration (PURCHASING `ocr_monthly_readings`, e.g. 500); at the limit the button says so and the invoice is captured by hand. |
+| E-OCR1-04-4 | OCR1-04 | «Subir foto o PDF» in the inbox; on a phone it opens the camera. |
+| E-X1-03-1 | X1-03 | The e-CF 47 is issued when a services invoice of a foreign supplier is **paid**; the withholding is made at payment (art. 305). Approved 2026-10-09. |
+| E-X1-03-2 | X1-03 | The withholding is taken from the payment: the supplier receives the invoice less the ISR; the ISR goes to withholdings payable for the IR-17. |
+| E-X1-03-3 | X1-03 | 27 % in general; 15 % for royalties, software, online advertising and data storage (Ley 30-26); the expense category says which, and the rates are new fiscal rules with their source. |
+| E-X1-03-4 | X1-03 | No e-CF 47 for imported goods (DUA) nor goods lines: services only. |
+| E-X1-03-5 | X1-03 | A DGII e-NCF range for type 47 is needed, as for 31; without an ACTIVE range the payment is held and says why. |
+| E-X1-03-6 | X1-03 | Fiscal › Reportes fiscales › 609 of the month as CSV in the DGII tool's order; the e-CF 47 also goes in the 606 under the company's RNC. |
+| E-X1-03-7 | X1-03 | The payment settles the whole USD invoice; the bank pays 73 % (or 85 %) and the difference goes to «ISR withheld payable» in pesos at the payment's rate: a new version of P-41 the Controller approves. Approved 2026-10-09. |
+| E-X1-03-8 | X1-03 | When Alanube rejects the e-CF 47 the payment stays released; the e-CF 47 is corrected and resent like a rejected invoice; the payment is not reversed. |
+| E-X1-03-9 | X1-03 | The expense category carries «Pago al exterior»: General (27 %) or Digital (15 %: royalties, software, online advertising, data); the rates are a new fiscal rule citing Ley 30-26. |
+| E-X1-03-10 | X1-03 | Treasury keeps its module graph (E-VS2-02-1): at release it records the withholding, reading the rate in force with a query; the daily process, from Procurement, issues the e-CF 47 of released foreign payments through Alanube; without an ACTIVE type-47 range the payment shows «e-CF 47 pendiente» on Inicio. |
+| E-X1-03-11 | X1-03 | X1-03 is built after 2026-11-01; until then a payment abroad is recorded by hand with the accountant. |
+| E-X1-04-1 | X1-04a | Activating a version whose start falls inside an earlier ACTIVE version of the same rule brings that version's end forward to the new start, even when it already had an end; ACTIVE versions starting on or after it are retired as before. If a document was already taxed under the old version on the days that change hands, the activation is refused and names the day. Approved 2026-10-09. |
+| E-X1-04-2 | X1-04a | `ITBIS_VENTAS` exempting TRANSPORTE from 2026-10-09: the pack's version moves to that date; loaded on staging, the Especialista fiscal activates it and it retires the 2026-10-10 version. |
 
 Implementation rules derived from the above (no architectural change):
 

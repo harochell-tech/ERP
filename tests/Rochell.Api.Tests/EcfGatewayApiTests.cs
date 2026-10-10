@@ -3,6 +3,8 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Rochell.Api.Ecf;
 using Rochell.Identity;
+using Rochell.Platform.Time;
+using Rochell.Tax.Ecf;
 using Rochell.TestInfrastructure;
 using Xunit;
 
@@ -39,7 +41,8 @@ public sealed class EcfGatewayApiTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.Unauthorized, without.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
         Assert.Equal(HttpStatusCode.Accepted, valid.StatusCode);
-        Assert.Equal("WEBHOOK:SIMULATED:01SIM", await h.ScalarAsync<string>("SELECT operation || ':' || mode || ':' || message FROM tax.ecf_call WHERE company_id = @c", ("c", h.CompanyId)));
+        Assert.Equal(
+            "WEBHOOK:SIMULATED:01SIM", await h.ScalarAsync<string>("SELECT operation || ':' || mode || ':' || message FROM tax.ecf_call WHERE company_id = @c AND operation = 'WEBHOOK'", ("c", h.CompanyId)));
     }
 
     [Fact]
@@ -61,6 +64,32 @@ public sealed class EcfGatewayApiTests(PostgresFixture postgres)
         Assert.Equal("ACTIVE", series.GetProperty("status").GetString());
         Assert.Equal("E310000000001", series.GetProperty("next").GetString());
         Assert.Equal(0, steps);
+    }
+
+    /// <summary>OCR1-02 (E-OCR1-01-9, E-OCR1-02-1/3/7): the worker reads suppliers' e-CF as the daily process and sends the answers kept.</summary>
+    [Fact]
+    public async Task The_worker_reads_received_eCF_and_sends_the_commercial_responses()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        await h.GrantAsync(h.CompanyId, IdentityConstants.DailyProcessUserId, "PROCESO_DIARIO");
+        using var api = new ApiHost(h, settings: Simulated);
+        var alanube = api.Services.GetRequiredService<SimulatedEcfProvider>();
+        var buyer = await h.ScalarAsync<string>("SELECT rnc FROM md.company WHERE company_id = @c", ("c", h.CompanyId));
+        var today = BusinessCalendar.DefaultBusinessDate(DateTime.UtcNow);
+        var xml = SimulatedEcfProvider.SampleXml(
+            "101000011", "Ferretería Uno", buyer!, "E310000000001", today, today.ToDateTime(new TimeOnly(8, 0)), [("Cemento", "1.00", "1000.00", "1000.00", true)], "1000.00", "180.00", "1180.00");
+        alanube.AddReceived("101000011", buyer!, "E310000000001", DateTimeOffset.UtcNow, "1180.00", xml);
+
+        api.Services.GetRequiredService<ReceptionNudge>().Nudge();
+        await api.Services.GetRequiredService<ReceivedDocumentsService>().RunOnceAsync(CancellationToken.None);
+        await h.AdminRequireAsync(
+            "UPDATE pur.supplier_document SET commercial_response = 'REJECTED', response_reason = 'No pedido', responded_by = created_by, responded_at = now(), version = version + 1");
+        await api.Services.GetRequiredService<ReceivedDocumentsService>().RunOnceAsync(CancellationToken.None);
+
+        Assert.Equal(
+            "E310000000001|1180.00|REJECTED|true",
+            await h.ScalarAsync<string>("SELECT fiscal_number || '|' || total_amount::numeric(19,2) || '|' || commercial_response || '|' || (response_sent_at IS NOT NULL) FROM pur.supplier_document"));
+        Assert.Equal((false, (string?)"No pedido"), (Assert.Single(alanube.Responses).Accept, alanube.Responses[0].Reason));
     }
 
     private static Task<HttpResponseMessage> Webhook(HttpClient client, string? secret)
