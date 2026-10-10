@@ -64,3 +64,11 @@ test("requirements, short code, parameters and failure types of the lab (LAB1-01
   await expect(lab.getByTestId("item-spec:BLOQUE-6")).toContainText("v1");
   await expect(lab.getByRole("button", { name: "Cambiar" })).toHaveCount(0);
 });
+
+// LAB1-03c (E-LAB1-03-8, 15): the page a certificate's QR opens needs no sign-in; a code that matches nothing says so. A real certificate's
+// verification (in force, then void) is covered over the API (QualityCertificateAcceptanceTests).
+test("a certificate's public verification page, without sign-in (LAB1-03c)", async ({ page }) => {
+  await page.goto("/verificar/certificado/?c=00000000-0000-0000-0000-000000000000&k=aaaaaaaaaaaaaaaaaaaaaaaa");
+  await expect(page.getByRole("heading", { name: "Verificación de certificado" })).toBeVisible();
+  await expect(page.getByTestId("certificate-verification-missing")).toBeVisible();
+});

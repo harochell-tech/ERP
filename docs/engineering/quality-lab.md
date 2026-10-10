@@ -185,7 +185,19 @@ recall and Calidad's actions (final release, block, unblock, evaluate again). La
 - Configuración › Formatos de impresión gains «Certificado de laboratorio» and «Etiqueta de rack» (paper «Etiqueta de 100 × 150 mm»).
   Journey: `e2e/print-formats-journey.spec.ts`.
 
+## LAB1-03c — the certificate's public verification (E-LAB1-03-8, 15; migration 0116)
+
+- Migration 0116: permission `lab_certificate:verify` (157 permissions); the service identity «Verificación pública»
+  (`IdentityConstants.PublicVerificationUserId`, …d005) with its own role VERIFICACION_PUBLICA (30 roles), assigned to every company
+  (`rochell-migrate create-company` assigns it to new ones); `iam.role_assignment_service_guard` knows it.
+- `VerifyLabCertificate` (`lab_certificate:verify`): by the 24-character public code — number, issuer, product, lot, break date, specimens,
+  average (kg/cm² and MPa), minimum, CV, issue date, status and when it was voided. Never the customer nor the site.
+- `GET /api/v1/public/lab-certificates/{companyId}/{code}` (`CertificatePages`): no sign-in; a SERVICE session of «Verificación
+  pública» per request; an unknown company or code is a 404.
+- Web: `/verificar/certificado/?c=&k=` (no sign-in, no menu, like `/entrega`): «Certificado auténtico y vigente» or «… ANULADO: no lo
+  use», or that no certificate has the code.
+
 ### Not yet
 
-The public verification page (waits for E-LAB1-03-15); control chart, the age curve on screen and the history before Core,
+The control chart, the age curve on screen and the history before Core,
 `qa.legacy_lot` (LAB1-04, E-LAB1-01-15).

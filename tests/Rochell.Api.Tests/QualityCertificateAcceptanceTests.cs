@@ -246,12 +246,24 @@ public sealed class QualityCertificateAcceptanceTests(PostgresFixture postgres)
         var wrongTruck = await (await quality.CommandAsync(c, "manufacturing", "issue-lab-certificate", new { plantId = plant, lotId = lotB, breakDate, deliveryId = fifoTruck }, Guid.NewGuid().ToString())).ProblemAsync();
         var noSpecimens = await (await quality.CommandAsync(c, "manufacturing", "issue-lab-certificate", new { plantId = plant, lotId = lotB, breakDate = breakDate.AddDays(-1) }, Guid.NewGuid().ToString())).ProblemAsync();
         var certificate = issued.GetProperty("certificateId").GetGuid();
+        // E-LAB1-03-8, 15: the QR's page, without sign-in, answered as «Verificación pública».
+        await h.GrantAsync(c, Rochell.Identity.IdentityConstants.PublicVerificationUserId, "VERIFICACION_PUBLICA");
+        var publicCode = issued.GetProperty("publicCode").GetString()!;
+        var anonymous = api.Browser();
+        var verified = JsonDocument.Parse(await (await anonymous.GetAsync($"/api/v1/public/lab-certificates/{c}/{publicCode}")).Content.ReadAsStringAsync()).RootElement;
+        var unknown = await anonymous.GetAsync($"/api/v1/public/lab-certificates/{c}/{new string('a', 24)}");
         var printed = await lab.GetOkAsync($"/api/v1/companies/{c}/manufacturing/lab/certificates/{certificate}/print");
         var body = printed.GetProperty("body").GetString()!;
 
         var number = $"CR-{codeB}-{breakDate:ddMMyy}";
         Assert.Equal($"{number}:{number}-2:ISSUED", $"{issued.GetProperty("certificateNo").GetString()}:{again.GetProperty("certificateNo").GetString()}:{issued.GetProperty("status").GetString()}");
         Assert.Equal(("LAB_CERTIFICATE_REFUSED", "LAB_CERTIFICATE_REFUSED"), (wrongTruck.Code, noSpecimens.Code));
+        Assert.Equal($"{number}:{codeB}:BLOQUE-6 — Bloque de 6 pulgadas:3:77.90:7.64:75.30:3.33:ISSUED", string.Join(':',
+            verified.GetProperty("certificateNo").GetString(), verified.GetProperty("lot").GetString(), verified.GetProperty("product").GetString(), verified.GetProperty("specimens").GetInt32(),
+            verified.GetProperty("avgKgcm2").GetString(), verified.GetProperty("avgMpa").GetString(), verified.GetProperty("minKgcm2").GetString(), verified.GetProperty("cvPercent").GetString(),
+            verified.GetProperty("status").GetString()));
+        Assert.DoesNotContain("Constructora Uno", verified.GetRawText(), StringComparison.Ordinal);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, unknown.StatusCode);
         Assert.Contains(number, body, StringComparison.Ordinal);
         Assert.Contains("Constructora Uno", body, StringComparison.Ordinal);
         Assert.Contains("Resistencia calculada sobre área bruta. Resultados válidos solo para las unidades ensayadas.", body, StringComparison.Ordinal);
@@ -278,5 +290,7 @@ public sealed class QualityCertificateAcceptanceTests(PostgresFixture postgres)
             x.GetProperty("certificateNo").GetString(), x.GetProperty("status").GetString(), x.GetProperty("voidCause").GetString(), x.GetProperty("specimens").GetInt32(),
             x.GetProperty("customerName").GetString()))));
         Assert.Contains("ANULADO", reprinted, StringComparison.Ordinal);
+        var afterVoid = JsonDocument.Parse(await (await anonymous.GetAsync($"/api/v1/public/lab-certificates/{c}/{publicCode}")).Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal("VOIDED", afterVoid.GetProperty("status").GetString());
     }
 }

@@ -33,6 +33,9 @@ public static class IdentityConstants
     /// <summary>E-ENT1-01-5: the delivery confirmation of the drivers' QR page (role CONFIRMACION_ENTREGA): it records full receipts only.</summary>
     public static readonly Guid DeliveryConfirmationUserId = Guid.Parse("00000000-0000-7000-8000-00000000d004");
 
+    /// <summary>E-LAB1-03-15: the public verification of a lab certificate's QR (role VERIFICACION_PUBLICA): it reads a certificate by its code only.</summary>
+    public static readonly Guid PublicVerificationUserId = Guid.Parse("00000000-0000-7000-8000-00000000d005");
+
     public const string AuthMethodOidcGoogle = "OIDC_GOOGLE";
 
     public const string AuthMethodService = "SERVICE";

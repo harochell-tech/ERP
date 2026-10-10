@@ -678,8 +678,8 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
   const menuVisible = mobile && menuOpen;
 
-  // ENT1-03 (E-ENT-1): the drivers' page is public — no sign-in, no menu.
-  if (pathname.startsWith("/entrega")) {
+  // ENT1-03 (E-ENT-1): the drivers' page is public — no sign-in, no menu. So is a lab certificate's verification (E-LAB1-03-8, LAB1-03c).
+  if (pathname.startsWith("/entrega") || pathname.startsWith("/verificar")) {
     return <main className="driver-page">{children}</main>;
   }
   if (state.status === "loading") {

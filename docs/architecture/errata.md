@@ -1442,6 +1442,8 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-LAB1-03-12 | LAB1-03 | The gate-out takes the scanned lots first, in the order scanned and up to their stock; what is missing comes FIFO. Without a scan, FIFO as today. |
 | E-LAB1-03-13 | LAB1-03 | Baseline §14-7: the printed conduce shows the lot's field code when it has one, else the internal code. |
 | E-LAB1-03-14 | LAB1-03 | Sending the certificate by e-mail is out of LAB1-03: it is printed or saved as PDF from the screen, like the conduce. |
+| E-LAB1-03-15 | LAB1-03 | The public verification page answers as a service identity of its own, «Verificación pública» (role VERIFICACION_PUBLICA, user …d005), whose only permission is the new `lab_certificate:verify` (read a certificate by its public code). Like «Confirmación de entrega», it does nothing else. |
+| E-LAB1-03-16 | LAB1-03 | A lot scanned at loading and blocked by quality before the gate-out stops the gate-out (STOCK_BLOCKED_BY_QUALITY); the system never swaps it for another lot, since the truck carries it. A confirmed loading cannot go back to LOADING, so Dispatch cancels the delivery and plans it again without that rack. |
 | E-NAV-1 | NAV-01 | The menu follows the business in 12 groups: Ventas → Despacho → Facturación y cobros → Compras → Almacén → Producción → Calidad → Tesorería → Contabilidad → Fiscal → Administración → Configuración. Maestros disappears: each catalogue sits with the work that uses it. Only the menu moves; routes, screens and labels stay. |
 | E-NAV-2 | NAV-01 | Ventas: Clientes, Cotizaciones, Pedidos, Venta de contado, Listas de precios, Zonas de entrega. |
 | E-NAV-3 | NAV-01 | Despacho: Tablero de despacho, Vehículos y choferes. |

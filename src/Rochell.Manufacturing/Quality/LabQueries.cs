@@ -563,3 +563,45 @@ public sealed class GetDeliveryRecallHandler : IQueryHandler<GetDeliveryRecall>
             [.. taken.Where(x => x.SummaryId is null).Select(x => x.LotCode)]));
     }
 }
+
+/// <summary>
+/// LAB1-03c (E-LAB1-03-8, 15): what the certificate's public QR page shows, read by its public code — never the customer nor the site.
+/// Only the service identity «Verificación pública» holds the permission.
+/// </summary>
+public sealed record VerifyLabCertificate(Guid CompanyId, Guid SessionId, string PublicCode) : IQuery;
+
+/// <remarks><c>Status</c> ISSUED (in force) or VOIDED, with when it was voided.</remarks>
+public sealed record LabCertificateVerification(
+    string CertificateNo, string Issuer, string Product, string Lot, DateOnly BreakDate, int Specimens, string AvgKgcm2, string AvgMpa, string MinKgcm2, string? CvPercent,
+    DateTime IssuedAt, string Status, DateTime? VoidedAt);
+
+[RequiresPermission("lab_certificate:verify")]
+public sealed class VerifyLabCertificateHandler : IQueryHandler<VerifyLabCertificate>
+{
+    public string QueryType => "Manufacturing.VerifyLabCertificate";
+
+    public async Task<string> HandleAsync(VerifyLabCertificate query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var code = (query.PublicCode ?? string.Empty).Trim();
+        var found = code.Length == 24 && code.All(ch => ch is (>= 'a' and <= 'z') or (>= '0' and <= '9'))
+            ? await Reading.SingleOrDefaultAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                SELECT c.certificate_no, c.snapshot -> 'issuer' ->> 'name', (c.snapshot -> 'lot' ->> 'itemCode') || ' — ' || (c.snapshot -> 'lot' ->> 'item'), c.snapshot -> 'lot' ->> 'fieldCode',
+                       c.break_date, (c.snapshot -> 'summary' ->> 'specimens')::int, c.snapshot -> 'summary' ->> 'avgKgcm2', c.snapshot -> 'summary' ->> 'avgMpa',
+                       c.snapshot -> 'summary' ->> 'minKgcm2', c.snapshot -> 'summary' ->> 'cvPercent', c.issued_at, c.status, c.voided_at
+                FROM qa.certificate c WHERE c.company_id = @c AND c.public_code = @k
+                """,
+                r => new LabCertificateVerification(
+                    r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.Date(4), r.GetInt32(5), r.GetString(6), r.GetString(7), r.GetString(8), r.NullableString(9), r.Utc(10),
+                    r.GetString(11), r.NullableUtc(12)),
+                cancellationToken,
+                ("c", context.CompanyId),
+                ("k", code)).ConfigureAwait(false)
+            : null;
+        return found is null ? throw new DomainException(QueryErrors.NotFound, "No certificate has that code.") : ApiJson.Serialize(found);
+    }
+}

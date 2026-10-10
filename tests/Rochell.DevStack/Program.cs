@@ -41,6 +41,7 @@ internal static class DevStackProgram
             // As `rochell-migrate create-company` does (E-FIS1-04-7): the daily process runs the e-CF worker and the expiry (E-VS4-02-1).
             await harness.GrantAsync(harness.CompanyId, Rochell.Identity.IdentityConstants.DailyProcessUserId, "PROCESO_DIARIO");
             await harness.GrantAsync(harness.CompanyId, Rochell.Identity.IdentityConstants.DeliveryConfirmationUserId, "CONFIRMACION_ENTREGA"); // ENT1-02
+            await harness.GrantAsync(harness.CompanyId, Rochell.Identity.IdentityConstants.PublicVerificationUserId, "VERIFICACION_PUBLICA"); // LAB1-03c
             using var idp = new SimulatedIdp(publicOrigin + SimulatedIdp.BrowserPath);
             foreach (var account in accounts)
             {

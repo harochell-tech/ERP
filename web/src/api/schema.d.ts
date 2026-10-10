@@ -5789,6 +5789,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/manufacturing/lab/certificates/verify/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["VerifyLabCertificate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/manufacturing/lab/lots/{lotId}/recall": {
         parameters: {
             query?: never;
@@ -7818,6 +7834,23 @@ export interface paths {
         put?: never;
         /** E-ENT-3/4: the driver's confirmation (multipart, with the photo or signature). FULL records the POD; DIFFERENCES waits for Dispatch. */
         post: operations["ConfirmDeliveryPublic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/lab-certificates/{companyId}/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** E-LAB1-03-8: what the certificate's public page shows — number, product, lot, break date, specimens, average, minimum, CV, issue date and status. No customer, no site. */
+        get: operations["VerifyLabCertificatePublic"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11285,6 +11318,25 @@ export interface components {
             offset: number;
         };
         JsonElement: unknown;
+        LabCertificateVerification: {
+            certificateNo: string;
+            issuer: string;
+            product: string;
+            lot: string;
+            /** Format: date */
+            breakDate: string;
+            /** Format: int32 */
+            specimens: number;
+            avgKgcm2: string;
+            avgMpa: string;
+            minKgcm2: string;
+            cvPercent: null | string;
+            /** Format: date-time */
+            issuedAt: string;
+            status: string;
+            /** Format: date-time */
+            voidedAt: null | string;
+        };
         LabCertificateView: {
             /** Format: uuid */
             certificateId: string;
@@ -41938,6 +41990,65 @@ export interface operations {
             };
         };
     };
+    VerifyLabCertificate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabCertificateVerification"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     GetLotRecall: {
         parameters: {
             query?: never;
@@ -48777,6 +48888,36 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    VerifyLabCertificatePublic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabCertificateVerification"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
