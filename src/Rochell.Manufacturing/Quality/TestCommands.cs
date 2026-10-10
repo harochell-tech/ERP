@@ -55,6 +55,9 @@ internal static class LabTests
         CommandContext context, string table, string aggregate, Guid plantId, Guid testId, string? reason, string commandType, CancellationToken cancellationToken)
     {
         var why = Lots.Lots.Reason(reason);
+        var lotOfTest = await MfgSql.ScalarAsync<Guid?>(context, $"SELECT lot_id FROM {table} WHERE company_id = @c AND test_id = @t", cancellationToken, ("c", context.CompanyId), ("t", testId))
+            .ConfigureAwait(false) ?? throw new DomainException(ManufacturingErrors.NotFound, "The test does not exist.");
+        var locked = await Lots.Lots.LockAsync(context, plantId, lotOfTest, null, cancellationToken).ConfigureAwait(false);
         var test = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
@@ -89,7 +92,9 @@ internal static class LabTests
             cancellationToken,
             ("r", why), ("by", await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false)), ("at", context.Clock.UtcNow), ("t", testId)).ConfigureAwait(false);
         await context.AppendStateAsync(aggregate, testId, "DOCUMENT", "RECORDED", "VOIDED", commandType, eventId, cancellationToken, why).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { testId, lotId, status = "VOIDED" });
+        // E-LAB1-02-8: the lot is evaluated again without the voided test; a lot it had blocked stays blocked until Calidad unblocks it.
+        var outcome = await LotEvaluator.EvaluateAsync(context, locked, "TESTS", commandType, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { testId, lotId, status = "VOIDED", evaluation = LotEvaluator.Result(outcome) });
     }
 }
 
@@ -105,6 +110,7 @@ public sealed class RecordCompressionTestsHandler : ICommandHandler<RecordCompre
         var specimens = command.Specimens ?? [];
         LabTests.EnsureRows(specimens.Count, "specimens");
         var lot = await LabTests.LotOfPlantAsync(context, command.PlantId, command.LotId, cancellationToken).ConfigureAwait(false);
+        var locked = await Lots.Lots.LockAsync(context, command.PlantId, command.LotId, null, cancellationToken).ConfigureAwait(false);
         var age = Lab.Age(lot, command.BreakDate, MfgSql.Today(context), "The break date");
         var spec = await Lab.SpecAsync(context.Connection, context.Transaction, context.CompanyId, lot.ItemId, cancellationToken).ConfigureAwait(false);
         var toMpa = await Lab.ParameterAsync(context.Connection, context.Transaction, context.CompanyId, "KGCM2_TO_MPA", cancellationToken).ConfigureAwait(false);
@@ -162,7 +168,9 @@ public sealed class RecordCompressionTestsHandler : ICommandHandler<RecordCompre
             });
         }
 
-        return JsonSerializer.Serialize(new { batchId = batch, lotId = lot.LotId, fieldCode = lot.FieldCode, ageDays = age, tests });
+        // E-LAB1-02-1: the lot is evaluated again with what was just recorded; a NO CUMPLE blocks it here (E-LAB1-02-6).
+        var outcome = await LotEvaluator.EvaluateAsync(context, locked, "TESTS", CommandType, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { batchId = batch, lotId = lot.LotId, fieldCode = lot.FieldCode, ageDays = age, tests, evaluation = LotEvaluator.Result(outcome) });
     }
 }
 
@@ -191,6 +199,7 @@ public sealed class RecordAbsorptionTestsHandler : ICommandHandler<RecordAbsorpt
         var blocks = command.Blocks ?? [];
         LabTests.EnsureRows(blocks.Count, "blocks");
         var lot = await LabTests.LotOfPlantAsync(context, command.PlantId, command.LotId, cancellationToken).ConfigureAwait(false);
+        var locked = await Lots.Lots.LockAsync(context, command.PlantId, command.LotId, null, cancellationToken).ConfigureAwait(false);
         Lab.Age(lot, command.TestDate, MfgSql.Today(context), "The test date");
         var technician = await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false);
         var batch = context.ResultRef;
@@ -226,7 +235,8 @@ public sealed class RecordAbsorptionTestsHandler : ICommandHandler<RecordAbsorpt
             tests.Add(id);
         }
 
-        return JsonSerializer.Serialize(new { batchId = batch, lotId = lot.LotId, fieldCode = lot.FieldCode, tests });
+        var outcome = await LotEvaluator.EvaluateAsync(context, locked, "TESTS", CommandType, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { batchId = batch, lotId = lot.LotId, fieldCode = lot.FieldCode, tests, evaluation = LotEvaluator.Result(outcome) });
     }
 }
 

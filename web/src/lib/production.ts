@@ -74,7 +74,7 @@ export function lotActions(status: string, can: (permission: string) => boolean,
   if (status === "BLOCKED" && can("fg_lot:release")) {
     actions.push("unblock");
   }
-  if ((status === "CURING" || status === "BLOCKED" || status === "RELEASED") && can("fg_lot:scrap")) {
+  if ((status === "CURING" || status === "BLOCKED" || status === "RELEASED" || status === "FINAL_RELEASED") && can("fg_lot:scrap")) {
     actions.push("scrap");
   }
   return actions;

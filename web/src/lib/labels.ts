@@ -32,6 +32,7 @@ const STATUS: Readonly<Record<string, string>> = {
   // E-UI-5: treasury.
   PREPARED: "Preparado",
   RELEASED: "Liberado",
+  FINAL_RELEASED: "Liberación final", // LAB1-02 (E-LAB1-4)
   CLEARED: "Compensado",
   VERIFIED: "Verificada",
   SUPERSEDED: "Reemplazada",
@@ -133,7 +134,7 @@ const TONES: Readonly<Record<string, StatusTone>> = {
   ACCEPTED_EXTERNAL: "done", PAID: "done", CREDITED: "done", APPLIED: "done",
   ECF_SENDING: "progress", ECF_ACCEPTED: "done", ECF_REJECTED: "error", ECF_ACTION: "attention", // VS4-03
   NOT_FOUND: "error", NOT_ACTIVE: "attention", NAME_DIFFERS: "attention", // E-RNC-7
-  IN_PROGRESS: "progress", CURING: "progress", COMPLETED: "done", SETTLED: "done", SCRAPPED: "error", // MFG1-07
+  IN_PROGRESS: "progress", CURING: "progress", FINAL_RELEASED: "done", COMPLETED: "done", SETTLED: "done", SCRAPPED: "error", // MFG1-07
   PENDING_VERIFICATION: "progress", SUSPENDED: "attention", EXHAUSTED: "neutral", EXPIRED: "neutral", // FIS1-05
   SENT: "progress", CONVERTED: "done", LOST: "neutral", // QUO1-04
   REVERSED: "reversed",

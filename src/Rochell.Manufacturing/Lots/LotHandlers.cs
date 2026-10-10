@@ -12,7 +12,10 @@ internal static class Lots
 {
     public const string ScrapRule = "P-12";
 
-    public sealed record Lot(Guid LotId, string LotCode, Guid ItemId, Guid PlantId, string Status, DateTime ReleasableAt, long Version);
+    public sealed record Lot(Guid LotId, string LotCode, Guid ItemId, Guid PlantId, string Status, DateTime ReleasableAt, long Version, string? BlockedFrom = null);
+
+    /// <summary>E-LAB1-02-6: what a block keeps — its cause (MANUAL or LAB) and, for the lab's, the evaluation that caused it.</summary>
+    public sealed record Block(string Cause, Guid? EvaluationId = null);
 
     /// <summary>Locks the finished-goods lot, checks the plant and the expected version.</summary>
     public static async Task<Lot> LockAsync(CommandContext context, Guid plantId, Guid lotId, long? expectedVersion, CancellationToken cancellationToken)
@@ -21,12 +24,12 @@ internal static class Lots
             context.Connection,
             context.Transaction,
             """
-            SELECT f.lot_id, l.lot_code, l.item_id, r.plant_id, f.status, f.releasable_at, f.version
+            SELECT f.lot_id, l.lot_code, l.item_id, r.plant_id, f.status, f.releasable_at, f.version, f.blocked_from
             FROM mfg.fg_lot f JOIN inv.lot l ON l.lot_id = f.lot_id JOIN mfg.production_run r ON r.run_id = f.run_id
             WHERE f.company_id = @c AND f.lot_id = @l
             FOR UPDATE OF f
             """,
-            r => new Lot(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetGuid(3), r.GetString(4), r.GetFieldValue<DateTime>(5), r.GetInt64(6)),
+            r => new Lot(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetGuid(3), r.GetString(4), r.GetFieldValue<DateTime>(5), r.GetInt64(6), r.NullableString(7)),
             cancellationToken,
             ("c", context.CompanyId),
             ("l", lotId)).ConfigureAwait(false)
@@ -50,7 +53,7 @@ internal static class Lots
     /// <summary>Changes the lot's status (+1 version) with its event and state history.</summary>
     public static async Task<Guid> TransitionAsync(
         CommandContext context, Lot lot, string to, string eventType, object payload, string commandType, CancellationToken cancellationToken, string? reason = null, string? blockReason = null,
-        (Guid By, DateTime At, Guid To)? release = null)
+        (Guid By, DateTime At, Guid To)? release = null, Block? block = null, (Guid By, DateTime At)? finalRelease = null)
     {
         var eventId = await context.AppendEventAsync(
             new EventDraft(eventType, 1, Runs.Runs.LotAggregate, lot.LotId, await MfgSql.NextEventVersionAsync(context, Runs.Runs.LotAggregate, lot.LotId, cancellationToken).ConfigureAwait(false),
@@ -61,18 +64,43 @@ internal static class Lots
             context.Transaction,
             """
             UPDATE mfg.fg_lot SET status = @s, block_reason = @b, version = version + 1,
-                   released_by = coalesce(CAST(@by AS uuid), released_by), released_at = coalesce(CAST(@at AS timestamptz), released_at), released_to = coalesce(CAST(@to AS uuid), released_to)
+                   block_cause = @cause, blocked_from = CASE WHEN CAST(@cause AS text) IS NULL THEN NULL ELSE status END, block_evaluation_id = @evaluation,
+                   released_by = coalesce(CAST(@by AS uuid), released_by), released_at = coalesce(CAST(@at AS timestamptz), released_at), released_to = coalesce(CAST(@to AS uuid), released_to),
+                   final_released_by = coalesce(CAST(@fby AS uuid), final_released_by), final_released_at = coalesce(CAST(@fat AS timestamptz), final_released_at)
             WHERE lot_id = @l
             """,
             cancellationToken,
             ("s", to),
             ("b", blockReason),
+            ("cause", block?.Cause),
+            ("evaluation", block?.EvaluationId),
+            ("fby", finalRelease?.By),
+            ("fat", finalRelease?.At),
             ("by", release?.By),
             ("at", release?.At),
             ("to", release?.To),
             ("l", lot.LotId)).ConfigureAwait(false);
         await context.AppendStateAsync(Runs.Runs.LotAggregate, lot.LotId, "DOCUMENT", lot.Status, to, commandType, eventId, cancellationToken, reason).ConfigureAwait(false);
         return eventId;
+    }
+}
+
+internal static class LotBlocks
+{
+    /// <summary>The rack status of a lot that is not blocked: racks know CURING and RELEASED (a final release does not change them).</summary>
+    public static string RackStatus(string lotStatus) => lotStatus == "CURING" ? "CURING" : "RELEASED";
+
+    /// <summary>
+    /// E-LAB1-4, E-LAB1-02-6: blocks a CURING, RELEASED or FINAL_RELEASED lot, keeping the status it came from; its racks follow.
+    /// </summary>
+    public static async Task BlockAsync(CommandContext context, Lots.Lot lot, Lots.Block block, string reason, string commandType, CancellationToken cancellationToken)
+    {
+        await Lots.TransitionAsync(
+            context, lot, "BLOCKED", "LotBlocked", new { lotId = lot.LotId, reason, cause = block.Cause, from = lot.Status, evaluationId = block.EvaluationId }, commandType, cancellationToken, reason,
+            reason, block: block).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection, context.Transaction, "UPDATE mfg.rack SET status = 'BLOCKED' WHERE lot_id = @l AND status IN ('CURING', 'RELEASED')", cancellationToken, ("l", lot.LotId))
+            .ConfigureAwait(false);
     }
 }
 
@@ -141,13 +169,12 @@ public sealed class BlockLotHandler : ICommandHandler<BlockLot>
         ArgumentNullException.ThrowIfNull(context);
         var reason = Lots.Reason(command.Reason);
         var lot = await Lots.LockAsync(context, command.PlantId, command.LotId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
-        if (lot.Status != "CURING")
+        if (lot.Status is not ("CURING" or "RELEASED" or "FINAL_RELEASED"))
         {
-            throw new DomainException(ManufacturingErrors.InvalidState, $"The lot is {lot.Status}; only a CURING lot is blocked.");
+            throw new DomainException(ManufacturingErrors.InvalidState, $"The lot is {lot.Status}; a curing or released lot is blocked.");
         }
 
-        await Lots.TransitionAsync(context, lot, "BLOCKED", "LotBlocked", new { lotId = lot.LotId, reason }, CommandType, cancellationToken, reason, reason).ConfigureAwait(false);
-        await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE mfg.rack SET status = 'BLOCKED' WHERE lot_id = @l AND status = 'CURING'", cancellationToken, ("l", lot.LotId)).ConfigureAwait(false);
+        await LotBlocks.BlockAsync(context, lot, new Lots.Block("MANUAL"), reason, CommandType, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { lotId = lot.LotId, status = "BLOCKED", version = lot.Version + 1 });
     }
 }
@@ -168,9 +195,13 @@ public sealed class UnblockLotHandler : ICommandHandler<UnblockLot>
             throw new DomainException(ManufacturingErrors.InvalidState, $"The lot is {lot.Status}; only a BLOCKED lot is unblocked.");
         }
 
-        await Lots.TransitionAsync(context, lot, "CURING", "LotUnblocked", new { lotId = lot.LotId, reason }, CommandType, cancellationToken, reason).ConfigureAwait(false);
-        await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE mfg.rack SET status = 'CURING' WHERE lot_id = @l AND status = 'BLOCKED'", cancellationToken, ("l", lot.LotId)).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { lotId = lot.LotId, status = "CURING", version = lot.Version + 1 });
+        // E-LAB1-4: back to the status the lot came from.
+        var to = lot.BlockedFrom ?? "CURING";
+        await Lots.TransitionAsync(context, lot, to, "LotUnblocked", new { lotId = lot.LotId, reason, to }, CommandType, cancellationToken, reason).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection, context.Transaction, "UPDATE mfg.rack SET status = @s WHERE lot_id = @l AND status = 'BLOCKED'", cancellationToken, ("s", LotBlocks.RackStatus(to)), ("l", lot.LotId))
+            .ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { lotId = lot.LotId, status = to, version = lot.Version + 1 });
     }
 }
 
@@ -191,7 +222,7 @@ public sealed class ScrapLotHandler : ICommandHandler<ScrapLot>
         var reason = Lots.Reason(command.Reason);
         var quantity = MfgSql.Quantity(command.Quantity, "The scrapped quantity");
         var lot = await Lots.LockAsync(context, command.PlantId, command.LotId, null, cancellationToken).ConfigureAwait(false);
-        if (lot.Status is not ("CURING" or "BLOCKED" or "RELEASED"))
+        if (lot.Status is not ("CURING" or "BLOCKED" or "RELEASED" or "FINAL_RELEASED"))
         {
             throw new DomainException(ManufacturingErrors.InvalidState, $"The lot is {lot.Status}.");
         }

@@ -22,6 +22,9 @@ public static class QualityErrors
 
     /// <summary>An unknown parameter or failure type, or a value outside its range.</summary>
     public const string ParameterInvalid = "LAB_PARAMETER_INVALID";
+
+    /// <summary>LAB1-02 (E-LAB1-02-10): the final release needs the evaluation in force to be CUMPLE on real data.</summary>
+    public const string FinalReleaseRefused = "LAB_FINAL_RELEASE_REFUSED";
 }
 
 public static class BlockConditions

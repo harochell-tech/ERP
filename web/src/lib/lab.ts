@@ -45,3 +45,50 @@ export function parameterText(parameter: Pick<Schemas["LabParameterView"], "kind
   const value = parameter.number ?? "";
   return value.includes(".") ? value.replace(/0+$/, "").replace(/\.$/, "") : value;
 }
+
+// LAB1-02 (E-LAB1-02-1…10): the lot's verdict and alerts in words.
+const VERDICT: Record<string, { label: string; tone: string }> = {
+  COMPLIES: { label: "Cumple", tone: "tone-done" },
+  FAILS: { label: "No cumple", tone: "tone-error" },
+  NO_SPEC: { label: "Sin requisito", tone: "tone-neutral" },
+  NO_DATA: { label: "Sin dato", tone: "tone-neutral" },
+};
+
+/** «Cumple (estimado)», «No cumple», «Sin requisito»…; a lot never evaluated is «Sin ensayos». */
+export function verdictBadge(verdict: string | null | undefined, basis: string | null | undefined): { label: string; tone: string } {
+  if (!verdict) {
+    return { label: "Sin ensayos", tone: "tone-neutral" };
+  }
+  const known = VERDICT[verdict] ?? { label: verdict, tone: "tone-neutral" };
+  const estimated = basis === "ESTIMATED" && (verdict === "COMPLIES" || verdict === "FAILS");
+  return estimated ? { label: `${known.label} (estimado)`, tone: verdict === "FAILS" ? "tone-error" : "tone-attention" } : known;
+}
+
+export const LOT_ALERT: Record<string, string> = {
+  NO_TESTS: "Sin probetas",
+  FEW_SPECIMENS: "Pocas probetas",
+  HIGH_CV: "CV alto",
+  HIGH_ABSORPTION: "Absorción alta",
+};
+
+export function alertsText(alerts: readonly string[]): string {
+  return alerts.map((a) => LOT_ALERT[a] ?? a).join(" · ");
+}
+
+/** What Calidad may do with a lot on Calidad › Lotes (E-LAB1-4, E-LAB1-02-10). */
+export function qualityActions(lot: { status: string; readyForFinalRelease: boolean }, can: (permission: string) => boolean): ("finalRelease" | "block" | "unblock" | "reevaluate")[] {
+  const actions: ("finalRelease" | "block" | "unblock" | "reevaluate")[] = [];
+  if (lot.readyForFinalRelease && can("fg_lot:final_release")) {
+    actions.push("finalRelease");
+  }
+  if ((lot.status === "CURING" || lot.status === "RELEASED" || lot.status === "FINAL_RELEASED") && can("fg_lot:release")) {
+    actions.push("block");
+  }
+  if (lot.status === "BLOCKED" && can("fg_lot:release")) {
+    actions.push("unblock");
+  }
+  if (can("lab_spec:manage")) {
+    actions.push("reevaluate");
+  }
+  return actions;
+}

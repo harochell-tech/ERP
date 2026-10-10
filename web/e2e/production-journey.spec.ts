@@ -260,4 +260,24 @@ test("a production day from the recipe to a released lot (MFG-1)", async ({ brow
   await voidDialog.getByRole("button", { name: "Confirmar: Anular" }).click();
   await expect(specimens.getByRole("row").nth(1)).toContainText("Anulado: Carga mal leída");
   await expect(specimens.getByRole("button", { name: "Anular" })).toHaveCount(1);
+
+  // LAB1-02 (E-LAB1-4, E-LAB1-02-14/15): Calidad › Lotes y veredicto shows the lot with its verdict and its recall; Calidad blocks it
+  // by hand with a reason and unblocks it — it returns to the status it had.
+  await nav(quality, "Lotes y veredicto");
+  await quality.getByLabel("Código del lote").fill(nightLot);
+  await quality.getByTestId(`quality-lot:${nightLot}`).getByRole("button", { name: "Ver" }).click();
+  await expect(quality.getByTestId("quality-lot")).toContainText(nightLot);
+  await expect(quality.getByTestId("quality-lot-evaluation")).toContainText("58.42");
+  await expect(quality.getByTestId("quality-lot-recall")).toContainText("Ningún conduce ha tomado este lote.");
+  await expectFits(quality);
+  for (const [label, reason, status] of [
+    ["Bloquear", "Fisuras en la inspección", "Bloqueado"],
+    ["Desbloquear", "Inspección repetida", "En curado"],
+  ] as const) {
+    await quality.getByTestId("lot-quality-actions").getByRole("button", { name: label, exact: true }).click();
+    const reasonDialog = quality.getByRole("dialog");
+    await reasonDialog.getByLabel(`Motivo: ${label}`).fill(reason);
+    await reasonDialog.getByRole("button", { name: `Confirmar: ${label}` }).click();
+    await expect(quality.getByTestId("quality-lot-status")).toHaveText(status);
+  }
 });
