@@ -92,9 +92,13 @@ internal static class LabTests
             cancellationToken,
             ("r", why), ("by", await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false)), ("at", context.Clock.UtcNow), ("t", testId)).ConfigureAwait(false);
         await context.AppendStateAsync(aggregate, testId, "DOCUMENT", "RECORDED", "VOIDED", commandType, eventId, cancellationToken, why).ConfigureAwait(false);
+        // E-LAB1-03-5: the certificates that showed this specimen are void from now on.
+        IReadOnlyList<string> certificates = aggregate == Compression
+            ? await LabCertificates.VoidForTestAsync(context, testId, why, commandType, cancellationToken).ConfigureAwait(false)
+            : [];
         // E-LAB1-02-8: the lot is evaluated again without the voided test; a lot it had blocked stays blocked until Calidad unblocks it.
         var outcome = await LotEvaluator.EvaluateAsync(context, locked, "TESTS", commandType, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { testId, lotId, status = "VOIDED", evaluation = LotEvaluator.Result(outcome) });
+        return JsonSerializer.Serialize(new { testId, lotId, status = "VOIDED", certificatesVoided = certificates, evaluation = LotEvaluator.Result(outcome) });
     }
 }
 

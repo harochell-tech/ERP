@@ -1,0 +1,16 @@
+{%- comment -%} Etiqueta de rack (E-LAB1-03-9/10): una por rack, 100 × 150 mm — código de campo en grande, producto, fecha, máquina, turno, rack n de N, unidades y QR. {%- endcomment -%}
+{% for e in etiquetas %}<section class="rack-label" data-testid="rack-label">
+  {% if logo %}<img class="logo" src="{{ logo.src }}" alt="{{ emisor.nombre }}">{% endif %}
+  <div class="rack-code mono" data-testid="rack-label-code">{{ e.codigo }}</div>
+  <div class="rack-item">{{ e.producto }}</div>
+  <dl class="rack-facts">
+    <dt>Fecha</dt><dd>{{ e.fecha }}</dd>
+    <dt>Máquina</dt><dd>{{ e.maquina }}</dd>
+    <dt>Turno</dt><dd>{{ e.turno }}</dd>
+    <dt>Rack</dt><dd data-testid="rack-label-rack">{{ e.rack }} de {{ e.racks }}</dd>
+    <dt>Unidades</dt><dd>{{ e.unidades }}</dd>
+  </dl>
+  <div class="qr" data-testid="rack-label-qr" data-url="{{ e.qr.url }}">{{ e.qr.svg | raw }}</div>
+  {% if formato.textos.pie %}<p class="texto-pie muted">{{ formato.textos.pie }}</p>{% endif %}
+</section>
+{% endfor %}

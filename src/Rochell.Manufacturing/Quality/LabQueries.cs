@@ -57,9 +57,17 @@ public sealed record AbsorptionTestView(
 /// <summary>The averages of the lot's valid absorption blocks, the class of the average density and its limit.</summary>
 public sealed record AbsorptionSummary(int Blocks, decimal AbsorptionKgm3, decimal AbsorptionFraction, decimal DensityKgm3, string DensityClass, decimal AbsorptionLimitKgm3, bool AboveLimit);
 
+/// <remarks>
+/// LAB1-03 (E-LAB1-03-2…5): a certificate of the lot — ISSUED or VOIDED (<c>VoidCause</c> MANUAL, or SPECIMEN_VOIDED when one of its specimens
+/// was voided); <c>PublicCode</c> is the key its QR carries.
+/// </remarks>
+public sealed record LabCertificateView(
+    Guid CertificateId, string CertificateNo, DateOnly BreakDate, int Specimens, string? DeliveryNo, string? CustomerName, string Status, DateTime IssuedAt, string IssuedBy,
+    string? VoidCause, string? VoidReason, DateTime? VoidedAt, string PublicCode);
+
 public sealed record LabLotDetail(
     LabLotView Lot, ItemSpecView? Spec, IReadOnlyList<CompressionTestView> Compression, IReadOnlyList<AbsorptionTestView> Absorption, AbsorptionSummary? AbsorptionSummary,
-    LotEvaluationView? Evaluation);
+    LotEvaluationView? Evaluation, IReadOnlyList<LabCertificateView> Certificates);
 
 /// <summary>LAB1-02 (baseline §4.7, E-LAB1-02-14): where a lot went — its deliveries with customer, site and invoice — and what is left of it.</summary>
 public sealed record GetLotRecall(Guid CompanyId, Guid SessionId, Guid LotId) : IQuery;
@@ -306,7 +314,24 @@ public sealed class GetLabLotHandler : IQueryHandler<GetLabLot>
             cancellationToken,
             ("c", context.CompanyId),
             ("l", query.LotId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new LabLotDetail(lot, spec, compression, absorption, summary, evaluation));
+        var certificates = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT c.certificate_id, c.certificate_no, c.break_date, (SELECT count(*) FROM qa.certificate_test x WHERE x.certificate_id = c.certificate_id)::int,
+                   c.snapshot -> 'delivery' ->> 'deliveryNo', c.snapshot -> 'delivery' ->> 'customer', c.status, c.issued_at, coalesce(u.display_name, u.email),
+                   c.void_cause, c.void_reason, c.voided_at, c.public_code
+            FROM qa.certificate c JOIN iam.user u ON u.user_id = c.issued_by
+            WHERE c.company_id = @c AND c.lot_id = @l
+            ORDER BY c.break_date, c.seq
+            """,
+            r => new LabCertificateView(
+                r.GetGuid(0), r.GetString(1), r.Date(2), r.GetInt32(3), r.NullableString(4), r.NullableString(5), r.GetString(6), r.Utc(7), r.GetString(8), r.NullableString(9),
+                r.NullableString(10), r.NullableUtc(11), r.GetString(12)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("l", query.LotId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new LabLotDetail(lot, spec, compression, absorption, summary, evaluation, certificates));
     }
 
     private static int? Int(System.Data.Common.DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetInt32(ordinal);

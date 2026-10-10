@@ -309,8 +309,8 @@ public sealed class QualityLabTests(PostgresFixture postgres)
         Assert.Equal(
             (QualityErrors.ParameterInvalid, QualityErrors.ParameterInvalid, QualityErrors.ParameterInvalid, QualityErrors.ParameterInvalid, ManufacturingErrors.NotFound),
             (outOfRange.Code, notWhole.Code, unknown.Code, textForNumber.Code, noSuchType.Code));
-        // The starting values are the validated Excel's: 13 parameters and the 28 initial age factors.
-        Assert.Equal(41, before.GetProperty("parameters").GetArrayLength());
+        // The starting values are the validated Excel's: 13 parameters and the 28 initial age factors; LAB1-03 adds the certificate's signer and title.
+        Assert.Equal(43, before.GetProperty("parameters").GetArrayLength());
         Assert.Equal(
             "0.15000000:shared|3.00000000:shared|26.00000000:shared|2.00000000:shared|0.09806650:shared|0.84000000:shared|0.98300000:shared|1.00000000:shared|220808:shared",
             string.Join('|', new[] { "MAX_CV", "MIN_SPECIMENS", "AGE_28D_MIN_DAYS", "OWN_FACTOR_MIN_LOTS", "KGCM2_TO_MPA", "AGE_FACTOR_03", "AGE_FACTOR_22", "AGE_FACTOR_28", "EQUIPMENT_SERIAL" }

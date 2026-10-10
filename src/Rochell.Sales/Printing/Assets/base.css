@@ -31,4 +31,14 @@
 .doc .watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; z-index: 1; }
 .doc .watermark span { transform: rotate(-30deg); font-size: clamp(28px, 9vw, 96px); font-weight: 700; letter-spacing: 0.06em; color: rgba(143, 21, 32, 0.16);
   white-space: nowrap; text-align: center; }
+/* E-LAB1-03-9: the rack label — one per page, the field code in large type. */
+.doc .rack-label { page-break-after: always; break-after: page; text-align: center; }
+.doc .rack-label:last-child { page-break-after: auto; break-after: auto; }
+.doc .rack-label .logo { margin: 0 auto 4px; }
+.doc .rack-code { font-size: 40px; font-weight: 700; line-height: 1.1; margin: 8px 0; overflow-wrap: anywhere; }
+.doc .rack-item { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.doc dl.rack-facts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; text-align: left; margin: 0 auto 8px; max-width: 80mm; font-size: 15px; }
+.doc dl.rack-facts dt { font-weight: 600; color: var(--muted); }
+.doc dl.rack-facts dd { margin: 0; }
+.doc .rack-label .qr svg { width: 45mm; height: 45mm; margin: 0 auto; }
 @page { size: letter; margin: 12mm; }

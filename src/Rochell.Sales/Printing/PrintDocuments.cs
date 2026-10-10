@@ -23,7 +23,13 @@ public static class PrintDocumentTypes
     public const string Statement = "STATEMENT";
     public const string ArAging = "AR_AGING";
 
-    public static readonly IReadOnlyList<string> All = [DeliveryNote, Invoice, Quote, Proforma, OrderProforma, Statement, ArAging];
+    /// <summary>LAB1-03 (E-LAB1-03-1): the lab's certificate and the rack label; they print through their own queries (lab:read, production:read).</summary>
+    public const string LabCertificate = "LAB_CERTIFICATE";
+    public const string RackLabel = "RACK_LABEL";
+
+    public static readonly IReadOnlyList<string> All = [DeliveryNote, Invoice, Quote, Proforma, OrderProforma, Statement, ArAging, LabCertificate, RackLabel];
+
+    public static bool IsLab(string documentType) => documentType is LabCertificate or RackLabel;
 }
 
 /// <summary>
@@ -31,7 +37,7 @@ public static class PrintDocumentTypes
 /// one — drawn by the server from the same print queries the screens and the e-mails use. The QR codes are drawn here too.
 /// </summary>
 /// <remarks><paramref name="BaseUrl"/> is the address the screen was opened at; without it (the e-mail) no driver's QR prints.</remarks>
-public sealed record GetPrintDocument(Guid CompanyId, Guid SessionId, string DocumentType, Guid Id, DateOnly? From = null, DateOnly? To = null, string? BaseUrl = null) : IQuery;
+public sealed record GetPrintDocument(Guid CompanyId, Guid SessionId, string DocumentType, Guid Id, DateOnly? From = null, DateOnly? To = null, string? BaseUrl = null, int? RackNo = null) : IQuery;
 
 public sealed record PrintedDocument(string DocumentType, int FormatVersion, string Title, string Html, string Css, string Body);
 
@@ -44,6 +50,12 @@ public sealed class GetPrintDocumentHandler(DriverLinkKey? key = null) : IQueryH
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(context);
+        if (PrintDocumentTypes.IsLab(query.DocumentType))
+        {
+            // E-LAB1-03-6/9: the certificate prints with lab:read, the rack label with production:read — not with sales:read.
+            throw new DomainException(QueryErrors.InvalidParameter, $"{query.DocumentType} prints through the lab's own print query.");
+        }
+
         var printed = await PrintDocuments.RenderAsync(context, key, query, cancellationToken).ConfigureAwait(false);
         return ApiJson.Serialize(printed);
     }
@@ -109,6 +121,8 @@ public static class PrintDocuments
             PrintDocumentTypes.OrderProforma => await OrderProformaAsync(context, query, cancellationToken).ConfigureAwait(false),
             PrintDocumentTypes.Statement => await StatementAsync(context, query, cancellationToken).ConfigureAwait(false),
             PrintDocumentTypes.ArAging => await AgingAsync(context, query, cancellationToken).ConfigureAwait(false),
+            PrintDocumentTypes.LabCertificate => await LabPrints.CertificateAsync(context, query, cancellationToken).ConfigureAwait(false),
+            PrintDocumentTypes.RackLabel => await LabPrints.RackLabelAsync(context, query, cancellationToken).ConfigureAwait(false),
             _ => throw new DomainException(QueryErrors.InvalidParameter, $"Unknown document type {query.DocumentType}."),
         };
         format ??= await FormatAsync(context, query.DocumentType, cancellationToken).ConfigureAwait(false);

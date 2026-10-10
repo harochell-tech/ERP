@@ -20,6 +20,9 @@ public static class DeliveryErrors
 
     /// <summary>LAB1-02 (E-LAB1-02-11): the location has the units, but in lots the quality lab blocked.</summary>
     public const string StockBlocked = "STOCK_BLOCKED_BY_QUALITY";
+
+    /// <summary>E-LAB1-03-11: a scanned rack whose lot has no stock of the line's product in the source location.</summary>
+    public const string ScanInvalid = "DELIVERY_SCAN_INVALID";
     public const string WeighingInvalid = "WEIGHING_INVALID";
     public const string OverCapacity = "VEHICLE_OVER_CAPACITY";
     public const string EvidenceInvalid = "EVIDENCE_INVALID";
@@ -121,10 +124,58 @@ internal static class Deliveries
     }
 
     /// <summary>
+    /// E-LAB1-03-11: the racks scanned for a line — each lot once, in the order first scanned — must hold stock of the line's item in its
+    /// source location and not be blocked by quality.
+    /// </summary>
+    public static async Task SaveScansAsync(
+        CommandContext context, int lineNo, Guid lineId, Guid itemId, Guid locationId, IReadOnlyList<ScannedRack>? scans, CancellationToken cancellationToken)
+    {
+        var seq = 0;
+        foreach (var scan in (scans ?? []).Where(x => x is not null).DistinctBy(x => x.LotId))
+        {
+            if (scan.RackNo is < 1)
+            {
+                throw new DomainException(DeliveryErrors.ScanInvalid, $"Line {lineNo}: the rack number is 1 or more.");
+            }
+
+            var lot = await Reading.ListAsync(
+                context.Connection,
+                context.Transaction,
+                """
+                SELECT coalesce((SELECT sum(b.quantity) FROM inv.inv_stock_balance b WHERE b.location_id = @loc AND b.item_id = @i AND b.lot_id = l.lot_id), 0),
+                       EXISTS (SELECT 1 FROM mfg.fg_lot f WHERE f.lot_id = l.lot_id AND f.status = 'BLOCKED'), l.lot_code
+                FROM inv.lot l WHERE l.company_id = @c AND l.lot_id = @lot
+                """,
+                r => (Stock: r.GetDecimal(0), Blocked: r.GetBoolean(1), Code: r.GetString(2)),
+                cancellationToken,
+                ("loc", locationId), ("i", itemId), ("c", context.CompanyId), ("lot", scan.LotId)).ConfigureAwait(false);
+            if (lot.Count == 0 || lot[0].Stock <= 0m)
+            {
+                throw new DomainException(DeliveryErrors.ScanInvalid, $"Line {lineNo}: the scanned lot has no stock of the line's product in the source location.");
+            }
+
+            if (lot[0].Blocked)
+            {
+                throw new DomainException(DeliveryErrors.StockBlocked, $"Line {lineNo}: the scanned lot {lot[0].Code} is blocked by quality.");
+            }
+
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "INSERT INTO log.delivery_line_scan (delivery_line_id, company_id, seq, lot_id, rack_no) VALUES (@l, @c, @s, @lot, @rack)",
+                cancellationToken,
+                ("l", lineId), ("c", context.CompanyId), ("s", ++seq), ("lot", scan.LotId), ("rack", scan.RackNo)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
     /// The lots of an item in a location, oldest code first (E-VS3-04-5), covering <paramref name="baseQuantity"/>. A lot Calidad or the
     /// lab blocked is never taken, even with stock in the yard (E-LAB1-4, E-LAB1-02-11: its status is read from Manufacturing's table).
+    /// The <paramref name="scanned"/> lots go first, in the order scanned and up to their stock; the rest is FIFO (E-LAB1-03-12). A scanned
+    /// lot blocked since it was loaded stops the gate-out: the truck carries it (E-LAB1-03-16).
     /// </summary>
-    public static async Task<List<(Guid LotId, decimal Quantity)>> FifoAsync(CommandContext context, Guid locationId, Guid itemId, decimal baseQuantity, CancellationToken cancellationToken)
+    public static async Task<List<(Guid LotId, decimal Quantity)>> FifoAsync(
+        CommandContext context, Guid locationId, Guid itemId, decimal baseQuantity, CancellationToken cancellationToken, IReadOnlyList<Guid>? scanned = null)
     {
         var lots = await Reading.ListAsync(
             context.Connection,
@@ -140,7 +191,26 @@ internal static class Deliveries
             ("i", itemId)).ConfigureAwait(false);
         var picked = new List<(Guid, decimal)>();
         var remaining = baseQuantity;
-        foreach (var (lot, available, _) in lots.Where(l => !l.Blocked))
+        var first = scanned ?? [];
+        foreach (var lotId in first)
+        {
+            var row = lots.FirstOrDefault(l => l.LotId == lotId);
+            if (row.Blocked)
+            {
+                throw new DomainException(DeliveryErrors.StockBlocked, "A lot scanned while loading was blocked by quality since: the truck carries it. Cancel the delivery and plan it again without that rack.");
+            }
+
+            if (remaining <= 0m || row.Quantity <= 0m)
+            {
+                continue;
+            }
+
+            var take = Math.Min(row.Quantity, remaining);
+            picked.Add((lotId, take));
+            remaining -= take;
+        }
+
+        foreach (var (lot, available, _) in lots.Where(l => !l.Blocked && !first.Contains(l.LotId)))
         {
             if (remaining <= 0m)
             {
@@ -562,12 +632,22 @@ public sealed class ConfirmLoadedHandler : ICommandHandler<ConfirmLoaded>
             await Sql.ExecuteAsync(
                 context.Connection, context.Transaction, "UPDATE log.delivery_line SET source_location_id = @l, base_factor = @f WHERE delivery_line_id = @id", cancellationToken,
                 ("l", location), ("f", factor), ("id", line.Id)).ConfigureAwait(false);
+            await Deliveries.SaveScansAsync(context, line.LineNo, line.Id, line.ItemId, location, input.Single(i => i.DeliveryLineId == line.Id).Scans, cancellationToken).ConfigureAwait(false);
         }
 
         var version = row.Version + 1;
         var eventId = await Deliveries.AppendAsync(
             context, command.DeliveryId, version, "DeliveryLoaded",
-            new { deliveryId = command.DeliveryId, lines = input.Select(i => new { deliveryLineId = i.DeliveryLineId, sourceLocationId = i.SourceLocationId }) },
+            new
+            {
+                deliveryId = command.DeliveryId,
+                lines = input.Select(i => new
+                {
+                    deliveryLineId = i.DeliveryLineId,
+                    sourceLocationId = i.SourceLocationId,
+                    scans = (i.Scans ?? []).Select(x => new { lotId = x.LotId, rackNo = x.RackNo }),
+                }),
+            },
             context.Clock.UtcNow, today, cancellationToken).ConfigureAwait(false);
         await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE log.delivery SET status = 'LOADED', version = @v WHERE delivery_id = @d", cancellationToken, ("v", version), ("d", command.DeliveryId)).ConfigureAwait(false);
         await context.AppendStateAsync(Deliveries.Aggregate, command.DeliveryId, "DOCUMENT", "LOADING", "LOADED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
@@ -639,7 +719,10 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
         {
             var baseQuantity = Deliveries.Base(line.Planned, line.Factor!.Value);
             var source = new MovementSource(movementEvent, Deliveries.DocumentType, command.DeliveryId, line.Id);
-            foreach (var (lot, quantity) in await Deliveries.FifoAsync(context, line.Source!.Value, line.ItemId, baseQuantity, cancellationToken).ConfigureAwait(false))
+            var scanned = await Reading.ListAsync(
+                context.Connection, context.Transaction, "SELECT lot_id FROM log.delivery_line_scan WHERE delivery_line_id = @l ORDER BY seq", r => r.GetGuid(0), cancellationToken,
+                ("l", line.Id)).ConfigureAwait(false);
+            foreach (var (lot, quantity) in await Deliveries.FifoAsync(context, line.Source!.Value, line.ItemId, baseQuantity, cancellationToken, scanned).ConfigureAwait(false))
             {
                 var reservation = await _inventory.ReserveIssueAsync(context, line.Source.Value, line.ItemId, lot, quantity, cancellationToken).ConfigureAwait(false);
                 if (atGate)

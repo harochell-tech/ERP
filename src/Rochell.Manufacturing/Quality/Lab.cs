@@ -25,6 +25,9 @@ public static class QualityErrors
 
     /// <summary>LAB1-02 (E-LAB1-02-10): the final release needs the evaluation in force to be CUMPLE on real data.</summary>
     public const string FinalReleaseRefused = "LAB_FINAL_RELEASE_REFUSED";
+
+    /// <summary>LAB1-03 (E-LAB1-03-2…4): a certificate that cannot be issued — no field code, no valid specimen that date, a delivery that did not take the lot.</summary>
+    public const string CertificateRefused = "LAB_CERTIFICATE_REFUSED";
 }
 
 public static class BlockConditions

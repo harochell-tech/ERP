@@ -133,7 +133,48 @@ Calidad › Lotes y veredicto (`/calidad/lotes/`): the list with verdict, 28-day
 recall and Calidad's actions (final release, block, unblock, evaluate again). Laboratorio shows the verdict after saving. Inicio:
 «Lotes bloqueados por laboratorio» (`fg_lot:release`) and «Lotes listos para liberación final» (`fg_lot:final_release`).
 
+## LAB1-03a — certificate, rack label, scan at loading (E-LAB1-03-1…16; migration 0115)
+
+### The certificate (baseline §4.6)
+
+- `IssueLabCertificate` (`fg_lot:final_release`, step-up, plant-scoped): the lot (with its field code) and a break date with at least
+  one valid specimen, and optionally a delivery that took the lot (`LAB_CERTIFICATE_REFUSED` otherwise). Number
+  `CR-<field code>-<DDMMYY>`, then `-2`, `-3`… for the same lot and date (E-LAB1-03-2/3). Any verdict can be certified; only tested
+  results print (E-LAB1-03-4).
+- `qa.certificate` keeps a **snapshot** (E-LAB1-03-5): issuer, lot (field and internal code, product, machine and short code, shift,
+  plant, production date), break date, the delivery's number, customer, RNC and site, the press, the signer (parameters
+  `CERT_SIGNER_NAME` / `CERT_SIGNER_TITLE`, set in Calidad › Parámetros, E-LAB1-03-6), who issued it, and per specimen measures (the
+  nominal ones flagged), area, weight, load, age, kg/cm² and MPa; the summary (specimens, average and minimum in kg/cm² and MPa, CV,
+  predominant condition and failure) and the lot's absorption and density. Numbers are text with 2 decimals. `qa.certificate_test`
+  lists its specimens.
+- ISSUED → VOIDED once (`qa.certificate_guard`): `VoidLabCertificate` (`fg_lot:final_release`, step-up, reason, cause MANUAL), or by
+  itself when one of its specimens is voided (`VoidCompressionTest` voids them with cause SPECIMEN_VOIDED and returns
+  `certificatesVoided`). A voided certificate prints «ANULADO».
+- Each certificate has a random 24-character public code for its QR: `/verificar/certificado/?c=<company>&k=<code>`.
+- `GetLabLot` returns the lot's certificates.
+
+### Printing (E-LAB1-03-1, 7, 9, 10, 13)
+
+- Two document types in `Sales/Printing` with editable formats (Configuración › Formatos de impresión): `LAB_CERTIFICATE` (letter, the
+  table's columns: specimen, conduce, measures, area, block type, production, break, age, weight, load, kg/cm², MPa; logo on by
+  default) and `RACK_LABEL` (paper `ETIQUETA_100X150`, 100 × 150 mm, one label per page). `LabPrints` reads the certificate's snapshot
+  and the lot's racks through SQL — no module reference.
+- `GetLabCertificatePrint` (`lab:read`): `GET …/manufacturing/lab/certificates/{id}/print`. `GetRackLabelPrint` (`production:read`):
+  `GET …/manufacturing/lots/{lotId}/rack-labels?rack=` — every live rack, or one. `GetPrintDocument` (`sales:read`) refuses both types.
+- A format of either type is activated only when the example shows what is mandatory: the certificate's number, its QR, the gross-area
+  note and «ANULADO» on a voided one; the label's field code and QR.
+- The label's QR: `/calidad/lotes/?lote=<lotId>&rack=<n>`.
+- The conduce (screen and print) shows each lot's field code when it has one, else its internal code (E-LAB1-03-13).
+
+### Scan at loading (E-LAB1-03-11/12/16)
+
+- `ConfirmLoaded` takes, per line, `scans` — `{ lotId, rackNo? }` in the order scanned. Each lot counts once
+  (`log.delivery_line_scan`, append-only); it must hold stock of the line's item in the line's source location
+  (`DELIVERY_SCAN_INVALID`) and not be blocked (`STOCK_BLOCKED_BY_QUALITY`).
+- `RecordGateOut` takes the scanned lots first, in that order and up to their stock, then FIFO for the rest. A scanned lot blocked
+  after loading stops the gate-out (`STOCK_BLOCKED_BY_QUALITY`): the truck carries it; Dispatch cancels the delivery and plans it again.
+
 ### Not yet
 
-Certificate, rack label and scan at the gate-out (LAB1-03); control chart, the age curve on screen and the history before Core,
+The screens and the public verification page (LAB1-03b); control chart, the age curve on screen and the history before Core,
 `qa.legacy_lot` (LAB1-04, E-LAB1-01-15).
