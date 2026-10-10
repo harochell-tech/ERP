@@ -72,6 +72,8 @@ jobs:
           # E-VS4-11: optional. Without ECF_MODE the e-CF gateway is OFF; the token stays in a file on the server.
           ECF_MODE: ${{ vars.ECF_MODE }}
           ECF_BASE_URL: ${{ vars.ECF_BASE_URL }}
+          # E-VS4-06-1: only with ECF_MODE=SANDBOX (the API refuses it otherwise).
+          ECF_SANDBOX_RNC: ${{ vars.ECF_SANDBOX_RNC }}
           # MFG2-02: optional. Without PORTAL_URL the machines' portal is not read.
           PORTAL_URL: ${{ vars.PORTAL_URL }}
           # ENT1-02: optional. The private bucket of the drivers' photos (its key is a file on the server).
@@ -92,7 +94,7 @@ jobs:
               printf '%s=%s\n' "${name}" "${value}"
             done
             # Optional variables: written only when the environment defines them.
-            for name in MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC ECF_MODE ECF_BASE_URL PORTAL_URL EVIDENCE_BUCKET; do
+            for name in MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC ECF_MODE ECF_BASE_URL ECF_SANDBOX_RNC PORTAL_URL EVIDENCE_BUCKET; do
               value="${!name}"
               if test -n "${value}"; then printf '%s=%s\n' "${name}" "${value}"; fi
             done

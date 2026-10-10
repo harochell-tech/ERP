@@ -137,3 +137,12 @@ results and the manual cases go to `docs/acceptance/vs4-contract-test.md`, signe
 - Dev stack: gateway SIMULATED, polled every second; the company holds PROCESO_DIARIO like `create-company` gives it.
 - Acceptance matrix `docs/acceptance/vs4.md` (ECF-01…10, E2E-ECF) and the order for Production (staging becomes production on
   2026-11-01). 264 commands, 143 permissions.
+
+## VS4-06 — the sandbox's test RNC (E-VS4-06-1/2)
+
+- Alanube's sandbox account is registered as its test company (RNC 132109122) and refuses any other `sender.rnc` (AP1016).
+  `Rochell:Ecf:SandboxSenderRnc` (staging: `ECF_SANDBOX_RNC`) makes `AlanubeProvider` send a copy of each payload whose
+  `sender.rnc` (e-CF) or `header.rncSender` (annulment) is that RNC, keeping the field's JSON kind; `tax.ecf_document` keeps the
+  company's own. Only in SANDBOX: the API refuses to start with it set in any other mode.
+- The DGII stamp link Alanube returns (QR) then names the test RNC — expected in the sandbox.
+- Staging's test ranges sit at the top of the sandbox block (E31 9820501–9821000); the contract test numbers from the bottom.

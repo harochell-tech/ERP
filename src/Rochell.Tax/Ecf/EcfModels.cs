@@ -33,6 +33,13 @@ public sealed class EcfSettings
     /// <summary>E-VS4-02-3: a call that takes longer has an unknown outcome.</summary>
     public TimeSpan CallTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// E-VS4-06-1: the test company's RNC Alanube's sandbox account is registered with (it refuses any other sender, AP1016). Only in
+    /// <see cref="EcfModes.Sandbox"/>: the sender RNC of every document and annulment is replaced by it on the way out; the stored
+    /// payload keeps the company's own. Production always sends the company's RNC.
+    /// </summary>
+    public string? SandboxSenderRnc { get; set; }
+
     public bool Enabled => Mode is EcfModes.Sandbox or EcfModes.Production or EcfModes.Simulated;
 }
 

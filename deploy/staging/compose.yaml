@@ -69,6 +69,8 @@ services:
       # and the webhook secret are files the owner writes on the server in secrets/ecf (never in the .env or the repository).
       Rochell__Ecf__Mode: ${ECF_MODE:-OFF}
       Rochell__Ecf__BaseUrl: ${ECF_BASE_URL:-}
+      # E-VS4-06-1: only with ECF_MODE=SANDBOX — the RNC of Alanube's test company, sent in place of the company's own.
+      Rochell__Ecf__SandboxSenderRnc: ${ECF_SANDBOX_RNC:-}
       Rochell__Ecf__TokenFile: /run/secrets/ecf/alanube-token
       Rochell__Ecf__WebhookSecretFile: /run/secrets/ecf/webhook-secret
       # MFG2-02 (E-MFG2-1): the machines' portal, read every 15 min once PORTAL_URL is set; Core's key is the file secrets/portal/core-token.
