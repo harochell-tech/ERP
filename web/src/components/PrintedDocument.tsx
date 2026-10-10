@@ -66,3 +66,36 @@ export function PrintedDocument({
     </div>
   );
 }
+
+/** LAB1-03 (E-LAB1-03-1): the lab's documents print through their own queries — the certificate with lab:read, the rack labels with production:read. */
+export function LabPrintedDocument({ kind, id, rack, back }: { kind: "certificate" | "rackLabels"; id: string; rack?: number; back: ReactNode }) {
+  const { companyId, can } = useSession();
+  const permission = kind === "certificate" ? "lab:read" : "production:read";
+  const allowed = can(permission) && id !== "";
+  const { data, error } = useLoad(
+    allowed
+      ? () =>
+          kind === "certificate"
+            ? query("/api/v1/companies/{companyId}/manufacturing/lab/certificates/{certificateId}/print", { path: { companyId, certificateId: id } })
+            : query("/api/v1/companies/{companyId}/manufacturing/lots/{lotId}/rack-labels", { path: { companyId, lotId: id }, query: { rack } })
+      : null,
+    [companyId, kind, id, rack],
+  );
+  if (!can(permission)) {
+    return <NoPermission />;
+  }
+  if (data === null) {
+    return <LoadingIndicator error={error} />;
+  }
+  return (
+    <div className="printed-document">
+      <div className="actions no-print">
+        {back}
+        <button type="button" className="primary" onClick={() => window.print()}>
+          Imprimir
+        </button>
+      </div>
+      <DocumentView css={data.css} body={data.body} formatVersion={data.formatVersion} />
+    </div>
+  );
+}

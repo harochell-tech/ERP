@@ -91,6 +91,7 @@ public sealed class ListDeliveriesHandler : IQueryHandler<ListDeliveries>
 
 public sealed record GetDelivery(Guid CompanyId, Guid SessionId, Guid DeliveryId) : IQuery;
 
+/// <remarks>E-LAB1-03-13: <c>LotCode</c> is the lot's field code when it has one, else its internal code.</remarks>
 public sealed record DeliveryLotView(string LotCode, string SourceLocationCode, decimal BaseQuantity);
 
 public sealed record DeliveryLineView(
@@ -145,9 +146,10 @@ public sealed class GetDeliveryHandler : IQueryHandler<GetDelivery>
             context.Connection,
             context.Transaction,
             """
-            SELECT x.delivery_line_id, l.lot_code, loc.code, x.base_quantity
+            SELECT x.delivery_line_id, coalesce(f.field_code, l.lot_code), loc.code, x.base_quantity
             FROM log.delivery_line_lot x JOIN log.delivery_line dl ON dl.delivery_line_id = x.delivery_line_id
             JOIN inv.lot l ON l.lot_id = x.lot_id JOIN md.location loc ON loc.location_id = x.source_location_id
+            LEFT JOIN mfg.fg_lot f ON f.lot_id = x.lot_id
             WHERE dl.delivery_id = @d ORDER BY l.lot_code
             """,
             r => (Line: r.GetGuid(0), Lot: new DeliveryLotView(r.GetString(1), r.GetString(2), r.GetDecimal(3))),
@@ -211,6 +213,7 @@ public sealed class GetDeliveryHandler : IQueryHandler<GetDelivery>
 /// <summary>E-UX3-7: the printable delivery note (conduce).</summary>
 public sealed record GetDeliveryPrint(Guid CompanyId, Guid SessionId, Guid DeliveryId) : IQuery;
 
+/// <remarks>E-LAB1-03-13: <c>LotCode</c> is the lot's field code when it has one, else its internal code.</remarks>
 public sealed record DeliveryPrintLot(string LotCode, string SourceLocationCode, decimal BaseQuantity);
 
 /// <summary>E-PRS-04-7: <paramref name="Freight"/> names the line's freight («Transporte de blocks — Bávaro»), same quantities, no price.</summary>
@@ -272,9 +275,10 @@ public sealed class GetDeliveryPrintHandler(DriverLinkKey? key = null) : IQueryH
             context.Connection,
             context.Transaction,
             """
-            SELECT x.delivery_line_id, l.lot_code, loc.code, x.base_quantity
+            SELECT x.delivery_line_id, coalesce(f.field_code, l.lot_code), loc.code, x.base_quantity
             FROM log.delivery_line_lot x JOIN log.delivery_line dl ON dl.delivery_line_id = x.delivery_line_id
             JOIN inv.lot l ON l.lot_id = x.lot_id JOIN md.location loc ON loc.location_id = x.source_location_id
+            LEFT JOIN mfg.fg_lot f ON f.lot_id = x.lot_id
             WHERE dl.delivery_id = @d ORDER BY l.lot_code
             """,
             r => (Line: r.GetGuid(0), Lot: new DeliveryPrintLot(r.GetString(1), r.GetString(2), r.GetDecimal(3))),

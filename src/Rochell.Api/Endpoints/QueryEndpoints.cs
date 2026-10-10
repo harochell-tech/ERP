@@ -81,6 +81,7 @@ public static class QueryEndpoints
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler), typeof(GetDriverEvidenceHandler), typeof(GetDriverDeliveryHandler), typeof(Rochell.Sales.Printing.GetPrintDocumentHandler), typeof(Rochell.Sales.Printing.ListPrintFormatsHandler), typeof(Rochell.Sales.Printing.GetPrintFormatHandler),
         typeof(Rochell.Sales.Printing.PreviewPrintFormatHandler),
         typeof(Rochell.Manufacturing.Quality.ListLabLotsHandler), typeof(Rochell.Manufacturing.Quality.GetLabLotHandler), typeof(Rochell.Manufacturing.Quality.ListItemSpecsHandler), typeof(Rochell.Manufacturing.Quality.GetLabSettingsHandler), typeof(Rochell.Manufacturing.Quality.PreviewCompressionTestsHandler), typeof(Rochell.Manufacturing.Quality.GetLotRecallHandler), typeof(Rochell.Manufacturing.Quality.GetDeliveryRecallHandler),
+        typeof(Rochell.Sales.Printing.GetLabCertificatePrintHandler), typeof(Rochell.Sales.Printing.GetRackLabelPrintHandler), typeof(Rochell.Manufacturing.Quality.VerifyLabCertificateHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
@@ -252,6 +253,18 @@ public static class QueryEndpoints
                 => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.GetLabLot(companyId, s, lotId), handler, ct))
             .Describe<Rochell.Manufacturing.Quality.LabLotDetail>(nameof(Rochell.Manufacturing.Quality.GetLabLot), notFound: true);
         // LAB1-02 (E-LAB1-02-14): the recall — forward from a lot, backward from a delivery.
+        // LAB1-03 (E-LAB1-03-1, 6, 9): the certificate as it prints (lab:read) and the labels of a lot's racks (production:read), drawn by the
+        // server with the company's formats; the address the screen was opened at goes in for the QR codes.
+        manufacturing.MapGet("/lab/certificates/{certificateId:guid}/print", (HttpContext http, Guid companyId, Guid certificateId, Rochell.Sales.Printing.GetLabCertificatePrintHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Sales.Printing.GetLabCertificatePrint(companyId, s, certificateId, $"{http.Request.Scheme}://{http.Request.Host}"), handler, ct))
+            .Describe<Rochell.Sales.Printing.PrintedDocument>(nameof(Rochell.Sales.Printing.GetLabCertificatePrint), notFound: true);
+        manufacturing.MapGet("/lots/{lotId:guid}/rack-labels", (HttpContext http, Guid companyId, Guid lotId, int? rack, Rochell.Sales.Printing.GetRackLabelPrintHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Sales.Printing.GetRackLabelPrint(companyId, s, lotId, rack, $"{http.Request.Scheme}://{http.Request.Host}"), handler, ct))
+            .Describe<Rochell.Sales.Printing.PrintedDocument>(nameof(Rochell.Sales.Printing.GetRackLabelPrint), notFound: true);
+        // LAB1-03c (E-LAB1-03-15): the public page's query, also reachable signed in (only the service identity holds its permission).
+        manufacturing.MapGet("/lab/certificates/verify/{code}", (HttpContext http, Guid companyId, string code, Rochell.Manufacturing.Quality.VerifyLabCertificateHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.VerifyLabCertificate(companyId, s, code), handler, ct))
+            .Describe<Rochell.Manufacturing.Quality.LabCertificateVerification>(nameof(Rochell.Manufacturing.Quality.VerifyLabCertificate), notFound: true);
         manufacturing.MapGet("/lab/lots/{lotId:guid}/recall", (HttpContext http, Guid companyId, Guid lotId, Rochell.Manufacturing.Quality.GetLotRecallHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.GetLotRecall(companyId, s, lotId), handler, ct))
             .Describe<Rochell.Manufacturing.Quality.LotRecall>(nameof(Rochell.Manufacturing.Quality.GetLotRecall), notFound: true);

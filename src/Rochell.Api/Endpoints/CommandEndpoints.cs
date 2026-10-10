@@ -414,6 +414,9 @@ public static class CommandEndpoints
         manufacturing.MapCommand<Rochell.Manufacturing.Quality.VoidAbsorptionTest, Rochell.Manufacturing.Quality.VoidAbsorptionTestHandler>();
         manufacturing.MapCommand<Rochell.Manufacturing.Quality.ReevaluateLot, Rochell.Manufacturing.Quality.ReevaluateLotHandler>(); // LAB1-02 (E-LAB1-02-2)
         manufacturing.MapCommand<Rochell.Manufacturing.Quality.FinalReleaseLot, Rochell.Manufacturing.Quality.FinalReleaseLotHandler>(); // LAB1-02 (E-LAB1-4, E-LAB1-02-10)
+        // LAB1-03 (E-LAB1-03-2…6): the compression certificate, issued and voided by Calidad.
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.IssueLabCertificate, Rochell.Manufacturing.Quality.IssueLabCertificateHandler>();
+        manufacturing.MapCommand<Rochell.Manufacturing.Quality.VoidLabCertificate, Rochell.Manufacturing.Quality.VoidLabCertificateHandler>();
 
         var identity = company.MapGroup("/identity").WithTags("Identity");
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
@@ -487,6 +490,7 @@ public static class CommandEndpoints
         typeof(ReleaseLotHandler), typeof(BlockLotHandler), typeof(UnblockLotHandler), typeof(ScrapLotHandler), typeof(SettleCostCollectorHandler),
         typeof(Rochell.Manufacturing.Quality.SetItemSpecHandler), typeof(Rochell.Manufacturing.Quality.SetLabParameterHandler), typeof(Rochell.Manufacturing.Quality.DefineFailureTypeHandler), typeof(Rochell.Manufacturing.Quality.SetFailureTypeStatusHandler), typeof(Rochell.Manufacturing.Quality.SetMachineShortCodeHandler),
         typeof(Rochell.Manufacturing.Quality.RecordCompressionTestsHandler), typeof(Rochell.Manufacturing.Quality.VoidCompressionTestHandler), typeof(Rochell.Manufacturing.Quality.RecordAbsorptionTestsHandler), typeof(Rochell.Manufacturing.Quality.VoidAbsorptionTestHandler), typeof(Rochell.Manufacturing.Quality.ReevaluateLotHandler), typeof(Rochell.Manufacturing.Quality.FinalReleaseLotHandler),
+        typeof(Rochell.Manufacturing.Quality.IssueLabCertificateHandler), typeof(Rochell.Manufacturing.Quality.VoidLabCertificateHandler),
         typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
         typeof(PrepareAssetClassHandler), typeof(ApproveAssetClassHandler), typeof(DiscardAssetClassHandler), typeof(PutFixedAssetInServiceHandler),
         typeof(TransferFixedAssetHandler), typeof(UpdateFixedAssetHandler), typeof(CreateCardsForPostedInvoicesHandler),

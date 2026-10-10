@@ -3,7 +3,8 @@ import { confirmAction, nav, signIn } from "./support";
 
 // PRT-02 (E-PRT-3…10, E-PRT-02-1…7): the Director changes the conduce's format on Configuración › Formatos de impresión — hides the
 // lots, renames a column, adds a footer — sees it in the preview, activates it, and goes back to the built-in one; an advanced invoice
-// without its fiscal data is not activated. The Contador sees the formats without changing them.
+// without its fiscal data is not activated. The lab's certificate and rack label preview their examples (LAB1-03). The Contador sees the
+// formats without changing them.
 
 test("the Director changes, previews and activates a print format (PRT-02)", async ({ browser }) => {
   const director = await signIn(browser, "Director");
@@ -40,6 +41,17 @@ test("the Director changes, previews and activates a print format (PRT-02)", asy
   await director.getByRole("dialog").getByRole("button", { name: "Confirmar: Activar la versión 1" }).click();
   await expect(director.getByTestId("format-editor")).toContainText("Al formato le falta algo obligatorio");
   await director.getByRole("button", { name: "Volver al incluido" }).click();
+
+  // LAB1-03 (E-LAB1-03-1, 9): the lab's certificate and the 100 × 150 mm rack label have their formats too; their previews show the examples.
+  await director.getByRole("tab", { name: /Certificado de laboratorio/ }).click();
+  await director.getByTestId("format-preview-button").click();
+  await expect(director.getByTestId("format-preview-document")).toContainText("CR-8160924P1-190924");
+  await expect(director.getByTestId("format-preview-document")).toContainText("Resistencia calculada sobre área bruta");
+  await director.getByRole("tab", { name: /Etiqueta de rack/ }).click();
+  await expect(director.getByTestId("format-editor")).toContainText("Etiqueta de 100 × 150 mm");
+  await director.getByTestId("format-preview-button").click();
+  // The latest lot with racks, else the example: either way one label per rack with its QR.
+  await expect(director.getByTestId("format-preview-document").getByTestId("rack-label-qr").first()).toBeVisible();
 
   const contador = await signIn(browser, "Contador");
   await nav(contador, "Formatos de impresión");

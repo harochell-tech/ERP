@@ -162,6 +162,19 @@ try
                 confirm.Parameters.AddWithValue("id", Guid.CreateVersion7());
                 confirm.Parameters.AddWithValue("company", companyId);
                 await confirm.ExecuteNonQueryAsync();
+
+                // E-LAB1-03-15: and the public verification of the lab certificates' QR.
+                await using var verify = new NpgsqlCommand(
+                    """
+                    INSERT INTO iam.role_assignment (assignment_id, company_id, user_id, role_id, plant_id, valid_from, granted_by)
+                    SELECT @id, @company, '00000000-0000-7000-8000-00000000d005', role_id, NULL, now(), '00000000-0000-7000-8000-00000000d001'
+                    FROM iam.role WHERE code = 'VERIFICACION_PUBLICA'
+                    """,
+                    connection,
+                    transaction);
+                verify.Parameters.AddWithValue("id", Guid.CreateVersion7());
+                verify.Parameters.AddWithValue("company", companyId);
+                await verify.ExecuteNonQueryAsync();
                 await transaction.CommitAsync();
 
                 Console.WriteLine($"Company {args[1]} created: {companyId}.");

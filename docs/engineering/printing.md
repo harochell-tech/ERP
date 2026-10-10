@@ -50,3 +50,9 @@ Baseline `docs/architecture/prt1/frozen-baseline-prt1.md` (E-PRT-1…10, E-PRT-0
 - Web: `/configuracion/formatos/` (menu Configuración › Formatos de impresión): logo, one tab per document, simple settings or advanced
   template, preview (`DocumentView`), save, activate, versions with restore. Dev stack: a Director account. Journey:
   `e2e/print-formats-journey.spec.ts`.
+
+## LAB1-03 — the lab's documents (E-LAB1-03-1, 9)
+
+- Two more types: `LAB_CERTIFICATE` (letter only) and `RACK_LABEL` (paper `ETIQUETA_100X150`, 100 × 150 mm, the only one it offers).
+  Their models are built by `LabPrints` and they print through their own queries — `GetLabCertificatePrint` (`lab:read`) and
+  `GetRackLabelPrint` (`production:read`); `GetPrintDocument` refuses them. Details: `quality-lab.md`.

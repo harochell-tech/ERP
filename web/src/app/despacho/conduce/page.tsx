@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { query, type Schemas } from "@/api/client";
 import { DeliveryMail } from "@/components/DocumentMail";
+import { QrScan } from "@/components/QrScan";
 import { SalesHistory } from "@/components/SalesUx4";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
@@ -12,6 +13,7 @@ import { formatQuantity, isDecimal, isPositiveDecimal, normalizeInput } from "@/
 import { licenseWarning, vehicleName } from "@/lib/fleet";
 import { DELIVERY_TERMS, formatDateTime, statusLabel } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
+import { parseRackQr } from "@/lib/lab";
 import { cancellable, nextDeliveryStep } from "@/lib/sales";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -161,11 +163,69 @@ function StartLoading({ delivery, onDone }: { delivery: Delivery; onDone: () => 
   );
 }
 
+type Scan = { lotId: string; rackNo: number | null; code: string | null };
+
+/**
+ * LAB1-03 (E-LAB1-03-11/12): the racks scanned for a line, in the order scanned — their lots leave first at the gate-out; the rest is FIFO.
+ * The server checks each lot has stock in the line's location and is not blocked.
+ */
+function RackScans({ itemCode, scans, onChange }: { itemCode: string; scans: Scan[]; onChange: (scans: Scan[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  return (
+    <div data-testid={`rack-scans:${itemCode}`}>
+      {scans.length > 0 ? (
+        <ul className="plain-list">
+          {scans.map((s, i) => (
+            <li key={`${s.lotId}:${s.rackNo ?? 0}`} data-testid="rack-scan">
+              <span className="mono">{s.code ?? `lote ${s.lotId.slice(-6)}`}</span>
+              {s.rackNo ? ` · rack ${s.rackNo}` : ""}{" "}
+              <button type="button" className="link" onClick={() => onChange(scans.filter((_, j) => j !== i))}>
+                Quitar
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="muted">Sin escanear: sale por FIFO.</div>
+      )}
+      <button type="button" onClick={() => setOpen((o) => !o)}>
+        {open ? "Cerrar el escáner" : "Escanear rack"}
+      </button>
+      {open ? (
+        <QrScan
+          busy={false}
+          testId={`rack-qr:${itemCode}`}
+          placeholder="Enlace de la etiqueta del rack"
+          onLink={(link) => {
+            const read = parseRackQr(link);
+            if (!read) {
+              setProblem("Ese QR no es la etiqueta de un rack.");
+              return;
+            }
+            setProblem(null);
+            setOpen(false);
+            if (!scans.some((s) => s.lotId === read.lotId && s.rackNo === read.rackNo)) {
+              onChange([...scans, read]);
+            }
+          }}
+        />
+      ) : null}
+      {problem ? (
+        <p className="error" role="alert">
+          {problem}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const { companyId, plantName } = useSession();
   const id = delivery.header.deliveryId;
   const confirm = useCommand(`confirm-loaded:${id}`, "/api/v1/companies/{companyId}/sales/confirm-loaded", `Conduce ${delivery.header.deliveryNo}: carga confirmada.`);
   const [sources, setSources] = useState<Record<string, string>>({});
+  const [scans, setScans] = useState<Record<string, Scan[]>>({});
   const fe = useFieldErrors();
   const { data, error } = useLoad(() => query("/api/v1/companies/{companyId}/sales/plants", { path: { companyId } }), [companyId]);
   if (data === null) {
@@ -177,7 +237,11 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
       className="card"
       onSubmit={async (e) => {
         e.preventDefault();
-        const lines = delivery.lines.map((l) => ({ deliveryLineId: l.deliveryLineId, sourceLocationId: sources[l.deliveryLineId] ?? locations[0]?.locationId ?? "" }));
+        const lines = delivery.lines.map((l) => ({
+          deliveryLineId: l.deliveryLineId,
+          sourceLocationId: sources[l.deliveryLineId] ?? locations[0]?.locationId ?? "",
+          scans: (scans[l.deliveryLineId] ?? []).map((s) => ({ lotId: s.lotId, rackNo: s.rackNo })),
+        }));
         const missing = Object.fromEntries(lines.filter((l) => !l.sourceLocationId).map((l) => [l.deliveryLineId, `No hay ubicación de existencias en la planta ${plantName(delivery.header.plantCode)}.`]));
         if (!fe.check(missing)) {
           return;
@@ -193,6 +257,7 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
             <th>Producto</th>
             <th className="num">Cantidad</th>
             <th>Ubicación de salida</th>
+            <th>Racks escaneados</th>
           </tr>
         </thead>
         <tbody>
@@ -218,6 +283,9 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
                   ))}
                 </select>
                 <FieldMessage id={`source-${l.deliveryLineId}`} error={fe.errors[l.deliveryLineId]} />
+              </td>
+              <td>
+                <RackScans itemCode={l.itemCode} scans={scans[l.deliveryLineId] ?? []} onChange={(next) => setScans({ ...scans, [l.deliveryLineId]: next })} />
               </td>
             </tr>
           ))}

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Npgsql;
 using Rochell.Api.Auth;
 using Rochell.Api.Deliveries;
+using Rochell.Api.Quality;
 using Rochell.Api.Ecf;
 using Rochell.Api.Endpoints;
 using Rochell.Api.Hosting;
@@ -291,6 +292,7 @@ app.MapGet("/api/v1/environment", () => Results.Json(new EnvironmentInfo(string.
 var company = app.MapGroup("/api/v1/companies/{companyId:guid}");
 app.MapEcfWebhook();
 app.MapDriverPages(); // ENT1-02
+app.MapCertificatePages(); // LAB1-03c
 company.MapCommandEndpoints();
 company.MapQueryEndpoints();
 

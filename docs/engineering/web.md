@@ -180,6 +180,7 @@ specimen's strength before saving), Requisitos por ítem and Parámetros; see `d
 `src/lib/lab.ts` (`tests/unit/lab.test.ts`); journeys `e2e/lab-journey.spec.ts` and the end of `e2e/production-journey.spec.ts`.
 LAB1-02 (E-LAB1-02-15): Lotes y veredicto (`/calidad/lotes/`) with the recall and Calidad's actions, the verdict on Laboratorio, two Inicio
 counters.
+LAB1-03b (E-LAB1-03-9…11): rack scans at «Confirmar carga» (Despacho › conduce), certificates and rack labels on Calidad › Lotes (`?lote=` from a label's QR), print pages `/calidad/certificado/` and `/produccion/etiquetas/` (`LabPrintedDocument`): `quality-lab.md`.
 
 ## FIS1-05 — fiscal authorization screens (E-FIS1-05-1…12)
 

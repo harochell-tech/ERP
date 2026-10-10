@@ -1,9 +1,9 @@
 # LAB-1 acceptance — quality lab and lot traceability
 
-Baseline LAB-1 (`docs/architecture/lab1/frozen-baseline-lab1.md`) §10, with the approved errata E-LAB1-1…10 and E-LAB1-01-1…17 and E-LAB1-02-1…15. The «PR»
+Baseline LAB-1 (`docs/architecture/lab1/frozen-baseline-lab1.md`) §10, with the approved errata E-LAB1-1…10, E-LAB1-01-1…17, E-LAB1-02-1…15 and E-LAB1-03-1…16. The «PR»
 column names the PR that delivers each one (baseline §12). Every acceptance ID gets at least one test tagged
 `[Trait("AcceptanceLab1", "<ID>")]`; `AcceptanceLab1TraceabilityTests` fails if an ID has neither a tagged test nor a place in its
-pending list (the IDs of LAB1-03 and LAB1-04), or is missing from this matrix.
+pending list (the IDs of LAB1-04), or is missing from this matrix.
 
 Expected values come from the validated Excel through `docs/architecture/lab1/reference/historico_ensayos.csv`.
 
@@ -23,9 +23,9 @@ Expected values come from the validated Excel through `docs/architecture/lab1/re
 | LAB-10 | Three absorption blocks: absorption, density, class and limit; alert when the lot average exceeds the limit | LAB1-01 (records), LAB1-02 (alert) | `QualityLabTests` `Three_absorption_blocks_give_absorption_density_class_and_limit`; `QualityEvaluationTests` `Without_a_requirement_…` (the alert) |
 | LAB-11 | Two lots broken at 3 and at 28 days: the 3-day factor is their own; with one lot, the initial factor | LAB1-02 | `QualityEvaluationTests` `The_factor_of_an_age_is_the_lots_own_once_two_lots_have_it_…` |
 | LAB-12 | Runs of P1 and P2 with the same product, shift and day get different field codes; T2 carries its suffix (E-LAB1-1, 3) | LAB1-01 | `QualityLabTests` `Runs_of_two_machines_get_different_field_codes_…` |
-| LAB-13 | Gate-out with a scanned rack label takes that lot; without a scan, FIFO (E-LAB1-7) | LAB1-03 | pending |
+| LAB-13 | Gate-out with a scanned rack label takes that lot; without a scan, FIFO (E-LAB1-7) | LAB1-03 | `QualityCertificateAcceptanceTests` `A_scanned_rack_chooses_the_lot_at_the_gate_…_over_HTTP` (also a scanned lot blocked before the gate, E-LAB1-03-16) |
 | LAB-14 | Recall forward (deliveries, customers, sites) and backward (run, shift, machine, consumption, tests) | LAB1-02 | `QualityLabAcceptanceTests` `A_real_no_cumple_blocks_a_released_lot_…_over_HTTP` |
-| LAB-15 | Certificate `CR-<field code>-<DDMMYY>` with the baseline's content and a public QR that verifies it | LAB1-03 | pending |
+| LAB-15 | Certificate `CR-<field code>-<DDMMYY>` with the baseline's content and a public QR that verifies it | LAB1-03 | `QualityCertificateAcceptanceTests` `A_scanned_rack_chooses_the_lot_at_the_gate_and_the_certificate_prints_…_over_HTTP` |
 | LAB-16 | Import of the history: 42 lots and 216 specimens, read-only, computed values equal to the CSV's; a second import duplicates nothing (E-LAB1-6) | LAB1-04 | pending |
 | LAB-17 | A technician without `fg_lot:final_release` cannot release (E-LAB1-9) | LAB1-01 (permissions), LAB1-02 (command) | `QualityLabTests` `The_lab_technician_records_tests_and_reads_but_holds_neither_…` (role and SoD); `QualityEvaluationTests` `An_early_break_estimates_the_28_day_strength_…` (the command) |
 | E2E-L1 | Whole flow over the API and the UI: run → lot → preliminary release → delivery → early test → 28 days → final release → certificate | LAB1-04 | pending |

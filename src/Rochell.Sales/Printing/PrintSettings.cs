@@ -47,6 +47,9 @@ public static partial class PrintFormatRules
     public const string HalfLetter = "MEDIA_CARTA";
     public const string Ticket80 = "TICKET_80";
 
+    /// <summary>E-LAB1-03-9: the rack label, 100 × 150 mm.</summary>
+    public const string Label100x150 = "ETIQUETA_100X150";
+
     private static readonly JsonSerializerOptions Json = new() { DefaultIgnoreCondition = JsonIgnoreCondition.Never };
 
     /// <summary>The columns each table offers, in their built-in order: key, title, numeric.</summary>
@@ -67,16 +70,27 @@ public static partial class PrintFormatRules
         PrintDocumentTypes.ArAging =>
             [("numero", "Factura", false), ("encf", "e-NCF", false), ("fecha", "Fecha", false), ("vence", "Vence", false), ("dias", "Días vencida", true),
              ("pendiente", "Pendiente (RD$)", true)],
+        PrintDocumentTypes.LabCertificate =>
+            [("linea", "#", true), ("conduce", "Conduce", false), ("medidas", "Medidas (cm)", false), ("area", "Área (cm²)", true), ("tipo", "Tipo de bloque", false),
+             ("produccion", "Producción", false), ("rotura", "Rotura", false), ("edad", "Edad (d)", true), ("peso", "Peso (kg)", true), ("carga", "Carga (kg)", true),
+             ("kgcm2", "kg/cm²", true), ("mpa", "MPa", true)],
         _ => [],
     };
 
     /// <summary>E-PRT-02-4: the papers a document may use — letter and half letter for all; the 80 mm ticket for the consumer invoice and the receipt.</summary>
-    public static IReadOnlyList<string> Papers(string documentType) => documentType is PrintDocumentTypes.Invoice ? [Letter, HalfLetter, Ticket80] : [Letter, HalfLetter];
+    public static IReadOnlyList<string> Papers(string documentType) => documentType switch
+    {
+        PrintDocumentTypes.Invoice => [Letter, HalfLetter, Ticket80],
+        PrintDocumentTypes.LabCertificate => [Letter],
+        PrintDocumentTypes.RackLabel => [Label100x150],
+        _ => [Letter, HalfLetter],
+    };
 
     /// <summary>The built-in settings: what PRT-01 printed (E-PRT-01-4).</summary>
     public static PrintSettings Default(string documentType)
         => new(
-            Simple, Letter, 12, 15, 10, "#1d1d1f", false, 40, "IZQUIERDA",
+            Simple, Papers(documentType)[0], documentType == PrintDocumentTypes.RackLabel ? 4 : 12, documentType == PrintDocumentTypes.LabCertificate ? 12 : 15,
+            documentType == PrintDocumentTypes.LabCertificate ? 6 : 10, "#1d1d1f", documentType == PrintDocumentTypes.LabCertificate, 40, "IZQUIERDA",
             [.. Catalogue(documentType).Select(c => new PrintColumnSetting(c.Key, c.Title, true, null, c.Numeric ? "DERECHA" : "IZQUIERDA"))],
             new PrintTexts(null, null, null, null));
 
@@ -161,6 +175,7 @@ public static partial class PrintFormatRules
         {
             HalfLetter => ("5.5in 8.5in", "5.5in"),
             Ticket80 => ("80mm auto", "80mm"),
+            Label100x150 => ("100mm 150mm", "100mm"),
             _ => ("letter", "8.5in"),
         };
         css.Append(CultureInfo.InvariantCulture, $"@page{{size:{page};margin:{s.MarginMm}mm}}");

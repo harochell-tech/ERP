@@ -12,9 +12,16 @@ public sealed record StartLoading(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid DeliveryId, long ExpectedVersion, Guid? VehicleId, Guid? DriverId, string? CustomerVehiclePlate, string? CustomerDriverName)
     : ICommand;
 
-public sealed record LoadedLine(Guid DeliveryLineId, Guid SourceLocationId);
+/// <summary>E-LAB1-03-10/11: a rack label scanned while loading — its lot, and the rack when the QR names it.</summary>
+public sealed record ScannedRack(Guid LotId, int? RackNo = null);
 
-/// <summary>E-VS3-04-4/5: LOADING → LOADED; each line's source location holds the quantity (in base units).</summary>
+/// <remarks><c>Scans</c> (E-LAB1-03-11/12): the racks scanned for the line, in the order scanned; the gate-out takes their lots first.</remarks>
+public sealed record LoadedLine(Guid DeliveryLineId, Guid SourceLocationId, IReadOnlyList<ScannedRack>? Scans = null);
+
+/// <summary>
+/// E-VS3-04-4/5: LOADING → LOADED; each line's source location holds the quantity (in base units). A scanned lot must have stock of the
+/// line's item in that location and not be blocked (E-LAB1-03-11).
+/// </summary>
 public sealed record ConfirmLoaded(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid DeliveryId, long ExpectedVersion, IReadOnlyList<LoadedLine> Lines) : ICommand;
 
 /// <summary>

@@ -404,6 +404,8 @@ public static class PrintSamples
         PrintDocumentTypes.OrderProforma => "Proforma de pedido (DGII)",
         PrintDocumentTypes.Statement => "Estado de cuenta",
         PrintDocumentTypes.ArAging => "Facturas pendientes",
+        PrintDocumentTypes.LabCertificate => "Certificado de laboratorio",
+        PrintDocumentTypes.RackLabel => "Etiqueta de rack",
         _ => documentType,
     };
 
@@ -423,6 +425,14 @@ public static class PrintSamples
             // The customer of the invoice of that number (or the latest one), this month so far.
             PrintDocumentTypes.Statement or PrintDocumentTypes.ArAging =>
                 "SELECT party_id, invoice_no FROM sal.invoice WHERE company_id = @c AND (@n::text IS NULL OR invoice_no = @n) ORDER BY invoice_no DESC LIMIT 1",
+            PrintDocumentTypes.LabCertificate =>
+                "SELECT certificate_id, certificate_no FROM qa.certificate WHERE company_id = @c AND (@n::text IS NULL OR certificate_no = @n) ORDER BY issued_at DESC LIMIT 1",
+            PrintDocumentTypes.RackLabel =>
+                """
+                SELECT f.lot_id, coalesce(f.field_code, l.lot_code) FROM mfg.fg_lot f JOIN inv.lot l ON l.lot_id = f.lot_id
+                WHERE f.company_id = @c AND f.status <> 'VOIDED' AND EXISTS (SELECT 1 FROM mfg.rack k WHERE k.lot_id = f.lot_id)
+                  AND (@n::text IS NULL OR f.field_code = @n OR l.lot_code = @n) ORDER BY l.lot_code DESC LIMIT 1
+                """,
             _ => null,
         };
         if (sql is null)
@@ -483,10 +493,90 @@ public static class PrintSamples
                 return ("Facturas pendientes", PrintDocuments.AgingModel(new ArAgingCustomer(
                     Guid.Empty, customer, D("30000.00"), 0m, 0m, 0m, 0m, D("30000.00"), 0m, D("30000.00"),
                     [new(Guid.Empty, Guid.Empty, "FA-000123", SampleEncf, day, day.AddDays(30), D("30000.00"), 0, "CURRENT")], 0m, 0m, []), day, new ArAgingBuckets(30, 60, 90), issuer, IssuerRnc));
+            case PrintDocumentTypes.LabCertificate:
+                return ("Certificado CR-8160924P1-190924", LabPrints.CertificateModel(SampleCertificate(), draft ? "VOIDED" : "ISSUED", (baseUrl ?? "https://ejemplo.rochell") + "/verificar/certificado/?c=0&k=ejemplo"));
+            case PrintDocumentTypes.RackLabel:
+                return ("Etiquetas del lote 8160924P1", LabPrints.RackLabelModel(
+                    issuer, new LabPrints.RackLabelLot(Guid.Empty, SampleFieldCode, "BLOQUE-8", "Bloque de 8 pulgadas", new DateOnly(2024, 9, 16), "Ponedora 1", "P1", "T1"),
+                    [new(1, D("480")), new(2, D("480"))], null, baseUrl ?? "https://ejemplo.rochell"));
             default:
                 throw new DomainException(QueryErrors.InvalidParameter, $"Unknown document type {documentType}.");
         }
     }
+
+    private const string SampleFieldCode = "8160924P1";
+
+    /// <summary>LAB1-03: a certificate's snapshot with the history's lot 8160924P1 (two of its specimens at 3 days).</summary>
+    private static System.Text.Json.Nodes.JsonObject SampleCertificate() => new()
+    {
+        ["certificateNo"] = "CR-8160924P1-190924",
+        ["issuedAt"] = "2026-10-08T14:30:00.0000000Z",
+        ["breakDate"] = "2024-09-19",
+        ["issuer"] = new System.Text.Json.Nodes.JsonObject { ["name"] = "BLOCK ROCHELL SRL", ["rnc"] = IssuerRnc },
+        ["lot"] = new System.Text.Json.Nodes.JsonObject
+        {
+            ["fieldCode"] = SampleFieldCode,
+            ["lotCode"] = "PT-BLOQUE-8-20240916-T1",
+            ["itemCode"] = "BLOQUE-8",
+            ["item"] = "Bloque de 8 pulgadas",
+            ["machineCode"] = "PLANTA1",
+            ["machine"] = "Ponedora 1",
+            ["machineShortCode"] = "P1",
+            ["shift"] = "T1",
+            ["plant"] = "MATILLA",
+            ["productionDate"] = "2024-09-16",
+        },
+        ["delivery"] = new System.Text.Json.Nodes.JsonObject { ["deliveryNo"] = "CD-000123", ["orderNo"] = "PV-000045", ["customer"] = "Constructora de Ejemplo SRL", ["customerRnc"] = BuyerRnc, ["site"] = "Obra Punta Cana" },
+        ["equipment"] = new System.Text.Json.Nodes.JsonObject { ["brand"] = "TEST MARK", ["model"] = "CM-2500-iD", ["serial"] = "220808" },
+        ["signer"] = new System.Text.Json.Nodes.JsonObject { ["name"] = "Ing. Alexander Rochell", ["title"] = "Director de Operaciones" },
+        ["issuedBy"] = "Calidad",
+        ["specimens"] = new System.Text.Json.Nodes.JsonArray(
+            new System.Text.Json.Nodes.JsonObject
+            {
+                ["line"] = 1,
+                ["widthCm"] = "19.5",
+                ["heightCm"] = "19.0",
+                ["lengthCm"] = "39.5",
+                ["nominalUsed"] = false,
+                ["areaCm2"] = "770.25",
+                ["weightKg"] = null,
+                ["loadKg"] = "75000",
+                ["ageDays"] = 3,
+                ["strengthKgcm2"] = "97.37",
+                ["strengthMpa"] = "9.55",
+                ["condition"] = "SECO_AL_AIRE",
+                ["failure"] = "Cónica",
+            },
+            new System.Text.Json.Nodes.JsonObject
+            {
+                ["line"] = 2,
+                ["widthCm"] = "19.5",
+                ["heightCm"] = "19.0",
+                ["lengthCm"] = "39.5",
+                ["nominalUsed"] = true,
+                ["areaCm2"] = "770.25",
+                ["weightKg"] = null,
+                ["loadKg"] = "44000",
+                ["ageDays"] = 3,
+                ["strengthKgcm2"] = "57.12",
+                ["strengthMpa"] = "5.60",
+                ["condition"] = "SECO_AL_AIRE",
+                ["failure"] = "Cónica",
+            }),
+        ["summary"] = new System.Text.Json.Nodes.JsonObject
+        {
+            ["specimens"] = 2,
+            ["avgKgcm2"] = "77.25",
+            ["avgMpa"] = "7.58",
+            ["minKgcm2"] = "57.12",
+            ["minMpa"] = "5.60",
+            ["maxKgcm2"] = "97.37",
+            ["cvPercent"] = "36.85",
+            ["condition"] = "SECO_AL_AIRE",
+            ["failure"] = "Cónica",
+        },
+        ["absorption"] = null,
+    };
 
     /// <summary>
     /// E-PRT-5, E-PRT-02-6: renders the type's examples with the format and refuses it when something mandatory is missing — the
@@ -514,6 +604,19 @@ public static class PrintSamples
             Need(body.Contains("<svg", StringComparison.Ordinal), "el código QR del e-CF");
             Need(body.Contains(SecurityCode, StringComparison.Ordinal), "el código de seguridad");
             Need(body.Contains(PrintText.DateTime(new DateTime(2026, 10, 8, 14, 30, 0, DateTimeKind.Utc)), StringComparison.Ordinal), "la fecha de firma digital");
+        }
+        else if (documentType == PrintDocumentTypes.LabCertificate)
+        {
+            Need(body.Contains("CR-8160924P1-190924", StringComparison.Ordinal), "el número del certificado");
+            Need(body.Contains("<svg", StringComparison.Ordinal), "el QR de verificación");
+            Need(body.Contains("Resistencia calculada sobre área bruta", StringComparison.Ordinal), "la nota «Resistencia calculada sobre área bruta…»");
+            var (voidTitle, voidModel) = Model(documentType, draft: true);
+            Need(PrintDocuments.Render(documentType, voidTitle, voidModel, format, null).Body.Contains("ANULADO", StringComparison.Ordinal), "la marca de agua «ANULADO» del certificado anulado");
+        }
+        else if (documentType == PrintDocumentTypes.RackLabel)
+        {
+            Need(body.Contains(SampleFieldCode, StringComparison.Ordinal), "el código de campo del lote");
+            Need(body.Contains("<svg", StringComparison.Ordinal), "el QR del lote");
         }
         else if (documentType == PrintDocumentTypes.DeliveryNote)
         {
