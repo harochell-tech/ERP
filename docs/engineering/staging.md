@@ -285,8 +285,14 @@ a range per type approved by the Controller (at the cut-over: from the first num
 **Contract test** (E-VS4-04-8, sandbox only): write a settings file on the server (no secret in it) and run
 
 ```
-docker compose run --rm -v /opt/rochell-staging/ct:/ct -v /opt/rochell-staging/secrets/ecf:/run/secrets/ecf:ro migrate ecf-contract-test /ct/settings.json /ct/report.jsonl
+mkdir -p /opt/rochell-staging/ct && chmod 777 /opt/rochell-staging/ct
+img=$(docker inspect -f '{{.Config.Image}}' rochell-staging-api-1)
+docker run --rm --network rochell-staging_edge -v /opt/rochell-staging/ct:/ct -v /opt/rochell-staging/secrets/ecf:/run/secrets/ecf:ro \
+  --entrypoint dotnet "$img" /app/migrate/rochell-migrate.dll ecf-contract-test /ct/settings.json /ct/report.jsonl
 ```
+
+(It needs the internet: the `migrate` service sits on the internal network only, so the tool runs on `edge` without the database; the
+folder must be writable by the container's user 1654.)
 
 with `settings.json`:
 
