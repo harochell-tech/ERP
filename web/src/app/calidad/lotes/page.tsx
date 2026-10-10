@@ -6,7 +6,7 @@ import { query, type Schemas } from "@/api/client";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ConfirmAction, ErrorBox, Field, NoPermission, ReasonAction, StatusBadge } from "@/components/ui";
 import { formatDecimal, formatPercent, formatQuantity } from "@/lib/decimal";
-import { alertsText, certifiableDates, certificateVoidText, qualityActions, verdictBadge } from "@/lib/lab";
+import { alertsText, certifiableDates, certificateVoidText, qualityActions, releaseCheckText, verdictBadge } from "@/lib/lab";
 import { statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -284,6 +284,10 @@ function LotDetail({ lotId, onBack, onChanged }: { lotId: string; onBack: () => 
                   : `${formatDecimal(e.strength28d)} kg/cm² estimada: ${formatDecimal(e.earlyAvg)} a ${e.earlyAge} d ÷ factor ${formatDecimal(e.factorUsed)} (${e.factorSource === "OWN" ? "propio" : "inicial"}); mínimo ${formatDecimal(e.min28d)}`
                 : "Sin dato"}
             </dd>
+            <dt>Liberación inicial</dt>
+            <dd data-testid="quality-lot-initial-check">{releaseCheckText(e.initialCheck, e.initialAge, e.initialSpecimens, e.initialAvg, e.initialRequired)}</dd>
+            <dt>Liberación final</dt>
+            <dd data-testid="quality-lot-final-check">{releaseCheckText(e.finalCheck, 3, e.finalSpecimens, e.finalAvg, e.finalRequired)}</dd>
             <dt>Requisito</dt>
             <dd>
               {e.minAvgRequired

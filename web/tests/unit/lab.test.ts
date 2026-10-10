@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertsText, certifiableDates, certificateVoidText, parameterText, parseRackQr, qualityActions, specimenBody, todayIso, verdictBadge } from "@/lib/lab";
+import { alertsText, certifiableDates, certificateVoidText, parameterText, parseRackQr, qualityActions, releaseCheckText, specimenBody, todayIso, verdictBadge } from "@/lib/lab";
 
 describe("lab helpers (LAB1-01)", () => {
   it("sends empty measures as null so the server uses the item's nominal ones, and never computes", () => {
@@ -77,5 +77,15 @@ describe("LAB1-03 helpers", () => {
     expect(certificateVoidText("SPECIMEN_VOIDED")).toBe("anulado porque se anuló una de sus probetas");
     expect(certificateVoidText("MANUAL")).toBe("anulado por Calidad");
     expect(certificateVoidText(null)).toBe("");
+  });
+});
+
+describe("LAB1-03d helpers", () => {
+  it("says a release check in words and labels an untested item", () => {
+    expect(releaseCheckText("PASS", 2, 3, "45.439792", "40.000000")).toBe("Pasa: 3 probeta(s) a 2 día(s), promedio 45.439792 (mínimo 40.00)");
+    expect(releaseCheckText("FEW_SPECIMENS", 1, 2, "45.4", "40")).toMatch(/^Faltan probetas: 2 probeta/);
+    expect(releaseCheckText("FAIL", 3, 3, "67.510549", "70")).toMatch(/^No llega: /);
+    expect(releaseCheckText(null, 1, null, null, null)).toBe("Sin roturas a esa edad");
+    expect(verdictBadge("NOT_TESTED", null).label).toBe("No se ensaya");
   });
 });

@@ -255,6 +255,11 @@ public sealed class IssueLabCertificateHandler : ICommandHandler<IssueLabCertifi
             throw new DomainException(QualityErrors.CertificateRefused, "The lot has no field code yet: the certificate's number is made from it (E-LAB1-03-2).");
         }
 
+        if (!(await EarlyChecks.ComputeAsync(context, lot.LotId, lot.ItemId, cancellationToken).ConfigureAwait(false)).Spec.Tested)
+        {
+            throw new DomainException(QualityErrors.CertificateRefused, "The item is not tested (not structural): it has no certificate (E-LAB1-16).");
+        }
+
         var (snapshot, tests) = await LabCertificates.SnapshotAsync(context, lot, command.BreakDate, command.DeliveryId, cancellationToken).ConfigureAwait(false);
         var seq = (await MfgSql.ScalarAsync<int?>(
             context, "SELECT max(seq) FROM qa.certificate WHERE company_id = @c AND lot_id = @l AND break_date = @d", cancellationToken,

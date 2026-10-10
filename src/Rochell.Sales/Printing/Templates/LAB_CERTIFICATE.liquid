@@ -24,7 +24,7 @@
   <dt>Procedencia</dt>
   <dd data-testid="certificate-origin">Lote <span class="mono">{{ lote.codigo }}</span> · máquina {{ lote.maquina }} · turno {{ lote.turno }} · producido el {{ lote.produccion }}</dd>
   <dt>Fecha de rotura</dt>
-  <dd>{{ certificado.rotura }}</dd>
+  <dd data-testid="certificate-break">{{ certificado.rotura }} · a {{ certificado.edad }} días de producido</dd>
   <dt>Encargado</dt>
   <dd>{{ firmante.nombre }}{% if firmante.cargo %}, {{ firmante.cargo }}{% endif %}</dd>
   <dt>Equipo</dt>

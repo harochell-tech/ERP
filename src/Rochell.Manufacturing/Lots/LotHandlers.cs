@@ -134,6 +134,17 @@ public sealed class ReleaseLotHandler : ICommandHandler<ReleaseLot>
             throw new DomainException(ManufacturingErrors.LocationInvalid, "A lot is released to a stock location of its plant.");
         }
 
+        // E-LAB1-11/15/16: a tested item with a 1-day minimum is released only on breaks at 1 day (or a retest) that reach it.
+        var checks = await Quality.EarlyChecks.ComputeAsync(context, lot.LotId, lot.ItemId, cancellationToken).ConfigureAwait(false);
+        if (checks.Spec is { Tested: true, MinAvg1d: not null } && checks.Initial is not { Result: Quality.ReleaseChecks.Pass })
+        {
+            throw new DomainException(
+                Quality.QualityErrors.InitialReleaseRefused,
+                checks.Initial is { } i
+                    ? $"The breaks at {i.Age} day(s) do not allow it: {i.Specimens} specimen(s), average {Quality.Lab.Text(i.Average)} against {Quality.Lab.Text(i.Required)} kg/cm² (E-LAB1-11)."
+                    : "The lot has no breaks at 1 day yet: the lab tests it before the release (E-LAB1-11).");
+        }
+
         var curing = (await MfgSql.ScalarAsync<Guid?>(context, "SELECT location_id FROM md.location WHERE plant_id = @p AND is_curing", cancellationToken, ("p", lot.PlantId)).ConfigureAwait(false))!.Value;
         var quantity = await _inventory.LockStockAsync(context, curing, lot.ItemId, lot.LotId, cancellationToken).ConfigureAwait(false);
         await _inventory.LockStockAsync(context, command.ToLocationId, lot.ItemId, lot.LotId, cancellationToken).ConfigureAwait(false);

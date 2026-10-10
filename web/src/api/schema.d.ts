@@ -11252,6 +11252,10 @@ export interface components {
         };
         ItemSpecList: {
             items: components["schemas"]["ItemSpecView"][];
+            /** Format: decimal */
+            defaultMinAvg1d: string;
+            /** Format: decimal */
+            defaultMinAvg3d: string;
         };
         ItemSpecView: {
             /** Format: uuid */
@@ -11276,6 +11280,11 @@ export interface components {
             setBy: null | string;
             /** Format: date-time */
             setAt: null | string;
+            /** Format: decimal */
+            minAvg1d: null | string;
+            /** Format: decimal */
+            minAvg3d: null | string;
+            labTested: boolean;
         };
         ItemView: {
             /** Format: uuid */
@@ -11580,6 +11589,22 @@ export interface components {
             alerts: string[];
             /** Format: date-time */
             evaluatedAt: string;
+            initialCheck: null | string;
+            /** Format: int32 */
+            initialAge: null | number;
+            /** Format: int32 */
+            initialSpecimens: null | number;
+            /** Format: decimal */
+            initialAvg: null | string;
+            /** Format: decimal */
+            initialRequired: null | string;
+            finalCheck: null | string;
+            /** Format: int32 */
+            finalSpecimens: null | number;
+            /** Format: decimal */
+            finalAvg: null | string;
+            /** Format: decimal */
+            finalRequired: null | string;
         };
         LotRecall: {
             lot: components["schemas"]["LabLotView"];
@@ -14796,6 +14821,12 @@ export interface components {
             minAvg28d?: null | string;
             /** Format: decimal */
             minIndividual28d?: null | string;
+            /** Format: decimal */
+            minAvg1d?: null | string;
+            /** Format: decimal */
+            minAvg3d?: null | string;
+            /** @default true */
+            labTested?: boolean;
         };
         SetLabParameter: {
             code: string;

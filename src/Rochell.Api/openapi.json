@@ -63849,7 +63849,9 @@
       },
       "ItemSpecList": {
         "required": [
-          "items"
+          "items",
+          "defaultMinAvg1d",
+          "defaultMinAvg3d"
         ],
         "type": "object",
         "properties": {
@@ -63858,6 +63860,16 @@
             "items": {
               "$ref": "#/components/schemas/ItemSpecView"
             }
+          },
+          "defaultMinAvg1d": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "defaultMinAvg3d": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -63876,7 +63888,10 @@
           "minAvg28d",
           "minIndividual28d",
           "setBy",
-          "setAt"
+          "setAt",
+          "minAvg1d",
+          "minAvg3d",
+          "labTested"
         ],
         "type": "object",
         "properties": {
@@ -63963,6 +63978,25 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "minAvg1d": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "minAvg3d": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "labTested": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -65038,7 +65072,16 @@
           "minIndividualRequired",
           "verdict",
           "alerts",
-          "evaluatedAt"
+          "evaluatedAt",
+          "initialCheck",
+          "initialAge",
+          "initialSpecimens",
+          "initialAvg",
+          "initialRequired",
+          "finalCheck",
+          "finalSpecimens",
+          "finalAvg",
+          "finalRequired"
         ],
         "type": "object",
         "properties": {
@@ -65198,6 +65241,71 @@
           "evaluatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "initialCheck": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initialAge": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "initialSpecimens": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "initialAvg": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "initialRequired": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "finalCheck": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "finalSpecimens": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "finalAvg": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "finalRequired": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -77054,6 +77162,26 @@
               "string"
             ],
             "format": "decimal"
+          },
+          "minAvg1d": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "minAvg3d": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "labTested": {
+            "type": "boolean",
+            "default": true
           }
         },
         "additionalProperties": false

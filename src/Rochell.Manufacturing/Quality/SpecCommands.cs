@@ -13,7 +13,7 @@ namespace Rochell.Manufacturing.Quality;
 /// </summary>
 public sealed record SetItemSpec(
     Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid ItemId, string LotPrefix, decimal NominalWidthCm, decimal NominalHeightCm, decimal NominalLengthCm,
-    decimal? NetAreaFraction = null, decimal? MinAvg28d = null, decimal? MinIndividual28d = null) : ICommand;
+    decimal? NetAreaFraction = null, decimal? MinAvg28d = null, decimal? MinIndividual28d = null, decimal? MinAvg1d = null, decimal? MinAvg3d = null, bool LabTested = true) : ICommand;
 
 /// <summary>E-LAB1-01-3: Calidad sets one of the lab's parameters: <c>Number</c> for a number, <c>Text</c> for the equipment's data.</summary>
 public sealed record SetLabParameter(Guid CompanyId, Guid SessionId, string IdempotencyKey, string Code, decimal? Number = null, string? Text = null) : ICommand;
@@ -67,6 +67,14 @@ public sealed class SetItemSpecHandler : ICommandHandler<SetItemSpec>
             throw new DomainException(QualityErrors.SpecInvalid, "The net area is a fraction above 0 and up to 1 (0.55 for 55 %).");
         }
 
+        // LAB1-03d (E-LAB1-11/12/14/16): the minimum averages of the initial (1 day) and final (3 days) releases; an item that is not tested has none.
+        var min1 = command.MinAvg1d is { } m1 ? Specs.Positive(m1, "The minimum 1-day average") : (decimal?)null;
+        var min3 = command.MinAvg3d is { } m3 ? Specs.Positive(m3, "The minimum 3-day average") : (decimal?)null;
+        if (!command.LabTested && (min1 is not null || min3 is not null || minAvg is not null || minOne is not null))
+        {
+            throw new DomainException(QualityErrors.SpecInvalid, "An item that is not tested has no strength minimums (E-LAB1-16).");
+        }
+
         if (minOne is not null && minAvg is null)
         {
             throw new DomainException(QualityErrors.SpecInvalid, "The individual minimum needs the minimum average.");
@@ -86,12 +94,14 @@ public sealed class SetItemSpecHandler : ICommandHandler<SetItemSpec>
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO qa.item_spec (company_id, item_id, version, lot_prefix, nominal_width_cm, nominal_height_cm, nominal_length_cm, net_area_fraction, min_avg_28d, min_individual_28d, set_by, set_at)
-            VALUES (@c, @i, @v, @p, @w, @h, @l, @net, @avg, @one, @by, @at)
+            INSERT INTO qa.item_spec (company_id, item_id, version, lot_prefix, nominal_width_cm, nominal_height_cm, nominal_length_cm, net_area_fraction, min_avg_28d, min_individual_28d,
+                                      min_avg_1d, min_avg_3d, lab_tested, set_by, set_at)
+            VALUES (@c, @i, @v, @p, @w, @h, @l, @net, @avg, @one, @m1, @m3, @tested, @by, @at)
             """,
             cancellationToken,
             ("c", context.CompanyId), ("i", command.ItemId), ("v", version), ("p", prefix), ("w", width), ("h", height), ("l", length), ("net", command.NetAreaFraction), ("avg", minAvg),
-            ("one", minOne), ("by", await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false)), ("at", context.Clock.UtcNow)).ConfigureAwait(false);
+            ("one", minOne), ("m1", min1), ("m3", min3), ("tested", command.LabTested), ("by", await MfgSql.SessionUserAsync(context, cancellationToken).ConfigureAwait(false)),
+            ("at", context.Clock.UtcNow)).ConfigureAwait(false);
         await context.AppendEventAsync(
             new EventDraft("ItemSpecSet", 1, "ItemSpec", command.ItemId, version,
                 JsonSerializer.Serialize(new
@@ -101,6 +111,9 @@ public sealed class SetItemSpecHandler : ICommandHandler<SetItemSpec>
                     lotPrefix = prefix,
                     minAvg28d = minAvg is null ? null : Lab.Text(minAvg.Value),
                     minIndividual28d = minOne is null ? null : Lab.Text(minOne.Value),
+                    minAvg1d = min1 is null ? null : Lab.Text(min1.Value),
+                    minAvg3d = min3 is null ? null : Lab.Text(min3.Value),
+                    labTested = command.LabTested,
                 }),
                 Publish: false),
             cancellationToken).ConfigureAwait(false);

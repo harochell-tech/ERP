@@ -1,6 +1,7 @@
 # LAB-1 — Laboratorio de calidad y trazabilidad de lotes
 
-**Estado: CONGELADO — aprobado por Alexander Rochell el 2026-10-08**, con las decisiones D-01…D-10 de la sección 13 tal como se
+**Estado: CONGELADO — aprobado por Alexander Rochell el 2026-10-08**; D-04 y D-05 enmendadas el 2026-10-10 por E-LAB1-11…17 (liberación
+inicial con roturas a 1 día, final a 3 días, 28 días como verificación, Block 4" sin ensayos; pruebas LAB-18…20), con las decisiones D-01…D-10 de la sección 13 tal como se
 recomiendan (errata E-LAB1-1…10 en `../errata.md`). Es la especificación; cualquier cambio sigue la regla de congelamiento.
 Matriz de aceptación: `../../acceptance/lab1.md`.
 
@@ -267,6 +268,9 @@ Calidad de los datos, a tener en cuenta en la importación (D-06):
 | LAB-15 | Lote con ensayos | Emitir certificado | Número `CR-<código>-<DDMMAA>`; contenido de §4.6; QR público que lo verifica |
 | LAB-16 | CSV del histórico | Importar | 42 lotes y 216 probetas de solo lectura; valores calculados iguales a los del CSV; segunda importación no duplica |
 | LAB-17 | Técnico sin `fg_lot:final_release` | `FinalReleaseLot` | Rechazado |
+| LAB-18 | Ítem con mínimo a 1 día (E-LAB1-11, 15) | Liberación preliminar sin roturas, con promedio bajo o con menos de 3 probetas; luego reensayo a 2 días que llega | Rechazada mientras no haya 3 probetas a 1–2 días con promedio ≥ mínimo; el lote sigue curando sin bloquearse; después, liberado |
+| LAB-19 | Ítem con mínimo a 3 días (E-LAB1-12, 13, 15) | 3 probetas a 3 días ≥ mínimo; luego rotura real a 28 d que no cumple. Otro lote: 3 días bajo el mínimo | Liberación final por 3 días; la verificación a 28 d bloquea el lote liberado. Bajo el mínimo a 3 días: bloqueado y liberación final rechazada |
+| LAB-20 | Ítem que no se ensaya (E-LAB1-16) | Liberación visual, evaluación, liberación final, certificado | Liberado sin ensayos; veredicto «No se ensaya»; liberación final y certificado rechazados; no admite mínimos de resistencia |
 | E2E-L1 | Flujo completo | Por la API y por la UI | Corrida → lote → liberación preliminar → conduce → ensayo temprano → 28 d → liberación final → certificado |
 
 ## 11. Dependencias externas
