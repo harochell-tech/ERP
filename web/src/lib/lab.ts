@@ -1,6 +1,6 @@
 // LAB1-01: helpers of the Calidad screens (pure; unit-tested in tests/unit/lab.test.ts). Decimals stay strings (E-PR18b-2).
 import type { Schemas } from "@/api/client";
-import { normalizeInput } from "./decimal";
+import { formatDecimal, normalizeInput } from "./decimal";
 
 export const BLOCK_CONDITION: Record<string, string> = { SECO_AL_AIRE: "Seco al aire", HUMEDO: "Húmedo", SATURADO: "Saturado" };
 
@@ -52,7 +52,17 @@ const VERDICT: Record<string, { label: string; tone: string }> = {
   FAILS: { label: "No cumple", tone: "tone-error" },
   NO_SPEC: { label: "Sin requisito", tone: "tone-neutral" },
   NO_DATA: { label: "Sin dato", tone: "tone-neutral" },
+  NOT_TESTED: { label: "No se ensaya", tone: "tone-neutral" }, // E-LAB1-16
 };
+
+/** LAB1-03d (E-LAB1-11/12): a release check in words — «Pasa: 3 probetas a 1 día, promedio 45.44 (mínimo 40)». */
+export function releaseCheckText(check: string | null | undefined, age: number | null | undefined, specimens: number | null | undefined, avg: string | null | undefined, required: string | null | undefined): string {
+  if (!check) {
+    return "Sin roturas a esa edad";
+  }
+  const what = `${specimens ?? 0} probeta(s) a ${age ?? "—"} día(s), promedio ${formatDecimal(avg)} (mínimo ${formatDecimal(required)})`;
+  return check === "PASS" ? `Pasa: ${what}` : check === "FEW_SPECIMENS" ? `Faltan probetas: ${what}` : `No llega: ${what}`;
+}
 
 /** «Cumple (estimado)», «No cumple», «Sin requisito»…; a lot never evaluated is «Sin ensayos». */
 export function verdictBadge(verdict: string | null | undefined, basis: string | null | undefined): { label: string; tone: string } {

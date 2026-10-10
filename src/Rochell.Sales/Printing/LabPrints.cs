@@ -107,6 +107,8 @@ public static class LabPrints
                 ["numero"] = S(s["certificateNo"]),
                 ["emitido"] = DateTime.TryParse(S(s["issuedAt"]), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var at) ? PrintText.DateTime(at) : "—",
                 ["rotura"] = broken,
+                // E-LAB1-17: the age of the breaks, always said — a 3-day result never reads as a 28-day one.
+                ["edad"] = ((JsonArray)s["specimens"]!).FirstOrDefault()?["ageDays"] is { } age ? S(age) : "—",
                 ["estado"] = status == "VOIDED" ? "Anulado" : "Vigente",
             },
             ["lote"] = new Dictionary<string, object?>

@@ -197,6 +197,23 @@ recall and Calidad's actions (final release, block, unblock, evaluate again). La
 - Web: `/verificar/certificado/?c=&k=` (no sign-in, no menu, like `/entrega`): «Certificado auténtico y vigente» or «… ANULADO: no lo
   use», or that no certificate has the code.
 
+## LAB1-03d — early release rules (E-LAB1-11…17; migration 0117)
+
+- `qa.item_spec` gains `min_avg_1d`, `min_avg_3d` and `lab_tested` (false: no strength minimum is allowed). `SetItemSpec` takes
+  `minAvg1d`, `minAvg3d`, `labTested`; `ListItemSpecs` returns them and the suggested `defaultMinAvg1d` / `defaultMinAvg3d` (parameters
+  `DEFAULT_MIN_AVG_1D` 40, `DEFAULT_MIN_AVG_3D` 70).
+- `EarlyChecks` (Evaluation.cs): the initial check takes the breaks at each age from 1 to `INITIAL_RELEASE_MAX_AGE` (2) — the first that
+  passes, else the latest; the final check the breaks at `FINAL_RELEASE_AGE` (3). Each is PASS (at least `MIN_SPECIMENS` and the average
+  reaches the minimum), FAIL (below it) or FEW_SPECIMENS. `qa.lot_evaluation` keeps both (`initial_*`, `final_*`) and the verdict
+  NOT_TESTED for an item that is not tested (no NO_TESTS / FEW_SPECIMENS alerts).
+- `ReleaseLot`: a tested item with a 1-day minimum is released only on a PASS initial check (`LAB_INITIAL_RELEASE_REFUSED`; the lot keeps
+  curing). `FinalReleaseLot`: a PASS final check, or a real 28-day CUMPLE as before; never an untested item; the event and result say
+  `basis` 3_DAYS or 28_DAYS. A FAIL final check blocks the lot once (cause LAB); the 28-day NO CUMPLE still blocks, also a final-released
+  lot (E-LAB1-13). `ListLabLots` counts as ready for the final release a RELEASED lot with a PASS final check too.
+- No certificate for an untested item; the certificate says the age of its breaks (E-LAB1-17).
+- Web: Requisitos por ítem — «Se ensaya en laboratorio», minimums at 1 and 3 days (40 / 70 offered), the 28-day one as verification;
+  Lotes — the initial and final checks in words, «No se ensaya».
+
 ### Not yet
 
 The control chart, the age curve on screen and the history before Core,

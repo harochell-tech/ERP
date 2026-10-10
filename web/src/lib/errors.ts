@@ -440,6 +440,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   LAB_SPEC_INVALID: "Revise los requisitos: prefijo de 1 a 4 letras o números, medidas nominales mayores que cero, área neta entre 0 y 1, y el mínimo individual solo junto al mínimo del promedio. El código corto de máquina tiene de 1 a 6 letras o números.",
   LAB_FINAL_RELEASE_REFUSED: "La liberación final necesita que el lote cumpla con roturas reales a 28 días (no por estimación) y que el ítem tenga su requisito.",
   STOCK_BLOCKED_BY_QUALITY: "En esa ubicación solo queda producto de lotes bloqueados por Calidad. Cargue desde otra ubicación o pida a Calidad que revise el lote.",
+  LAB_INITIAL_RELEASE_REFUSED: "Calidad no puede liberar el lote todavía: hacen falta 3 probetas rotas a 1 día (o a 2 días) con el promedio mínimo del producto. El lote sigue curando.",
   LAB_CERTIFICATE_REFUSED: "No se puede emitir el certificado: el lote necesita su código de campo y al menos una probeta válida de esa fecha, y el conduce elegido debe haber llevado este lote.",
   DELIVERY_SCAN_INVALID: "El rack escaneado no tiene existencia de este producto en la ubicación de carga. Revise la etiqueta o la ubicación.",
   LAB_PARAMETER_INVALID: "Ese valor no es válido para el parámetro o el tipo de falla (vea el rango permitido).",

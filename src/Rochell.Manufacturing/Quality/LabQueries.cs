@@ -32,7 +32,8 @@ public sealed record LabLotList(IReadOnlyList<LabLotView> Items, int WithoutFiel
 public sealed record LotEvaluationView(
     Guid EvaluationId, int Specimens, int? AgeMin, int? AgeMax, decimal? AvgStrength, decimal? MinStrength, decimal? MaxStrength, decimal? StdDev, decimal? Cv, int? EarlyAge, decimal? EarlyAvg,
     decimal? RealAvg28d, decimal? FactorUsed, string? FactorSource, decimal? Strength28d, decimal? Min28d, string? Basis, int? SpecVersion, decimal? MinAvgRequired,
-    decimal? MinIndividualRequired, string Verdict, IReadOnlyList<string> Alerts, DateTime EvaluatedAt);
+    decimal? MinIndividualRequired, string Verdict, IReadOnlyList<string> Alerts, DateTime EvaluatedAt, string? InitialCheck, int? InitialAge, int? InitialSpecimens, decimal? InitialAvg,
+    decimal? InitialRequired, string? FinalCheck, int? FinalSpecimens, decimal? FinalAvg, decimal? FinalRequired);
 
 public sealed record GetLabLot(Guid CompanyId, Guid SessionId, Guid LotId) : IQuery;
 
@@ -97,9 +98,10 @@ public sealed record ListItemSpecs(Guid CompanyId, Guid SessionId) : IQuery;
 
 public sealed record ItemSpecView(
     Guid ItemId, string ItemCode, string ItemDescription, int? Version, string? LotPrefix, decimal? NominalWidthCm, decimal? NominalHeightCm, decimal? NominalLengthCm, decimal? NetAreaFraction,
-    decimal? MinAvg28d, decimal? MinIndividual28d, string? SetBy, DateTime? SetAt);
+    decimal? MinAvg28d, decimal? MinIndividual28d, string? SetBy, DateTime? SetAt, decimal? MinAvg1d, decimal? MinAvg3d, bool LabTested);
 
-public sealed record ItemSpecList(IReadOnlyList<ItemSpecView> Items);
+/// <remarks><c>DefaultMinAvg1d</c> / <c>DefaultMinAvg3d</c>: what the form offers for a new requirement (E-LAB1-14: 40 and 70 kg/cm²).</remarks>
+public sealed record ItemSpecList(IReadOnlyList<ItemSpecView> Items, decimal DefaultMinAvg1d, decimal DefaultMinAvg3d);
 
 /// <summary>E-LAB1-01-3/11: the lab's parameters with who changed what, the failure types and the block conditions.</summary>
 public sealed record GetLabSettings(Guid CompanyId, Guid SessionId) : IQuery;
@@ -137,7 +139,7 @@ internal static class LabReads
         (SELECT count(*) FROM qa.absorption_test t WHERE t.lot_id = f.lot_id AND t.status = 'RECORDED')::int,
         (SELECT max(t.break_date) FROM qa.compression_test t WHERE t.lot_id = f.lot_id AND t.status = 'RECORDED'),
         f.version, ev.verdict, ev.basis, ev.strength_28d, coalesce(ev.alerts, ARRAY[]::text[]), f.block_cause, f.block_reason,
-        coalesce(f.status = 'RELEASED' AND ev.verdict = 'COMPLIES' AND ev.basis = 'REAL', false)
+        coalesce(f.status = 'RELEASED' AND ((ev.verdict = 'COMPLIES' AND ev.basis = 'REAL') OR ev.final_check = 'PASS'), false)
         """;
 
     public const string LotFrom =
@@ -150,7 +152,7 @@ internal static class LabReads
     public const string SpecColumns =
         """
         i.item_id, i.code, i.description, s.version, s.lot_prefix, s.nominal_width_cm, s.nominal_height_cm, s.nominal_length_cm, s.net_area_fraction, s.min_avg_28d, s.min_individual_28d,
-        coalesce(u.display_name, u.email), s.set_at
+        coalesce(u.display_name, u.email), s.set_at, s.min_avg_1d, s.min_avg_3d, coalesce(s.lab_tested, true)
         """;
 
     public const string SpecFrom =
@@ -167,7 +169,7 @@ internal static class LabReads
 
     public static ItemSpecView Spec(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetInt32(3), r.NullableString(4), r.NullableDecimal(5), r.NullableDecimal(6), r.NullableDecimal(7),
-            r.NullableDecimal(8), r.NullableDecimal(9), r.NullableDecimal(10), r.NullableString(11), r.NullableUtc(12));
+            r.NullableDecimal(8), r.NullableDecimal(9), r.NullableDecimal(10), r.NullableString(11), r.NullableUtc(12), r.NullableDecimal(13), r.NullableDecimal(14), r.GetBoolean(15));
 }
 
 [RequiresPermission("lab:read")]
@@ -189,7 +191,7 @@ public sealed class ListLabLotsHandler : IQueryHandler<ListLabLots>
             WHERE f.company_id = @c AND f.status <> 'VOIDED'
               AND (CAST(@q AS text) IS NULL OR f.field_code ILIKE '%' || CAST(@q AS text) || '%' OR l.lot_code ILIKE '%' || CAST(@q AS text) || '%')
               AND (CAST(@view AS text) IS DISTINCT FROM 'BLOCKED_BY_LAB' OR (f.status = 'BLOCKED' AND f.block_cause = 'LAB'))
-              AND (CAST(@view AS text) IS DISTINCT FROM 'READY_FINAL' OR (f.status = 'RELEASED' AND ev.verdict = 'COMPLIES' AND ev.basis = 'REAL'))
+              AND (CAST(@view AS text) IS DISTINCT FROM 'READY_FINAL' OR (f.status = 'RELEASED' AND ((ev.verdict = 'COMPLIES' AND ev.basis = 'REAL') OR ev.final_check = 'PASS')))
             ORDER BY r.business_date DESC, f.field_code, l.lot_code
             LIMIT @n
             """,
@@ -211,7 +213,7 @@ public sealed class ListLabLotsHandler : IQueryHandler<ListLabLots>
             """
             SELECT count(*) FROM mfg.fg_lot f
             WHERE f.company_id = @c AND f.status = 'RELEASED'
-              AND (SELECT e.verdict = 'COMPLIES' AND e.basis = 'REAL' FROM qa.lot_evaluation e WHERE e.lot_id = f.lot_id ORDER BY e.seq DESC LIMIT 1)
+              AND (SELECT (e.verdict = 'COMPLIES' AND e.basis = 'REAL') OR e.final_check IS NOT DISTINCT FROM 'PASS' FROM qa.lot_evaluation e WHERE e.lot_id = f.lot_id ORDER BY e.seq DESC LIMIT 1)
             """,
             cancellationToken,
             ("c", context.CompanyId)).ConfigureAwait(false) ?? 0;
@@ -304,13 +306,15 @@ public sealed class GetLabLotHandler : IQueryHandler<GetLabLot>
             context.Transaction,
             """
             SELECT evaluation_id, specimens, age_min, age_max, avg_strength, min_strength, max_strength, std_dev, cv, early_age, early_avg, real_avg_28d, factor_used, factor_source, strength_28d,
-                   min_28d, basis, spec_version, min_avg_required, min_individual_required, verdict, alerts, evaluated_at
+                   min_28d, basis, spec_version, min_avg_required, min_individual_required, verdict, alerts, evaluated_at,
+                   initial_check, initial_age, initial_specimens, initial_avg, initial_required, final_check, final_specimens, final_avg, final_required
             FROM qa.lot_evaluation WHERE company_id = @c AND lot_id = @l ORDER BY seq DESC LIMIT 1
             """,
             r => new LotEvaluationView(
                 r.GetGuid(0), r.GetInt32(1), Int(r, 2), Int(r, 3), r.NullableDecimal(4), r.NullableDecimal(5), r.NullableDecimal(6), r.NullableDecimal(7), r.NullableDecimal(8), Int(r, 9),
                 r.NullableDecimal(10), r.NullableDecimal(11), r.NullableDecimal(12), r.NullableString(13), r.NullableDecimal(14), r.NullableDecimal(15), r.NullableString(16), Int(r, 17),
-                r.NullableDecimal(18), r.NullableDecimal(19), r.GetString(20), r.GetFieldValue<string[]>(21), r.Utc(22)),
+                r.NullableDecimal(18), r.NullableDecimal(19), r.GetString(20), r.GetFieldValue<string[]>(21), r.Utc(22), r.NullableString(23), Int(r, 24), Int(r, 25), r.NullableDecimal(26),
+                r.NullableDecimal(27), r.NullableString(28), Int(r, 29), r.NullableDecimal(30), r.NullableDecimal(31)),
             cancellationToken,
             ("c", context.CompanyId),
             ("l", query.LotId)).ConfigureAwait(false);
@@ -350,7 +354,10 @@ public sealed class ListItemSpecsHandler : IQueryHandler<ListItemSpecs>
             context.Connection, context.Transaction,
             $"SELECT {LabReads.SpecColumns} {LabReads.SpecFrom} WHERE i.company_id = @c AND i.item_type = 'FINISHED_GOOD' AND (i.status::text = 'ACTIVE' OR s.version IS NOT NULL) ORDER BY i.code",
             LabReads.Spec, cancellationToken, ("c", context.CompanyId)).ConfigureAwait(false);
-        return ApiJson.Serialize(new ItemSpecList(items));
+        var default1d = await Lab.ParameterAsync(context.Connection, context.Transaction, context.CompanyId, "DEFAULT_MIN_AVG_1D", cancellationToken).ConfigureAwait(false);
+        var default3d = await Lab.ParameterAsync(context.Connection, context.Transaction, context.CompanyId, "DEFAULT_MIN_AVG_3D", cancellationToken).ConfigureAwait(false);
+        static decimal Plain(decimal value) => decimal.Parse(Lab.Text(value), CultureInfo.InvariantCulture);
+        return ApiJson.Serialize(new ItemSpecList(items, Plain(default1d), Plain(default3d)));
     }
 }
 

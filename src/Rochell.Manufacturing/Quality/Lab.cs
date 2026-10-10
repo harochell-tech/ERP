@@ -28,6 +28,9 @@ public static class QualityErrors
 
     /// <summary>LAB1-03 (E-LAB1-03-2…4): a certificate that cannot be issued — no field code, no valid specimen that date, a delivery that did not take the lot.</summary>
     public const string CertificateRefused = "LAB_CERTIFICATE_REFUSED";
+
+    /// <summary>LAB1-03d (E-LAB1-11): the preliminary release of a tested item needs breaks at 1 day reaching its 1-day minimum.</summary>
+    public const string InitialReleaseRefused = "LAB_INITIAL_RELEASE_REFUSED";
 }
 
 public static class BlockConditions
