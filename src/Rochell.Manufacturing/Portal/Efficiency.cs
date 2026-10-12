@@ -10,6 +10,8 @@ namespace Rochell.Manufacturing.Portal;
 
 // MFG3-02 (E-MFG3-3…7, E-MFG3-01-2): the ideal cycle per machine and product, and each machine's efficiency per shift from what the
 // portal reported — planned time without scheduled maintenance, stoppages, cycles per mould — and the shift's summary (good and scrap).
+// MFG3-06 (E-MFG3-12…17): planned time ends at the scheduled end and leaves out the breaks; a stoppage counts only its part inside
+// planned time; short stoppages = the HMI's dead time − the recorded stoppages.
 
 /// <summary>E-MFG3-5, E-MFG3-01-2: the ideal seconds per cycle of a machine making a product, from a date on.</summary>
 public sealed record SetIdealCycle(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid MachineId, Guid ItemId, DateOnly ValidFrom, decimal Seconds) : ICommand;
@@ -77,16 +79,18 @@ public sealed record StoppageReasonView(string Reason, int Count, decimal Minute
 /// <remarks>
 /// Ratios are 0–1 with 4 decimals; null when they cannot be computed (no running time, no ideal cycle for a product, no summary).
 /// <c>LostUnits</c> = stoppage seconds ÷ ideal cycle × blocks per cycle of the shift's main mould; <c>LostValue</c> at the product's
-/// ACTIVE standard cost (information only, E-MFG3-6).
+/// ACTIVE standard cost (information only, E-MFG3-6). <c>BreakMinutes</c> are the shift's breaks (E-MFG3-12); <c>ShortStopMinutes</c> =
+/// the HMI's dead time − the recorded stoppages, never below 0 (E-MFG3-17); <c>StoppagesWithoutReason</c> counts the stoppages of
+/// 10 minutes or more without one (E-MFG3-15).
 /// </remarks>
 public sealed record ShiftEfficiencyView(
     DateOnly Date, int ShiftNo, string PortalCode, Guid MachineId, string MachineCode, string MachineName, decimal PlannedMinutes, decimal MaintenanceMinutes,
     decimal StoppageMinutes, decimal RunningMinutes, int Cycles, decimal? Availability, decimal? Performance, decimal? Quality, decimal? Oee, decimal? LostUnits, decimal? LostValue,
-    int StoppagesWithoutReason, IReadOnlyList<StoppageReasonView> Reasons);
+    int StoppagesWithoutReason, IReadOnlyList<StoppageReasonView> Reasons, decimal BreakMinutes, int DeadMinutes, decimal ShortStopMinutes);
 
 public sealed record MachineEfficiencyTotal(
     Guid MachineId, string MachineCode, string MachineName, decimal PlannedMinutes, decimal StoppageMinutes, decimal RunningMinutes, decimal? Availability, decimal? Performance,
-    decimal? Quality, decimal? Oee, decimal? LostUnits, decimal? LostValue, IReadOnlyList<StoppageReasonView> Reasons);
+    decimal? Quality, decimal? Oee, decimal? LostUnits, decimal? LostValue, IReadOnlyList<StoppageReasonView> Reasons, decimal ShortStopMinutes);
 
 public sealed record MachineEfficiency(
     DateOnly From, DateOnly To, IReadOnlyList<ShiftEfficiencyView> Shifts, IReadOnlyList<MachineEfficiencyTotal> Machines, IReadOnlyList<string> MissingIdealCycles,
@@ -97,7 +101,12 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
 {
     private sealed record Machine(string Code, Guid MachineId, string MachineCode, string Name, Guid PlantId);
 
-    private sealed record ShiftRow(DateOnly Date, int ShiftNo, DateTime From, DateTime To, int Cycles, string Moulds);
+    private sealed record ShiftRow(DateOnly Date, int ShiftNo, DateTime From, DateTime To, int Cycles, string Moulds, DateTime? ScheduledTo, string? Breaks, int DeadMinutes);
+
+    private readonly record struct Span(DateTime From, DateTime To);
+
+    /// <summary>E-MFG3-15: a stoppage this long or longer needs a reason (the portal asks for it before the day's report is closed).</summary>
+    private static readonly TimeSpan ReasonRequired = TimeSpan.FromMinutes(10);
 
     private sealed record Window(DateTime From, DateTime? To);
 
@@ -105,7 +114,8 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
 
     private sealed record Totals(decimal Good, decimal Scrap);
 
-    private sealed record Acc(decimal Planned, decimal Stop, decimal Running, decimal IdealSeconds, bool PerformanceKnown, decimal Good, decimal Scrap, bool QualityKnown, decimal? Lost, decimal? Value);
+    private sealed record Acc(
+        decimal Planned, decimal Stop, decimal Running, decimal IdealSeconds, bool PerformanceKnown, decimal Good, decimal Scrap, bool QualityKnown, decimal? Lost, decimal? Value, decimal Short);
 
     public string QueryType => "Manufacturing.GetMachineEfficiency";
 
@@ -143,10 +153,12 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
                 context.Connection,
                 context.Transaction,
                 """
-                SELECT DISTINCT ON (shift_date, shift_no) shift_date, shift_no, window_from, window_to, cycles, moulds::text FROM mfg.portal_reading
+                SELECT DISTINCT ON (shift_date, shift_no) shift_date, shift_no, window_from, window_to, cycles, moulds::text, scheduled_to, breaks::text, dead_minutes
+                FROM mfg.portal_reading
                 WHERE company_id = @c AND portal_code = @p AND shift_date BETWEEN @f AND @t ORDER BY shift_date, shift_no, fetched_at DESC
                 """,
-                r => new ShiftRow(r.Date(0), r.GetInt16(1), r.GetDateTime(2), r.GetDateTime(3), r.GetInt32(4), r.GetString(5)),
+                r => new ShiftRow(
+                    r.Date(0), r.GetInt16(1), r.GetDateTime(2), r.GetDateTime(3), r.GetInt32(4), r.GetString(5), r.IsDBNull(6) ? null : r.GetDateTime(6), r.NullableString(7), r.GetInt32(8)),
                 cancellationToken,
                 ("c", context.CompanyId), ("p", machine.Code), ("f", query.From), ("t", query.To)).ConfigureAwait(false);
             var windows = await Reading.ListAsync(
@@ -170,29 +182,40 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
                 cancellationToken,
                 ("c", context.CompanyId), ("p", machine.Code), ("f", query.From.AddDays(-1).ToDateTime(TimeOnly.MinValue)), ("t", query.To.AddDays(2).ToDateTime(TimeOnly.MinValue)))
                 .ConfigureAwait(false);
-            var acc = new Acc(0m, 0m, 0m, 0m, true, 0m, 0m, true, 0m, 0m);
+            var acc = new Acc(0m, 0m, 0m, 0m, true, 0m, 0m, true, 0m, 0m, 0m);
             var machineReasons = new Dictionary<string, (int Count, decimal Minutes)>(StringComparer.Ordinal);
             foreach (var row in rows)
             {
-                var end = row.To < localNow ? row.To : localNow;
-                var planned = Minutes(row.From, end) - windows.Sum(w => Minutes(Max(w.From, row.From), Min(w.To ?? end, end)));
-                var maintenance = Minutes(row.From, end) - planned;
-                var inShift = stops.Where(s => s.Start >= row.From && s.Start < end && !windows.Any(w => s.Start >= w.From && s.Start < (w.To ?? end))).ToList();
+                // E-MFG3-14: planned time ends at the scheduled end (the portal's lengthening after a late start is not planned time).
+                var scheduledEnd = row.ScheduledTo ?? row.To;
+                var end = scheduledEnd < localNow ? scheduledEnd : localNow;
+                List<Span> shiftSpan = end > row.From ? [new Span(row.From, end)] : [];
+                var withoutMaintenance = Subtract(shiftSpan, windows.Select(w => new Span(w.From, w.To ?? end)));
+                var plannedSpans = Subtract(withoutMaintenance, Breaks(row.Breaks)); // E-MFG3-12
+                var planned = plannedSpans.Sum(p => Minutes(p.From, p.To));
+                var maintenance = Minutes(row.From, end) - withoutMaintenance.Sum(p => Minutes(p.From, p.To));
+                var breakMinutes = withoutMaintenance.Sum(p => Minutes(p.From, p.To)) - planned;
+
+                // A stoppage counts only its part inside planned time; one starting inside maintenance does not count (E-MFG3-4).
+                var counted = stops
+                    .Where(s => !windows.Any(w => s.Start >= w.From && s.Start < (w.To ?? end)))
+                    .Select(s => (Stop: s, Minutes: plannedSpans.Sum(p => Minutes(Max(p.From, s.Start), Min(p.To, s.End ?? (s.Seconds is { } secs ? s.Start.AddSeconds(secs) : end))))))
+                    .Where(x => x.Minutes > 0m)
+                    .ToList();
                 var reasons = new Dictionary<string, (int Count, decimal Minutes)>(StringComparer.Ordinal);
                 decimal stopMinutes = 0m;
-                foreach (var stop in inShift)
+                foreach (var (stop, minutes) in counted)
                 {
-                    var stopEnd = stop.Seconds is { } secs ? stop.Start.AddSeconds(secs) : stop.End ?? end;
-                    var minutes = Minutes(stop.Start, Min(stopEnd, end));
                     stopMinutes += minutes;
                     var reason = stop.Reason ?? "SIN_RAZON";
                     reasons[reason] = (reasons.GetValueOrDefault(reason).Count + 1, reasons.GetValueOrDefault(reason).Minutes + minutes);
                     machineReasons[reason] = (machineReasons.GetValueOrDefault(reason).Count + 1, machineReasons.GetValueOrDefault(reason).Minutes + minutes);
                 }
 
-                var withoutReason = inShift.Count(s => s.Reason is null);
+                var withoutReason = counted.Count(x => x.Stop.Reason is null && x.Minutes >= (decimal)ReasonRequired.TotalMinutes);
                 unreasoned += withoutReason;
                 var running = Math.Max(0m, planned - stopMinutes);
+                var shortStops = Math.Max(0m, row.DeadMinutes - stopMinutes); // E-MFG3-17
 
                 // Performance: Σ cycles × ideal seconds of each mould's product ÷ running seconds.
                 var parsed = JsonSerializer.Deserialize<List<PortalMould>>(row.Moulds, new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? [];
@@ -239,7 +262,7 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
                 decimal? oee = availability is { } a && performance is { } p && q is { } qq ? Ratio(a * p * qq) : null;
                 shifts.Add(new ShiftEfficiencyView(
                     row.Date, row.ShiftNo, machine.Code, machine.MachineId, machine.MachineCode, machine.Name, Round(planned), Round(maintenance), Round(stopMinutes), Round(running), row.Cycles,
-                    availability, performance, q, oee, lostUnits, lostValue, withoutReason, Reasons(reasons)));
+                    availability, performance, q, oee, lostUnits, lostValue, withoutReason, Reasons(reasons), Round(breakMinutes), row.DeadMinutes, Round(shortStops)));
                 acc = acc with
                 {
                     Planned = acc.Planned + planned,
@@ -252,6 +275,7 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
                     QualityKnown = acc.QualityKnown && quality is not null,
                     Lost = acc.Lost is { } l && lostUnits is { } lu ? l + lu : null,
                     Value = acc.Value is { } v && lostValue is { } lv ? v + lv : null,
+                    Short = acc.Short + shortStops,
                 };
             }
 
@@ -265,7 +289,7 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
             decimal? mq = acc.QualityKnown && acc.Good + acc.Scrap > 0m ? Ratio(acc.Good / (acc.Good + acc.Scrap)) : null;
             totals.Add(new MachineEfficiencyTotal(
                 machine.MachineId, machine.MachineCode, machine.Name, Round(acc.Planned), Round(acc.Stop), Round(acc.Running), ma, mp, mq,
-                ma is { } x && mp is { } y && mq is { } z ? Ratio(x * y * z) : null, acc.Lost, acc.Value, Reasons(machineReasons)));
+                ma is { } x && mp is { } y && mq is { } z ? Ratio(x * y * z) : null, acc.Lost, acc.Value, Reasons(machineReasons), Round(acc.Short)));
         }
 
         return ApiJson.Serialize(new MachineEfficiency(query.From, query.To, shifts, totals, [.. missing], unreasoned));
@@ -294,6 +318,23 @@ public sealed class GetMachineEfficiencyHandler : IQueryHandler<GetMachineEffici
             r => new Totals(r.GetDecimal(0), r.GetDecimal(1)),
             cancellationToken,
             ("c", context.CompanyId), ("m", machine), ("d", date), ("n", (short)shiftNo)).ConfigureAwait(false);
+
+    /// <summary>The breaks the portal sent with the shift (E-MFG3-12); none from a portal without them.</summary>
+    private static IEnumerable<Span> Breaks(string? json)
+        => json is null ? [] : (JsonSerializer.Deserialize<List<PortalBreak>>(json, PortalJson.Options) ?? []).Select(b => new Span(PortalTime.Parse(b.From), PortalTime.Parse(b.To)));
+
+    /// <summary>The parts of the spans outside every cut.</summary>
+    private static List<Span> Subtract(List<Span> spans, IEnumerable<Span> cuts)
+    {
+        foreach (var cut in cuts.Where(c => c.To > c.From))
+        {
+            spans = [.. spans.SelectMany(s => cut.To <= s.From || cut.From >= s.To
+                ? [s]
+                : new[] { new Span(s.From, Min(cut.From, s.To)), new Span(Max(cut.To, s.From), s.To) }.Where(p => p.To > p.From))];
+        }
+
+        return spans;
+    }
 
     private static decimal Minutes(DateTime from, DateTime? to) => to is { } t && t > from ? (decimal)(t - from).Ticks / TimeSpan.TicksPerMinute : 0m;
 

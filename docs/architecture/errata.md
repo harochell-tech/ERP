@@ -1346,6 +1346,12 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG3-9 | MFG-3 | The mechanic marks a task done in the portal's Mantenimientos page by choosing it; Core publishes the task list to the portal and reads back the done ones; a done task's counter restarts. |
 | E-MFG3-10 | MFG-3 | «Por vencer» at 90 %, «Vencida» at 100 %: a counter on Core's Inicio and a portal push notification to subscribers with the Mantenimiento role. |
 | E-MFG3-11 | MFG-3 | Spare parts used in maintenance are out of scope for now. |
+| E-MFG3-12 | MFG-3 | Breaks per machine and weekday in the portal's shifts (Monday–Friday 13:00–14:00 at plants 2 and 3; Saturday 06:00–14:00 without a break): a stoppage inside a break is not recorded, the part of a stoppage inside a break does not count, and Core takes the breaks off the planned time and off the stoppages (approved 2026-10-12). |
+| E-MFG3-13 | MFG-3 | A stoppage starts at the machine's last real cycle as the portal received it, not at the time the VPS reports it (approved 2026-10-12). |
+| E-MFG3-14 | MFG-3 | A late start is a stoppage from the scheduled start to the first cycle with the automatic reason «Arranque tarde»; Core's planned time is the scheduled shift (the portal's «reponer tiempo» lengthening is not planned time) and cycles after the scheduled end still count to the shift (approved 2026-10-12). |
+| E-MFG3-15 | MFG-3 | Every stoppage of 10 minutes or more needs a reason before the portal's daily report is closed; Core shows the stoppages without a reason on Inicio (approved 2026-10-12). |
+| E-MFG3-16 | MFG-3 | The portal's Producción page groups by the configured shifts (`turnos_config`, as the export does), not by fixed hours (approved 2026-10-12). |
+| E-MFG3-17 | MFG-3 | Core shows «paros cortos (menos de 5 min)» = the HMI's dead time − the recorded stoppages, never below 0; availability still comes from the recorded stoppages (approved 2026-10-12). |
 | E-MFG3-00-1 | MFG3-00 | Paver (adoquín) is not counted by the machines: its «Producido» stays manual; the lock applies to 4", 6" and 8" only. |
 | E-MFG3-00-2 | MFG3-00 | «Producido» can no longer be overwritten in the portal; a machine miscount is corrected in Core on the shift draft (who changed it is kept). |
 | E-MFG3-00-3 | MFG3-00 | The day's «rechazados / dañados» become the draft's fresh scrap (E-MFG3-2); the next day's confirmed curing loss («Confirma la producción real de ayer») is shown in Core as a suggestion when Calidad releases the lot, never recorded by itself. |

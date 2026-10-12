@@ -11652,6 +11652,8 @@ export interface components {
             /** Format: decimal */
             lostValue: null | string;
             reasons: components["schemas"]["StoppageReasonView"][];
+            /** Format: decimal */
+            shortStopMinutes: string;
         };
         MachineList: {
             items: components["schemas"]["MachineView"][];
@@ -14975,6 +14977,12 @@ export interface components {
             /** Format: int32 */
             stoppagesWithoutReason: number;
             reasons: components["schemas"]["StoppageReasonView"][];
+            /** Format: decimal */
+            breakMinutes: string;
+            /** Format: int32 */
+            deadMinutes: number;
+            /** Format: decimal */
+            shortStopMinutes: string;
         };
         ShiftList: {
             items: components["schemas"]["ShiftView"][];

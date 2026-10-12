@@ -276,7 +276,7 @@ const TASKS: readonly Task[] = [
   },
   {
     href: "/produccion/eficiencia/",
-    label: "Paros sin razón esta semana",
+    label: "Paros de 10 min o más sin razón esta semana",
     permission: "production:read",
     count: async (companyId) => {
       const to = todayInDominicanRepublic();

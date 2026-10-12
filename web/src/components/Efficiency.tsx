@@ -32,6 +32,7 @@ export const STOPPAGE_REASONS: Record<string, string> = {
   falta_personal: "Falta de personal",
   mantenimiento: "Mantenimiento",
   cambio_molde: "Cambio de molde",
+  arranque_tarde: "Arranque tarde",
   otro: "Otro",
   SIN_RAZON: "Sin razón",
 };

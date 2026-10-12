@@ -77,7 +77,14 @@ public sealed record PortalShift(
     [property: JsonPropertyName("tiempo_muerto_min")] int DeadMinutes,
     [property: JsonPropertyName("primer_ciclo")] string? FirstCycle,
     [property: JsonPropertyName("ultimo_ciclo")] string? LastCycle,
-    [property: JsonPropertyName("ciclos_mantenimiento")] int MaintenanceCycles);
+    [property: JsonPropertyName("ciclos_mantenimiento")] int MaintenanceCycles,
+    [property: JsonPropertyName("fin_programado"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ScheduledTo = null,
+    [property: JsonPropertyName("descansos"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<PortalBreak>? Breaks = null);
+
+/// <summary>MFG3-06 (E-MFG3-12): a break inside a shift (lunch), not planned time.</summary>
+public sealed record PortalBreak(
+    [property: JsonPropertyName("inicio")] string From,
+    [property: JsonPropertyName("fin")] string To);
 
 public sealed record PortalMould(
     [property: JsonPropertyName("molde")] string Mould,

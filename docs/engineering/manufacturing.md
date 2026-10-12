@@ -228,3 +228,20 @@ Migration 0104:
   `data/planes.php` replaces the list and sends a push to users with the Mantenimiento (or admin) role when a task becomes «Por
   vencer» or «Vencida»; Mantenimientos lists the tasks and asks which one was done when a window ends; the export carries `tarea`,
   which Core reads back as the task done.
+
+## MFG3-06 — breaks, late starts, required reasons, short stoppages (migration 0118, E-MFG3-12…17; portal MFG3-06)
+
+- Portal (harochell-tech/portal, MFG3-06): `turnos_config` gains `descanso_inicio` / `descanso_fin` (created on first use;
+  Turnos › «Descanso» sets them on the shifts in force of the chosen machines and weekdays). A stoppage starts at the machine's last
+  real cycle (E-MFG3-13); one wholly inside a break is not recorded and its part inside a break does not count; no push alert during
+  a break, and the live monitor shows «En descanso» (E-MFG3-12). The first cycle after the scheduled start records a stoppage
+  `arranque_tarde` from the scheduled start (E-MFG3-14). «Reporte de cierre completado» cannot be checked while the day has
+  stoppages of 10 minutes or more without a reason (E-MFG3-15). Producción groups by the configured shifts (E-MFG3-16). The export
+  adds per shift `fin_programado` (the end without «reponer tiempo») and `descansos`.
+- `mfg.portal_reading.scheduled_to` / `breaks` keep them (NULL from an older portal; the new fields are left out of the content's
+  hash when absent, so an older export does not make new versions).
+- `GetMachineEfficiency`: planned time = from the window's start to the scheduled end (or the window's end), up to now, minus
+  maintenance and breaks; a stoppage counts only its part inside planned time (one starting inside maintenance still does not
+  count); `breakMinutes`; `deadMinutes` and `shortStopMinutes` = dead time − counted stoppages, never below 0 (E-MFG3-17, also per
+  machine); `stoppagesWithoutReason` counts only stoppages of 10 minutes or more. Producción › Eficiencia shows «Descanso» and
+  «Paros cortos»; the reason `arranque_tarde` reads «Arranque tarde».

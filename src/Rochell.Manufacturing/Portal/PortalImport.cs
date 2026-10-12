@@ -83,8 +83,9 @@ public sealed class ImportPortalDataHandler(IPortalSource source) : ICommandHand
                 context.Transaction,
                 """
                 INSERT INTO mfg.portal_reading (reading_id, company_id, portal_code, shift_date, shift_no, window_from, window_to, closed, cycles, cycles_without_mould,
-                                                maintenance_cycles, dead_minutes, first_cycle, last_cycle, moulds, content_sha256, fetched_at)
-                VALUES (@id, @c, @p, @d, @n, @from, @to, @closed, @cycles, @nomould, @maint, @dead, @first, @last, CAST(@moulds AS jsonb), @sha, @at)
+                                                maintenance_cycles, dead_minutes, first_cycle, last_cycle, moulds, content_sha256, fetched_at, scheduled_to, breaks)
+                VALUES (@id, @c, @p, @d, @n, @from, @to, @closed, @cycles, @nomould, @maint, @dead, @first, @last, CAST(@moulds AS jsonb), @sha, @at, @scheduled,
+                        CAST(@breaks AS jsonb))
                 """,
                 cancellationToken,
                 ("id", context.Ids.NewId()),
@@ -103,7 +104,9 @@ public sealed class ImportPortalDataHandler(IPortalSource source) : ICommandHand
                 ("last", shift.LastCycle is null ? DBNull.Value : PortalTime.Parse(shift.LastCycle)),
                 ("moulds", JsonSerializer.Serialize(shift.Moulds, PortalJson.Options)),
                 ("sha", sha),
-                ("at", now)).ConfigureAwait(false);
+                ("at", now),
+                ("scheduled", shift.ScheduledTo is null ? DBNull.Value : PortalTime.Parse(shift.ScheduledTo)),
+                ("breaks", shift.Breaks is null ? DBNull.Value : JsonSerializer.Serialize(shift.Breaks, PortalJson.Options))).ConfigureAwait(false);
             readings++;
             if (shift.CyclesWithoutMould > 0)
             {
