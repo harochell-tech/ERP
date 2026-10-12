@@ -37,6 +37,7 @@ public sealed class OpeningInventoryTests(PostgresFixture postgres)
             INSERT INTO md.item VALUES ('{block}', '{h.CompanyId}', 'BLOQUE-6', 'Bloque de 6 pulgadas', 'FINISHED_GOOD', 'un', 'BLOQUE', 'ACTIVE', 1);
             INSERT INTO md.item VALUES ('{paver}', '{h.CompanyId}', 'ADOQUIN-H', 'Adoquín holandés', 'FINISHED_GOOD', 'un', 'ADOQUIN', 'ACTIVE', 1);
             INSERT INTO md.item VALUES (gen_random_uuid(), '{h.CompanyId}', 'ARENA', 'Arena', 'RAW_MATERIAL', 't', 'AGREGADO', 'ACTIVE', 1);
+            INSERT INTO md.item VALUES (gen_random_uuid(), '{h.CompanyId}', 'FLETE', 'Flete', 'SERVICE', 'un', 'TRANSPORTE', 'ACTIVE', 1);
             UPDATE fin.posting_rule_version SET status = 'ACTIVE', approved_by = '{h.UserId}' WHERE posting_rule_id = '{OpenInv}' AND version = 1;
             """);
         var fg = await h.CreateAccountAsync("1350", "Inventario de producto terminado", isControl: true);
@@ -96,7 +97,8 @@ public sealed class OpeningInventoryTests(PostgresFixture postgres)
 
         var header = await Assert.ThrowsAsync<DomainException>(() => Prepare(h, s, "h", Convert.ToBase64String(Encoding.UTF8.GetBytes("a,b\n1,2\n"))));
         var noCost = await Assert.ThrowsAsync<DomainException>(() => Prepare(h, s, "c", Csv("HIGUEY,PATIO,ADOQUIN-H,10,ADM-9")));
-        var raw = await Assert.ThrowsAsync<DomainException>(() => Prepare(h, s, "r", Csv("HIGUEY,PATIO,ARENA,10,ADM-9")));
+        var raw = await Assert.ThrowsAsync<DomainException>(() => Prepare(h, s, "r", Csv("HIGUEY,PATIO,ARENA,10,ADM-9"))); // VS3-02c: raw material needs a standard cost that uses it
+        var service = await Assert.ThrowsAsync<DomainException>(() => Prepare(h, s, "sv", Csv("HIGUEY,PATIO,FLETE,10,ADM-9")));
         var location = await Assert.ThrowsAsync<DomainException>(() => Prepare(h, s, "l", Csv("HIGUEY,BODEGA,BLOQUE-6,10,ADM-9")));
         var twice = await Assert.ThrowsAsync<DomainException>(() => Prepare(h, s, "d", Csv("HIGUEY,PATIO,BLOQUE-6,10,ADM-9", "HIGUEY,PATIO,BLOQUE-6,5,ADM-9")));
         var file = Csv("HIGUEY,PATIO,BLOQUE-6,10,ADM-1");
@@ -106,8 +108,9 @@ public sealed class OpeningInventoryTests(PostgresFixture postgres)
         var sameDocument = await Assert.ThrowsAsync<DomainException>(() => Prepare(h, s, "doc", Csv("HIGUEY,PATIO,BLOQUE-6,99,ADM-1")));
 
         Assert.Equal(
-            (OpeningErrors.FileInvalid, OpeningErrors.CostMissing, SalesErrors.NotFinishedGood, OpeningErrors.FileInvalid, OpeningErrors.FileInvalid, OpeningErrors.FileAlreadyPosted, OpeningErrors.DocumentAlreadyLoaded),
-            (header.Code, noCost.Code, raw.Code, location.Code, twice.Code, sameFile.Code, sameDocument.Code));
+            (OpeningErrors.FileInvalid, OpeningErrors.CostMissing, OpeningErrors.CostMissing, SalesErrors.NotFinishedGood, OpeningErrors.FileInvalid, OpeningErrors.FileInvalid, OpeningErrors.FileAlreadyPosted,
+                OpeningErrors.DocumentAlreadyLoaded),
+            (header.Code, noCost.Code, raw.Code, service.Code, location.Code, twice.Code, sameFile.Code, sameDocument.Code));
     }
 
     [Fact]

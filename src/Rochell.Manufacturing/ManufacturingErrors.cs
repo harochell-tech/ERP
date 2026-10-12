@@ -36,4 +36,7 @@ public static class ManufacturingErrors
 
     /// <summary>MFG3-02 (E-MFG3-5): an ideal cycle out of range, for something that is not a machine and a finished good, or a date already set.</summary>
     public const string IdealCycleInvalid = "IDEAL_CYCLE_INVALID";
+
+    /// <summary>VS3-02c (E-VS3-02c-2): a shortfall of the summary was already covered by material that entered; it cannot be reversed.</summary>
+    public const string ShortfallSettled = "MATERIAL_SHORTFALL_SETTLED";
 }

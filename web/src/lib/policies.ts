@@ -24,7 +24,7 @@ export interface PolicyVersion {
   parameters: Record<string, string>;
 }
 
-export type PolicyUnit = "PERCENT" | "AMOUNT" | "DAYS" | "HOURS" | "MINUTES" | "OPTION" | "COUNT" | "NUMBER";
+export type PolicyUnit = "PERCENT" | "AMOUNT" | "DAYS" | "HOURS" | "MINUTES" | "OPTION" | "COUNT" | "DATE" | "NUMBER";
 
 /** The unit of a parameter (E-UX2-2); a parameter a later migration added without texts falls back on its value type. */
 export function policyUnit(definition: PolicyParameterDefinition): PolicyUnit {
@@ -36,6 +36,7 @@ export function policyUnit(definition: PolicyParameterDefinition): PolicyUnit {
     case "MINUTES":
     case "OPTION":
     case "COUNT":
+    case "DATE":
       return definition.unit;
   }
   switch (definition.valueType) {
@@ -60,6 +61,7 @@ export const UNIT_SUFFIX: Readonly<Record<PolicyUnit, string>> = {
   MINUTES: "minutos",
   OPTION: "",
   COUNT: "lecturas",
+  DATE: "",
   NUMBER: "",
 };
 
@@ -84,12 +86,24 @@ export function toInputValue(definition: PolicyParameterDefinition, stored: stri
   if (stored === null || stored === undefined || stored === "") {
     return "";
   }
+  if (policyUnit(definition) === "DATE") {
+    return dateFromStored(stored) ?? "";
+  }
   return isPercent(definition) ? (fractionToPercent(stored) ?? stored) : stored;
+}
+
+/** VS3-02c (E-VS3-02c-3): a date parameter is stored as YYYYMMDD (0 = none) and typed as yyyy-MM-dd. */
+function dateFromStored(stored: string): string | null {
+  const m = /^(\d{4})(\d{2})(\d{2})$/.exec(stored.trim());
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
 }
 
 /** The typed value as the server expects it: "5" → "0.05" for a percentage; grouping removed from amounts. */
 export function fromInputValue(definition: PolicyParameterDefinition, typed: string): string {
   const text = typed.trim();
+  if (policyUnit(definition) === "DATE") {
+    return text === "" ? "0" : text.replace(/-/g, "");
+  }
   if (isPercent(definition)) {
     return percentToFraction(text) ?? text;
   }
@@ -106,6 +120,10 @@ export function formatParameterValue(definition: PolicyParameterDefinition | und
   }
   if (isPercent(definition)) {
     return formatPercent(stored);
+  }
+  if (policyUnit(definition) === "DATE") {
+    const date = dateFromStored(stored);
+    return date ? `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}` : "No";
   }
   switch (policyUnit(definition)) {
     case "AMOUNT":
@@ -131,6 +149,9 @@ export function validateParameter(definition: PolicyParameterDefinition, typed: 
   const label = parameterLabel(definition);
   const text = typed.trim();
   const example = definition.example ? ` (p. ej. ${definition.example})` : "";
+  if (policyUnit(definition) === "DATE") {
+    return text === "" || /^\d{4}-\d{2}-\d{2}$/.test(text) ? null : `Elija una fecha o déjelo vacío.`;
+  }
   if (text === "") {
     return policyUnit(definition) === "OPTION" ? `Elija ${label.toLowerCase()}.` : `Indique ${label.toLowerCase()}${example}.`;
   }

@@ -64,13 +64,26 @@ internal static class Openings
         return duplicate is null ? lines : throw new DomainException(OpeningErrors.FileInvalid, $"Document {duplicate.Key} appears more than once.");
     }
 
-    public static async Task<decimal?> ActiveCostAsync(CommandContext context, Guid itemId, Guid plantId, CancellationToken cancellationToken)
+    public const string RawMaterial = "RAW_MATERIAL";
+
+    /// <summary>
+    /// E-VS3-02b-5: a finished good at its ACTIVE standard cost; E-VS3-02b-11, E-VS3-02c-5: a raw material at its standard price in the
+    /// latest ACTIVE standard cost (of the plant's valuation area) that uses it.
+    /// </summary>
+    public static async Task<decimal?> ActiveCostAsync(CommandContext context, Guid itemId, string itemType, Guid plantId, CancellationToken cancellationToken)
         => await SalesSql.ScalarAsync<decimal?>(
             context,
-            """
-            SELECT s.unit_cost FROM md.standard_cost_version s JOIN md.plant p ON p.valuation_area_id = s.valuation_area_id
-            WHERE s.company_id = @c AND s.item_id = @i AND p.plant_id = @p AND s.status = 'ACTIVE'
-            """,
+            itemType == RawMaterial
+                ? """
+                  SELECT m.std_price FROM md.standard_cost_material m JOIN md.standard_cost_version s ON s.cost_version_id = m.cost_version_id
+                  JOIN md.plant p ON p.valuation_area_id = s.valuation_area_id
+                  WHERE s.company_id = @c AND m.material_item_id = @i AND p.plant_id = @p AND s.status = 'ACTIVE'
+                  ORDER BY s.effective_from DESC, s.cost_version_id DESC LIMIT 1
+                  """
+                : """
+                  SELECT s.unit_cost FROM md.standard_cost_version s JOIN md.plant p ON p.valuation_area_id = s.valuation_area_id
+                  WHERE s.company_id = @c AND s.item_id = @i AND p.plant_id = @p AND s.status = 'ACTIVE'
+                  """,
             cancellationToken,
             ("c", context.CompanyId),
             ("i", itemId),
@@ -94,18 +107,18 @@ internal static class Openings
             : throw new DomainException(SalesErrors.VersionConflict, $"The batch changed (version {batch.Version}, expected {expectedVersion}); reload and retry.");
     }
 
-    public sealed record Line(Guid LineId, int LineNo, string Document, Guid PlantId, Guid LocationId, Guid ItemId, string ItemCode, decimal Quantity, decimal UnitCost, decimal Value, Guid? LotId);
+    public sealed record Line(Guid LineId, int LineNo, string Document, Guid PlantId, Guid LocationId, Guid ItemId, string ItemCode, decimal Quantity, decimal UnitCost, decimal Value, Guid? LotId, string ItemType);
 
     public static Task<List<Line>> LinesAsync(CommandContext context, Guid batchId, CancellationToken cancellationToken)
         => Reading.ListAsync(
             context.Connection,
             context.Transaction,
             """
-            SELECT l.line_id, l.line_no, l.source_document_number, l.plant_id, l.location_id, l.item_id, i.code, l.quantity, l.unit_cost, l.value, l.lot_id
+            SELECT l.line_id, l.line_no, l.source_document_number, l.plant_id, l.location_id, l.item_id, i.code, l.quantity, l.unit_cost, l.value, l.lot_id, i.item_type
             FROM mig.opening_inventory_line l JOIN md.item i ON i.item_id = l.item_id
             WHERE l.batch_id = @b ORDER BY l.line_no
             """,
-            r => new Line(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetGuid(3), r.GetGuid(4), r.GetGuid(5), r.GetString(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9), r.NullableGuid(10)),
+            r => new Line(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetGuid(3), r.GetGuid(4), r.GetGuid(5), r.GetString(6), r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9), r.NullableGuid(10), r.GetString(11)),
             cancellationToken,
             ("b", batchId));
 
@@ -158,7 +171,7 @@ public sealed class PrepareOpeningInventoryHandler : ICommandHandler<PrepareOpen
                 context.Connection,
                 context.Transaction,
                 """
-                SELECT p.plant_id, l.location_id, i.item_id, i.item_type, i.status::text
+                SELECT p.plant_id, CASE WHEN l.is_curing OR l.is_transit THEN NULL ELSE l.location_id END, i.item_id, i.item_type, i.status::text
                 FROM md.plant p
                 LEFT JOIN md.location l ON l.plant_id = p.plant_id AND l.code = @loc
                 LEFT JOIN md.item i ON i.company_id = p.company_id AND i.code = @item
@@ -175,14 +188,18 @@ public sealed class PrepareOpeningInventoryHandler : ICommandHandler<PrepareOpen
                 throw new DomainException(OpeningErrors.FileInvalid, $"Line {row.LineNo + 1}: plant {row.Plant} or location {row.Location} does not exist.");
             }
 
-            if (ids[2] is null || ids[3] != "FINISHED_GOOD" || ids[4] != "ACTIVE")
+            if (ids[2] is null || ids[3] is not ("FINISHED_GOOD" or Openings.RawMaterial) || ids[4] != "ACTIVE")
             {
-                throw new DomainException(SalesErrors.NotFinishedGood, $"Line {row.LineNo + 1}: {row.Item} is not an active finished good (E-VS3-02b-3).");
+                throw new DomainException(SalesErrors.NotFinishedGood, $"Line {row.LineNo + 1}: {row.Item} is not an active finished good or raw material (E-VS3-02b-3, E-VS3-02b-11).");
             }
 
             var (plantId, locationId, itemId) = (Guid.Parse(ids[0]!), Guid.Parse(ids[1]!), Guid.Parse(ids[2]!));
-            var cost = await Openings.ActiveCostAsync(context, itemId, plantId, cancellationToken).ConfigureAwait(false)
-                ?? throw new DomainException(OpeningErrors.CostMissing, $"Line {row.LineNo + 1}: {row.Item} has no approved standard cost in the valuation area of {row.Plant} (E-VS3-02b-5).");
+            var cost = await Openings.ActiveCostAsync(context, itemId, ids[3]!, plantId, cancellationToken).ConfigureAwait(false)
+                ?? throw new DomainException(
+                    OpeningErrors.CostMissing,
+                    ids[3] == Openings.RawMaterial
+                        ? $"Line {row.LineNo + 1}: no approved standard cost in the valuation area of {row.Plant} uses {row.Item}, so it has no standard price (E-VS3-02c-5)."
+                        : $"Line {row.LineNo + 1}: {row.Item} has no approved standard cost in the valuation area of {row.Plant} (E-VS3-02b-5).");
             var value = decimal.Round(row.Quantity * cost, 2, MidpointRounding.AwayFromZero);
             if (value <= 0m)
             {
@@ -280,7 +297,7 @@ public sealed class PostOpeningInventoryHandler : ICommandHandler<PostOpeningInv
         var lines = await Openings.LinesAsync(context, command.BatchId, cancellationToken).ConfigureAwait(false);
         foreach (var line in lines)
         {
-            if (await Openings.ActiveCostAsync(context, line.ItemId, line.PlantId, cancellationToken).ConfigureAwait(false) != line.UnitCost)
+            if (await Openings.ActiveCostAsync(context, line.ItemId, line.ItemType, line.PlantId, cancellationToken).ConfigureAwait(false) != line.UnitCost)
             {
                 throw new DomainException(OpeningErrors.CostChanged, $"Line {line.LineNo + 1}: the standard cost of {line.ItemCode} changed since the batch was prepared; prepare it again.");
             }
@@ -314,7 +331,9 @@ public sealed class PostOpeningInventoryHandler : ICommandHandler<PostOpeningInv
                     };
                     return new[]
                     {
-                        new PostingLineInput("OPENINV-DR-FG", "opening_value", p.Line.Value, PlantId: p.Line.PlantId, ItemId: p.Line.ItemId, SubledgerRef: p.ValueEntryId, InvValueEntryId: p.ValueEntryId, Inputs: inputs),
+                        new PostingLineInput(
+                            p.Line.ItemType == Openings.RawMaterial ? "OPENINV-DR-RM" : "OPENINV-DR-FG", "opening_value", p.Line.Value, PlantId: p.Line.PlantId, ItemId: p.Line.ItemId,
+                            SubledgerRef: p.ValueEntryId, InvValueEntryId: p.ValueEntryId, Inputs: inputs),
                         new PostingLineInput("OPENINV-CR-MIG", "opening_value", p.Line.Value, PlantId: p.Line.PlantId, Inputs: inputs),
                     };
                 }).ToList()),
@@ -355,8 +374,15 @@ public sealed class PostOpeningInventoryHandler : ICommandHandler<PostOpeningInv
             ("b", command.BatchId)).ConfigureAwait(false);
 
         var dates = new MovementDates(occurredAt, postingDate, plan.PostingDate);
+        var settlements = new List<ShortfallSettlement>();
+        var settle = await MaterialShortfalls.RuleActiveAsync(context, MaterialShortfalls.SettleRule, postingDate, cancellationToken).ConfigureAwait(false);
         foreach (var (line, valueEntryId) in planned)
         {
+            if (line.ItemType == Openings.RawMaterial)
+            {
+                await MaterialShortfalls.LockAsync(context, line.LocationId, line.ItemId, cancellationToken).ConfigureAwait(false);
+            }
+
             // E-VS3-02b-4: one lot per line, AP-<item>-<cutover>-<n>.
             var prefix = $"AP-{line.ItemCode}-{batch.Cutover:yyyyMMdd}-";
             var next = (await SalesSql.ScalarAsync<long?>(
@@ -371,11 +397,26 @@ public sealed class PostOpeningInventoryHandler : ICommandHandler<PostOpeningInv
                 MovementTypes.Opening).ConfigureAwait(false);
             await Sql.ExecuteAsync(
                 context.Connection, context.Transaction, "UPDATE mig.opening_inventory_line SET lot_id = @lot, live = true WHERE line_id = @l", cancellationToken, ("lot", lotId), ("l", line.LineId)).ConfigureAwait(false);
+
+            // E-VS3-02b-13, E-VS3-02c-2: raw material that enters covers first what production consumed without stock in that location.
+            if (settle && line.ItemType == Openings.RawMaterial
+                && await MaterialShortfalls.ReserveAsync(context, _inventory, line.LocationId, line.ItemId, lotId, line.Quantity, cancellationToken).ConfigureAwait(false) is { } settlement)
+            {
+                settlements.Add(settlement);
+            }
         }
 
         await context.AppendStateAsync(Openings.Aggregate, command.BatchId, "DOCUMENT", "DRAFT", "POSTED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
         var journal = await _engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { batchId = command.BatchId, status = "POSTED", version, journalId = journal.JournalId, postingDate });
+        Guid? settlementJournalId = null;
+        foreach (var plant in settlements.GroupBy(x => x.Reservation.PlantId))
+        {
+            settlementJournalId = await ShortfallSettlementPosting.PostAsync(
+                context, _engine, _inventory, [.. plant], plant.Key, Openings.Aggregate, command.BatchId, version, Openings.DocumentType, command.BatchId, occurredAt, postingDate,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return JsonSerializer.Serialize(new { batchId = command.BatchId, status = "POSTED", version, journalId = journal.JournalId, postingDate, settlementJournalId });
     }
 }
 

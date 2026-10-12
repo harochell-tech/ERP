@@ -61,6 +61,9 @@ function ParameterInput({ definition, value, onChange, ...fieldAria }: { definit
       </select>
     );
   }
+  if (unit === "DATE") {
+    return <input type="date" {...aria} value={value} onChange={(e) => onChange(e.target.value)} />;
+  }
   return (
     <SuffixInput
       suffix={unit === "AMOUNT" ? "" : UNIT_SUFFIX[unit]}
