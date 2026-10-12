@@ -11,7 +11,7 @@ namespace Rochell.Manufacturing.Portal;
 /// date and portal shift. Per machine and product (mould) with blocks: the run's DRAFT summary with units = blocks; batches from the
 /// batch plant's post split by units, else units ÷ the recipe's units per batch rounded up; consumption from the batch plant's latest
 /// post split among the group's runs by their theoretical consumption once every machine's shift has ended, else the theoretical as a
-/// PENDING placeholder. A draft a person changed, or a posted summary, is left alone. Runs that do not exist yet are returned for the
+/// PENDING placeholder — or, for a machine without a batch plant whose shift ended, as THEORETICAL, which is posted (E-MFG2-15). A draft a person changed, or a posted summary, is left alone. Runs that do not exist yet are returned for the
 /// caller to open (StartProductionRun) before calling again.
 /// </summary>
 public sealed record SyncPortalShift(Guid CompanyId, Guid SessionId, string IdempotencyKey, DateOnly Date, int ShiftNo, string Group) : ICommand;
@@ -342,8 +342,9 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
             }
 
             var fresh = counted.TryGetValue(t.Run.RunId, out var countedGood) ? t.Units - countedGood : broken.GetValueOrDefault(t.Run.RunId);
-            var provenance = new SummaryProvenance(
-                "PORTAL", t.ReadingId, null, splitOk ? "BATCH_PLANT" : "PENDING", null, splitOk ? post!.Value.Id : null);
+            // E-MFG2-15: a machine without a batch plant takes the recipe's theoretical once its shift ended; it can be posted.
+            var source = splitOk ? "BATCH_PLANT" : batchPlant is null && allClosed ? "THEORETICAL" : "PENDING";
+            var provenance = new SummaryProvenance("PORTAL", t.ReadingId, null, source, null, splitOk ? post!.Value.Id : null);
             if (live is { Status: "DRAFT" } && current is not null && current.ReadingId == t.ReadingId && current.ConsumptionSource == provenance.ConsumptionSource
                 && current.ConsumptionId == provenance.ConsumptionId && live.Batches == batches && live.GoodUnits == t.Units - fresh && live.FreshScrap == fresh
                 && await ShiftSummaryWriter.SameConsumptionAsync(context, t.Run.RunId, consumption, cancellationToken).ConfigureAwait(false))

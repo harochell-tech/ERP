@@ -6,8 +6,8 @@ namespace Rochell.Manufacturing.Runs;
 
 /// <summary>
 /// Where a shift summary came from (MFG-2, E-MFG2-01-2/8): typed (MANUAL) or prepared from the machines' portal (PORTAL, its reading), who
-/// changed a portal draft, and where its consumption came from — MANUAL, BATCH_PLANT (its post) or PENDING (the recipe's theoretical as a
-/// placeholder, never posted). A PORTAL summary's theoretical consumption is the recipe's per unit × units (E-MFG2-7); a MANUAL one keeps
+/// changed a portal draft, and where its consumption came from — MANUAL, BATCH_PLANT (its post), PENDING (the recipe's theoretical as a
+/// placeholder, never posted) or THEORETICAL (the recipe's theoretical of a machine without a batch plant, posted, E-MFG2-15). A PORTAL summary's theoretical consumption is the recipe's per unit × units (E-MFG2-7); a MANUAL one keeps
 /// MFG-1's per batch × batches.
 /// </summary>
 internal sealed record SummaryProvenance(string Source, Guid? ReadingId, Guid? EditedBy, string ConsumptionSource, string? ConsumptionReason, Guid? ConsumptionId)

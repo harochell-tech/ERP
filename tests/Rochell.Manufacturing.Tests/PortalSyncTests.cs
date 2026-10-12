@@ -167,6 +167,29 @@ public sealed class PortalSyncTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_machine_without_a_batch_plant_takes_the_recipes_theoretical_once_its_shift_ended_and_is_posted()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        await h.AdminRequireAsync($"UPDATE mfg.portal_machine SET batch_plant = NULL WHERE company_id = '{h.CompanyId}' AND portal_code = 'planta2'");
+
+        // While the shift runs the theoretical is only a placeholder (E-MFG2-15); once it ended it is the summary's consumption.
+        w.Portal.Shifts.Add(Shift(w, "planta2", 375, closed: false));
+        await PassAsync(w);
+        var running = await SummaryAsync(h, w.S.Machine);
+        w.Portal.Shifts[0] = Shift(w, "planta2", 375, closed: true);
+        await PassAsync(w);
+        var ended = await SummaryAsync(h, w.S.Machine);
+        var run = await h.ScalarAsync<Guid>("SELECT run_id FROM mfg.production_run WHERE machine_id = @m", ("m", w.S.Machine));
+        var version = await h.ScalarAsync<long>("SELECT version FROM mfg.shift_summary WHERE run_id = @r", ("r", run));
+        await h.RunAsync(new PostShiftSummary(h.CompanyId, w.S.Manager, "post", w.S.Plant, run, version), new PostShiftSummaryHandler());
+
+        Assert.Equal("PORTAL:PENDING:10:1500:DRAFT:ADITIVO-P=15.000/15.000,ARENA-LAVADA=18.000/18.000,CEMENTO-GU=1800.000/1800.000", running);
+        Assert.Equal("PORTAL:THEORETICAL:10:1500:DRAFT:ADITIVO-P=15.000/15.000,ARENA-LAVADA=18.000/18.000,CEMENTO-GU=1800.000/1800.000", ended);
+        Assert.StartsWith("PORTAL:THEORETICAL:10:1500:POSTED:", await SummaryAsync(h, w.S.Machine), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task What_is_not_paired_is_reported_and_a_portal_that_does_not_answer_is_recorded()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
