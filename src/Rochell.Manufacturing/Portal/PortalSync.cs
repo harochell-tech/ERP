@@ -29,7 +29,8 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
 
     private sealed record ShiftReading(Guid ReadingId, bool Closed, IReadOnlyList<PortalMould> Moulds);
 
-    private sealed record Target(Machine Machine, Guid ReadingId, Guid ItemId, decimal Units, Runs.Runs.Run Run, decimal UnitsPerBatch, List<(Guid Item, decimal PerUnit, string BaseUom)> Recipe);
+    private sealed record Target(
+        Machine Machine, Guid ReadingId, Guid ItemId, decimal Units, Runs.Runs.Run Run, decimal UnitsPerBatch, List<(Guid Item, decimal PerUnit, string BaseUom)> Recipe, string Mould);
 
     public async Task<string> HandleAsync(SyncPortalShift command, CommandContext context, CancellationToken cancellationToken)
     {
@@ -117,7 +118,7 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
                     r => (Item: r.GetGuid(0), PerUnit: r.GetDecimal(1) / unitsPerBatch, BaseUom: r.GetString(2)),
                     cancellationToken,
                     ("r", run.RecipeVersionId)).ConfigureAwait(false);
-                targets.Add(new Target(machine, reading.ReadingId, item.Value, mould.Blocks, run, unitsPerBatch, recipe));
+                targets.Add(new Target(machine, reading.ReadingId, item.Value, mould.Blocks, run, unitsPerBatch, recipe, mould.Mould));
             }
         }
 
@@ -200,28 +201,59 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
         }
 
         // E-MFG3-2, E-MFG3-01-4: the daily report's broken blocks of a machine with a single shift that day, split among its products by
-        // units (the last takes the remainder); with two shifts they are split by hand in Core.
+        // units (the last takes the remainder); with two shifts they are split by hand in Core. E-MFG3-20: the supervisor's count of good
+        // blocks per size, made the next morning, is the real good quantity: fresh scrap = blocks − count (broken + curing loss).
         var broken = new Dictionary<Guid, decimal>();
+        var counted = new Dictionary<Guid, decimal>();
         foreach (var machine in targets.Select(t => t.Machine).DistinctBy(m => m.Code))
         {
-            var reported = (await Reading.ListAsync(
+            var report = (await Reading.ListAsync(
                 context.Connection,
                 context.Transaction,
-                "SELECT broken_units FROM mfg.portal_daily_report WHERE company_id = @c AND portal_code = @p AND report_date = @d ORDER BY fetched_at DESC LIMIT 1",
-                r => r.IsDBNull(0) ? (int?)null : r.GetInt32(0),
+                "SELECT broken_units, cured_good::text FROM mfg.portal_daily_report WHERE company_id = @c AND portal_code = @p AND report_date = @d ORDER BY fetched_at DESC LIMIT 1",
+                r => (Broken: r.IsDBNull(0) ? (int?)null : r.GetInt32(0), Cured: r.IsDBNull(1) ? null : JsonSerializer.Deserialize<Dictionary<string, int>>(r.GetString(1))),
                 cancellationToken,
                 ("c", context.CompanyId),
                 ("p", machine.Code),
                 ("d", command.Date)).ConfigureAwait(false)).SingleOrDefault();
+            var reported = report.Broken;
+            var shifts = await MfgSql.ScalarAsync<long>(
+                context, "SELECT count(DISTINCT shift_no) FROM mfg.portal_reading WHERE company_id = @c AND portal_code = @p AND shift_date = @d", cancellationToken,
+                ("c", context.CompanyId), ("p", machine.Code), ("d", command.Date)).ConfigureAwait(false);
+            var own = targets.Where(t => t.Machine.Code == machine.Code).ToList();
+            if (report.Cured is { Count: > 0 } cured)
+            {
+                if (shifts > 1)
+                {
+                    warnings.Add($"{machine.Code} ({command.Date:yyyy-MM-dd}): el conteo del supervisor es de un día con dos turnos; páselo a mano en Core.");
+                }
+                else
+                {
+                    foreach (var t in own)
+                    {
+                        if (!cured.TryGetValue(t.Mould, out var good))
+                        {
+                            continue;
+                        }
+
+                        if (good > t.Units)
+                        {
+                            warnings.Add($"{machine.Code} ({command.Date:yyyy-MM-dd}): el supervisor contó {good} bloques de {t.Mould}\" buenos, más que los {t.Units} que contó la máquina; no se pasa al borrador.");
+                            continue;
+                        }
+
+                        counted[t.Run.RunId] = good;
+                        var loss = t.Units - good - (reported ?? 0);
+                        warnings.Add($"{machine.Code} ({command.Date:yyyy-MM-dd}) {t.Mould}\": máquina {t.Units}, buenos contados {good}, rotos {reported ?? 0}, merma de curado {loss}.");
+                    }
+                }
+            }
+
             if (reported is not { } units || units == 0)
             {
                 continue;
             }
 
-            var shifts = await MfgSql.ScalarAsync<long>(
-                context, "SELECT count(DISTINCT shift_no) FROM mfg.portal_reading WHERE company_id = @c AND portal_code = @p AND shift_date = @d", cancellationToken,
-                ("c", context.CompanyId), ("p", machine.Code), ("d", command.Date)).ConfigureAwait(false);
-            var own = targets.Where(t => t.Machine.Code == machine.Code).ToList();
             var produced = own.Sum(t => t.Units);
             if (shifts > 1)
             {
@@ -257,6 +289,11 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
             var live = await Runs.Runs.LiveSummaryAsync(context, t.Run.RunId, cancellationToken).ConfigureAwait(false);
             if (live is { Status: "POSTED" } || current?.EditedBy is not null || current?.Source == "MANUAL" || t.Run.Status != "IN_PROGRESS")
             {
+                if (counted.ContainsKey(t.Run.RunId) && live is not { Status: "POSTED" })
+                {
+                    warnings.Add($"{t.Machine.Code} ({label}): el borrador fue cambiado en Core, así que el conteo del supervisor no se le aplica.");
+                }
+
                 kept++;
                 continue;
             }
@@ -304,7 +341,7 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
                 continue;
             }
 
-            var fresh = broken.GetValueOrDefault(t.Run.RunId);
+            var fresh = counted.TryGetValue(t.Run.RunId, out var countedGood) ? t.Units - countedGood : broken.GetValueOrDefault(t.Run.RunId);
             var provenance = new SummaryProvenance(
                 "PORTAL", t.ReadingId, null, splitOk ? "BATCH_PLANT" : "PENDING", null, splitOk ? post!.Value.Id : null);
             if (live is { Status: "DRAFT" } && current is not null && current.ReadingId == t.ReadingId && current.ConsumptionSource == provenance.ConsumptionSource
@@ -315,7 +352,7 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
                 continue;
             }
 
-            // Scrap: the report's broken blocks (above); a draft a person changed is never refreshed, so theirs stays.
+            // Scrap: the report's broken blocks, or blocks − the supervisor's count (above); a draft a person changed is never refreshed.
             await ShiftSummaryWriter.WriteAsync(context, t.Run, batches, t.Units - fresh, 0m, fresh, consumption, provenance, CommandType, cancellationToken, context.Ids.NewId())
                 .ConfigureAwait(false);
             written++;

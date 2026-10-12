@@ -22,8 +22,11 @@ public sealed class PortalSettings
 
     public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(15);
 
-    /// <summary>Days before today read on every pass (a shift that ends after midnight, a late batch-plant post).</summary>
-    public int LookbackDays { get; set; } = 1;
+    /// <summary>
+    /// Days before today read on every pass (a shift that ends after midnight, a late batch-plant post, and E-MFG3-20: the supervisor's
+    /// count of the previous production day, e.g. Saturday's counted on Monday).
+    /// </summary>
+    public int LookbackDays { get; set; } = 7;
 
     public bool Enabled => !string.IsNullOrWhiteSpace(BaseUrl);
 }
