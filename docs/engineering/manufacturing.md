@@ -258,3 +258,5 @@ Migration 0104:
   shift that day, the draft takes good = the count and fresh scrap = blocks − count (broken + curing loss); the figures are listed in
   the warnings; a count above the machine's blocks, a day with two shifts, or a draft changed in Core leave the draft alone with a
   warning. `Rochell:Portal:LookbackDays` defaults to 7 so a count made days later still arrives.
+- Portal MFG3-08 (E-MFG3-24…27): role «supervisor» limited to the Supervisor page; blind count corrected only by an admin; Checklist
+  retired into Supervisor; Reporte de paros read only.
