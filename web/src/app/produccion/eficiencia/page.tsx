@@ -12,7 +12,8 @@ import { useLoad } from "@/lib/useQuery";
 
 // MFG3-04 (E-MFG3-4…7): Producción › Eficiencia — each paired machine's availability, performance, quality and overall efficiency
 // per shift and for the period (the server's figures), the minutes stopped by reason and the blocks they cost at standard cost.
-// The reasons are written in the portal (Reporte de paros); «Sin razón» counts on Inicio.
+// The reasons are written in the portal (Reporte de paros); «Sin razón» counts on Inicio. MFG3-06 (E-MFG3-12…17): lunch is not planned
+// time, a late start is a stoppage «Arranque tarde», and «Paros cortos» are the HMI's dead time the recorded stoppages do not explain.
 
 function daysBefore(day: string, days: number): string {
   const d = new Date(`${day}T12:00:00Z`);
@@ -63,7 +64,7 @@ export default function Page() {
           ) : null}
           {data.stoppagesWithoutReason > 0 ? (
             <p className="notice" data-testid="stoppages-without-reason">
-              {data.stoppagesWithoutReason} paro(s) sin razón en el período: escríbala en el portal (Reporte de paros).
+              {data.stoppagesWithoutReason} paro(s) de 10 minutos o más sin razón en el período: escríbala en el portal (Reporte de paros).
             </p>
           ) : null}
           <h2>Por máquina</h2>
@@ -74,6 +75,7 @@ export default function Page() {
                   <th>Máquina</th>
                   <th className="num">Planificado (min)</th>
                   <th className="num">Paros (min)</th>
+                  <th className="num">Paros cortos (min)</th>
                   <th className="num">Disponibilidad</th>
                   <th className="num">Rendimiento</th>
                   <th className="num">Calidad</th>
@@ -91,6 +93,7 @@ export default function Page() {
                     </td>
                     <td className="num">{formatQuantity(m.plannedMinutes)}</td>
                     <td className="num">{formatQuantity(m.stoppageMinutes)}</td>
+                    <td className="num">{formatQuantity(m.shortStopMinutes)}</td>
                     <td className="num">{percent(m.availability)}</td>
                     <td className="num">{percent(m.performance)}</td>
                     <td className="num">{percent(m.quality)}</td>
@@ -104,7 +107,7 @@ export default function Page() {
                 ))}
                 {data.machines.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="muted">
+                    <td colSpan={11} className="muted">
                       Sin lecturas del portal en el período.
                     </td>
                   </tr>
@@ -122,7 +125,9 @@ export default function Page() {
                   <th>Máquina</th>
                   <th className="num">Ciclos</th>
                   <th className="num">Mantenimiento (min)</th>
+                  <th className="num">Descanso (min)</th>
                   <th className="num">Paros (min)</th>
+                  <th className="num">Paros cortos (min)</th>
                   <th className="num">Disponibilidad</th>
                   <th className="num">Rendimiento</th>
                   <th className="num">Calidad</th>
@@ -138,9 +143,13 @@ export default function Page() {
                     <td>{s.machineCode}</td>
                     <td className="num">{s.cycles}</td>
                     <td className="num">{formatQuantity(s.maintenanceMinutes)}</td>
+                    <td className="num">{formatQuantity(s.breakMinutes)}</td>
                     <td className="num">
                       {formatQuantity(s.stoppageMinutes)}
                       {s.stoppagesWithoutReason > 0 ? <span className="badge tone-attention"> {s.stoppagesWithoutReason} sin razón</span> : null}
+                    </td>
+                    <td className="num" title={`Tiempo muerto de la máquina: ${s.deadMinutes} min`}>
+                      {formatQuantity(s.shortStopMinutes)}
                     </td>
                     <td className="num">{percent(s.availability)}</td>
                     <td className="num">{percent(s.performance)}</td>

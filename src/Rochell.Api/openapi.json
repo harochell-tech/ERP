@@ -65411,7 +65411,8 @@
           "oee",
           "lostUnits",
           "lostValue",
-          "reasons"
+          "reasons",
+          "shortStopMinutes"
         ],
         "type": "object",
         "properties": {
@@ -65493,6 +65494,11 @@
             "items": {
               "$ref": "#/components/schemas/StoppageReasonView"
             }
+          },
+          "shortStopMinutes": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
           }
         },
         "additionalProperties": false
@@ -77593,7 +77599,10 @@
           "lostUnits",
           "lostValue",
           "stoppagesWithoutReason",
-          "reasons"
+          "reasons",
+          "breakMinutes",
+          "deadMinutes",
+          "shortStopMinutes"
         ],
         "type": "object",
         "properties": {
@@ -77699,6 +77708,20 @@
             "items": {
               "$ref": "#/components/schemas/StoppageReasonView"
             }
+          },
+          "breakMinutes": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "deadMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "shortStopMinutes": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
           }
         },
         "additionalProperties": false

@@ -82,4 +82,54 @@ public sealed class EfficiencyTests(PostgresFixture postgres)
         Assert.Equal(0, efficiency.GetProperty("missingIdealCycles").GetArrayLength());
         Assert.Equal("0.4318", efficiency.GetProperty("machines")[0].GetProperty("oee").GetString());
     }
+
+    /// <summary>
+    /// MFG3-06 (E-MFG3-12…17): a shift scheduled 08:00–17:00 that started 15 minutes late (the portal lengthened it to 17:15), lunch
+    /// 13:00–14:00, the late start «arranque_tarde» 08:00–08:15, a stoppage 12:50–14:10 without reason (20 min outside lunch), one of
+    /// 8 minutes without reason at 16:00 and one at 17:05 after the scheduled end; the HMI's dead time is 50 minutes.
+    /// Planned 540 − 60 = 480; stoppages 15 + 20 + 8 = 43; running 437; availability 0.9104; short stoppages 50 − 43 = 7; one
+    /// stoppage of 10 minutes or more without a reason.
+    /// </summary>
+    [Fact]
+    public async Task Breaks_late_starts_and_the_scheduled_end_shape_planned_time()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await ProductionRunTests.SetupAsync(h);
+        await h.GrantAsync(h.CompanyId, IdentityConstants.DailyProcessUserId, "PROCESO_DIARIO");
+        await h.AdminRequireAsync(
+            $"""
+            INSERT INTO mfg.portal_machine VALUES ('{h.CompanyId}', 'planta2', '{s.Machine}', NULL, 1);
+            INSERT INTO mfg.portal_mould VALUES ('{h.CompanyId}', '6', '{s.Block}', 1);
+            INSERT INTO mfg.portal_shift VALUES ('{h.CompanyId}', 1, '{s.Day}', 1);
+            """);
+        var day = s.Today.AddDays(-1);
+        var d = day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var export = new PortalExport(
+            "now",
+            [new PortalShift("planta2", d, 1, $"{d} 08:00:00", $"{d} 17:15:00", true, 200, 0, [new PortalMould("6", 4, 200, 800)], 50, $"{d} 08:15:00", $"{d} 17:10:00", 0,
+                $"{d} 17:00:00", [new PortalBreak($"{d} 13:00:00", $"{d} 14:00:00")])],
+            [],
+            [new PortalStoppage(21, "planta2", $"{d} 08:00:00", $"{d} 08:15:00", 900, "arranque_tarde", null),
+             new PortalStoppage(22, "planta2", $"{d} 12:50:00", $"{d} 14:10:00", 1200, null, null),
+             new PortalStoppage(23, "planta2", $"{d} 16:00:00", $"{d} 16:08:00", 480, null, null),
+             new PortalStoppage(24, "planta2", $"{d} 17:05:00", $"{d} 17:12:00", 420, null, null)],
+            [],
+            []);
+        var service = await h.Sessions.StartServiceSessionAsync(IdentityConstants.DailyProcessUserId);
+        await PortalRunner.RunOnceAsync(h.Pipeline, new FakePortal(export), h.CompanyId, service, s.Today, 1, CancellationToken.None);
+        var efficiency = JsonDocument.Parse(await h.QueryAsync(new GetMachineEfficiency(h.CompanyId, s.Supervisor, day, day), new GetMachineEfficiencyHandler())).RootElement;
+        var shift = efficiency.GetProperty("shifts")[0];
+
+        Assert.Equal($"{d} 17:00:00|true", await h.ScalarAsync<string>(
+            "SELECT to_char(scheduled_to, 'YYYY-MM-DD HH24:MI:SS') || '|' || (breaks = CAST(@b AS jsonb))::text FROM mfg.portal_reading",
+            ("b", $"[{{\"inicio\": \"{d} 13:00:00\", \"fin\": \"{d} 14:00:00\"}}]")));
+        Assert.Equal(("480", "0", "60", "43", "437"), (shift.GetProperty("plannedMinutes").GetString(), shift.GetProperty("maintenanceMinutes").GetString(),
+            shift.GetProperty("breakMinutes").GetString(), shift.GetProperty("stoppageMinutes").GetString(), shift.GetProperty("runningMinutes").GetString()));
+        Assert.Equal("0.9104", shift.GetProperty("availability").GetString());
+        Assert.Equal((50, "7"), (shift.GetProperty("deadMinutes").GetInt32(), shift.GetProperty("shortStopMinutes").GetString()));
+        Assert.Equal(1, shift.GetProperty("stoppagesWithoutReason").GetInt32());
+        Assert.Equal("SIN_RAZON:2:28,arranque_tarde:1:15", string.Join(',', shift.GetProperty("reasons").EnumerateArray()
+            .Select(r => $"{r.GetProperty("reason").GetString()}:{r.GetProperty("count").GetInt32()}:{r.GetProperty("minutes").GetString()}")));
+        Assert.Equal("7", efficiency.GetProperty("machines")[0].GetProperty("shortStopMinutes").GetString());
+    }
 }
