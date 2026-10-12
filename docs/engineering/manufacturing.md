@@ -245,3 +245,16 @@ Migration 0104:
   count); `breakMinutes`; `deadMinutes` and `shortStopMinutes` = dead time − counted stoppages, never below 0 (E-MFG3-17, also per
   machine); `stoppagesWithoutReason` counts only stoppages of 10 minutes or more. Producción › Eficiencia shows «Descanso» and
   «Paros cortos»; the reason `arranque_tarde` reads «Arranque tarde».
+
+## MFG3-07 — the supervisor's page and the counted good blocks (E-MFG3-18…23; portal MFG3-07)
+
+- Portal (harochell-tech/portal, MFG3-07): `produccion/supervisor.php`, first in the menu, one section per machine with shifts that
+  day: the count of good blocks per size of the previous production day (up to a week back) beside the machine's count and the
+  broken ones, written to that day's report as `prod_confirmado_<size>`; today's production live; the day's stoppages with reason
+  and detail inline; today's broken blocks; the checklist; remarks; «Cerrar el día» (needs the reasons of stoppages of 10 minutes or
+  more, the previous day's count and today's broken blocks; a closed day is read only, an admin reopens it, both audited). Today and
+  yesterday can be worked, earlier days are read only. `inc/reporte_diario.php` reads and writes the daily report store.
+- `SyncPortalShift` (E-MFG3-20, replaces E-MFG3-00-3): with the report's `confirmado_curado` for a mould of a machine with a single
+  shift that day, the draft takes good = the count and fresh scrap = blocks − count (broken + curing loss); the figures are listed in
+  the warnings; a count above the machine's blocks, a day with two shifts, or a draft changed in Core leave the draft alone with a
+  warning. `Rochell:Portal:LookbackDays` defaults to 7 so a count made days later still arrives.

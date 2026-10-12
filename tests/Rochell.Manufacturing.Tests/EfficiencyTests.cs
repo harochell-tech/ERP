@@ -11,9 +11,10 @@ namespace Rochell.Manufacturing.Tests;
 /// <summary>
 /// MFG3-02 (E-MFG3-2…7, E-MFG3-01-1/4): yesterday's shift 07:00–19:00 of planta2 — 150 cycles of the 6" mould (600 blocks), a
 /// maintenance 14:00–15:00, a 40-minute mechanical stoppage, a 10-minute one without reason and one inside the maintenance — and the
-/// daily report's 30 broken blocks: the draft takes them as fresh scrap, and the efficiency is computed with an ideal cycle of 120 s.
+/// daily report's 30 broken blocks and the supervisor's next-morning count of 560 good 6" blocks: the draft takes good = 560 and fresh
+/// scrap = 600 − 560 = 40 (30 broken + 10 curing loss, E-MFG3-20), and the efficiency is computed with an ideal cycle of 120 s.
 /// Planned 720 − 60 = 660 min; running 660 − 50 = 610; availability 0.9242; performance 150 × 120 s = 300 min ÷ 610 = 0.4918; quality
-/// 570 ÷ 600 = 0.95; OEE 0.4318; lost blocks 50 min × 60 ÷ 120 s × 4 = 100.
+/// 560 ÷ 600 = 0.9333; OEE 0.4242; lost blocks 50 min × 60 ÷ 120 s × 4 = 100.
 /// </summary>
 [Collection(PostgresTestGroup.Name)]
 public sealed class EfficiencyTests(PostgresFixture postgres)
@@ -63,7 +64,7 @@ public sealed class EfficiencyTests(PostgresFixture postgres)
         var shift = efficiency.GetProperty("shifts")[0];
 
         Assert.Equal(ManufacturingErrors.IdealCycleInvalid, twice.Code);
-        Assert.Equal("PORTAL:570:0:30:DRAFT", await h.ScalarAsync<string>(
+        Assert.Equal("PORTAL:560:0:40:DRAFT", await h.ScalarAsync<string>(
             """
             SELECT s.source || ':' || s.good_units::numeric(18,0) || ':' || s.mix_scrap_units::numeric(18,0) || ':' || s.fresh_scrap_units::numeric(18,0) || ':' || s.status
             FROM mfg.shift_summary s JOIN mfg.production_run r ON r.run_id = s.run_id WHERE r.machine_id = @m AND s.status = 'DRAFT'
@@ -73,14 +74,15 @@ public sealed class EfficiencyTests(PostgresFixture postgres)
             await h.ScalarAsync<long>("SELECT count(*) FROM mfg.portal_daily_report")));
         Assert.Equal(("660", "60", "50", "610", 150), (shift.GetProperty("plannedMinutes").GetString(), shift.GetProperty("maintenanceMinutes").GetString(),
             shift.GetProperty("stoppageMinutes").GetString(), shift.GetProperty("runningMinutes").GetString(), shift.GetProperty("cycles").GetInt32()));
-        Assert.Equal(("0.9242", "0.4918", "0.95", "0.4318"), (shift.GetProperty("availability").GetString(), shift.GetProperty("performance").GetString(),
+        Assert.Equal(("0.9242", "0.4918", "0.9333", "0.4242"), (shift.GetProperty("availability").GetString(), shift.GetProperty("performance").GetString(),
             shift.GetProperty("quality").GetString(), shift.GetProperty("oee").GetString()));
         Assert.Equal("100", shift.GetProperty("lostUnits").GetString());
         Assert.Equal(0, shift.GetProperty("stoppagesWithoutReason").GetInt32()); // the later version gave it a reason
         Assert.Equal("fallo_mecanico:1:40,falta_material:1:10", string.Join(',', shift.GetProperty("reasons").EnumerateArray()
             .Select(r => $"{r.GetProperty("reason").GetString()}:{r.GetProperty("count").GetInt32()}:{r.GetProperty("minutes").GetString()}")));
         Assert.Equal(0, efficiency.GetProperty("missingIdealCycles").GetArrayLength());
-        Assert.Equal("0.4318", efficiency.GetProperty("machines")[0].GetProperty("oee").GetString());
+        Assert.Equal("0.4242", efficiency.GetProperty("machines")[0].GetProperty("oee").GetString());
+        Assert.Contains("merma de curado 10", await h.ScalarAsync<string>("SELECT warnings::text FROM mfg.portal_sync_state"), StringComparison.Ordinal);
     }
 
     /// <summary>
