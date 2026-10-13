@@ -52,8 +52,10 @@ function PortalInfo({ portal }: { portal: Detail["portal"] }) {
     portal.consumptionSource === "PENDING"
       ? portal.batchPlant
         ? "Sin consumo de dosificadora todavía: lleva el teórico y no se puede cerrar hasta que llegue o se escriba con motivo."
-        : "Sin consumo: la dosificadora de esta máquina no está conectada; escríbalo antes de cerrar."
-      : portal.consumptionSource === "BATCH_PLANT"
+        : "Turno en curso: al terminar toma el consumo teórico de la receta."
+      : portal.consumptionSource === "THEORETICAL"
+        ? "Consumo teórico de la receta (esta máquina no tiene dosificadora conectada): se puede cerrar así o escribir el real."
+        : portal.consumptionSource === "BATCH_PLANT"
         ? `Consumo enviado por la ${portal.batchPlant} al cierre del turno.`
         : `Consumo escrito a mano${portal.consumptionReason ? `: ${portal.consumptionReason}` : "."}`;
   return (

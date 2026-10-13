@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Security;
 using System.Text;
 using System.Text.Json.Nodes;
+using Rochell.Platform.Time;
 
 namespace Rochell.Tax.Ecf;
 
@@ -153,7 +154,8 @@ public sealed class SimulatedEcfProvider : IEcfProvider, IEcfReception
 
         var page = _received.Values
             .Where(d => d.Status == request.Status && d.CommercialResponse == request.CommercialResponse)
-            .Where(d => d.SignatureDate is { } at && DateOnly.FromDateTime(at.UtcDateTime) >= request.Start && DateOnly.FromDateTime(at.UtcDateTime) <= request.End)
+            // Dates in the business calendar (Santo Domingo), as Core asks for them; a UTC date breaks the window from 20:00 local.
+            .Where(d => d.SignatureDate is { } at && BusinessCalendar.DefaultBusinessDate(at.UtcDateTime) >= request.Start && BusinessCalendar.DefaultBusinessDate(at.UtcDateTime) <= request.End)
             .OrderByDescending(d => d.SignatureDate).ThenBy(d => d.Id, StringComparer.Ordinal)
             .Skip((request.Page - 1) * request.Limit).Take(request.Limit)
             .Select(d => d with { Xml = null })

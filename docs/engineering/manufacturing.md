@@ -143,7 +143,8 @@ E-MFG2-01-7); PROCESO_DIARIO gains `shift_summary:record` and `production_run:ma
 - `SyncPortalShift`: per machine and mould with blocks, the run's DRAFT summary (`source` PORTAL): units = blocks; batches = the post's
   batches split by units, else ⌈units ÷ units per batch⌉; consumption = the latest post of the batch plant once every machine of the
   group ended its shift, split by each run's theoretical consumption (the post's unit must be the pairing's; converted to the base
-  unit) — `BATCH_PLANT`; otherwise the theoretical as a `PENDING` placeholder. Theoretical = per batch ÷ units per batch × units
+  unit) — `BATCH_PLANT`; otherwise the theoretical as a `PENDING` placeholder — or, for a machine paired without a batch plant
+  whose shift ended, as `THEORETICAL`, which is posted (E-MFG2-15, migration 0120). Theoretical = per batch ÷ units per batch × units
   (E-MFG2-7). A posted summary, a MANUAL one or a draft a person changed (`edited_by`) is left alone; an unchanged draft is not
   rewritten. Locations come from `mfg.portal_material` (the group's batch plant first).
 - `RecordShiftSummary` (+ `ConsumptionReason`): on a PORTAL draft a person's save sets `edited_by`; the same consumption keeps its

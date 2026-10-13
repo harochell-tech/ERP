@@ -78,12 +78,14 @@ public sealed class PortalSchemaTests(PostgresFixture postgres)
 
         var noReading = await h.AppExecuteAsync($"UPDATE mfg.shift_summary SET source = 'PORTAL', version = version + 1 WHERE run_id = '{run}'");
         var pending = await h.AppExecuteAsync($"UPDATE mfg.shift_summary SET consumption_source = 'PENDING', version = version + 1 WHERE run_id = '{run}'");
+        var theoretical = await h.AppExecuteAsync($"UPDATE mfg.shift_summary SET consumption_source = 'THEORETICAL', version = version + 1 WHERE run_id = '{run}'");
         var version = await h.ScalarAsync<long>("SELECT version FROM mfg.shift_summary WHERE run_id = @r", ("r", run));
         var post = await Record.ExceptionAsync(() => h.RunAsync(new PostShiftSummary(h.CompanyId, s.Manager, "post", s.Plant, run, version), new PostShiftSummaryHandler()));
 
         Assert.True(recorded.GetProperty("version").GetInt64() >= 1);
         Assert.Equal("42501", noReading?.SqlState); // source is written once, on insert
         Assert.Null(pending);
+        Assert.Equal("23514", theoretical?.SqlState); // only a portal draft takes the recipe's theoretical (E-MFG2-15)
         Assert.Equal(ManufacturingErrors.ConsumptionPending, (post as Rochell.Platform.Commands.DomainException)?.Code); // MFG2-02; the CHECK stays behind it
         var direct = await h.AppExecuteAsync($"UPDATE mfg.shift_summary SET status = 'POSTED', version = version + 1 WHERE run_id = '{run}'");
         Assert.Equal("23514", direct?.SqlState);
