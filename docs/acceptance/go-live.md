@@ -12,14 +12,13 @@ not met carries an exception signed by the owner; those marked ★ admit none.
 | Outgoing mail | `MAIL_MODE=Live` (E-PROD-13) | Invoices by e-mail wait for the e-CF from Core |
 | e-CF gateway | `ECF_MODE=OFF`, no `ECF_SANDBOX_RNC` (E-PROD-11) | Invoices take the manual channel: issued in Core, e-CF in ADM Cloud, its e-NCF recorded in Core |
 | Fiscal reports | 606 and IT-1 filed from ADM Cloud (E-PROD-12) | Core's compared at each close |
-| Address and badge | `staging.industriasrochell.com.do`, `PARALELO` | `core.industriasrochell.com.do`, no badge (E-PROD-3 / 4), once the DNS record and the OIDC redirect URI exist |
+| Address and badge | `staging.industriasrochell.com.do`, `PARALELO` until the deploy of E-PROD-3 / 4 | `core.industriasrochell.com.do`, no badge; `staging.` redirects (`LEGACY_HOST`) |
 
 ## Open before 2026-11-01
 
 | # | What | Who |
 | --- | --- | --- |
 | 1 | Close the sandbox e-NCF ranges on Fiscal › Rangos e-NCF (E-PROD-11) | Controller |
-| 2 | DNS record `core.industriasrochell.com.do` and the redirect URI in the Google OIDC client (E-PROD-3) | Owner |
 | 3 | WORM retention in years and the bucket `industriasrochell-worm-prod` (E-PROD-6) | Owner, accountant |
 | 4 | Backup lifecycle 35 daily + 12 monthly in B2, restore test (E-PROD-7) | Owner |
 | 5 | Raw material reconciliation, date to be set (E-PROD-9) | Owner |

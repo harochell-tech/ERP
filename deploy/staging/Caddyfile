@@ -4,3 +4,10 @@
 	header Strict-Transport-Security "max-age=31536000"
 	reverse_proxy api:8080
 }
+
+# E-PROD-3: the former address keeps answering and sends every request, path and query included, to the current one, so the QR
+# already printed (delivery notes, certificates, rack labels) still open. Without LEGACY_HOST the block is a host nobody asks for.
+{$LEGACY_HOST:legacy.localhost} {
+	header Strict-Transport-Security "max-age=31536000"
+	redir https://{$STAGING_HOST}{uri} 308
+}

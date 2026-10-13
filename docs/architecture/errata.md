@@ -787,7 +787,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-ADM-2-7 | ADM-2 | One PR over every module, with tests that a superadmin prepares and approves alone (marked), and that everyone else keeps four eyes. |
 | E-PAR-1 | Parallel run | Staging stops being "synthetic data only" (E-B03, E-VS1-2): it becomes the parallel-run environment (E-VS1-4); Rochell runs next to ADM Cloud and is reconciled at each month's close. |
 | E-PAR-2 | Parallel run | Full reset of the staging database: first a backup of the current one to B2, then a new database, migrations and the real company (the synthetic company uses the real RNC, which cannot repeat). Executed only with the owner's explicit confirmation at the time. |
-| E-PAR-3 | Parallel run | The database is marked PRODUCTION (no synthetic users, no "Actuar como", official sources to activate fiscal rules, P-7); the top-bar badge reads "PARALELO"; the URL stays. |
+| E-PAR-3 | Parallel run | The database is marked PRODUCTION (no synthetic users, no "Actuar como", official sources to activate fiscal rules, P-7); the top-bar badge reads "PARALELO"; the URL stays. Ended by E-PROD-3 / 4. |
 | E-PAR-4 | Parallel run | Before real data: a backup restore test on another server (criterion E1), B2 backups verified encrypted, SSH access reviewed. |
 | E-PAR-5 | Parallel run | Real Google Workspace accounts; the owner with SUPERADMIN (E-ADM-2), the others with their roles as duties are delegated. |
 | E-PAR-6 | Parallel run | Initial load: company, named plants, chart of accounts, maps, policies and rules (A-01), fiscal rules with official sources, masters and opening balances; a separate slice for the missing opening balances (AR, AP, raw materials). |
