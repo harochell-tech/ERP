@@ -22,6 +22,7 @@ import {
   parameterLabelWithUnit,
   policyDiff,
   policyInForce,
+  policyUnit,
   toInputValue,
   validateParameter,
   type PolicyParameterDefinition,
@@ -140,6 +141,23 @@ describe("policy parameters by unit (E-UX2-1/2)", () => {
     expect(validateParameter(OPTION, "B")).toBeNull();
     expect(validateParameter(OPTION, "")).toMatch(/^Elija/);
     expect(validateParameter(OPTION, "C")).toMatch(/opciones/);
+  });
+});
+
+describe("a date parameter is stored as YYYYMMDD (VS3-02c, E-VS3-02c-3)", () => {
+  const DATE: PolicyParameterDefinition = { ...HOURS, paramCode: "raw_material_negative_until", minValue: "0", maxValue: "20991231", label: "Materia prima en negativo hasta", unit: "DATE", example: "30/11/2026" };
+
+  it("shows a date input, stores the day as a number and 0 when left empty", () => {
+    expect(policyUnit(DATE)).toBe("DATE");
+    expect(toInputValue(DATE, "20261130")).toBe("2026-11-30");
+    expect(toInputValue(DATE, "0")).toBe("");
+    expect(fromInputValue(DATE, "2026-11-30")).toBe("20261130");
+    expect(fromInputValue(DATE, "")).toBe("0");
+    expect(formatParameterValue(DATE, "20261130")).toBe("30/11/2026");
+    expect(formatParameterValue(DATE, "0")).toBe("No");
+    expect(validateParameter(DATE, "")).toBeNull();
+    expect(validateParameter(DATE, "2026-11-30")).toBeNull();
+    expect(validateParameter(DATE, "30/11/2026")).toBe("Elija una fecha o déjelo vacío.");
   });
 });
 

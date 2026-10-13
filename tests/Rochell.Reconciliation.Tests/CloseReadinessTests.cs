@@ -105,7 +105,7 @@ public sealed class CloseReadinessTests(PostgresFixture postgres)
         await h.RunAsync(h.Ping("event-only", occurredAt: LastMonth(h).ToDateTime(new TimeOnly(15, 0), DateTimeKind.Utc)), new PingHandler());
         var unsealed = await ReadinessAsync(h, controller, last);
         await new LedgerSealer(h.Sealer, h.Clock).SealAllAsync(CancellationToken.None);
-        await Verify(h, controller, "v", await EndsOnAsync(h, last), "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "INV-VALUE-GL", "VAL-RESIDUAL", "VALUE-GL-LINK", "ACC-EVIDENCE", "PRODUCTION-CLOSE-ORDER");
+        await Verify(h, controller, "v", await EndsOnAsync(h, last), "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "INV-VALUE-GL", "VAL-RESIDUAL", "VALUE-GL-LINK", "ACC-EVIDENCE", "PRODUCTION-CLOSE-ORDER", "MP-NEGATIVO");
         var sealedUp = await ReadinessAsync(h, controller, last);
         var running = await ReadinessAsync(h, controller, current);
         var missing = await Assert.ThrowsAsync<DomainException>(() => ReadinessAsync(h, controller, Guid.CreateVersion7()));

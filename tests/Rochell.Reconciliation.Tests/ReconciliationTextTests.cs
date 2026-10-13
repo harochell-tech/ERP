@@ -25,6 +25,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
         "AP_FOREIGN", // AP-GL counts foreign payables too (E-USD1-03-5)
         "IMPORT_CLEARING", "CUSTOMS_DECLARATION", // the role and the document kind IMPORT-CLEARING reads (E-USD1-06-4)
         "AWAITING_SERVICE", "IN_SERVICE", // the card statuses FA-GL reads (E-AF1-04-7)
+        "MATERIAL_SHORTFALL", // the bridge account MP-NEGATIVO reads (E-VS3-02c-4)
         "ECF_SENDING", "ECF_REJECTED", "ECF_ACTION", // the fiscal statuses FISC-DOC reads (E-VS4-03-1)
     };
 
@@ -88,7 +89,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
 
         Assert.Contains("CLASSIFICATION_MISSING", produced);   // from tax.report_606
         Assert.Contains("BANK_GL_DIFFERENCE", produced);       // from BankGl.cs
-        Assert.Equal(74, produced.Count); // + UNBILLED_AT_CLOSE (X1-01b); + FA_COST_DIFFERENCE, FA_ACCUMULATED_DIFFERENCE, FA_DEPRECIATION_MISSING (AF1-04); + AP_USD_DIFFERENCE, IMPORT_CLEARING_DIFFERENCE, IMPORT_SETTLEMENT_OVERDUE, FX_REVALUATION_MISSING (USD1-06); // + the three of TAX-606 for expense taxes (E-GAS-06-5); + the three of CASH-SALE (E-CF1-10, 11); // + the three of PROFORMA-ASIG (E-FIS1b-01-12)
+        Assert.Equal(77, produced.Count); // + the three of MP-NEGATIVO (E-VS3-02c-4); + UNBILLED_AT_CLOSE (X1-01b); + FA_COST_DIFFERENCE, FA_ACCUMULATED_DIFFERENCE, FA_DEPRECIATION_MISSING (AF1-04); + AP_USD_DIFFERENCE, IMPORT_CLEARING_DIFFERENCE, IMPORT_SETTLEMENT_OVERDUE, FX_REVALUATION_MISSING (USD1-06); // + the three of TAX-606 for expense taxes (E-GAS-06-5); + the three of CASH-SALE (E-CF1-10, 11); // + the three of PROFORMA-ASIG (E-FIS1b-01-12)
         Assert.Equal(produced, catalogued);                     // none missing, none stale
         Assert.Equal(Reconciliations.All.Order(StringComparer.Ordinal), definitions.Select(d => d.GetProperty("reconCode").GetString()));
         Assert.All(definitions, d => Assert.False(string.IsNullOrWhiteSpace(d.GetProperty("name").GetString())));

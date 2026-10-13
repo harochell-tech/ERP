@@ -274,6 +274,13 @@ const TASKS: readonly Task[] = [
     countPermission: "production:read",
     count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/maintenance-tasks", { path: { companyId } })).dueSoon,
   },
+  // VS3-02c (E-VS3-02c-4): raw material consumed without stock and not yet covered.
+  {
+    href: "/produccion/materia-prima/",
+    label: "Materia prima en negativo por regularizar",
+    permission: "production:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/material-shortfalls", { path: { companyId } })).openCount,
+  },
   {
     href: "/produccion/eficiencia/",
     label: "Paros de 10 min o más sin razón esta semana",

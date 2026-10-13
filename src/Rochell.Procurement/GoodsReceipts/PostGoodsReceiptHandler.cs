@@ -161,8 +161,11 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
             ("occurred", occurredAt)).ConfigureAwait(false);
 
         var resultLines = new List<object>();
+        var settlements = new List<ShortfallSettlement>();
+        var settle = await MaterialShortfalls.RuleActiveAsync(context, MaterialShortfalls.SettleRule, plan.PostingDate, cancellationToken).ConfigureAwait(false);
         foreach (var r in received)
         {
+            await MaterialShortfalls.LockAsync(context, command.LocationId, r.Line.ItemId, cancellationToken).ConfigureAwait(false);
             var lotId = await _inventory.CreateLotAsync(context, r.Line.ItemId, header.PartyId, r.Input.SupplierLotNumber, eventId, businessDate, cancellationToken).ConfigureAwait(false);
             await Sql.ExecuteAsync(
                 context.Connection,
@@ -183,6 +186,12 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
                 new MovementSource(eventId, "GOODS_RECEIPT", grId, r.GrLineId),
                 new MovementDates(occurredAt, businessDate, plan.PostingDate),
                 cancellationToken).ConfigureAwait(false);
+
+            // E-VS3-02c-2: what entered covers first what production consumed without stock in this location (P-48 below).
+            if (settle && await MaterialShortfalls.ReserveAsync(context, _inventory, command.LocationId, r.Line.ItemId, lotId, r.BaseQuantity, cancellationToken).ConfigureAwait(false) is { } settlement)
+            {
+                settlements.Add(settlement);
+            }
 
             await Sql.ExecuteAsync(
                 context.Connection,
@@ -230,9 +239,18 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
         }
 
         var journal = await _engine.WriteAsync(context, plan, eventId, cancellationToken).ConfigureAwait(false);
+        Guid? settlementJournalId = null;
+        if (settlements.Count > 0)
+        {
+            settlementJournalId = await ShortfallSettlementPosting.PostAsync(
+                context, _engine, _inventory, settlements, header.PlantId, Aggregate, grId, 1, "GOODS_RECEIPT", grId, occurredAt, businessDate, cancellationToken).ConfigureAwait(false);
+        }
+
         return JsonSerializer.Serialize(new
         {
             goodsReceiptId = grId,
+            settlementJournalId,
+            shortfallsCovered = settlements.Sum(x => x.Shares.Count),
             grNo,
             purchaseOrderStatus = newStatus,
             journalId = journal.JournalId,

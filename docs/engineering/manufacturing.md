@@ -260,3 +260,24 @@ Migration 0104:
   warning. `Rochell:Portal:LookbackDays` defaults to 7 so a count made days later still arrives.
 - Portal MFG3-08 (E-MFG3-24…27): role «supervisor» limited to the Supervisor page; blind count corrected only by an admin; Checklist
   retired into Supervisor; Reporte de paros read only.
+
+## VS3-02c — raw material consumed without stock (migration 0119, E-VS3-02b-11…14, E-VS3-02c-1…5)
+
+- `inv.material_shortfall` (per location and material: quantity, standard price, value, run, what is settled, status OPEN / SETTLED /
+  CANCELLED, justification) and `inv.material_shortfall_settlement` (append-only); `Rochell.Inventory.MaterialShortfalls` keeps the
+  inventory side and serializes each location × material with an advisory lock.
+- `PostShiftSummary`: a material short in its location is issued as far as the stock goes; the rest is a shortfall at the run's standard
+  price (`md.standard_cost_material`) when the PRODUCTION policy's `raw_material_negative_until` (YYYYMMDD; 0 = off) covers the run's
+  date, otherwise `INSUFFICIENT_STOCK` as before. Its own event `MaterialShortfallRecorded` and journal P-47 (Dr WIP / Cr
+  MATERIAL_SHORTFALL). `ReverseShiftSummary` cancels open shortfalls with their journal and refuses (`MATERIAL_SHORTFALL_SETTLED`) once
+  material covered part of them.
+- `PostGoodsReceipt` and `PostOpeningInventory` (raw material lines): what enters a location covers its oldest open shortfalls first by
+  issuing from the new lot (PRODUCTION_ISSUE, document MATERIAL_SHORTFALL) at the area's moving average; event
+  `MaterialShortfallSettled`, journal P-48 (Dr MATERIAL_SHORTFALL at standard / Cr RAW_MATERIAL at real cost / ± MATERIAL_PRICE_VARIANCE).
+  While P-48 has no ACTIVE version the receipt posts and the shortfall waits.
+- Opening: raw material lines (not in CURADO / TRANSITO) at the standard price of the latest ACTIVE standard cost that uses the material;
+  OPEN-INV v2 (from 2026-10-01) adds `OPENINV-DR-RM`.
+- Reconciliation MP-NEGATIVO (blocks INV-MOV): each open shortfall up to the cutoff is an error unless justified (then a warning), and
+  the bridge account must equal what is open at standard. `JustifyMaterialShortfall` (`shift_summary:post`), `ListMaterialShortfalls`
+  (`production:read`, balances = stock − open). Screen Producción › Materia prima en negativo, Inicio counter, the policy parameter as a
+  date in Configuración › Políticas. 307 commands.

@@ -29,7 +29,7 @@ public static class Reconciliations
         ["AP-GL", "INV-VALUE-GL", "INV-QTY-BALANCE", "INV-VALUE-BALANCE", "VAL-RESIDUAL", "ACC-EVIDENCE", "VALUE-GL-LINK", "GRNI-AGING", "BANK-GL", "PAY-APPL",
          "MANUAL-EVIDENCE", "TB-BALANCED", "STRUCT-COVERAGE", "MIGRATION-CLEARING", "AR-GL", "CONTRACT-ASSET", "RECEIPT-APPL", "FISC-DOC", "DELIVERY-OPEN",
          "WIP-GL", "WIP-OPEN", "SHIFT-OPEN", "USAGE-TOLERANCE", "CURING-OVERDUE", "PRODUCTION-CLOSE-ORDER",
-         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG", "CASH-SALE", "IMPORT-CLEARING", "FX-REVAL", "FA-GL"];
+         "AUTH-CONSUMPTION", "EXEMPT-WITHOUT-AUTH", "AUTH-EXPIRY", "TAX-606", "CONTROLS-WAIVED", "PROFORMA-ASIG", "CASH-SALE", "IMPORT-CLEARING", "FX-REVAL", "FA-GL", "MP-NEGATIVO"];
 
     private const string Findings = "SELECT match_key, value_a, value_b, classification, severity, component FROM (";
 
@@ -670,6 +670,27 @@ public static class Reconciliations
             FROM missing m) f
             """,
             null),
+        ["MP-NEGATIVO"] = (
+            Findings + """
+            -- E-VS3-02c-4: raw material consumed without stock and not yet covered, as of the cutoff: an error that blocks INV-MOV unless it is
+            -- justified (then a warning); and the bridge account against what is open at standard price.
+            SELECT 'MP ' || i.code || ' ' || l.code || ' ' || to_char(s.business_date, 'YYYY-MM-DD') AS match_key, s.value - s.settled_value AS value_a,
+                   s.qty - s.settled_qty AS value_b,
+                   CASE WHEN s.justification IS NULL THEN 'MATERIAL_SHORTFALL_OPEN' ELSE 'MATERIAL_SHORTFALL_JUSTIFIED' END AS classification,
+                   CASE WHEN s.justification IS NULL THEN 'ERROR' ELSE 'WARNING' END AS severity,
+                   CASE WHEN s.justification IS NULL THEN 'INV-MOV' END AS component
+            FROM inv.material_shortfall s JOIN md.item i ON i.item_id = s.item_id JOIN md.location l ON l.location_id = s.location_id
+            WHERE s.company_id = @c AND s.status = 'OPEN' AND s.business_date <= @cutoff
+            UNION ALL
+            SELECT 'cuenta puente', x.a, x.b, 'MATERIAL_SHORTFALL_GL_DIFFERENCE', 'ERROR', 'INV-MOV'
+            FROM (SELECT (SELECT coalesce(sum(value - settled_value), 0) FROM inv.material_shortfall WHERE company_id = @c AND status = 'OPEN') AS a,
+                         (SELECT coalesce(sum(credit - debit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role = 'MATERIAL_SHORTFALL') AS b) x
+            WHERE x.a <> x.b) f
+            """,
+            """
+            SELECT (SELECT coalesce(sum(value - settled_value), 0) FROM inv.material_shortfall WHERE company_id = @c AND status = 'OPEN'),
+                   (SELECT coalesce(sum(credit - debit), 0) FROM fin.gl_entry WHERE company_id = @c AND account_role = 'MATERIAL_SHORTFALL')
+            """),
         ["FX-REVAL"] = (
             Findings + """
             -- E-USD1-06-4: each month ended before the cutoff that closed with a USD payable or bank balance and has no POSTED revaluation.

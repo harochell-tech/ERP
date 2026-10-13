@@ -19,6 +19,8 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
 
     private sealed record StockLot(Guid LotId, string LotCode, decimal Quantity);
 
+    private sealed record Shortfall(Runs.Line Line, decimal Qty, decimal StdPrice, decimal Value, Guid ShortfallId);
+
     public async Task<string> HandleAsync(PostShiftSummary command, CommandContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -71,10 +73,14 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
 
         var lines = await Runs.LinesAsync(context, summary.SummaryId, cancellationToken).ConfigureAwait(false);
 
-        // E-MFG1-03-4: lots FIFO by lot code in the chosen location; nothing is written when a material falls short.
+        // E-MFG1-03-4: lots FIFO by lot code in the chosen location; nothing is written when a material falls short — unless the PRODUCTION
+        // policy lets raw material go negative on the run's date (E-VS3-02c-1/3): then the missing part is a shortfall at standard price.
         var issues = new List<(Runs.Line Line, StockLot Lot, decimal Qty, IssueReservation Reservation, Guid ValueEntryId)>();
+        var shortfalls = new List<Shortfall>();
+        bool? negativeAllowed = null;
         foreach (var line in lines.OrderBy(l => l.LocationId).ThenBy(l => l.MaterialItemId))
         {
+            await MaterialShortfalls.LockAsync(context, line.LocationId, line.MaterialItemId, cancellationToken).ConfigureAwait(false);
             var lots = await Reading.ListAsync(
                 context.Connection,
                 context.Transaction,
@@ -89,12 +95,25 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
                 ("c", context.CompanyId),
                 ("loc", line.LocationId),
                 ("i", line.MaterialItemId)).ConfigureAwait(false);
-            if (lots.Sum(l => l.Quantity) < line.Qty)
+            var missing = line.Qty - lots.Sum(l => l.Quantity);
+            if (missing > 0m)
             {
-                throw new DomainException(InventoryErrors.InsufficientStock, $"Not enough {line.MaterialCode} in the location: {Runs.Qty(lots.Sum(l => l.Quantity))} available, {Runs.Qty(line.Qty)} consumed.");
+                negativeAllowed ??= await MaterialShortfalls.AllowedAsync(context, run.BusinessDate, cancellationToken).ConfigureAwait(false);
+                var stdPrice = negativeAllowed.Value
+                    ? await MfgSql.ScalarAsync<decimal?>(
+                        context, "SELECT std_price FROM md.standard_cost_material WHERE cost_version_id = @v AND material_item_id = @m", cancellationToken,
+                        ("v", run.CostVersionId), ("m", line.MaterialItemId)).ConfigureAwait(false)
+                    : null;
+                var value = stdPrice is { } p ? decimal.Round(missing * p, 2, MidpointRounding.AwayFromZero) : 0m;
+                if (stdPrice is null || value <= 0m)
+                {
+                    throw new DomainException(InventoryErrors.InsufficientStock, $"Not enough {line.MaterialCode} in the location: {Runs.Qty(lots.Sum(l => l.Quantity))} available, {Runs.Qty(line.Qty)} consumed.");
+                }
+
+                shortfalls.Add(new Shortfall(line, missing, stdPrice.Value, value, context.Ids.NewId()));
             }
 
-            var remaining = line.Qty;
+            var remaining = Math.Min(line.Qty, lots.Sum(l => l.Quantity));
             foreach (var lot in lots)
             {
                 if (remaining == 0m)
@@ -121,7 +140,7 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
         var occurredAt = context.Clock.UtcNow;
         var receiptValueEntryId = context.Ids.NewId();
 
-        var materialPlan = await _engine.PrepareAsync(
+        var materialPlan = issues.Count == 0 ? null : await _engine.PrepareAsync(
             context,
             new PostingRequest(
                 Runs.MaterialRule,
@@ -144,7 +163,29 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
                     };
                 }).ToList()),
             cancellationToken).ConfigureAwait(false);
-        if (materialPlan.PostingDate != run.BusinessDate)
+        var shortfallPlan = shortfalls.Count == 0 ? null : await _engine.PrepareAsync(
+            context,
+            new PostingRequest(
+                MaterialShortfalls.RecordRule,
+                run.BusinessDate,
+                occurredAt,
+                shortfalls.SelectMany(f =>
+                {
+                    var inputs = new Dictionary<string, string>
+                    {
+                        ["material_code"] = f.Line.MaterialCode,
+                        ["run_no"] = run.RunNo,
+                        ["quantity"] = Runs.Qty(f.Qty),
+                        ["std_price"] = f.StdPrice.ToString(CultureInfo.InvariantCulture),
+                    };
+                    return new[]
+                    {
+                        new PostingLineInput("P47-DR-WIP", "shortfall_value", f.Value, PlantId: run.PlantId, ItemId: run.ItemId, SubledgerRef: run.CollectorId, Inputs: inputs),
+                        new PostingLineInput("P47-CR-SHORT", "shortfall_value", f.Value, PlantId: run.PlantId, ItemId: f.Line.MaterialItemId, Inputs: inputs),
+                    };
+                }).ToList()),
+            cancellationToken).ConfigureAwait(false);
+        if ((materialPlan is not null && materialPlan.PostingDate != run.BusinessDate) || (shortfallPlan is not null && shortfallPlan.PostingDate != run.BusinessDate))
         {
             throw new DomainException(ManufacturingErrors.PeriodClosed, $"INV-MOV is closed for {run.BusinessDate:yyyy-MM-dd}; production is posted only on its business date (E-MFG1-03-8).");
         }
@@ -188,6 +229,7 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
                     runId = run.RunId,
                     collectorId = run.CollectorId,
                     total = Runs.Money(consumptionValue),
+                    shortfalls = shortfalls.Select(f => new { materialItemId = f.Line.MaterialItemId, quantity = Runs.Qty(f.Qty), value = Runs.Money(f.Value) }),
                     issues = issues.Select(i => new { materialItemId = i.Line.MaterialItemId, lotId = i.Lot.LotId, quantity = Runs.Qty(i.Qty), value = Runs.Money(i.Reservation.Value) }),
                 }),
                 Publish: true,
@@ -229,7 +271,7 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
         await context.AppendStateAsync(Runs.SummaryAggregate, summary.SummaryId, "DOCUMENT", "DRAFT", "POSTED", CommandType, materialEvent, cancellationToken).ConfigureAwait(false);
         await Runs.SetRunStatusAsync(context, run, "COMPLETED", CommandType, receiptEvent, cancellationToken).ConfigureAwait(false);
 
-        var dates = new MovementDates(occurredAt, run.BusinessDate, materialPlan.PostingDate);
+        var dates = new MovementDates(occurredAt, run.BusinessDate, run.BusinessDate);
         foreach (var issue in issues)
         {
             await _inventory.WriteIssueAsync(
@@ -300,7 +342,46 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
                 ("u", Math.Min(left, info.UnitsPerRack))).ConfigureAwait(false);
         }
 
-        var materialJournal = await _engine.WriteAsync(context, materialPlan, materialEvent, cancellationToken).ConfigureAwait(false);
+        // E-VS3-02c-1: the shortfalls and their journal (P-47), an event of their own so a reversal finds it.
+        Guid? shortfallJournalId = null;
+        if (shortfallPlan is not null)
+        {
+            var shortfallEvent = await context.AppendEventAsync(
+                new EventDraft(
+                    "MaterialShortfallRecorded",
+                    1,
+                    Runs.SummaryAggregate,
+                    summary.SummaryId,
+                    await MfgSql.NextEventVersionAsync(context, Runs.SummaryAggregate, summary.SummaryId, cancellationToken).ConfigureAwait(false),
+                    JsonSerializer.Serialize(new
+                    {
+                        summaryId = summary.SummaryId,
+                        runId = run.RunId,
+                        shortfalls = shortfalls.Select(f => new
+                        {
+                            shortfallId = f.ShortfallId,
+                            materialItemId = f.Line.MaterialItemId,
+                            locationId = f.Line.LocationId,
+                            quantity = Runs.Qty(f.Qty),
+                            stdPrice = f.StdPrice.ToString(CultureInfo.InvariantCulture),
+                            value = Runs.Money(f.Value),
+                        }),
+                    }),
+                    Publish: true,
+                    OccurredAt: occurredAt,
+                    BusinessDate: run.BusinessDate),
+                cancellationToken).ConfigureAwait(false);
+            foreach (var f in shortfalls)
+            {
+                await MaterialShortfalls.RecordAsync(
+                    context, f.ShortfallId, run.PlantId, f.Line.LocationId, f.Line.MaterialItemId, "SHIFT_SUMMARY", summary.SummaryId, run.RunId, run.BusinessDate, f.Qty, f.StdPrice, f.Value,
+                    shortfallEvent, cancellationToken).ConfigureAwait(false);
+            }
+
+            shortfallJournalId = (await _engine.WriteAsync(context, shortfallPlan, shortfallEvent, cancellationToken).ConfigureAwait(false)).JournalId;
+        }
+
+        var materialJournal = materialPlan is null ? null : await _engine.WriteAsync(context, materialPlan, materialEvent, cancellationToken).ConfigureAwait(false);
         var receiptJournal = await _engine.WriteAsync(context, receiptPlan, receiptEvent, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new
         {
@@ -313,7 +394,9 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
             racks,
             consumptionValue = Runs.Money(consumptionValue),
             standardValue = Runs.Money(standardValue),
-            materialJournalId = materialJournal.JournalId,
+            materialJournalId = materialJournal?.JournalId,
+            shortfallJournalId,
+            shortfalls = shortfalls.Select(f => new { materialCode = f.Line.MaterialCode, quantity = Runs.Qty(f.Qty), value = Runs.Money(f.Value) }),
             receiptJournalId = receiptJournal.JournalId,
         });
     }
@@ -425,8 +508,29 @@ public sealed class ReverseShiftSummaryHandler : ICommandHandler<ReverseShiftSum
             await _inventory.LockStockAsync(context, issue.LocationId, issue.MaterialItemId, issue.LotId, cancellationToken).ConfigureAwait(false);
         }
 
+        // E-VS3-02c-2: shortfalls not yet covered are cancelled with their journal; one already covered stops the reversal.
+        var shortfalls = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT shortfall_id, location_id, item_id, settled_qty, event_id FROM inv.material_shortfall WHERE company_id = @c AND source_id = @s AND status <> 'CANCELLED' ORDER BY location_id, item_id",
+            r => (Id: r.GetGuid(0), Location: r.GetGuid(1), Item: r.GetGuid(2), Settled: r.GetDecimal(3), Event: r.GetGuid(4)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("s", summary.SummaryId)).ConfigureAwait(false);
+        foreach (var f in shortfalls)
+        {
+            await MaterialShortfalls.LockAsync(context, f.Location, f.Item, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (shortfalls.Any(f => f.Settled > 0m))
+        {
+            throw new DomainException(ManufacturingErrors.ShortfallSettled, "Material that entered already covered part of what this summary consumed without stock; it cannot be reversed (E-VS3-02c-2).");
+        }
+
         var plans = new List<ReversalPlan>();
-        foreach (var eventId in new[] { summary.MaterialEventId!.Value, summary.ReceiptEventId!.Value })
+        var events = new List<Guid> { summary.MaterialEventId!.Value, summary.ReceiptEventId!.Value };
+        events.AddRange(shortfalls.Select(f => f.Event).Distinct());
+        foreach (var eventId in events)
         {
             var journal = await MfgSql.ScalarAsync<Guid?>(
                 context,
@@ -437,9 +541,14 @@ public sealed class ReverseShiftSummaryHandler : ICommandHandler<ReverseShiftSum
                 """,
                 cancellationToken,
                 ("c", context.CompanyId),
-                ("e", eventId)).ConfigureAwait(false)
-                ?? throw new DomainException(ManufacturingErrors.InvalidState, "The summary has no live journal.");
-            var plan = await _engine.PrepareReversalAsync(context, journal, run.BusinessDate, cancellationToken).ConfigureAwait(false);
+                ("e", eventId)).ConfigureAwait(false);
+            if (journal is null && eventId == summary.MaterialEventId && issues.Count == 0)
+            {
+                continue; // everything was consumed without stock: P-08 wrote no journal
+            }
+
+            var plan = await _engine.PrepareReversalAsync(
+                context, journal ?? throw new DomainException(ManufacturingErrors.InvalidState, "The summary has no live journal."), run.BusinessDate, cancellationToken).ConfigureAwait(false);
             if (plan.PostingDate != run.BusinessDate)
             {
                 throw new DomainException(ManufacturingErrors.PeriodClosed, $"INV-MOV is closed for {run.BusinessDate:yyyy-MM-dd}; the summary can no longer be reversed.");
@@ -475,6 +584,12 @@ public sealed class ReverseShiftSummaryHandler : ICommandHandler<ReverseShiftSum
         await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE mfg.fg_lot SET status = 'VOIDED', version = version + 1 WHERE lot_id = @l", cancellationToken, ("l", lot.LotId)).ConfigureAwait(false);
         await context.AppendStateAsync(Runs.LotAggregate, lot.LotId, "DOCUMENT", "CURING", "VOIDED", CommandType, reversedEvent, cancellationToken, reason).ConfigureAwait(false);
         await Sql.ExecuteAsync(context.Connection, context.Transaction, "UPDATE mfg.rack SET status = 'VOIDED' WHERE lot_id = @l", cancellationToken, ("l", lot.LotId)).ConfigureAwait(false);
+        foreach (var f in shortfalls)
+        {
+            await Sql.ExecuteAsync(
+                context.Connection, context.Transaction, "UPDATE inv.material_shortfall SET status = 'CANCELLED', version = version + 1 WHERE shortfall_id = @s", cancellationToken, ("s", f.Id))
+                .ConfigureAwait(false);
+        }
         await Runs.SetRunStatusAsync(context, run, "IN_PROGRESS", CommandType, reversedEvent, cancellationToken, reason).ConfigureAwait(false);
 
         var dates = new MovementDates(occurredAt, run.BusinessDate, run.BusinessDate);

@@ -381,6 +381,7 @@ public static class CommandEndpoints
         // MFG2-02 (E-MFG2-1/6): the daily process's steps reading the machines' portal.
         manufacturing.MapCommand<ImportPortalData, ImportPortalDataHandler>();
         manufacturing.MapCommand<SetIdealCycle, SetIdealCycleHandler>(); // MFG3-02 (E-MFG3-5)
+        manufacturing.MapCommand<Rochell.Manufacturing.Shortfalls.JustifyMaterialShortfall, Rochell.Manufacturing.Shortfalls.JustifyMaterialShortfallHandler>(); // VS3-02c (E-VS3-02c-4)
         manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.DefineMaintenanceTask, Rochell.Manufacturing.Maintenance.DefineMaintenanceTaskHandler>(); // MFG3-03 (E-MFG3-8…10)
         manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.UpdateMaintenanceTask, Rochell.Manufacturing.Maintenance.UpdateMaintenanceTaskHandler>();
         manufacturing.MapCommand<Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatus, Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatusHandler>();
@@ -482,7 +483,7 @@ public static class CommandEndpoints
         typeof(ReverseReceiptHandler), typeof(RecordCustomerWithholdingHandler), typeof(ReverseCustomerWithholdingHandler),
         typeof(CreateMachineHandler), typeof(RenameMachineHandler), typeof(SetMachineStatusHandler), typeof(DefineShiftHandler), typeof(UpdateShiftTimesHandler), typeof(SetShiftStatusHandler),
         typeof(PrepareRecipeHandler), typeof(ApproveRecipeHandler),
-        typeof(ImportPortalDataHandler), typeof(SetIdealCycleHandler), typeof(Rochell.Manufacturing.Maintenance.DefineMaintenanceTaskHandler),
+        typeof(ImportPortalDataHandler), typeof(SetIdealCycleHandler), typeof(Rochell.Manufacturing.Shortfalls.JustifyMaterialShortfallHandler), typeof(Rochell.Manufacturing.Maintenance.DefineMaintenanceTaskHandler),
         typeof(Rochell.Manufacturing.Maintenance.UpdateMaintenanceTaskHandler), typeof(Rochell.Manufacturing.Maintenance.SetMaintenanceTaskStatusHandler),
         typeof(Rochell.Manufacturing.Maintenance.RecordMaintenanceDoneHandler), typeof(Rochell.Manufacturing.Maintenance.PublishMaintenanceTasksHandler), typeof(SyncPortalShiftHandler), typeof(SetPortalMachineHandler), typeof(SetPortalMouldHandler), typeof(SetPortalShiftHandler),
         typeof(SetPortalMaterialHandler), typeof(RemovePortalPairingHandler),
