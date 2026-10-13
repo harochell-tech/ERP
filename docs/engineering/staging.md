@@ -215,6 +215,20 @@ and TRANSITO, the 2026 periods, the registry of 2026-09-19 and the owner as SUPE
    `import-rnc-registry`.
 7. Sign in; Configuración › Centro de configuración shows the 19 setup steps pending.
 
+## Go-live (E-PROD-1…13)
+
+Since 2026-10-12 this server is the system of record (E-PROD-1), on the same database (E-PROD-2) and under the same names
+(E-PROD-5). State and open points: `docs/acceptance/go-live.md`.
+
+- Mail is **Live** (`MAIL_MODE=Live`, E-PROD-13).
+- The e-CF gateway is **OFF** (`ECF_MODE=OFF`, `ECF_SANDBOX_RNC` deleted, E-PROD-11): ADM Cloud issues the e-CF and Core records
+  the invoice through the manual channel. The sandbox ranges are closed on Fiscal › Rangos e-NCF; the contract test below runs
+  without the gateway. Switching to PRODUCTION follows `docs/acceptance/vs4.md` › Going to Production.
+- Address and badge change together (E-PROD-3 / 4), after the DNS record of `core.industriasrochell.com.do` and its redirect URI
+  `https://core.industriasrochell.com.do/api/v1/auth/callback` in the Google OIDC client: without `Rochell__EnvironmentBadge` a
+  `staging.` host shows STAGING.
+- WORM retention and the backup lifecycle below are still the staging values (7 days) until E-PROD-6 / 7.
+
 ## Outgoing mail (MAIL-03, E-MAIL-01-3 / E-MAIL-01-4)
 
 The compose file runs `pdf` (Gotenberg with Chromium, internal network only) and passes the mail settings to the API. Mail stays
