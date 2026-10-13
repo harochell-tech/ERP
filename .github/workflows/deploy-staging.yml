@@ -50,6 +50,8 @@ jobs:
         env:
           TARGET: ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}
           STAGING_HOST: ${{ vars.STAGING_HOST }}
+          # E-PROD-3: optional. The former address, which Caddy redirects to STAGING_HOST.
+          LEGACY_HOST: ${{ vars.LEGACY_HOST }}
           WORKSPACE_DOMAIN: ${{ vars.WORKSPACE_DOMAIN }}
           DEPLOY_DB_PASSWORD: ${{ secrets.DEPLOY_DB_PASSWORD }}
           APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
@@ -94,7 +96,7 @@ jobs:
               printf '%s=%s\n' "${name}" "${value}"
             done
             # Optional variables: written only when the environment defines them.
-            for name in MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC ECF_MODE ECF_BASE_URL ECF_SANDBOX_RNC PORTAL_URL EVIDENCE_BUCKET; do
+            for name in LEGACY_HOST MAIL_MODE MAIL_FROM MAIL_REDIRECT_TO MAIL_ARCHIVE_BCC ECF_MODE ECF_BASE_URL ECF_SANDBOX_RNC PORTAL_URL EVIDENCE_BUCKET; do
               value="${!name}"
               if test -n "${value}"; then printf '%s=%s\n' "${name}" "${value}"; fi
             done

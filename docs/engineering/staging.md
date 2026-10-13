@@ -224,9 +224,13 @@ Since 2026-10-12 this server is the system of record (E-PROD-1), on the same dat
 - The e-CF gateway is **OFF** (`ECF_MODE=OFF`, `ECF_SANDBOX_RNC` deleted, E-PROD-11): ADM Cloud issues the e-CF and Core records
   the invoice through the manual channel. The sandbox ranges are closed on Fiscal › Rangos e-NCF; the contract test below runs
   without the gateway. Switching to PRODUCTION follows `docs/acceptance/vs4.md` › Going to Production.
-- Address and badge change together (E-PROD-3 / 4), after the DNS record of `core.industriasrochell.com.do` and its redirect URI
-  `https://core.industriasrochell.com.do/api/v1/auth/callback` in the Google OIDC client: without `Rochell__EnvironmentBadge` a
-  `staging.` host shows STAGING.
+- The address is `https://core.industriasrochell.com.do` (E-PROD-3): the variables `STAGING_HOST=core.industriasrochell.com.do`
+  and `LEGACY_HOST=staging.industriasrochell.com.do` of the GitHub Environment `staging`. Caddy answers the former address with a
+  308 to the same path and query on the current one, so the QR already printed still open; both names need their DNS record
+  (DNS only, no proxy: the certificate is validated on 443) and the Google OIDC client the redirect URI
+  `https://core.industriasrochell.com.do/api/v1/auth/callback`. Sessions belong to a host, so everyone signs in again once.
+- No badge (E-PROD-4): `Rochell__EnvironmentBadge` is gone from `compose.yaml`, and the web shows none on a host that is neither
+  `staging.` nor local.
 - WORM retention and the backup lifecycle below are still the staging values (7 days) until E-PROD-6 / 7.
 
 ## Outgoing mail (MAIL-03, E-MAIL-01-3 / E-MAIL-01-4)
