@@ -39,6 +39,11 @@ public sealed class SyncPortalShiftHandler : ICommandHandler<SyncPortalShift>
         var group = command.Group.Trim().ToLowerInvariant();
         var warnings = new List<string>();
         var label = $"{command.Date:yyyy-MM-dd} turno {command.ShiftNo}";
+        if (await PortalCutoff.BeforeAsync(context, command.Date, cancellationToken).ConfigureAwait(false))
+        {
+            return Result(0, 0, 0, [], warnings);
+        }
+
         var machines = await Reading.ListAsync(
             context.Connection,
             context.Transaction,

@@ -1600,6 +1600,7 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-COST-6 | COST-01 | Until COST-01 is deployed production runs on a provisional cost with the allowance inside the conversion; once deployed the cost is prepared again with the two apart and the same total, so nothing is revalued. |
 | E-MFG2-16 | MFG2-04 | When Core cannot open a run for the portal's production (no ACTIVE recipe on the machine, no ACTIVE standard cost with breakdown, machine or shift inactive) the reason is kept with the other notices of Producción › Portal de máquinas, in Spanish, naming the machine, the product and the day. Approved 2026-10-13. |
 | E-MFG2-17 | MFG2-04 | A standard cost written by hand for a product with an ACTIVE recipe is warned about where it is prepared (COST-01: the text of option 1) and marked in the Centro de configuración as «costo sin desglose» (MFG2-04). |
+| E-MFG2-18 | MFG2-04 | PRODUCTION policy parameter `portal_import_from` (date as YYYYMMDD, «Producción del portal desde»; 0 = every day read): the portal's days before it open no run and write no draft, because they are already in the opening inventory. Production sets 2026-10-13 (the physical count was taken before the 13th's shift ended); the runs of 2026-10-07…12 opened before are cancelled once. Approved 2026-10-14. |
 
 Implementation rules derived from the above (no architectural change):
 
