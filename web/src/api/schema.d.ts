@@ -12595,6 +12595,11 @@ export interface components {
             materialPrices: components["schemas"]["MaterialPriceInput"][];
             /** Format: decimal */
             conversionCost: string;
+            /**
+             * Format: decimal
+             * @default 0
+             */
+            scrapAllowance?: string;
         };
         PrepareSupplierPayment: {
             /** Format: uuid */
@@ -15128,6 +15133,12 @@ export interface components {
             status: string;
             preparedBy: null | string;
             approvedBy: null | string;
+            /** Format: decimal */
+            materialCost?: null | string;
+            /** Format: decimal */
+            conversionCost?: null | string;
+            /** Format: decimal */
+            scrapAllowance?: null | string;
         };
         StartLoading: {
             /** Format: uuid */

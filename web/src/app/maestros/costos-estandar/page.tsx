@@ -57,7 +57,10 @@ function PrepareCost({ onDone }: { onDone: () => void }) {
       }}
     >
       <h2>Opción 1 · Escribir el costo unitario</h2>
-      <p className="muted">Para un producto sin receta activa, o cuando el costo viene de otro cálculo: escriba cuánto cuesta una unidad.</p>
+      <p className="muted">
+        Para un producto sin receta activa, o cuando el costo viene de otro cálculo: escriba cuánto cuesta una unidad. Un producto que se fabrica necesita
+        el costo de la Opción 2: con un costo escrito a mano no se pueden abrir sus corridas de producción.
+      </p>
       <Field label="Producto" required error={fe.errors.itemId}>
         <SearchSelect
           aria-label="Producto"
@@ -93,10 +96,11 @@ interface FromRecipeResult {
   unitCost: string;
   materialCost: string;
   conversionCost: string;
+  scrapAllowance: string;
 }
 
 /** MFG1-07 (E-MFG1-07-4): the standard of a product from its ACTIVE recipe — a standard price per material plus the conversion cost; the
- * API computes the unit cost (materials per unit × price + conversion). */
+ * API computes the unit cost (materials per unit × price + conversion). COST-01 (E-COST-1/5): plus the standard scrap allowance, asked apart. */
 function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
   const { companyId, plantFor } = useSession();
   const prepare = useCommand("prepare-standard-cost-from-recipe", "/api/v1/companies/{companyId}/sales/prepare-standard-cost-from-recipe");
@@ -113,6 +117,7 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
   );
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [conversionCost, setConversionCost] = useState("");
+  const [scrapAllowance, setScrapAllowance] = useState("");
   const fe = useFieldErrors();
   const [result, setResult] = useState<FromRecipeResult | null>(null);
   if (recipes.data === null) {
@@ -127,9 +132,11 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
         e.preventDefault();
         const materialPrices = lines.map((l) => ({ materialItemId: l.materialItemId, stdPrice: normalizeInput(prices[l.materialItemId] ?? "") }));
         const conversion = normalizeInput(conversionCost);
+        const scrap = normalizeInput(scrapAllowance) || "0";
         const found: Record<string, string | false> = {
           recipe: (!recipeVersionId || lines.length === 0) && "Elija una receta activa.",
           conversion: (!isDecimal(conversion, 4) || conversion.startsWith("-")) && "El costo de conversión es cero o más (hasta 4 decimales).",
+          scrap: (!isDecimal(scrap, 4) || scrap.startsWith("-")) && "La merma estándar es cero o más (hasta 4 decimales).",
         };
         for (const p of materialPrices) {
           found[`price-${p.materialItemId}`] = !isPositiveDecimal(p.stdPrice, 4) && "Indique un precio estándar mayor que cero (hasta 4 decimales).";
@@ -138,19 +145,20 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
           return;
         }
         const itemCode = recipes.data?.items.find((r) => r.recipeVersionId === recipeVersionId)?.itemCode ?? "";
-        const response = await prepare.run({ recipeVersionId, materialPrices, conversionCost: conversion }, undefined, `Costo estándar de ${itemCode} preparado desde la receta; falta su aprobación.`);
+        const response = await prepare.run({ recipeVersionId, materialPrices, conversionCost: conversion, scrapAllowance: scrap }, undefined, `Costo estándar de ${itemCode} preparado desde la receta; falta su aprobación.`);
         if (response) {
           setResult(response.result as FromRecipeResult);
           setPrices({});
           setConversionCost("");
+          setScrapAllowance("");
           onDone();
         }
       }}
     >
       <h2>Opción 2 · Calcular desde la receta</h2>
       <p className="muted">
-        Para un producto con receta activa: escriba el precio estándar de cada material y el costo de conversión (mano de obra, energía, equipos) por unidad;
-        el sistema calcula el costo unitario con las cantidades de la receta.
+        Para un producto con receta activa: escriba el precio estándar de cada material, el costo de conversión (mano de obra, energía, equipos) y la merma
+        estándar por unidad; el sistema calcula el costo unitario con las cantidades de la receta.
       </p>
       <Field label="Receta activa" required error={fe.errors.recipe}>
         <select
@@ -179,6 +187,13 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
       <Field label="Costo de conversión por unidad" required error={fe.errors.conversion} hint="En RD$ por unidad producida; puede ser 0.">
         <input inputMode="decimal" value={conversionCost} onChange={(e) => setConversionCost(e.target.value)} />
       </Field>
+      <Field
+        label="Merma estándar por unidad"
+        error={fe.errors.scrap}
+        hint="En RD$ por unidad buena: el desperdicio previsto, que se absorbe aparte de la conversión para compararlo con la merma real. Vacío es 0."
+      >
+        <input inputMode="decimal" aria-label="Merma estándar por unidad" value={scrapAllowance} onChange={(e) => setScrapAllowance(e.target.value)} />
+      </Field>
       <div className="actions form-actions">
         <button type="submit" className="primary" disabled={prepare.busy}>
           Preparar desde receta
@@ -188,7 +203,7 @@ function PrepareFromRecipe({ onDone }: { onDone: () => void }) {
       {result ? (
         <p className="notice" data-testid="recipe-cost-result">
           Costo unitario <Money value={result.unitCost} testId="recipe-unit-cost" currency /> = materiales <Money value={result.materialCost} /> + conversión{" "}
-          <Money value={result.conversionCost} />
+          <Money value={result.conversionCost} /> + merma estándar <Money value={result.scrapAllowance} />
         </p>
       ) : null}
     </form>
@@ -245,6 +260,9 @@ export default function Page() {
               <th>Área de valuación</th>
               <th className="num">Versión</th>
               <th>Vigente desde</th>
+              <th className="num">Materiales</th>
+              <th className="num">Conversión</th>
+              <th className="num">Merma estándar</th>
               <th className="num">Costo unitario (RD$)</th>
               <th>Estado</th>
               <th>Preparó</th>
@@ -259,6 +277,9 @@ export default function Page() {
                 <td>{c.valuationAreaCode}</td>
                 <td className="num">{c.version}</td>
                 <td>{formatDate(c.effectiveFrom)}</td>
+                <td className="num">{c.materialCost == null ? "—" : <Money value={c.materialCost} />}</td>
+                <td className="num">{c.conversionCost == null ? "—" : <Money value={c.conversionCost} />}</td>
+                <td className="num">{c.scrapAllowance == null ? "—" : <Money value={c.scrapAllowance} />}</td>
                 <td className="num">
                   <Money value={c.unitCost} />
                 </td>

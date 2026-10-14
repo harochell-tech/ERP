@@ -143,7 +143,7 @@ public sealed record ListStandardCosts(Guid CompanyId, Guid SessionId, string? S
 
 public sealed record StandardCostView(
     Guid CostVersionId, Guid ItemId, string ItemCode, string ItemDescription, string BaseUom, Guid ValuationAreaId, string ValuationAreaCode, int Version, DateOnly EffectiveFrom,
-    decimal UnitCost, string Status, string? PreparedBy, string? ApprovedBy);
+    decimal UnitCost, string Status, string? PreparedBy, string? ApprovedBy, decimal? MaterialCost = null, decimal? ConversionCost = null, decimal? ScrapAllowance = null);
 
 public sealed record StandardCostList(IReadOnlyList<StandardCostView> Items);
 
@@ -160,7 +160,8 @@ public sealed class ListStandardCostsHandler : IQueryHandler<ListStandardCosts>
             context.Connection,
             context.Transaction,
             """
-            SELECT s.cost_version_id, s.item_id, i.code, i.description, i.base_uom, s.valuation_area_id, a.code, s.version, s.effective_from, s.unit_cost, s.status, coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email)
+            SELECT s.cost_version_id, s.item_id, i.code, i.description, i.base_uom, s.valuation_area_id, a.code, s.version, s.effective_from, s.unit_cost, s.status, coalesce(pu.display_name, pu.email), coalesce(au.display_name, au.email),
+                   s.material_cost, s.conversion_cost, CASE WHEN s.material_cost IS NULL THEN NULL ELSE s.scrap_allowance END
             FROM md.standard_cost_version s
             JOIN md.item i ON i.item_id = s.item_id
             JOIN md.valuation_area a ON a.valuation_area_id = s.valuation_area_id
@@ -172,7 +173,7 @@ public sealed class ListStandardCostsHandler : IQueryHandler<ListStandardCosts>
             """,
             r => new StandardCostView(
                 r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetGuid(5), r.GetString(6), r.GetInt32(7), r.Date(8), r.GetDecimal(9), r.GetString(10),
-                r.NullableString(11), r.NullableString(12)),
+                r.NullableString(11), r.NullableString(12), r.IsDBNull(13) ? null : r.GetDecimal(13), r.IsDBNull(14) ? null : r.GetDecimal(14), r.IsDBNull(15) ? null : r.GetDecimal(15)),
             cancellationToken,
             ("c", context.CompanyId),
             ("s", query.Status),

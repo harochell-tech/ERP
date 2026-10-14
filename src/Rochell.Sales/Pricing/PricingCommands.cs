@@ -12,10 +12,11 @@ public sealed record MaterialPriceInput(Guid MaterialItemId, decimal StdPrice);
 /// E-MFG1-9, E-MFG1-02-4/5: the Controller prepares a new DRAFT standard cost with its breakdown from an ACTIVE recipe (the finished
 /// good and the valuation area of the recipe's machine): a standard price for each material of the recipe and the conversion cost per
 /// unit. Standard quantity per unit = quantity per batch ÷ units per batch (6 decimals); material cost = Σ quantity × price (4
-/// decimals); unit cost = material + conversion.
+/// decimals); unit cost = material + conversion + scrap allowance (E-COST-1: the standard scrap per unit, zero when left out).
 /// </summary>
 public sealed record PrepareStandardCostFromRecipe(
-    Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid RecipeVersionId, IReadOnlyList<MaterialPriceInput> MaterialPrices, decimal ConversionCost) : ICommand;
+    Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid RecipeVersionId, IReadOnlyList<MaterialPriceInput> MaterialPrices, decimal ConversionCost,
+    decimal ScrapAllowance = 0m) : ICommand;
 
 /// <summary>
 /// E-VS3-02-7, E-MFG1-10, E-MFG1-02-6/7: the Aprobador de políticas approves it (step-up), in force from the approval date. With stock in

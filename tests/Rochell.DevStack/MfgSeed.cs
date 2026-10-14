@@ -20,6 +20,7 @@ internal static class MfgSeed
             ("WIP", "1340", "Producción en proceso", true), ("CONVERSION_ABSORPTION", "5150", "Absorción de conversión", false),
             ("MATERIAL_USAGE_VARIANCE", "5102", "Variación de uso de materiales", false), ("MATERIAL_PRICE_VARIANCE", "5103", "Variación de precio de materiales", false),
             ("PRODUCTION_SCRAP", "5160", "Scrap de producto terminado", false), ("STANDARD_REVALUATION", "5190", "Revaluación de costo estándar", false),
+            ("SCRAP_ALLOWANCE", "5155", "Merma estándar absorbida", false), // COST-01
         })
         {
             if (await h.ScalarAsync<long>("SELECT count(*) FROM fin.account_role_map WHERE company_id = @c AND account_role = @r AND status = 'ACTIVE'", ("c", h.CompanyId), ("r", role)) == 0)
@@ -32,7 +33,7 @@ internal static class MfgSeed
             $"""
             UPDATE fin.posting_rule_version v SET status = 'ACTIVE', approved_by = '{h.UserId}'
             FROM fin.posting_rule r WHERE r.posting_rule_id = v.posting_rule_id AND v.status = 'DRAFT'
-              AND (r.code IN ('P-08', 'P-10', 'P-12', 'P-13', 'REVAL') OR r.posting_rule_id = '{TestReceipt}');
+              AND (r.code IN ('P-08', 'P-12', 'P-13', 'REVAL') OR (r.code = 'P-10' AND v.version = 2) OR r.posting_rule_id = '{TestReceipt}');
             """);
         await h.CreateActivePolicyAsync("PRODUCTION", new Dictionary<string, string> { ["usage_tolerance_pct"] = "0.05" });
 

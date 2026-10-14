@@ -15,7 +15,8 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
 
     public string CommandType => "Manufacturing.PostShiftSummary";
 
-    private sealed record Context(string ShiftCode, TimeOnly StartsAt, TimeOnly EndsAt, decimal UnitsPerRack, int MinCuringHours, decimal UnitCost, decimal MaterialCost, string CollectorStatus);
+    private sealed record Context(string ShiftCode, TimeOnly StartsAt, TimeOnly EndsAt, decimal UnitsPerRack, int MinCuringHours, decimal UnitCost, decimal MaterialCost, string CollectorStatus,
+        decimal ScrapAllowance);
 
     private sealed record StockLot(Guid LotId, string LotCode, decimal Quantity);
 
@@ -55,7 +56,7 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
             context.Connection,
             context.Transaction,
             """
-            SELECT s.code, s.starts_at, s.ends_at, v.units_per_rack, v.min_curing_hours, c.unit_cost, c.material_cost, col.status
+            SELECT s.code, s.starts_at, s.ends_at, v.units_per_rack, v.min_curing_hours, c.unit_cost, c.material_cost, col.status, c.scrap_allowance
             FROM mfg.production_run r
             JOIN mfg.shift s ON s.shift_id = r.shift_id
             JOIN mfg.recipe_version v ON v.recipe_version_id = r.recipe_version_id
@@ -63,7 +64,8 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
             JOIN mfg.cost_collector col ON col.collector_id = r.collector_id
             WHERE r.run_id = @r
             """,
-            r => new Context(r.GetString(0), r.GetFieldValue<TimeOnly>(1), r.GetFieldValue<TimeOnly>(2), r.GetDecimal(3), r.GetInt32(4), r.GetDecimal(5), r.GetDecimal(6), r.GetString(7)),
+            r => new Context(r.GetString(0), r.GetFieldValue<TimeOnly>(1), r.GetFieldValue<TimeOnly>(2), r.GetDecimal(3), r.GetInt32(4), r.GetDecimal(5), r.GetDecimal(6), r.GetString(7),
+                r.GetDecimal(8)),
             cancellationToken,
             ("r", run.RunId)).ConfigureAwait(false))!;
         if (info.CollectorStatus != "OPEN")
@@ -136,7 +138,15 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
         var consumptionValue = issues.Sum(i => i.Reservation.Value);
         var standardValue = decimal.Round(summary.GoodUnits * info.UnitCost, 2, MidpointRounding.AwayFromZero);
         var materialStandard = decimal.Round(summary.GoodUnits * info.MaterialCost, 2, MidpointRounding.AwayFromZero);
-        var conversionStandard = standardValue - materialStandard;
+        // E-COST-2: the standard scrap allowance of the good units; conversion is what is left of the standard value.
+        var scrapStandard = decimal.Round(summary.GoodUnits * info.ScrapAllowance, 2, MidpointRounding.AwayFromZero);
+        var conversionStandard = standardValue - materialStandard - scrapStandard;
+        if (conversionStandard < 0m)
+        {
+            // Without conversion the two rounded parts can exceed the rounded whole by a cent: the allowance takes it.
+            scrapStandard += conversionStandard;
+            conversionStandard = 0m;
+        }
         var occurredAt = context.Clock.UtcNow;
         var receiptValueEntryId = context.Ids.NewId();
 
@@ -198,6 +208,7 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
             ["lot_code"] = lotCode,
             ["unit_cost"] = info.UnitCost.ToString(CultureInfo.InvariantCulture),
             ["material_cost"] = info.MaterialCost.ToString(CultureInfo.InvariantCulture),
+            ["scrap_allowance"] = info.ScrapAllowance.ToString(CultureInfo.InvariantCulture),
         };
         var receiptLines = new List<PostingLineInput>
         {
@@ -211,6 +222,29 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
         if (conversionStandard > 0m)
         {
             receiptLines.Add(new("P10-CR-CONV", "conversion_standard", conversionStandard, PlantId: run.PlantId, Inputs: receiptInputs));
+        }
+
+        if (scrapStandard > 0m)
+        {
+            // E-COST-2: only P-10 version 2 has the allowance's line; with version 1 in force the summary waits for the Controller.
+            if (!await MfgSql.ScalarAsync<bool>(
+                    context,
+                    """
+                    SELECT EXISTS (
+                      SELECT 1 FROM fin.posting_rule r JOIN fin.posting_rule_version v ON v.posting_rule_id = r.posting_rule_id
+                      WHERE r.code = @rule AND v.status = 'ACTIVE' AND v.effective_from <= @d AND (v.effective_to IS NULL OR v.effective_to > @d)
+                        AND v.definition -> 'lines' @> '[{"code": "P10-CR-SCRAP"}]'::jsonb)
+                    """,
+                    cancellationToken,
+                    ("rule", Runs.ReceiptRule),
+                    ("d", run.BusinessDate)).ConfigureAwait(false))
+            {
+                throw new DomainException(
+                    Rochell.Finance.FinanceErrors.PostingPrerequisiteMissing,
+                    $"The standard cost carries a scrap allowance and {Runs.ReceiptRule} version 2 is not ACTIVE for {run.BusinessDate:yyyy-MM-dd} (E-COST-2).");
+            }
+
+            receiptLines.Add(new("P10-CR-SCRAP", "scrap_standard", scrapStandard, PlantId: run.PlantId, Inputs: receiptInputs));
         }
 
         var receiptPlan = await _engine.PrepareAsync(context, new PostingRequest(Runs.ReceiptRule, run.BusinessDate, occurredAt, receiptLines), cancellationToken).ConfigureAwait(false);
@@ -252,6 +286,7 @@ public sealed class PostShiftSummaryHandler : ICommandHandler<PostShiftSummary>
                     standardValue = Runs.Money(standardValue),
                     materialStandard = Runs.Money(materialStandard),
                     conversionStandard = Runs.Money(conversionStandard),
+                    scrapStandard = Runs.Money(scrapStandard),
                 }),
                 Publish: true,
                 OccurredAt: occurredAt,
