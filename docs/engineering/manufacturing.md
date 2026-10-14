@@ -300,3 +300,10 @@ version 1 is in force (the rule has no such line).
 Real scrap is as before: P-12 debits PRODUCTION_SCRAP for cured product, fresh breakage stays in the usage variance (P-13). The
 month's real scrap against the allowance absorbed is COST-02. Tests: `ScrapAllowanceTests`. The dev stack activates P-10 version 2
 and maps SCRAP_ALLOWANCE (`MfgSeed`).
+
+## MFG2-04 — portal production from a date (migration 0122, E-MFG2-18)
+
+PRODUCTION policy parameter `portal_import_from` («Producción del portal desde», YYYYMMDD, unit DATE; 0 = every day read). The
+version in force today decides; `SyncPortalShift` returns without opening a run or writing a draft for a portal day before it
+(`PortalCutoff`), because those days are already in the opening inventory. Runs opened before the parameter was set are cancelled
+with `CancelProductionRun` and are not opened again. Test: `PortalSyncTests.Days_before_the_policys_portal_start_open_no_run_and_no_draft`.

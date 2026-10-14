@@ -167,6 +167,27 @@ public sealed class PortalSyncTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Days_before_the_policys_portal_start_open_no_run_and_no_draft()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        await h.CreateActivePolicyAsync("PRODUCTION", new Dictionary<string, string>
+        {
+            ["usage_tolerance_pct"] = "0.05",
+            ["portal_import_from"] = w.S.Today.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture),
+        });
+        var yesterday = w with { Day = w.S.Today.AddDays(-1).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) };
+
+        // E-MFG2-18: yesterday is already in the opening inventory; only today's shift becomes a run with its draft.
+        w.Portal.Shifts.Add(Shift(yesterday, "planta2", 300, closed: true));
+        w.Portal.Shifts.Add(Shift(w, "planta2", 375, closed: false));
+        await PassAsync(w);
+
+        Assert.Equal(w.Day, await h.ScalarAsync<string>("SELECT string_agg(business_date::text, ',') FROM mfg.production_run WHERE machine_id = @m", ("m", w.S.Machine)));
+        Assert.StartsWith("PORTAL:PENDING:10:1500:DRAFT:", await SummaryAsync(h, w.S.Machine), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_machine_without_a_batch_plant_takes_the_recipes_theoretical_once_its_shift_ended_and_is_posted()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
