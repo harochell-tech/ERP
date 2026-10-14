@@ -282,3 +282,21 @@ Migration 0104:
   the bridge account must equal what is open at standard. `JustifyMaterialShortfall` (`shift_summary:post`), `ListMaterialShortfalls`
   (`production:read`, balances = stock − open). Screen Producción › Materia prima en negativo, Inicio counter, the policy parameter as a
   date in Configuración › Políticas. 307 commands.
+
+## COST-01 — standard scrap allowance (migration 0121, E-COST-1…6)
+
+A standard cost prepared from a recipe has three parts: materials (Σ standard quantity × standard price), conversion and the
+**scrap allowance** per unit (`md.standard_cost_version.scrap_allowance`, zero unless given); unit cost = the three added.
+`PrepareStandardCostFromRecipe` takes `scrapAllowance` (optional, ≥ 0, 4 decimals); `ListStandardCosts` returns
+`materialCost`, `conversionCost` and `scrapAllowance` (null for a cost written by hand, which has no breakdown and cannot
+open a production run).
+
+P-10 **version 2** (from 2026-10-01, DRAFT until the Controller activates it; it ends an active version 1 there) adds
+`P10-CR-SCRAP`: Dr FINISHED_GOODS standard value / Cr WIP materials at standard / Cr CONVERSION_ABSORPTION conversion / Cr
+**SCRAP_ALLOWANCE** good units × allowance. Conversion is the remainder of the standard value; when a cost has no conversion and the
+rounded parts exceed the whole by a cent, the allowance takes it. A summary whose cost carries an allowance is not posted while only
+version 1 is in force (the rule has no such line).
+
+Real scrap is as before: P-12 debits PRODUCTION_SCRAP for cured product, fresh breakage stays in the usage variance (P-13). The
+month's real scrap against the allowance absorbed is COST-02. Tests: `ScrapAllowanceTests`. The dev stack activates P-10 version 2
+and maps SCRAP_ALLOWANCE (`MfgSeed`).

@@ -143,6 +143,9 @@ public sealed class PrepareStandardCostFromRecipeHandler : ICommandHandler<Prepa
         var conversion = command.ConversionCost >= 0m && decimal.Round(command.ConversionCost, 4) == command.ConversionCost
             ? command.ConversionCost
             : throw new DomainException(SalesErrors.AmountInvalid, "The conversion cost is zero or more with at most 4 decimals.");
+        var scrap = command.ScrapAllowance >= 0m && decimal.Round(command.ScrapAllowance, 4) == command.ScrapAllowance
+            ? command.ScrapAllowance
+            : throw new DomainException(SalesErrors.AmountInvalid, "The scrap allowance is zero or more with at most 4 decimals.");
         var recipe = await Reading.SingleOrDefaultAsync(
             context.Connection,
             context.Transaction,
@@ -187,7 +190,7 @@ public sealed class PrepareStandardCostFromRecipeHandler : ICommandHandler<Prepa
         }
 
         var materialCost = decimal.Round(materials.Sum(m => m.Qty * m.Price), 4, MidpointRounding.AwayFromZero);
-        var unitCost = materialCost + conversion;
+        var unitCost = materialCost + conversion + scrap;
         if (unitCost <= 0m)
         {
             throw new DomainException(SalesErrors.AmountInvalid, "The standard cost must be greater than zero.");
@@ -214,6 +217,7 @@ public sealed class PrepareStandardCostFromRecipeHandler : ICommandHandler<Prepa
                     unitCost = Pricing.Money4(unitCost),
                     materialCost = Pricing.Money4(materialCost),
                     conversionCost = Pricing.Money4(conversion),
+                    scrapAllowance = Pricing.Money4(scrap),
                     materials = materials.Select(m => new { materialItemId = m.MaterialItemId, stdQtyPerUnit = m.Qty.ToString(CultureInfo.InvariantCulture), stdPrice = Pricing.Money4(m.Price) }),
                 }),
                 Publish: true),
@@ -222,8 +226,9 @@ public sealed class PrepareStandardCostFromRecipeHandler : ICommandHandler<Prepa
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO md.standard_cost_version (cost_version_id, company_id, item_id, valuation_area_id, version, effective_from, unit_cost, status, prepared_by, material_cost, conversion_cost)
-            VALUES (@id, @c, @i, @a, @v, @today, @cost, 'DRAFT', @by, @material, @conversion)
+            INSERT INTO md.standard_cost_version (cost_version_id, company_id, item_id, valuation_area_id, version, effective_from, unit_cost, status, prepared_by, material_cost, conversion_cost,
+                                                  scrap_allowance)
+            VALUES (@id, @c, @i, @a, @v, @today, @cost, 'DRAFT', @by, @material, @conversion, @scrap)
             """,
             cancellationToken,
             ("id", context.ResultRef),
@@ -235,7 +240,8 @@ public sealed class PrepareStandardCostFromRecipeHandler : ICommandHandler<Prepa
             ("cost", unitCost),
             ("by", preparer),
             ("material", materialCost),
-            ("conversion", conversion)).ConfigureAwait(false);
+            ("conversion", conversion),
+            ("scrap", scrap)).ConfigureAwait(false);
         foreach (var (material, qty, price) in materials)
         {
             await Sql.ExecuteAsync(
@@ -259,6 +265,7 @@ public sealed class PrepareStandardCostFromRecipeHandler : ICommandHandler<Prepa
             unitCost = Pricing.Money4(unitCost),
             materialCost = Pricing.Money4(materialCost),
             conversionCost = Pricing.Money4(conversion),
+            scrapAllowance = Pricing.Money4(scrap),
         });
     }
 }
