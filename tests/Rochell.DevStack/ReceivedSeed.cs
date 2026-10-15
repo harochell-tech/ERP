@@ -21,13 +21,17 @@ internal static class ReceivedSeed
     {
         await h.AdminRequireAsync(
             $"DO $$ BEGIN PERFORM set_config('session_replication_role', 'replica', true); UPDATE md.company SET rnc = '{CompanyRnc}' WHERE company_id = '{h.CompanyId}'; END $$");
-        // OCR1-04 (E-OCR1-04-3): 500 readings a month in the PURCHASING policy in force.
+        // OCR1-04 (E-OCR1-04-3): 500 readings a month in the PURCHASING policy in force; REC-02 (E-REC-02-3): 10 % direct receipt price deviation.
         await h.AdminRequireAsync(
             $"""
             DO $$ BEGIN
               PERFORM set_config('session_replication_role', 'replica', true);
               INSERT INTO acc.accounting_policy_parameter (company_id, policy_version_id, param_code, value)
               SELECT company_id, policy_version_id, 'ocr_monthly_readings', to_jsonb('500'::text)
+              FROM acc.accounting_policy_version WHERE company_id = '{h.CompanyId}' AND policy_code = 'PURCHASING' AND status = 'ACTIVE'
+              ON CONFLICT DO NOTHING;
+              INSERT INTO acc.accounting_policy_parameter (company_id, policy_version_id, param_code, value)
+              SELECT company_id, policy_version_id, 'direct_receipt_price_deviation_pct', to_jsonb('0.10'::text)
               FROM acc.accounting_policy_version WHERE company_id = '{h.CompanyId}' AND policy_code = 'PURCHASING' AND status = 'ACTIVE'
               ON CONFLICT DO NOTHING;
             END $$
