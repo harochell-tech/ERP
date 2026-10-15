@@ -77724,6 +77724,13 @@
             "items": {
               "type": "string"
             }
+          },
+          "validTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         },
         "additionalProperties": false

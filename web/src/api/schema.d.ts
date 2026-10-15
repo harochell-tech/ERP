@@ -14917,6 +14917,8 @@ export interface components {
             /** Format: uuid */
             plantId: null | string;
             permissions: string[];
+            /** Format: date-time */
+            validTo?: null | string;
         };
         SessionCompany: {
             /** Format: uuid */
