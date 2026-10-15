@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { query } from "@/api/client";
 import { lastEndedMonth } from "@/components/FixedAssets";
 import { EcfContingencyNotice } from "@/components/EcfGateway";
 import { EmptyState } from "@/components/StateNotices";
-import { todayInDominicanRepublic } from "@/lib/labels";
+import { formatDate, todayInDominicanRepublic } from "@/lib/labels";
 import { isReadyToRelease } from "@/lib/production";
 import { nextSteps, setupProgress, stepInfo } from "@/lib/setup";
 import { useSession } from "@/lib/session";
@@ -502,6 +503,22 @@ function SetupCard() {
   );
 }
 
+/** SEC-01 (E-SEC-4): 30 days before a superadministrator role ends, Inicio says so; it is renewed with a new grant. */
+function SuperadminEndNotice() {
+  const { company } = useSession();
+  const [now] = useState(() => Date.now());
+  const end = company?.assignments.find((a) => a.roleCode === "SUPERADMIN")?.validTo;
+  if (!end) {
+    return null;
+  }
+  const days = Math.ceil((new Date(end).getTime() - now) / 86_400_000);
+  return days <= 30 ? (
+    <p className="notice" data-testid="superadmin-end">
+      Su rol de superadministrador vence {days <= 0 ? "hoy" : `en ${days} día${days === 1 ? "" : "s"}`} ({formatDate(end.slice(0, 10))}). Pida la renovación antes de esa fecha.
+    </p>
+  ) : null;
+}
+
 export default function Home() {
   const { company, can, plantName } = useSession();
   const tasks = TASKS.filter((t) => can(t.permission));
@@ -512,6 +529,7 @@ export default function Home() {
         Roles en {company?.legalName}:{" "}
         {company?.assignments.map((a) => (a.plantId ? `${a.roleName} (planta ${plantName(a.plantId, a.plantId.slice(0, 8))})` : a.roleName)).join(", ")}
       </p>
+      <SuperadminEndNotice />
       <SetupCard />
       <EcfContingencyNotice />
       <h2>Tareas</h2>

@@ -17,7 +17,8 @@ public sealed record OidcClaims(string Subject, string? Email, bool EmailVerifie
 /// A role the session's user holds now in a company, company-wide (<see cref="PlantId"/> null) or for one plant, with the
 /// permissions it grants (the UI derives each permission's plant scope from it, E-PR18b-8).
 /// </summary>
-public sealed record SessionAssignment(string RoleCode, string RoleName, Guid? PlantId, IReadOnlyList<string> Permissions);
+/// <param name="ValidTo">E-SEC-4: when the role ends, if it ends (the latest end among the assignments it groups).</param>
+public sealed record SessionAssignment(string RoleCode, string RoleName, Guid? PlantId, IReadOnlyList<string> Permissions, DateTime? ValidTo = null);
 
 /// <summary>A plant of the company as screens name it (E-UX1-01-4): its code and, once set, its readable name.</summary>
 public sealed record SessionPlant(Guid PlantId, string Code, string? Name);
@@ -205,7 +206,8 @@ public sealed class SessionService
                 connection,
                 transaction,
                 """
-                SELECT r.code, r.name, ra.plant_id, array_agg(rp.permission_code ORDER BY rp.permission_code)
+                SELECT r.code, r.name, ra.plant_id, array_agg(rp.permission_code ORDER BY rp.permission_code),
+                       CASE WHEN bool_or(ra.valid_to IS NULL) THEN NULL ELSE max(ra.valid_to) END
                 FROM iam.role_assignment ra
                 JOIN iam.role r ON r.role_id = ra.role_id
                 JOIN iam.role_permission rp ON rp.role_id = ra.role_id
@@ -213,7 +215,7 @@ public sealed class SessionService
                 GROUP BY r.code, r.name, ra.plant_id
                 ORDER BY r.code, ra.plant_id NULLS FIRST
                 """,
-                r => new SessionAssignment(r.GetString(0), r.GetString(1), r.NullableGuid(2), r.GetFieldValue<string[]>(3)),
+                r => new SessionAssignment(r.GetString(0), r.GetString(1), r.NullableGuid(2), r.GetFieldValue<string[]>(3), r.IsDBNull(4) ? null : r.GetFieldValue<DateTime>(4)),
                 cancellationToken,
                 ("c", companyId),
                 ("u", session.UserId),

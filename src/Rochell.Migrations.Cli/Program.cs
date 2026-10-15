@@ -276,7 +276,7 @@ try
                     return 2;
                 }
 
-                // E-ADM-2-2: SUPERADMIN ends 90 days after the grant (database trigger); renewed with a new grant or request.
+                // E-SEC-4: SUPERADMIN ends 365 days after the grant (database trigger); renewed with a new grant or request.
                 var until = validTo is DateTime end ? $" until {end:yyyy-MM-dd HH:mm} UTC" : string.Empty;
                 Console.WriteLine($"Role {args[2]} granted to {args[1].ToLowerInvariant()} in company {args[3]}{until}.");
                 return 0;
