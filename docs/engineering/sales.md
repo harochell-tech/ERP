@@ -291,3 +291,18 @@ Migration 0101:
 `driverConfirmedAt`) and filters by `driverConfirmedOn` (the confirmation's date in America/Santo_Domingo). Tablero de despacho shows
 «Confirmadas por el chofer hoy» so Dispatch reviews them together; a delivery with differences still in transit reads «falta
 completar». No schema change.
+
+## DSP-01 — simple dispatch (migration 0123, E-DSP-1…5)
+
+| Change | Effect |
+| --- | --- |
+| `md.plant.has_truck_scale` (`master-data/set-plant-truck-scale`, company:manage, step-up) | E-DSP-1: with a scale `record-gate-out` needs the weighing (E-VS3-04-7); without one it takes none, or a whole weighing. `log.delivery` keeps the four weighing values all or none (`delivery_weighing`); readers already allowed them empty |
+| `plan-delivery` + transport (`vehicleId` / `driverId` or `customerVehiclePlate` / `customerDriverName`) | E-DSP-2: PLANNED and LOADING in the same command (`Deliveries.StartLoadingAsync`, shared with `start-loading`) |
+| `dispatch-delivery` | E-DSP-3: from LOADING at a plant without a scale — `ConfirmLoaded` then `RecordGateOut` in one transaction; refused (`WEIGHING_INVALID`) at a plant with one |
+| `ScannedRack.Quantity`, `log.delivery_line_scan.base_quantity` | E-DSP-5: a chosen lot leaves first up to that base quantity (none: up to its stock), then the scanned ones, then FIFO (`Deliveries.FifoAsync`) |
+| `GET …/sales/deliveries/{id}/lots` (`ListDispatchLots`, sales:read) | E-DSP-5: per line, the lots in stock in each location of the plant (not curing, not transit) with the lot's quality status, verdict and 28-day strength read from `mfg.fg_lot` / `qa.lot_evaluation` through SQL |
+| `GetDelivery.plantHasTruckScale` | The screen shows «Despachar» or «Confirmar carga» + weighing |
+
+Screens: Despacho › Planificar asks the transport; the conduce lists the lots to choose per line, the rack scanner folded as optional
+(E-DSP-4), and the button «Despachar» without a scale. Tests: `DispatchTests`; the Playwright journeys plan with the transport and
+press «Despachar».

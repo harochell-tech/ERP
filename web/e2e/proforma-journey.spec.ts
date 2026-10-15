@@ -30,26 +30,19 @@ async function attach(page: Page, label: string, name: string) {
 }
 
 /** Plans a pickup of the order, loads it on the customer's truck and weighs it out: the delivery is the gate-out. Returns CD-…. */
-async function deliver(dispatch: Page, orderUrl: string, quantity: string, ticket: string): Promise<string> {
+async function deliver(dispatch: Page, orderUrl: string, quantity: string): Promise<string> {
   await dispatch.goto(orderUrl);
   await dispatch.getByRole("link", { name: "Planificar conduce" }).click();
   await dispatch.getByLabel("A despachar BLOQUE-6").fill(quantity);
-  await submit(dispatch, "Planificar conduce");
-  const status = dispatch.getByTestId("delivery-status");
-  await expect(status).toHaveText("Planificado");
-  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
-  expect(deliveryNo).not.toBe("");
   await dispatch.getByLabel("Placa del cliente").fill("G654321");
   await dispatch.getByLabel("Chofer del cliente").fill("Pedro Díaz");
-  await dispatch.getByRole("button", { name: "Iniciar carga" }).click();
+  await submit(dispatch, "Planificar conduce");
+  const status = dispatch.getByTestId("delivery-status");
   await expect(status).toHaveText("Cargando");
-  await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
-  await expect(status).toHaveText("Cargado");
-  await dispatch.getByLabel("Peso bruto (kg)").fill("5000");
-  await dispatch.getByLabel("Tara (kg)").fill("4400");
-  await dispatch.getByLabel("Ticket de báscula", { exact: true }).setInputFiles({ name: ticket, mimeType: "application/octet-stream", buffer: Buffer.from(`evidencia ${ticket}`) });
-  await expect(dispatch.getByTestId("evidence-verified")).toHaveText(`✓ Huella del archivo verificada: ${ticket}`);
-  await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
+  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
+  expect(deliveryNo).not.toBe("");
+  await expect(status).toHaveText("Cargando");
+  await dispatch.getByRole("button", { name: "Despachar" }).click();
   await expect(status).toHaveText("Entregado");
   return deliveryNo;
 }
@@ -76,8 +69,8 @@ test("proformas collected with ITBIS, certified, invoiced as one e-CF 44 and the
 
   // Despacho: two pickups, 30 and 20 blocks. Each one issues its proforma.
   const dispatch = await signIn(browser, "Despacho");
-  const firstDelivery = await deliver(dispatch, orderUrl, "30", "ticket-pf-1.jpg");
-  const secondDelivery = await deliver(dispatch, orderUrl, "20", "ticket-pf-2.jpg");
+  const firstDelivery = await deliver(dispatch, orderUrl, "30");
+  const secondDelivery = await deliver(dispatch, orderUrl, "20");
 
   // Facturación: the two proformas, apart from the fiscal receivable; their deliveries are not billable by conduce.
   const billing = await signIn(browser, "Facturación");
