@@ -58,6 +58,10 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   // none and the storekeeper picks one; a plant with RECEPCION (or a single stock location) comes preselected.
   await expect(storekeeper.getByLabel("Ubicación")).toHaveValue("");
   await storekeeper.getByLabel("Ubicación").selectOption({ label: "PATIO-A" });
+  // REC-01 (E-REC-1/2): our truck and driver (the dev seed has one of each) and the supplier's delivery note are required.
+  await storekeeper.getByLabel("Conduce del proveedor").fill(`CP-${Date.now()}`);
+  await storekeeper.getByLabel("Camión").selectOption({ index: 1 });
+  await storekeeper.getByLabel("Chofer").selectOption({ index: 1 });
   await submit(storekeeper, "Registrar recepción");
   await expect(storekeeper.getByRole("heading", { name: /^Recepción / })).toBeVisible();
   await expect(storekeeper.getByTestId("accounting-status")).toHaveText("Contabilizado");
@@ -69,4 +73,9 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   await expect(storekeeper.getByTestId("qty-received")).toHaveText("40");
   await expect(storekeeper.getByTestId("qty-open")).toHaveText("0");
   await expect(storekeeper.getByTestId("po-receipts")).toContainText("ARENA-LAVADA");
+
+  // REC-01 (E-REC-4): the receipt report lists it with its transport and totals per material.
+  await nav(storekeeper, "Reporte de recepciones");
+  await expect(storekeeper.getByTestId("receipt-report-totals")).toContainText("ARENA-LAVADA");
+  await expect(storekeeper.getByTestId("receipt-report-rows")).toContainText("L123456");
 });

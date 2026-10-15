@@ -3,6 +3,9 @@ namespace Rochell.Procurement;
 public static class ProcurementErrors
 {
     public const string NotFound = "PURCHASE_ORDER_NOT_FOUND";
+    public const string ReceiptTransportRequired = "RECEIPT_TRANSPORT_REQUIRED";
+    public const string SupplierDeliveryNoteRequired = "SUPPLIER_DELIVERY_NOTE_REQUIRED";
+    public const string SupplierDeliveryNoteUsed = "SUPPLIER_DELIVERY_NOTE_USED";
     public const string VersionConflict = "VERSION_CONFLICT";
     public const string InvalidState = "INVALID_STATE";
     public const string PlantMismatch = "PLANT_MISMATCH";

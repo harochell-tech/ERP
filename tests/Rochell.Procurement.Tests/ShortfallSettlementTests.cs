@@ -41,7 +41,7 @@ public sealed class ShortfallSettlementTests(PostgresFixture postgres)
             await h.RunAsync(new ApprovePurchaseOrder(h.CompanyId, p.Controller, key + "-a", p.PlantId, po, 2), new ApprovePurchaseOrderHandler());
             var line = await h.ScalarAsync<Guid>("SELECT po_line_id FROM pur.purchase_order_line WHERE po_id = @p", ("p", po));
             return JsonDocument.Parse((await h.RunAsync(
-                new PostGoodsReceipt(h.CompanyId, r.Storekeeper, key, p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(line, qty)]), new PostGoodsReceiptHandler())).ResultPayload).RootElement;
+                new PostGoodsReceipt(h.CompanyId, r.Storekeeper, key, p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(line, qty)]).WithTransport(r), new PostGoodsReceiptHandler())).ResultPayload).RootElement;
         }
 
         var first = await ReceiveAsync("gr-1", 1m);

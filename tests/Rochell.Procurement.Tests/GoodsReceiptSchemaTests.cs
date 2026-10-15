@@ -20,7 +20,7 @@ public sealed class GoodsReceiptSchemaTests(PostgresFixture postgres)
         await h.RunAsync(new SubmitPurchaseOrder(h.CompanyId, p.Buyer, "s", p.PlantId, po, 1), new SubmitPurchaseOrderHandler());
         await h.RunAsync(new ApprovePurchaseOrder(h.CompanyId, p.Controller, "a", p.PlantId, po, 2), new ApprovePurchaseOrderHandler());
         var line = await h.ScalarAsync<Guid>("SELECT po_line_id FROM pur.purchase_order_line WHERE po_id = @p", ("p", po));
-        var gr = (await h.RunAsync(new PostGoodsReceipt(h.CompanyId, r.Storekeeper, "gr", p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(line, 3m)]), new PostGoodsReceiptHandler())).ResultRef;
+        var gr = (await h.RunAsync(new PostGoodsReceipt(h.CompanyId, r.Storekeeper, "gr", p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(line, 3m)]).WithTransport(r), new PostGoodsReceiptHandler())).ResultRef;
         return (h, r, po, gr);
     }
 

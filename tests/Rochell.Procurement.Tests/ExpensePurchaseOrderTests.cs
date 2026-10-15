@@ -112,7 +112,7 @@ public sealed class ExpensePurchaseOrderTests(PostgresFixture postgres)
         var (po, line) = await ApprovedAsync(h, w);
         var toReceive = JsonDocument.Parse(await h.QueryAsync(new ListPurchaseOrdersToReceive(h.CompanyId, p.Buyer), new ListPurchaseOrdersToReceiveHandler())).RootElement.GetProperty("items");
         var receive = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(
-            new PostGoodsReceipt(h.CompanyId, w.S.Receiving.Storekeeper, "gr", p.PlantId, po, w.S.Receiving.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(line, 1m)]),
+            new PostGoodsReceipt(h.CompanyId, w.S.Receiving.Storekeeper, "gr", p.PlantId, po, w.S.Receiving.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(line, 1m)]).WithTransport(w.S.Receiving),
             new PostGoodsReceiptHandler()));
         await BillAsync(h, w, "i1", "B0100000801", po, line, 2m);
         var cancel = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new CancelPurchaseOrder(h.CompanyId, p.Buyer, "c", p.PlantId, po, 3, "Ya no"), new CancelPurchaseOrderHandler()));

@@ -1,7 +1,8 @@
 namespace Rochell.TestInfrastructure;
 
 /// <summary>Receiving fixtures on top of purchasing: locations, RAW_MATERIAL and GRNI accounts and maps, periods, R-01 and a storekeeper.</summary>
-public sealed record TestReceiving(TestPurchasing Purchasing, Guid LocationA, Guid LocationB, Guid RawMaterialAccount, Guid GrniAccount, Guid Storekeeper);
+/// <remarks>REC-01 (E-REC-1): <c>Vehicle</c> and <c>Driver</c> are our truck and driver, named on every receipt.</remarks>
+public sealed record TestReceiving(TestPurchasing Purchasing, Guid LocationA, Guid LocationB, Guid RawMaterialAccount, Guid GrniAccount, Guid Storekeeper, Guid Vehicle, Guid Driver);
 
 public static class ReceivingSetup
 {
@@ -32,6 +33,26 @@ public static class ReceivingSetup
             await h.AdminRequireAsync($"UPDATE fin.posting_rule_version SET status = 'ACTIVE', approved_by = '{h.UserId}' WHERE posting_rule_id = '{R01}' AND version = 1");
         }
 
-        return new TestReceiving(p, locationA, locationB, raw, grni, await h.SessionWithRolesAsync("ALMACENISTA"));
+        var vehicle = Guid.CreateVersion7();
+        var driver = Guid.CreateVersion7();
+        await h.AdminRequireAsync(
+            $"""
+            INSERT INTO log.vehicle (vehicle_id, company_id, plate, capacity_kg, status, version) VALUES ('{vehicle}', '{h.CompanyId}', 'L{vehicle.ToString("N")[..6].ToUpperInvariant()}', 12000, 'ACTIVE', 1);
+            INSERT INTO log.driver (driver_id, company_id, full_name, national_id, status, version) VALUES ('{driver}', '{h.CompanyId}', 'Chofer de recepción', '{Random.Shared.NextInt64(10_000_000_000, 99_999_999_999)}', 'ACTIVE', 1);
+            """);
+        return new TestReceiving(p, locationA, locationB, raw, grni, await h.SessionWithRolesAsync("ALMACENISTA"), vehicle, driver);
+    }
+
+    /// <summary>REC-01 (E-REC-1/2): the receipt names the fixture's truck and driver and a supplier's delivery note of its own.</summary>
+    public static Rochell.Procurement.GoodsReceipts.PostGoodsReceipt WithTransport(this Rochell.Procurement.GoodsReceipts.PostGoodsReceipt receipt, TestReceiving receiving, string? deliveryNote = null)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        ArgumentNullException.ThrowIfNull(receiving);
+        return receipt with
+        {
+            VehicleId = receipt.VehicleId ?? receiving.Vehicle,
+            DriverId = receipt.DriverId ?? receiving.Driver,
+            SupplierDeliveryNote = receipt.SupplierDeliveryNote ?? deliveryNote ?? "CP-" + Guid.CreateVersion7().ToString("N")[^12..],
+        };
     }
 }

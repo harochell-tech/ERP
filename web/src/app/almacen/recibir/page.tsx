@@ -15,6 +15,9 @@ interface Values {
   locationId: string;
   occurredAt: string;
   weighTicketRef: string;
+  vehicleId: string;
+  driverId: string;
+  supplierDeliveryNote: string;
   lines: Record<string, { quantity: string; supplierLotNumber: string }>;
 }
 
@@ -34,7 +37,7 @@ function Receive() {
     "/api/v1/companies/{companyId}/procurement/post-goods-receipt",
     (_, doc) => (doc ? `Recepción ${doc} registrada y contabilizada.` : "Recepción registrada y contabilizada."),
   );
-  const [values, setValues] = useState<Values>(() => post.restored ?? { locationId: "", occurredAt: localNow(), weighTicketRef: "", lines: {} });
+  const [values, setValues] = useState<Values>(() => post.restored ?? { locationId: "", occurredAt: localNow(), weighTicketRef: "", vehicleId: "", driverId: "", supplierDeliveryNote: "", lines: {} });
   const fe = useFieldErrors();
   const allowed = can("goods_receipt:post");
 
@@ -52,8 +55,11 @@ function Receive() {
             query: { plantId: plantFor("purchase_order:read") ?? order.plantId, supplierId: order.supplierId, limit: 200 },
           });
           const receivable = toReceive.items.find((o) => o.purchaseOrderId === order.purchaseOrderId);
+          // REC-01 (E-REC-1): our trucks and drivers.
+          const fleet = await query("/api/v1/companies/{companyId}/procurement/receiving-fleet", { path: { companyId } });
           return {
             order,
+            fleet,
             locations: plants.items.find((p) => p.plantId === order.plantId)?.locations ?? [],
             maximum: new Map((receivable?.lines ?? []).map((l) => [l.poLineId, l.maxReceivable])),
             // C-15 (E-UX4-8): the plant's receiving location (RECEPCION, or its only stock location), or none — then the user picks.
@@ -70,7 +76,7 @@ function Receive() {
   if (data === null) {
     return <Loading error={error} />;
   }
-  const { order, locations, maximum, defaultLocationId } = data;
+  const { order, locations, maximum, defaultLocationId, fleet } = data;
   const locationId = values.locationId || defaultLocationId;
   const chosen = locations.find((l) => l.locationId === locationId);
   // E-UX3-5: each line starts with its open quantity (the server's); the user may change or clear it.
@@ -87,7 +93,10 @@ function Receive() {
       }));
     const found: Record<string, string | false> = {
       locationId: !locationId ? "Elija la ubicación." : !!chosen && !isReceivableLocation(chosen.code) && "La materia prima no se recibe en CURADO ni en TRÁNSITO; elija la ubicación de recepción.",
-      occurredAt: !values.occurredAt && "Indique la fecha y hora de la recepción.",
+      occurredAt: !values.occurredAt && "Indique la fecha y hora de llegada.",
+      vehicleId: !values.vehicleId && "Elija el camión.",
+      driverId: !values.driverId && "Elija el chofer.",
+      supplierDeliveryNote: !values.supplierDeliveryNote.trim() && "Escriba el número del conduce que entregó el proveedor.",
       lines: lines.length === 0 && "Indique al menos una cantidad a recibir.",
     };
     for (const l of lines) {
@@ -104,6 +113,9 @@ function Receive() {
         occurredAt: new Date(values.occurredAt).toISOString(),
         lines,
         weighTicketRef: values.weighTicketRef.trim() || null,
+        vehicleId: values.vehicleId,
+        driverId: values.driverId,
+        supplierDeliveryNote: values.supplierDeliveryNote.trim(),
       },
       values,
     );
@@ -145,12 +157,38 @@ function Receive() {
             ))}
           </select>
         </Field>
-        <Field label="Fecha y hora (pesaje)" required error={fe.errors.occurredAt}>
+        <Field label="Fecha y hora de llegada" required error={fe.errors.occurredAt}>
           <input type="datetime-local" aria-label="Fecha y hora" value={values.occurredAt} onChange={(e) => setValues({ ...values, occurredAt: e.target.value })} />
         </Field>
-        <Field label="Ticket de báscula">
-          <input aria-label="Ticket de báscula" value={values.weighTicketRef} onChange={(e) => setValues({ ...values, weighTicketRef: e.target.value })} />
+        <Field label="Conduce del proveedor" required error={fe.errors.supplierDeliveryNote} hint="El número del conduce que entregó el proveedor con el material.">
+          <input aria-label="Conduce del proveedor" value={values.supplierDeliveryNote} onChange={(e) => setValues({ ...values, supplierDeliveryNote: e.target.value })} />
         </Field>
+        <Field label="Camión" required error={fe.errors.vehicleId} hint="Nuestro camión que trajo el material.">
+          <select aria-label="Camión" value={values.vehicleId} onChange={(e) => setValues({ ...values, vehicleId: e.target.value })}>
+            <option value="">Seleccione…</option>
+            {fleet.vehicles.map((v) => (
+              <option key={v.vehicleId} value={v.vehicleId}>
+                {v.fleetCode ? `${v.fleetCode} · ${v.plate}` : v.plate}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Chofer" required error={fe.errors.driverId}>
+          <select aria-label="Chofer" value={values.driverId} onChange={(e) => setValues({ ...values, driverId: e.target.value })}>
+            <option value="">Seleccione…</option>
+            {fleet.drivers.map((d) => (
+              <option key={d.driverId} value={d.driverId}>
+                {d.fullName}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <details>
+          <summary>Ticket de báscula (opcional)</summary>
+          <Field label="Ticket de báscula">
+            <input aria-label="Ticket de báscula" value={values.weighTicketRef} onChange={(e) => setValues({ ...values, weighTicketRef: e.target.value })} />
+          </Field>
+        </details>
       </div>
       <LineTable>
         <thead>

@@ -77,6 +77,7 @@ export const NAV: readonly NavGroup[] = [
     items: [
       { href: "/almacen/por-recibir/", label: "Por recibir", permission: "goods_receipt:post" }, // UX3-02 (E-UX3-5)
       { href: "/almacen/recepciones/", label: "Recepciones", permission: "goods_receipt:read" },
+      { href: "/almacen/reporte-recepciones/", label: "Reporte de recepciones", permission: "goods_receipt:read" }, // REC-01 (E-REC-4)
       { href: "/almacen/correcciones/", label: "Correcciones", permission: "goods_receipt:read" },
       { href: "/maestros/articulos/", label: "Materias primas", permission: "master_data:read" },
       { href: "/maestros/productos-terminados/", label: "Productos terminados", permission: "master_data:read" },

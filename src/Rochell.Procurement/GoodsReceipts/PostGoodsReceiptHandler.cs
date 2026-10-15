@@ -48,6 +48,26 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
 
         var businessDate = BusinessCalendar.DefaultBusinessDate(occurredAt);
         var weighTicket = string.IsNullOrWhiteSpace(command.WeighTicketRef) ? null : command.WeighTicketRef.Trim();
+        var deliveryNote = (command.SupplierDeliveryNote ?? string.Empty).Trim();
+        if (deliveryNote.Length is 0 or > 60) // type-limit: pur.goods_receipt supplier_delivery_note
+        {
+            throw new DomainException(ProcurementErrors.SupplierDeliveryNoteRequired, "The supplier's delivery note number is required (1 to 60 characters, E-REC-2).");
+        }
+
+        // E-REC-1: our truck and our driver, both ACTIVE (the fleet's tables are read through SQL: no module reference).
+        await using (var fleet = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT (SELECT count(*) FROM log.vehicle WHERE company_id = @c AND vehicle_id = @v AND status = 'ACTIVE') + (SELECT count(*) FROM log.driver WHERE company_id = @c AND driver_id = @d AND status = 'ACTIVE')",
+            ("c", context.CompanyId),
+            ("v", (object?)command.VehicleId ?? DBNull.Value),
+            ("d", (object?)command.DriverId ?? DBNull.Value)))
+        {
+            if (command.VehicleId is null || command.DriverId is null || await fleet.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not 2L)
+            {
+                throw new DomainException(ProcurementErrors.ReceiptTransportRequired, "The receipt names one of our ACTIVE trucks and an ACTIVE driver (E-REC-1).");
+            }
+        }
 
         // N3: the order.
         var header = await PurchaseOrderStore.LockAsync(context, command.PurchaseOrderId, command.PlantId, null, cancellationToken).ConfigureAwait(false);
@@ -61,6 +81,8 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
         {
             await EnsureTicketUnusedAsync(context, weighTicket, cancellationToken).ConfigureAwait(false);
         }
+
+        await EnsureDeliveryNoteUnusedAsync(context, header.PartyId, deliveryNote, cancellationToken).ConfigureAwait(false);
 
         // N4: the order lines, in id order; quantities, tolerance, conversion and value.
         var poLines = await LockLinesAsync(context, header.Id, cancellationToken).ConfigureAwait(false);
@@ -147,8 +169,9 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
             context.Connection,
             context.Transaction,
             """
-            INSERT INTO pur.goods_receipt (gr_id, company_id, gr_no, po_id, location_id, weigh_ticket_ref, document_status, accounting_status, posting_event_id, occurred_at, version)
-            VALUES (@id, @c, @no, @po, @location, @ticket, 'POSTED', 'POSTED', @event, @occurred, 1)
+            INSERT INTO pur.goods_receipt (gr_id, company_id, gr_no, po_id, location_id, weigh_ticket_ref, document_status, accounting_status, posting_event_id, occurred_at, version,
+                                           vehicle_id, driver_id, supplier_party_id, supplier_delivery_note)
+            VALUES (@id, @c, @no, @po, @location, @ticket, 'POSTED', 'POSTED', @event, @occurred, 1, @vehicle, @driver, @supplier, @note)
             """,
             cancellationToken,
             ("id", grId),
@@ -158,7 +181,11 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
             ("location", command.LocationId),
             ("ticket", weighTicket),
             ("event", eventId),
-            ("occurred", occurredAt)).ConfigureAwait(false);
+            ("occurred", occurredAt),
+            ("vehicle", command.VehicleId),
+            ("driver", command.DriverId),
+            ("supplier", header.PartyId),
+            ("note", deliveryNote)).ConfigureAwait(false);
 
         var resultLines = new List<object>();
         var settlements = new List<ShortfallSettlement>();
@@ -274,6 +301,22 @@ public sealed class PostGoodsReceiptHandler : ICommandHandler<PostGoodsReceipt>
         if (excluded)
         {
             throw new DomainException(ProcurementErrors.LocationNotReceivable, "Raw material is not received into the curing (CURADO) or in-transit (TRANSITO) location.");
+        }
+    }
+
+    /// <summary>E-REC-2: a supplier's delivery note is received once while the receipt stands (the unique index backs it under concurrency).</summary>
+    private static async Task EnsureDeliveryNoteUnusedAsync(CommandContext context, Guid supplier, string note, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            "SELECT EXISTS (SELECT 1 FROM pur.goods_receipt WHERE company_id = @c AND supplier_party_id = @s AND upper(supplier_delivery_note) = upper(@n) AND document_status <> 'REVERSED')",
+            ("c", context.CompanyId),
+            ("s", supplier),
+            ("n", note));
+        if (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true)
+        {
+            throw new DomainException(ProcurementErrors.SupplierDeliveryNoteUsed, $"The supplier's delivery note {note} is already received (E-REC-2).");
         }
     }
 

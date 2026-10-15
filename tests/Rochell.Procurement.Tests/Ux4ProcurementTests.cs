@@ -19,7 +19,7 @@ public sealed class Ux4ProcurementTests(PostgresFixture postgres)
 
     private static Task<CommandResult> Receive(TestHarness h, TestInvoicing s, string key, Guid location, decimal quantity = 1m)
         => h.RunAsync(
-            new PostGoodsReceipt(h.CompanyId, s.Receiving.Storekeeper, key, s.Purchasing.PlantId, s.PurchaseOrderId, location, h.Clock.UtcNow.AddMinutes(-1), [new(s.PoLineId, quantity)]),
+            new PostGoodsReceipt(h.CompanyId, s.Receiving.Storekeeper, key, s.Purchasing.PlantId, s.PurchaseOrderId, location, h.Clock.UtcNow.AddMinutes(-1), [new(s.PoLineId, quantity)]).WithTransport(s.Receiving),
             new PostGoodsReceiptHandler());
 
     [Fact]

@@ -43,3 +43,15 @@ materiality it is DRAFT, above it PENDING_APPROVAL. `ApproveReceiptCorrection` (
 - The receipt becomes CORRECTED (and can then no longer be reversed); the order's received quantity and status follow.
 
 **Setup:** approve R-03A and R-03B; map PURCHASE_PRICE_VARIANCE and MATERIAL_USAGE_VARIANCE; INVENTORY policy active.
+
+## Transport, the supplier's note and the receipt report (REC-01)
+
+E-REC-1…4, migration 0125. `PostGoodsReceipt` names our truck and driver (`VehicleId`, `DriverId`, both ACTIVE in
+`log.vehicle` / `log.driver`, read through SQL) and the supplier's delivery note (`SupplierDeliveryNote`, 1–60 characters). A note
+is received once per supplier while the receipt stands (case-insensitive; reversing the receipt frees it). The weigh ticket stays
+optional; the screen asks «Fecha y hora de llegada» and folds the ticket.
+
+- `ListReceivingFleet` (`/procurement/receiving-fleet`): our ACTIVE trucks and drivers for the screen.
+- `GetGoodsReceiptReport` (`/procurement/goods-receipt-report`, `format=csv`): one row per line of the non-reversed receipts whose
+  Dominican date falls between `from` and `to` (at most a year), filtered by supplier, material, location and plant, with totals
+  per material and unit. Almacén › Reporte de recepciones shows it and downloads the CSV.

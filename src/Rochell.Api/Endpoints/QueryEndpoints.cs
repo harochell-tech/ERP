@@ -63,7 +63,7 @@ public static class QueryEndpoints
         typeof(PreviewSupplierImportHandler), typeof(PreviewCustomerImportHandler),
         typeof(PreviewPurchaseOrderHandler), typeof(PreviewSalesOrderHandler), typeof(PreviewCashSaleHandler), typeof(PreviewQuoteHandler), typeof(GetCreditPreviewHandler), typeof(SuggestReceiptApplicationHandler),
         typeof(ListLatestReconciliationRunsHandler), typeof(SearchJournalsHandler), typeof(GetIntegrityStatusHandler),
-        typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(GetGoodsReceiptHandler),
+        typeof(ListPurchaseOrdersHandler), typeof(GetPurchaseOrderHandler), typeof(ListPurchaseOrdersToReceiveHandler), typeof(ListGoodsReceiptsHandler), typeof(ListReceivingFleetHandler), typeof(GetGoodsReceiptReportHandler), typeof(GetGoodsReceiptHandler),
         typeof(ListReceiptCorrectionsHandler), typeof(ListCustomsDeclarationsHandler), typeof(ListImportSettlementsHandler), typeof(GetImportSettlementHandler), typeof(ListSupplierInvoicesHandler), typeof(ListSupplierDocumentsHandler), typeof(GetSupplierDocumentHandler), typeof(GetSupplierDocumentFileHandler), typeof(ListExpenseCategoriesHandler), typeof(PreviewExpensePurchaseOrderHandler), typeof(PreviewExpenseInvoiceHandler), typeof(GetSupplierInvoiceHandler),
         typeof(ListPeriodsHandler), typeof(GetSetupStatusHandler), typeof(ListReconciliationRunsHandler), typeof(GetReconciliationRunHandler),
         typeof(GetCloseReadinessHandler), typeof(ListReconciliationDefinitionsHandler),
@@ -138,6 +138,13 @@ public static class QueryEndpoints
                     http, (s, b) => new PreviewPurchaseOrder(companyId, s, b.PlantId, b.PartyId, b.OrderDate, b.Lines), handler, ct))
             .Describe<PurchaseOrderPreview>(nameof(PreviewPurchaseOrder))
             .Accepts<PurchaseOrderPreviewRequest>("application/json");
+        // REC-01 (E-REC-1, E-REC-4): our transport for the receiving screen, and the report of raw material received (JSON or CSV).
+        procurement.MapGet("/receiving-fleet", (HttpContext http, Guid companyId, ListReceivingFleetHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListReceivingFleet(companyId, s), handler, ct))
+            .Describe<ReceivingFleet>(nameof(ListReceivingFleet));
+        procurement.MapGet("/goods-receipt-report", (HttpContext http, Guid companyId, DateOnly from, DateOnly to, Guid? supplierId, Guid? itemId, Guid? locationId, Guid? plantId, string? format, GetGoodsReceiptReportHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunReportAsync(http, format, s => new GetGoodsReceiptReport(companyId, s, from, to, supplierId, itemId, locationId, plantId), handler, GoodsReceiptCsv.Report, $"recepciones-{from:yyyyMMdd}-{to:yyyyMMdd}.csv", ct))
+            .Describe<GoodsReceiptReport>(nameof(GetGoodsReceiptReport)).Csv<GoodsReceiptReport>();
         procurement.MapGet("/goods-receipts", (HttpContext http, Guid companyId, Guid? plantId, Guid? purchaseOrderId, string? documentStatus, int? limit, int? offset, ListGoodsReceiptsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListGoodsReceipts(companyId, s, plantId, purchaseOrderId, documentStatus, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<GoodsReceiptList>(nameof(ListGoodsReceipts));

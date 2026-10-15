@@ -27,7 +27,7 @@ public sealed class GoodsReceiptReversalTests(PostgresFixture postgres)
     private static async Task<(Guid Gr, Guid Lot)> ReceiveAsync(TestHarness h, TestReceiving r, Guid po, Guid line, decimal qty, string key, string? ticket = null)
     {
         var result = await h.RunAsync(
-            new PostGoodsReceipt(h.CompanyId, r.Storekeeper, key, r.Purchasing.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-5), [new(line, qty)], ticket),
+            new PostGoodsReceipt(h.CompanyId, r.Storekeeper, key, r.Purchasing.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-5), [new(line, qty)], ticket).WithTransport(r),
             new PostGoodsReceiptHandler());
         var lot = JsonDocument.Parse(result.ResultPayload).RootElement.GetProperty("lines")[0].GetProperty("lotId").GetGuid();
         return (result.ResultRef, lot);
