@@ -39,6 +39,9 @@ services:
       Rochell__AppConnectionString: Host=postgres;Database=rochell;Username=rochell_app_login;Password=${APP_DB_PASSWORD:?}
       Rochell__SealerConnectionString: Host=postgres;Database=rochell;Username=rochell_sealer_login;Password=${SEALER_DB_PASSWORD:?}
       Rochell__Identity__HostedDomain: ${WORKSPACE_DOMAIN:?}
+      # E-SEC-1 / E-SEC-2: one Google confirmation covers the working day; a session closes after four idle hours (twelve at most).
+      Rochell__Identity__StepUpMaxAge: "08:00:00"
+      Rochell__Identity__SessionIdleTimeout: "04:00:00"
       Rochell__Oidc__Authority: https://accounts.google.com
       Rochell__Oidc__ClientId: ${OIDC_CLIENT_ID:?}
       Rochell__Oidc__ClientSecret: ${OIDC_CLIENT_SECRET:?}

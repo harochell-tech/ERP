@@ -99,6 +99,66 @@ internal static class Deliveries
             new EventDraft(eventType, 1, Aggregate, deliveryId, version, JsonSerializer.Serialize(payload), Publish: true, OccurredAt: occurredAt, BusinessDate: businessDate),
             cancellationToken).ConfigureAwait(false);
 
+    /// <summary>E-VS3-04-6: PLANNED → LOADING with the transport — from StartLoading and, with the transport given, from PlanDelivery (E-DSP-2).</summary>
+    public static async Task<long> StartLoadingAsync(
+        CommandContext context, Guid deliveryId, Row row, Guid? vehicleId, Guid? driverId, string? customerPlate, string? customerDriver, string commandType,
+        CancellationToken cancellationToken)
+    {
+        if (row.Status != "PLANNED")
+        {
+            throw new DomainException(SalesErrors.InvalidState, $"The delivery is {row.Status}.");
+        }
+
+        string? plate = null;
+        string? driverName = null;
+        if (row.Term == DeliveryTerms.DeliveredOwnTransport)
+        {
+            // E-VS3-04-6: our vehicle and driver, both ACTIVE.
+            var active = vehicleId is { } v && driverId is { } dr && await SalesSql.ScalarAsync<long?>(
+                context,
+                "SELECT (SELECT count(*) FROM log.vehicle WHERE company_id = @c AND vehicle_id = @v AND status = 'ACTIVE') + (SELECT count(*) FROM log.driver WHERE company_id = @c AND driver_id = @d AND status = 'ACTIVE')",
+                cancellationToken,
+                ("c", context.CompanyId),
+                ("v", v),
+                ("d", dr)).ConfigureAwait(false) == 2;
+            if (!active)
+            {
+                throw new DomainException(DeliveryErrors.TransportRequired, "A site delivery leaves in one of our ACTIVE vehicles with an ACTIVE driver.");
+            }
+        }
+        else
+        {
+            plate = SalesSql.Optional(customerPlate, 20, "The customer's plate")?.ToUpperInvariant();
+            driverName = SalesSql.Optional(customerDriver, 200, "The customer's driver");
+            if (plate is null || driverName is null)
+            {
+                throw new DomainException(DeliveryErrors.TransportRequired, "A pickup records the customer's plate and driver.");
+            }
+        }
+
+        var version = row.Version + 1;
+        var eventId = await AppendAsync(
+            context, deliveryId, version, "DeliveryLoadingStarted",
+            new { deliveryId, vehicleId, driverId, customerVehiclePlate = plate, customerDriverName = driverName },
+            context.Clock.UtcNow, SalesSql.Today(context), cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            UPDATE log.delivery SET status = 'LOADING', vehicle_id = @v, driver_id = @dr, customer_vehicle_plate = @plate, customer_driver_name = @name, version = @ver
+            WHERE delivery_id = @d
+            """,
+            cancellationToken,
+            ("v", row.Term == DeliveryTerms.DeliveredOwnTransport ? vehicleId : null),
+            ("dr", row.Term == DeliveryTerms.DeliveredOwnTransport ? driverId : null),
+            ("plate", plate),
+            ("name", driverName),
+            ("ver", version),
+            ("d", deliveryId)).ConfigureAwait(false);
+        await context.AppendStateAsync(Aggregate, deliveryId, "DOCUMENT", "PLANNED", "LOADING", commandType, eventId, cancellationToken).ConfigureAwait(false);
+        return version;
+    }
+
     public static decimal Base(decimal quantity, decimal factor) => decimal.Round(quantity * factor, 6, MidpointRounding.AwayFromZero);
 
     /// <summary>E-VS3-04-1: the plant's TRANSITO location, created the first time the plant dispatches in its own truck.</summary>
@@ -138,6 +198,11 @@ internal static class Deliveries
                 throw new DomainException(DeliveryErrors.ScanInvalid, $"Line {lineNo}: the rack number is 1 or more.");
             }
 
+            if (scan.Quantity is { } chosen && (chosen <= 0m || decimal.Round(chosen, 6) != chosen))
+            {
+                throw new DomainException(DeliveryErrors.ScanInvalid, $"Line {lineNo}: the quantity taken from a chosen lot is positive with at most 6 decimals (E-DSP-5).");
+            }
+
             var lot = await Reading.ListAsync(
                 context.Connection,
                 context.Transaction,
@@ -162,20 +227,21 @@ internal static class Deliveries
             await Sql.ExecuteAsync(
                 context.Connection,
                 context.Transaction,
-                "INSERT INTO log.delivery_line_scan (delivery_line_id, company_id, seq, lot_id, rack_no) VALUES (@l, @c, @s, @lot, @rack)",
+                "INSERT INTO log.delivery_line_scan (delivery_line_id, company_id, seq, lot_id, rack_no, base_quantity) VALUES (@l, @c, @s, @lot, @rack, @q)",
                 cancellationToken,
-                ("l", lineId), ("c", context.CompanyId), ("s", ++seq), ("lot", scan.LotId), ("rack", scan.RackNo)).ConfigureAwait(false);
+                ("l", lineId), ("c", context.CompanyId), ("s", ++seq), ("lot", scan.LotId), ("rack", scan.RackNo), ("q", scan.Quantity)).ConfigureAwait(false);
         }
     }
 
     /// <summary>
     /// The lots of an item in a location, oldest code first (E-VS3-04-5), covering <paramref name="baseQuantity"/>. A lot Calidad or the
     /// lab blocked is never taken, even with stock in the yard (E-LAB1-4, E-LAB1-02-11: its status is read from Manufacturing's table).
-    /// The <paramref name="scanned"/> lots go first, in the order scanned and up to their stock; the rest is FIFO (E-LAB1-03-12). A scanned
+    /// The <paramref name="scanned"/> lots go first, in the order scanned and up to their stock — or to the quantity chosen for them (E-DSP-5);
+    /// the rest is FIFO (E-LAB1-03-12). A scanned
     /// lot blocked since it was loaded stops the gate-out: the truck carries it (E-LAB1-03-16).
     /// </summary>
     public static async Task<List<(Guid LotId, decimal Quantity)>> FifoAsync(
-        CommandContext context, Guid locationId, Guid itemId, decimal baseQuantity, CancellationToken cancellationToken, IReadOnlyList<Guid>? scanned = null)
+        CommandContext context, Guid locationId, Guid itemId, decimal baseQuantity, CancellationToken cancellationToken, IReadOnlyList<(Guid LotId, decimal? Quantity)>? scanned = null)
     {
         var lots = await Reading.ListAsync(
             context.Connection,
@@ -192,7 +258,7 @@ internal static class Deliveries
         var picked = new List<(Guid, decimal)>();
         var remaining = baseQuantity;
         var first = scanned ?? [];
-        foreach (var lotId in first)
+        foreach (var (lotId, chosen) in first)
         {
             var row = lots.FirstOrDefault(l => l.LotId == lotId);
             if (row.Blocked)
@@ -205,12 +271,13 @@ internal static class Deliveries
                 continue;
             }
 
-            var take = Math.Min(row.Quantity, remaining);
+            var take = Math.Min(Math.Min(row.Quantity, remaining), chosen ?? row.Quantity);
             picked.Add((lotId, take));
             remaining -= take;
         }
 
-        foreach (var (lot, available, _) in lots.Where(l => !l.Blocked && !first.Contains(l.LotId)))
+        var firstIds = first.Select(f => f.LotId).ToHashSet();
+        foreach (var (lot, available, _) in lots.Where(l => !l.Blocked && !firstIds.Contains(l.LotId)))
         {
             if (remaining <= 0m)
             {
@@ -504,7 +571,16 @@ public sealed class PlanDeliveryHandler : ICommandHandler<PlanDelivery>
         }
 
         await context.AppendStateAsync(Deliveries.Aggregate, context.ResultRef, "DOCUMENT", null, "PLANNED", CommandType, eventId, cancellationToken).ConfigureAwait(false);
-        return JsonSerializer.Serialize(new { deliveryId = context.ResultRef, deliveryNo, status = "PLANNED", version = 1 });
+        if (command.VehicleId is null && command.DriverId is null && string.IsNullOrWhiteSpace(command.CustomerVehiclePlate) && string.IsNullOrWhiteSpace(command.CustomerDriverName))
+        {
+            return JsonSerializer.Serialize(new { deliveryId = context.ResultRef, deliveryNo, status = "PLANNED", version = 1 });
+        }
+
+        // E-DSP-2: the transport chosen with the delivery starts its loading.
+        var row = await Deliveries.LockAsync(context, context.ResultRef, 1, cancellationToken).ConfigureAwait(false);
+        var loading = await Deliveries.StartLoadingAsync(
+            context, context.ResultRef, row, command.VehicleId, command.DriverId, command.CustomerVehiclePlate, command.CustomerDriverName, CommandType, cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.Serialize(new { deliveryId = context.ResultRef, deliveryNo, status = "LOADING", version = loading });
     }
 }
 
@@ -518,58 +594,8 @@ public sealed class StartLoadingHandler : ICommandHandler<StartLoading>
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
         var row = await Deliveries.LockAsync(context, command.DeliveryId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
-        if (row.Status != "PLANNED")
-        {
-            throw new DomainException(SalesErrors.InvalidState, $"The delivery is {row.Status}.");
-        }
-
-        string? plate = null;
-        string? driverName = null;
-        if (row.Term == DeliveryTerms.DeliveredOwnTransport)
-        {
-            // E-VS3-04-6: our vehicle and driver, both ACTIVE.
-            var active = command.VehicleId is { } v && command.DriverId is { } dr && await SalesSql.ScalarAsync<long?>(
-                context,
-                "SELECT (SELECT count(*) FROM log.vehicle WHERE company_id = @c AND vehicle_id = @v AND status = 'ACTIVE') + (SELECT count(*) FROM log.driver WHERE company_id = @c AND driver_id = @d AND status = 'ACTIVE')",
-                cancellationToken,
-                ("c", context.CompanyId),
-                ("v", v),
-                ("d", dr)).ConfigureAwait(false) == 2;
-            if (!active)
-            {
-                throw new DomainException(DeliveryErrors.TransportRequired, "A site delivery leaves in one of our ACTIVE vehicles with an ACTIVE driver.");
-            }
-        }
-        else
-        {
-            plate = SalesSql.Optional(command.CustomerVehiclePlate, 20, "The customer's plate")?.ToUpperInvariant();
-            driverName = SalesSql.Optional(command.CustomerDriverName, 200, "The customer's driver");
-            if (plate is null || driverName is null)
-            {
-                throw new DomainException(DeliveryErrors.TransportRequired, "A pickup records the customer's plate and driver.");
-            }
-        }
-
-        var version = row.Version + 1;
-        var eventId = await Deliveries.AppendAsync(
-            context, command.DeliveryId, version, "DeliveryLoadingStarted",
-            new { deliveryId = command.DeliveryId, vehicleId = command.VehicleId, driverId = command.DriverId, customerVehiclePlate = plate, customerDriverName = driverName },
-            context.Clock.UtcNow, SalesSql.Today(context), cancellationToken).ConfigureAwait(false);
-        await Sql.ExecuteAsync(
-            context.Connection,
-            context.Transaction,
-            """
-            UPDATE log.delivery SET status = 'LOADING', vehicle_id = @v, driver_id = @dr, customer_vehicle_plate = @plate, customer_driver_name = @name, version = @ver
-            WHERE delivery_id = @d
-            """,
-            cancellationToken,
-            ("v", row.Term == DeliveryTerms.DeliveredOwnTransport ? command.VehicleId : null),
-            ("dr", row.Term == DeliveryTerms.DeliveredOwnTransport ? command.DriverId : null),
-            ("plate", plate),
-            ("name", driverName),
-            ("ver", version),
-            ("d", command.DeliveryId)).ConfigureAwait(false);
-        await context.AppendStateAsync(Deliveries.Aggregate, command.DeliveryId, "DOCUMENT", "PLANNED", "LOADING", CommandType, eventId, cancellationToken).ConfigureAwait(false);
+        var version = await Deliveries.StartLoadingAsync(
+            context, command.DeliveryId, row, command.VehicleId, command.DriverId, command.CustomerVehiclePlate, command.CustomerDriverName, CommandType, cancellationToken).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = "LOADING", version });
     }
 }
@@ -667,24 +693,32 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
-        var ticket = SalesSql.Optional(command.WeighTicketRef, 100, "The weigh ticket")
-            ?? throw new DomainException(DeliveryErrors.WeighingInvalid, "The weigh ticket reference is required.");
-        var ticketHash = Deliveries.Sha256(command.WeighTicketSha256);
-        if (command.TareKg < 0m || command.GrossKg <= command.TareKg || decimal.Round(command.GrossKg, 6) != command.GrossKg || decimal.Round(command.TareKg, 6) != command.TareKg)
-        {
-            throw new DomainException(DeliveryErrors.WeighingInvalid, "Gross weight above tare, both in kg with at most 6 decimals.");
-        }
-
         var (order, row) = await Deliveries.LockWithOrderAsync(context, command.DeliveryId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         if (row.Status != "LOADED")
         {
             throw new DomainException(SalesErrors.InvalidState, $"The delivery is {row.Status}.");
         }
 
+        // E-DSP-1: a plant with a truck scale weighs every truck (E-VS3-04-7); without one the weighing is left out, or given whole.
+        var scale = await SalesSql.ScalarAsync<bool>(context, "SELECT has_truck_scale FROM md.plant WHERE plant_id = @p", cancellationToken, ("p", row.PlantId)).ConfigureAwait(false);
+        var weighed = scale || command.GrossKg is not null || command.TareKg is not null || !string.IsNullOrWhiteSpace(command.WeighTicketRef) || !string.IsNullOrWhiteSpace(command.WeighTicketSha256);
+        string? ticket = null;
+        byte[]? ticketHash = null;
+        if (weighed)
+        {
+            ticket = SalesSql.Optional(command.WeighTicketRef, 100, "The weigh ticket")
+                ?? throw new DomainException(DeliveryErrors.WeighingInvalid, "The weigh ticket reference is required.");
+            ticketHash = Deliveries.Sha256(command.WeighTicketSha256);
+            if (command.GrossKg is not { } g || command.TareKg is not { } t || t < 0m || g <= t || decimal.Round(g, 6) != g || decimal.Round(t, 6) != t)
+            {
+                throw new DomainException(DeliveryErrors.WeighingInvalid, "Gross weight above tare, both in kg with at most 6 decimals.");
+            }
+        }
+
         // E-CF1-4, E-CF1-02-2: a cash sale leaves the gate only while the money that counts covers it (a bounced cheque stops it).
         await CashSales.CashSaleStore.EnsureCoveredAsync(context, row.SalesOrderId, order, cancellationToken).ConfigureAwait(false);
 
-        if (row.VehicleId is { } vehicle && await SalesSql.ScalarAsync<decimal?>(context, "SELECT capacity_kg FROM log.vehicle WHERE vehicle_id = @v", cancellationToken, ("v", vehicle)).ConfigureAwait(false) is { } capacity
+        if (weighed && row.VehicleId is { } vehicle && await SalesSql.ScalarAsync<decimal?>(context, "SELECT capacity_kg FROM log.vehicle WHERE vehicle_id = @v", cancellationToken, ("v", vehicle)).ConfigureAwait(false) is { } capacity
             && command.GrossKg - command.TareKg > capacity)
         {
             throw new DomainException(DeliveryErrors.OverCapacity, $"Net weight {command.GrossKg - command.TareKg} kg exceeds the vehicle's {capacity} kg (E-VS3-04-7).");
@@ -706,7 +740,7 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
         var version = row.Version + 1;
         var issued = await Deliveries.AppendAsync(
             context, command.DeliveryId, version, "GoodsIssued",
-            new { deliveryId = command.DeliveryId, deliveryNo = row.DeliveryNo, grossKg = Deliveries.M(command.GrossKg), tareKg = Deliveries.M(command.TareKg), weighTicketRef = ticket, controlTransfersAt = row.Control },
+            new { deliveryId = command.DeliveryId, deliveryNo = row.DeliveryNo, grossKg = weighed && command.GrossKg is { } gk ? Deliveries.M(gk) : null, tareKg = weighed && command.TareKg is { } tk ? Deliveries.M(tk) : null, weighTicketRef = ticket, controlTransfersAt = row.Control },
             occurredAt, businessDate, cancellationToken).ConfigureAwait(false);
         var control = atGate
             ? await Deliveries.AppendAsync(context, command.DeliveryId, version, "ControlTransferred", new { deliveryId = command.DeliveryId, deliveryNo = row.DeliveryNo, trigger = "GATE_OUT" }, occurredAt, businessDate, cancellationToken).ConfigureAwait(false)
@@ -720,8 +754,8 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
             var baseQuantity = Deliveries.Base(line.Planned, line.Factor!.Value);
             var source = new MovementSource(movementEvent, Deliveries.DocumentType, command.DeliveryId, line.Id);
             var scanned = await Reading.ListAsync(
-                context.Connection, context.Transaction, "SELECT lot_id FROM log.delivery_line_scan WHERE delivery_line_id = @l ORDER BY seq", r => r.GetGuid(0), cancellationToken,
-                ("l", line.Id)).ConfigureAwait(false);
+                context.Connection, context.Transaction, "SELECT lot_id, base_quantity FROM log.delivery_line_scan WHERE delivery_line_id = @l ORDER BY seq",
+                r => (r.GetGuid(0), r.IsDBNull(1) ? (decimal?)null : r.GetDecimal(1)), cancellationToken, ("l", line.Id)).ConfigureAwait(false);
             foreach (var (lot, quantity) in await Deliveries.FifoAsync(context, line.Source!.Value, line.ItemId, baseQuantity, cancellationToken, scanned).ConfigureAwait(false))
             {
                 var reservation = await _inventory.ReserveIssueAsync(context, line.Source.Value, line.ItemId, lot, quantity, cancellationToken).ConfigureAwait(false);
@@ -780,8 +814,8 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
             WHERE delivery_id = @d
             """,
             cancellationToken,
-            ("g", command.GrossKg),
-            ("t", command.TareKg),
+            ("g", weighed ? command.GrossKg : null),
+            ("t", weighed ? command.TareKg : null),
             ("ref", ticket),
             ("hash", ticketHash),
             ("at", occurredAt),
@@ -810,6 +844,33 @@ public sealed class RecordGateOutHandler : ICommandHandler<RecordGateOut>
         }
 
         return JsonSerializer.Serialize(new { deliveryId = command.DeliveryId, status = to, controlTransferred = atGate, version, proformaId = proforma?.ProformaId, proformaNo = proforma?.ProformaNo });
+    }
+}
+
+/// <summary>E-DSP-3: «Despachar» — ConfirmLoaded and RecordGateOut in one transaction, at a plant without a truck scale.</summary>
+[RequiresPermission("delivery:manage")]
+public sealed class DispatchDeliveryHandler : ICommandHandler<DispatchDelivery>
+{
+    public string CommandType => "Sales.DispatchDelivery";
+
+    public async Task<string> HandleAsync(DispatchDelivery command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var plant = await SalesSql.ScalarAsync<Guid?>(
+            context, "SELECT plant_id FROM log.delivery WHERE company_id = @c AND delivery_id = @d", cancellationToken, ("c", context.CompanyId), ("d", command.DeliveryId)).ConfigureAwait(false)
+            ?? throw new DomainException(SalesErrors.NotFound, "The delivery does not exist.");
+        if (await SalesSql.ScalarAsync<bool>(context, "SELECT has_truck_scale FROM md.plant WHERE plant_id = @p", cancellationToken, ("p", plant)).ConfigureAwait(false))
+        {
+            throw new DomainException(DeliveryErrors.WeighingInvalid, "The plant has a truck scale: confirm the loading and record the gate-out with the weighing (E-DSP-1).");
+        }
+
+        var loaded = JsonDocument.Parse(await new ConfirmLoadedHandler().HandleAsync(
+            new ConfirmLoaded(command.CompanyId, command.SessionId, command.IdempotencyKey, command.DeliveryId, command.ExpectedVersion, command.Lines), context, cancellationToken)
+            .ConfigureAwait(false)).RootElement;
+        return await new RecordGateOutHandler().HandleAsync(
+            new RecordGateOut(command.CompanyId, command.SessionId, command.IdempotencyKey, command.DeliveryId, loaded.GetProperty("version").GetInt64()), context, cancellationToken)
+            .ConfigureAwait(false);
     }
 }
 

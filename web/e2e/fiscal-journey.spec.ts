@@ -29,13 +29,6 @@ async function attach(page: Page, label: string, name: string) {
   await expect(page.getByLabel("SHA-256")).toHaveValue(/^[0-9a-f]{64}$/);
 }
 
-/** UX3-02 (E-UX3-8 (a)): weigh tickets and PODs show no SHA-256 field; choosing the file verifies its fingerprint. */
-async function attachEvidence(page: Page, label: string, name: string) {
-  await page.getByLabel(label, { exact: true }).setInputFiles({ name, mimeType: "application/octet-stream", buffer: Buffer.from(`evidencia ${name}`) });
-  await expect(page.getByTestId("evidence-verified")).toHaveText(`✓ Huella del archivo verificada: ${name}`);
-  await expect(page.getByLabel("SHA-256")).toHaveCount(0);
-}
-
 test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", async ({ browser }) => {
   const stamp = String(Date.now());
   const certificate = `CERT-E2E-${stamp}`;
@@ -100,21 +93,15 @@ test("a CONFOTUR authorization verified and consumed by an e-CF 44 invoice", asy
   await dispatch.goto(orderUrl);
   await dispatch.getByRole("link", { name: "Planificar conduce" }).click();
   await dispatch.getByLabel("A despachar BLOQUE-6").fill("40");
-  await dispatch.getByRole("button", { name: "Planificar conduce" }).click();
-  const delivery = dispatch.getByTestId("delivery-status");
-  await expect(delivery).toHaveText("Planificado");
-  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
-  expect(deliveryNo).not.toBe("");
   await dispatch.getByLabel("Placa del cliente").fill("G654321");
   await dispatch.getByLabel("Chofer del cliente").fill("Pedro Díaz");
-  await dispatch.getByRole("button", { name: "Iniciar carga" }).click();
+  await dispatch.getByRole("button", { name: "Planificar conduce" }).click();
+  const delivery = dispatch.getByTestId("delivery-status");
   await expect(delivery).toHaveText("Cargando");
-  await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
-  await expect(delivery).toHaveText("Cargado");
-  await dispatch.getByLabel("Peso bruto (kg)").fill("5000");
-  await dispatch.getByLabel("Tara (kg)").fill("4400");
-  await attachEvidence(dispatch, "Ticket de báscula", "ticket-e2e-44.jpg");
-  await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
+  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
+  expect(deliveryNo).not.toBe("");
+  await expect(delivery).toHaveText("Cargando");
+  await dispatch.getByRole("button", { name: "Despachar" }).click();
   await expect(delivery).toHaveText("Entregado");
 
   // Facturación invoices the delivery under the authorization: e-CF 44, ITBIS 0.00.

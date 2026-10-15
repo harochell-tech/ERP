@@ -22,6 +22,9 @@ public sealed record RenameLocation(Guid CompanyId, Guid SessionId, string Idemp
 /// <summary>E-PLT-3: a plant out of use (no stock, no run in progress, no dispatch on its way) or back in use.</summary>
 public sealed record SetPlantStatus(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PlantId, bool Active) : ICommand;
 
+/// <summary>E-DSP-1: whether the plant has a truck scale — with one every gate-out is weighed, without one nothing is weighed.</summary>
+public sealed record SetPlantTruckScale(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid PlantId, bool HasTruckScale) : ICommand;
+
 /// <summary>E-PLT-3: a location out of use (no stock in it; never CURADO or TRANSITO) or back in use.</summary>
 public sealed record SetLocationStatus(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid LocationId, bool Active) : ICommand;
 
@@ -239,6 +242,36 @@ public sealed class SetPlantStatusHandler : ICommandHandler<SetPlantStatus>
         await Sql.ExecuteAsync(
             context.Connection, context.Transaction, "UPDATE md.plant SET status = @s WHERE plant_id = @p", cancellationToken, ("s", to), ("p", command.PlantId)).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { plantId = command.PlantId, plant.Code, status = to });
+    }
+}
+
+[RequiresPermission("company:manage", StepUp = true)]
+public sealed class SetPlantTruckScaleHandler : ICommandHandler<SetPlantTruckScale>
+{
+    public string CommandType => "MasterData.SetPlantTruckScale";
+
+    public async Task<string> HandleAsync(SetPlantTruckScale command, CommandContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(context);
+        var plant = (await Reading.ListAsync(
+            context.Connection, context.Transaction, "SELECT code, has_truck_scale FROM md.plant WHERE company_id = @c AND plant_id = @p FOR UPDATE",
+            r => (Code: r.GetString(0), Scale: r.GetBoolean(1)), cancellationToken, ("c", context.CompanyId), ("p", command.PlantId)).ConfigureAwait(false)).SingleOrDefault();
+        if (plant == default)
+        {
+            throw new DomainException(PlantErrors.NotFound, "The plant does not exist.");
+        }
+
+        if (plant.Scale != command.HasTruckScale)
+        {
+            await PlantRules.PlantEventAsync(context, command.PlantId, "PlantTruckScaleSet", new { plantId = command.PlantId, plant.Code, hasTruckScale = command.HasTruckScale }, cancellationToken)
+                .ConfigureAwait(false);
+            await Sql.ExecuteAsync(
+                context.Connection, context.Transaction, "UPDATE md.plant SET has_truck_scale = @s WHERE plant_id = @p", cancellationToken, ("s", command.HasTruckScale), ("p", command.PlantId))
+                .ConfigureAwait(false);
+        }
+
+        return JsonSerializer.Serialize(new { plantId = command.PlantId, plant.Code, hasTruckScale = command.HasTruckScale });
     }
 }
 
