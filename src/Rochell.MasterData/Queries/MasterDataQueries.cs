@@ -138,8 +138,10 @@ public sealed record ListPlants(Guid CompanyId, Guid SessionId, Guid? PlantId = 
 public sealed record LocationView(Guid LocationId, string Code, string? Name = null, string Status = "ACTIVE");
 
 /// <param name="Name">E-UX1-01-4: the readable name, null until one is set.</param>
+/// <param name="HasTruckScale">E-DSP-1: the gate-out is weighed only at a plant with a truck scale.</param>
 public sealed record PlantView(
-    Guid PlantId, string Code, Guid ValuationAreaId, string ValuationAreaCode, IReadOnlyList<LocationView> Locations, string? Name = null, string Status = "ACTIVE");
+    Guid PlantId, string Code, Guid ValuationAreaId, string ValuationAreaCode, IReadOnlyList<LocationView> Locations, string? Name = null, string Status = "ACTIVE",
+    bool HasTruckScale = false);
 
 public sealed record PlantList(IReadOnlyList<PlantView> Items);
 
@@ -156,13 +158,13 @@ public sealed class ListPlantsHandler : IQueryHandler<ListPlants>
             context.Connection,
             context.Transaction,
             """
-            SELECT p.plant_id, p.code, p.valuation_area_id, va.code, p.name, p.status
+            SELECT p.plant_id, p.code, p.valuation_area_id, va.code, p.name, p.status, p.has_truck_scale
             FROM md.plant p
             JOIN md.valuation_area va ON va.valuation_area_id = p.valuation_area_id
             WHERE p.company_id = @c AND (CAST(@plant AS uuid) IS NULL OR p.plant_id = CAST(@plant AS uuid)) AND (@all OR p.status = 'ACTIVE')
             ORDER BY p.code
             """,
-            r => new PlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), [], r.NullableString(4), r.GetString(5)),
+            r => new PlantView(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), [], r.NullableString(4), r.GetString(5), r.GetBoolean(6)),
             cancellationToken,
             ("c", context.CompanyId),
             ("plant", query.PlantId),

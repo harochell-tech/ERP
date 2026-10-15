@@ -56,6 +56,7 @@ function PlantCard({ plant, manage, onDone }: { plant: Plant; manage: boolean; o
   const addLocation = useCommand(`create-location:${plant.plantId}`, "/api/v1/companies/{companyId}/master-data/create-location");
   const rename = useCommand(`rename-location:${plant.plantId}`, "/api/v1/companies/{companyId}/master-data/rename-location");
   const locationStatus = useCommand(`location-status:${plant.plantId}`, "/api/v1/companies/{companyId}/master-data/set-location-status");
+  const scale = useCommand(`plant-scale:${plant.plantId}`, "/api/v1/companies/{companyId}/master-data/set-plant-truck-scale");
   const [form, setForm] = useState({ code: "", name: "" });
   const [names, setNames] = useState<Record<string, string>>({});
   const active = (plant.status ?? "ACTIVE") === "ACTIVE";
@@ -66,6 +67,20 @@ function PlantCard({ plant, manage, onDone }: { plant: Plant; manage: boolean; o
         {label} <StatusBadge status={plant.status ?? "ACTIVE"} label={STATUS[plant.status ?? "ACTIVE"]} />
       </h2>
       <p className="muted">Área de valuación {plant.valuationAreaCode}</p>
+      <p data-testid={`truck-scale:${plant.code}`}>
+        {plant.hasTruckScale ? "Tiene báscula de camiones: cada despacho se pesa al salir." : "Sin báscula de camiones: los despachos salen sin pesada."}{" "}
+        {manage ? (
+          <button
+            type="button"
+            className="link"
+            disabled={scale.busy}
+            onClick={async () => (await scale.run({ plantId: plant.plantId, hasTruckScale: !plant.hasTruckScale })) && onDone()}
+          >
+            {plant.hasTruckScale ? "Quitar la báscula" : "Indicar que tiene báscula"}
+          </button>
+        ) : null}
+      </p>
+      <ErrorBox error={scale.error} />
       <div className="table-wrap">
         <table>
           <thead>

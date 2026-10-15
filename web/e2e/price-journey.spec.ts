@@ -97,21 +97,14 @@ test("customer price list with freight, from the list to the invoice (E2E-PR1)",
   // Despacho: our truck, the conduce shows the freight, the POD.
   const dispatch = await signIn(browser, "Despacho");
   await dispatch.goto(`/despacho/planificar/?pedido=${orderId}`);
-  await submit(dispatch, "Planificar conduce");
-  const status = dispatch.getByTestId("delivery-status");
-  await expect(status).toHaveText("Planificado");
   await dispatch.getByLabel("Camión").selectOption({ label: "BR 09 · L123456 (12,000 kg)" });
   await dispatch.getByLabel("Chofer").selectOption({ label: "Juan Pérez" });
-  await dispatch.getByRole("button", { name: "Iniciar carga" }).click();
+  await submit(dispatch, "Planificar conduce");
+  const status = dispatch.getByTestId("delivery-status");
   await expect(status).toHaveText("Cargando");
-  await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
-  await expect(status).toHaveText("Cargado");
   const deliveryUrl = dispatch.url();
   const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
-  await dispatch.getByLabel("Peso bruto (kg)").fill("9000");
-  await dispatch.getByLabel("Tara (kg)").fill("8000");
-  await attachEvidence(dispatch, "Ticket de báscula", "ticket-resorts.jpg");
-  await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
+  await dispatch.getByRole("button", { name: "Despachar" }).click();
   await expect(status).toHaveText("En tránsito");
   await dispatch.getByRole("link", { name: "Imprimir conduce" }).click();
   await expect(dispatch.getByTestId("conduce-freight:1")).toContainText("Transporte de blocks — Bávaro");

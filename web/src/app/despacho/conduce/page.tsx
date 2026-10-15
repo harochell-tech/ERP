@@ -11,7 +11,7 @@ import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, Field, FieldMessage, fieldAria, LineTable, NoPermission, ReasonAction, StatusBadge, useFieldErrors } from "@/components/ui";
 import { formatQuantity, isDecimal, isPositiveDecimal, normalizeInput } from "@/lib/decimal";
 import { licenseWarning, vehicleName } from "@/lib/fleet";
-import { DELIVERY_TERMS, formatDateTime, statusLabel } from "@/lib/labels";
+import { DELIVERY_TERMS, formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { sha256Hex } from "@/lib/ledger";
 import { parseRackQr } from "@/lib/lab";
 import { cancellable, nextDeliveryStep } from "@/lib/sales";
@@ -173,7 +173,9 @@ function RackScans({ itemCode, scans, onChange }: { itemCode: string; scans: Sca
   const [open, setOpen] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   return (
-    <div data-testid={`rack-scans:${itemCode}`}>
+    <details data-testid={`rack-scans:${itemCode}`} open={scans.length > 0 || undefined}>
+      <summary>Escanear racks (opcional)</summary>
+      <p className="muted">Escanear la etiqueta del rack deja anotado qué lote, con su certificado, se lleva el cliente; sin escanear salen los lotes elegidos o los más viejos.</p>
       {scans.length > 0 ? (
         <ul className="plain-list">
           {scans.map((s, i) => (
@@ -216,22 +218,109 @@ function RackScans({ itemCode, scans, onChange }: { itemCode: string; scans: Sca
           {problem}
         </p>
       ) : null}
-    </div>
+    </details>
   );
 }
 
+type DispatchLot = {
+  deliveryLineId: string;
+  locationId: string;
+  lotId: string;
+  lotCode: string;
+  producedOn?: string | null;
+  qualityStatus?: string | null;
+  verdict?: string | null;
+  strength28d?: string | null;
+  strengthBasis?: string | null;
+  quantity: string;
+};
+
+const QUALITY_STATUS: Record<string, string> = { RELEASED: "Liberado", FINAL_RELEASED: "Liberación final", BLOCKED: "Bloqueado", CURING: "En curado" };
+const VERDICT: Record<string, string> = { COMPLIES: "Cumple", FAILS: "No cumple", NO_SPEC: "Sin requisito", NO_DATA: "Sin datos", NOT_TESTED: "No se ensaya" };
+
+/**
+ * DSP-01 (E-DSP-5): the lots of the line's item in its location — code, production date, quality and strength. The ones ticked leave
+ * first, each up to the quantity written (empty: up to its stock); the rest leaves oldest first. Blocked lots cannot be ticked.
+ */
+function LotChoice({ lots, chosen, onChange }: { lots: DispatchLot[]; chosen: Record<string, string>; onChange: (chosen: Record<string, string>) => void }) {
+  if (lots.length === 0) {
+    return <div className="muted">Sin lotes con existencia en esa ubicación.</div>;
+  }
+  return (
+    <ul className="plain-list" data-testid="lot-choice">
+      {lots.map((lot) => {
+        const blocked = lot.qualityStatus === "BLOCKED";
+        const ticked = chosen[lot.lotId] !== undefined;
+        return (
+          <li key={lot.lotId}>
+            <label>
+              <input
+                type="checkbox"
+                aria-label={`Elegir lote ${lot.lotCode}`}
+                disabled={blocked}
+                checked={ticked}
+                onChange={(e) => {
+                  const next = { ...chosen };
+                  if (e.target.checked) {
+                    next[lot.lotId] = "";
+                  } else {
+                    delete next[lot.lotId];
+                  }
+                  onChange(next);
+                }}
+              />{" "}
+              <span className="mono">{lot.lotCode}</span> · {formatQuantity(lot.quantity)} disp.
+              {lot.producedOn ? ` · producido ${formatDate(lot.producedOn)}` : ""}
+              {lot.qualityStatus ? ` · ${QUALITY_STATUS[lot.qualityStatus] ?? lot.qualityStatus}` : ""}
+              {lot.verdict ? ` · ${VERDICT[lot.verdict] ?? lot.verdict}` : ""}
+              {lot.strength28d ? ` · ${formatQuantity(lot.strength28d)} kg/cm² a 28 d${lot.strengthBasis === "ESTIMATED" ? " (estimada)" : ""}` : ""}
+            </label>
+            {lot.qualityStatus === "RELEASED" && ticked ? <span className="badge tone-warn"> sin liberación final</span> : null}
+            {ticked ? (
+              <input
+                aria-label={`Cantidad del lote ${lot.lotCode}`}
+                inputMode="decimal"
+                placeholder="Todo lo que haga falta"
+                value={chosen[lot.lotId]}
+                onChange={(e) => onChange({ ...chosen, [lot.lotId]: e.target.value })}
+              />
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * LOADING: each line's source location, the lots chosen (E-DSP-5) and the racks scanned. At a plant without a truck scale the button is
+ * «Despachar» — loading confirmed and gate-out recorded at once (E-DSP-3); with one it only confirms the loading and the weighing follows.
+ */
 function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const { companyId, plantName } = useSession();
   const id = delivery.header.deliveryId;
+  const dispatchNow = !delivery.plantHasTruckScale;
   const confirm = useCommand(`confirm-loaded:${id}`, "/api/v1/companies/{companyId}/sales/confirm-loaded", `Conduce ${delivery.header.deliveryNo}: carga confirmada.`);
+  const dispatch = useCommand(`dispatch-delivery:${id}`, "/api/v1/companies/{companyId}/sales/dispatch-delivery", `Conduce ${delivery.header.deliveryNo}: despachado.`);
   const [sources, setSources] = useState<Record<string, string>>({});
   const [scans, setScans] = useState<Record<string, Scan[]>>({});
+  const [chosen, setChosen] = useState<Record<string, Record<string, string>>>({});
   const fe = useFieldErrors();
-  const { data, error } = useLoad(() => query("/api/v1/companies/{companyId}/sales/plants", { path: { companyId } }), [companyId]);
+  const { data, error } = useLoad(
+    async () => {
+      const [plants, lots] = await Promise.all([
+        query("/api/v1/companies/{companyId}/sales/plants", { path: { companyId } }),
+        query("/api/v1/companies/{companyId}/sales/deliveries/{deliveryId}/lots", { path: { companyId, deliveryId: id } }),
+      ]);
+      return { items: plants.items, lots: lots.items as DispatchLot[] };
+    },
+    [companyId, id],
+  );
   if (data === null) {
     return <LoadingIndicator error={error} />;
   }
   const locations = data.items.find((p) => p.code === delivery.header.plantCode)?.locations ?? [];
+  const busy = confirm.busy || dispatch.busy;
   return (
     <form
       className="card"
@@ -240,13 +329,20 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
         const lines = delivery.lines.map((l) => ({
           deliveryLineId: l.deliveryLineId,
           sourceLocationId: sources[l.deliveryLineId] ?? locations[0]?.locationId ?? "",
-          scans: (scans[l.deliveryLineId] ?? []).map((s) => ({ lotId: s.lotId, rackNo: s.rackNo })),
+          scans: [
+            ...Object.entries(chosen[l.deliveryLineId] ?? {}).map(([lotId, q]) => ({ lotId, rackNo: null, quantity: normalizeInput(q) === "" ? null : normalizeInput(q) })),
+            ...(scans[l.deliveryLineId] ?? []).map((s) => ({ lotId: s.lotId, rackNo: s.rackNo, quantity: null })),
+          ],
         }));
         const missing = Object.fromEntries(lines.filter((l) => !l.sourceLocationId).map((l) => [l.deliveryLineId, `No hay ubicación de existencias en la planta ${plantName(delivery.header.plantCode)}.`]));
-        if (!fe.check(missing)) {
+        const badQuantity = Object.fromEntries(
+          lines.filter((l) => l.scans.some((x) => x.quantity !== null && !isPositiveDecimal(x.quantity, 6))).map((l) => [l.deliveryLineId, "La cantidad de un lote elegido es mayor que cero (hasta 6 decimales)."]),
+        );
+        if (!fe.check({ ...missing, ...badQuantity })) {
           return;
         }
-        if (await confirm.run({ deliveryId: id, expectedVersion: delivery.header.version, lines })) {
+        const body = { deliveryId: id, expectedVersion: delivery.header.version, lines };
+        if (await (dispatchNow ? dispatch.run(body) : confirm.run(body))) {
           onDone();
         }
       }}
@@ -257,7 +353,7 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
             <th>Producto</th>
             <th className="num">Cantidad</th>
             <th>Ubicación de salida</th>
-            <th>Racks escaneados</th>
+            <th>Lotes</th>
           </tr>
         </thead>
         <tbody>
@@ -285,6 +381,11 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
                 <FieldMessage id={`source-${l.deliveryLineId}`} error={fe.errors[l.deliveryLineId]} />
               </td>
               <td>
+                <LotChoice
+                  lots={data.lots.filter((x) => x.deliveryLineId === l.deliveryLineId && x.locationId === (sources[l.deliveryLineId] ?? locations[0]?.locationId))}
+                  chosen={chosen[l.deliveryLineId] ?? {}}
+                  onChange={(next) => setChosen({ ...chosen, [l.deliveryLineId]: next })}
+                />
                 <RackScans itemCode={l.itemCode} scans={scans[l.deliveryLineId] ?? []} onChange={(next) => setScans({ ...scans, [l.deliveryLineId]: next })} />
               </td>
             </tr>
@@ -292,22 +393,43 @@ function ConfirmLoaded({ delivery, onDone }: { delivery: Delivery; onDone: () =>
         </tbody>
       </LineTable>
       <div className="actions form-actions">
-        <button type="submit" className="primary" disabled={confirm.busy}>
-          Confirmar carga
+        <button type="submit" className="primary" disabled={busy}>
+          {dispatchNow ? "Despachar" : "Confirmar carga"}
         </button>
       </div>
+      {dispatchNow ? <p className="muted">Sin báscula en la planta: «Despachar» confirma la carga y registra la salida en un paso.</p> : null}
       <ErrorBox error={confirm.error} />
+      <ErrorBox error={dispatch.error} />
     </form>
   );
 }
 
 function GateOut({ delivery, onDone }: { delivery: Delivery; onDone: () => void }) {
   const id = delivery.header.deliveryId;
-  const gate = useCommand(`gate-out:${id}`, "/api/v1/companies/{companyId}/sales/record-gate-out", `Conduce ${delivery.header.deliveryNo}: pesada y salida registradas.`);
+  const gate = useCommand(`gate-out:${id}`, "/api/v1/companies/{companyId}/sales/record-gate-out", `Conduce ${delivery.header.deliveryNo}: salida registrada.`);
   const [gross, setGross] = useState("");
   const [tare, setTare] = useState("");
   const [ticket, setTicket] = useState<EvidenceValue>(NO_EVIDENCE);
   const fe = useFieldErrors<"gross" | "tare" | "ref" | "sha256">();
+  if (!delivery.plantHasTruckScale) {
+    // E-DSP-1: without a truck scale the gate-out is recorded with no weighing.
+    return (
+      <div className="card">
+        <p className="muted">La planta no tiene báscula: la salida se registra sin pesada.</p>
+        <div className="actions form-actions">
+          <button
+            type="button"
+            className="primary"
+            disabled={gate.busy}
+            onClick={async () => (await gate.run({ deliveryId: id, expectedVersion: delivery.header.version })) && onDone()}
+          >
+            Registrar salida
+          </button>
+        </div>
+        <ErrorBox error={gate.error} />
+      </div>
+    );
+  }
   return (
     <form
       className="card"

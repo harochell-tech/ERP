@@ -113,7 +113,7 @@ public sealed record DriverConfirmationView(
 public sealed record DeliveryDetail(
     DeliverySummary Header, string? VehiclePlate, string? DriverName, string? CustomerVehiclePlate, string? CustomerDriverName, decimal? GrossKg, decimal? TareKg, string? WeighTicketRef,
     string? ExceptionReason, string? CancelReason, IReadOnlyList<DeliveryLineView> Lines, PodView? Pod, IReadOnlyList<ControlAssessmentView> Assessments, IReadOnlyList<StateChange> History,
-    DriverLinkView? DriverLink = null, DriverConfirmationView? DriverConfirmation = null);
+    DriverLinkView? DriverLink = null, DriverConfirmationView? DriverConfirmation = null, bool PlantHasTruckScale = false);
 
 [RequiresPermission("sales:read")]
 public sealed class GetDeliveryHandler : IQueryHandler<GetDelivery>
@@ -206,7 +206,65 @@ public sealed class GetDeliveryHandler : IQueryHandler<GetDelivery>
             ("d", query.DeliveryId)).ConfigureAwait(false);
         return ApiJson.Serialize(new DeliveryDetail(
             header, extra.Plate, extra.Driver, extra.CustomerPlate, extra.CustomerDriver, extra.Gross, extra.Tare, extra.Ticket, extra.Exception, extra.Cancel,
-            lines.Select(l => l with { Lots = lots.Where(x => x.Line == l.DeliveryLineId).Select(x => x.Lot).ToList() }).ToList(), pod, assessments, history, link, confirmation));
+            lines.Select(l => l with { Lots = lots.Where(x => x.Line == l.DeliveryLineId).Select(x => x.Lot).ToList() }).ToList(), pod, assessments, history, link, confirmation,
+            (await Reading.ListAsync(
+                context.Connection, context.Transaction, "SELECT p.has_truck_scale FROM md.plant p JOIN log.delivery d ON d.plant_id = p.plant_id WHERE d.delivery_id = @d",
+                r => r.GetBoolean(0), cancellationToken, ("d", query.DeliveryId)).ConfigureAwait(false)).SingleOrDefault()));
+    }
+}
+
+/// <summary>
+/// E-DSP-5: the lots a delivery's lines can take — per line, every stock location of the plant (not curing, not transit) with the
+/// line's item in stock: the lot (field code when it has one), when it entered curing, its quality status, the verdict and 28-day
+/// strength of its evaluation in force, and the quantity. Blocked lots are listed and flagged, never chosen.
+/// </summary>
+public sealed record ListDispatchLots(Guid CompanyId, Guid SessionId, Guid DeliveryId) : IQuery;
+
+public sealed record DispatchLotView(
+    Guid DeliveryLineId, Guid LocationId, string LocationCode, Guid LotId, string LotCode, DateOnly? ProducedOn, string? QualityStatus, string? Verdict, decimal? Strength28d,
+    string? StrengthBasis, decimal Quantity);
+
+public sealed record DispatchLotList(IReadOnlyList<DispatchLotView> Items);
+
+[RequiresPermission("sales:read")]
+public sealed class ListDispatchLotsHandler : IQueryHandler<ListDispatchLots>
+{
+    public string QueryType => "Sales.ListDispatchLots";
+
+    public async Task<string> HandleAsync(ListDispatchLots query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        if ((await Reading.ListAsync(
+                context.Connection, context.Transaction, "SELECT delivery_id FROM log.delivery WHERE company_id = @c AND delivery_id = @d", r => r.GetGuid(0), cancellationToken,
+                ("c", context.CompanyId), ("d", query.DeliveryId)).ConfigureAwait(false)).Count == 0)
+        {
+            throw new DomainException(QueryErrors.NotFound, "The delivery does not exist.");
+        }
+
+        // Quality is read from Manufacturing's tables through SQL, as the gate-out's FIFO does (E-LAB1-02-11): no module reference.
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT dl.delivery_line_id, loc.location_id, loc.code, l.lot_id, coalesce(f.field_code, l.lot_code), (f.curing_from AT TIME ZONE 'America/Santo_Domingo')::date,
+                   f.status, e.verdict, e.strength_28d, e.basis, b.quantity
+            FROM log.delivery_line dl
+            JOIN log.delivery d ON d.delivery_id = dl.delivery_id
+            JOIN md.location loc ON loc.plant_id = d.plant_id AND NOT loc.is_curing AND NOT loc.is_transit
+            JOIN inv.inv_stock_balance b ON b.location_id = loc.location_id AND b.item_id = dl.item_id AND b.quantity > 0
+            JOIN inv.lot l ON l.lot_id = b.lot_id
+            LEFT JOIN mfg.fg_lot f ON f.lot_id = l.lot_id
+            LEFT JOIN LATERAL (SELECT x.verdict, x.strength_28d, x.basis FROM qa.lot_evaluation x WHERE x.lot_id = l.lot_id ORDER BY x.seq DESC LIMIT 1) e ON true
+            WHERE dl.delivery_id = @d
+            ORDER BY dl.line_no, loc.code, l.lot_code, l.lot_id
+            """,
+            r => new DispatchLotView(
+                r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.IsDBNull(5) ? null : r.Date(5), r.NullableString(6), r.NullableString(7),
+                r.IsDBNull(8) ? null : r.GetDecimal(8), r.NullableString(9), r.GetDecimal(10)),
+            cancellationToken,
+            ("d", query.DeliveryId)).ConfigureAwait(false);
+        return ApiJson.Serialize(new DispatchLotList(items));
     }
 }
 

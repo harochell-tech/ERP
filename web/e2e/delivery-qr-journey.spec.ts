@@ -28,28 +28,21 @@ async function siteOrder(browser: Browser, quantity: string): Promise<string> {
 }
 
 /** Plans, loads on BR 09 with Juan Pérez, weighs out; returns the QR's address printed on the conduce. */
-async function gateOut(dispatch: Page, orderUrl: string, ticket: string): Promise<string> {
+async function gateOut(dispatch: Page, orderUrl: string): Promise<string> {
   await dispatch.goto(orderUrl);
   await dispatch.getByRole("link", { name: "Planificar conduce" }).click();
-  await submit(dispatch, "Planificar conduce");
-  const status = dispatch.getByTestId("delivery-status");
-  await expect(status).toHaveText("Planificado");
   await dispatch.getByLabel("Camión").selectOption({ label: "BR 09 · L123456 (12,000 kg)" });
   await dispatch.getByLabel("Chofer").selectOption({ label: "Juan Pérez" });
-  await dispatch.getByRole("button", { name: "Iniciar carga" }).click();
+  await submit(dispatch, "Planificar conduce");
+  const status = dispatch.getByTestId("delivery-status");
   await expect(status).toHaveText("Cargando");
-  await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
-  await expect(status).toHaveText("Cargado");
   // E-ENT-8: no QR before the gate.
   const deliveryUrl = dispatch.url();
   await dispatch.getByRole("link", { name: "Imprimir conduce" }).click();
   await expect(dispatch.getByTestId("watermark")).toHaveText("BORRADOR – NO DESPACHADO");
   await expect(dispatch.getByTestId("conduce-driver-qr")).toHaveCount(0);
   await dispatch.goto(deliveryUrl);
-  await dispatch.getByLabel("Peso bruto (kg)").fill("9000");
-  await dispatch.getByLabel("Tara (kg)").fill("8000");
-  await dispatch.getByLabel("Ticket de báscula", { exact: true }).setInputFiles({ name: ticket, mimeType: "application/octet-stream", buffer: Buffer.from(`evidencia ${ticket}`) });
-  await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
+  await dispatch.getByRole("button", { name: "Despachar" }).click();
   await expect(status).toHaveText("En tránsito");
   await expect(dispatch.getByTestId("driver-link-state")).toContainText("Activo: el chofer puede confirmar");
   await dispatch.getByRole("link", { name: "Imprimir conduce" }).click();
@@ -81,7 +74,7 @@ test("the driver confirms from the conduce's QR, and differences go to Despacho 
   await expect(pinCell).toContainText("Asignado");
 
   // First delivery: everything received.
-  const first = await gateOut(dispatch, await siteOrder(browser, "60"), "ticket-qr-1.jpg");
+  const first = await gateOut(dispatch, await siteOrder(browser, "60"));
   const driver = await phone(browser, first);
   await expect(driver.getByTestId("driver-delivery")).toContainText("Constructora Uno");
   await expect(driver.getByTestId("driver-delivery")).toContainText("60 un · Bloque de 6 pulgadas");
@@ -108,7 +101,7 @@ test("the driver confirms from the conduce's QR, and differences go to Despacho 
   await expect(dispatch.getByTestId("driver-evidence")).toBeVisible();
 
   // Second delivery: broken blocks at the site.
-  const second = await gateOut(dispatch, await siteOrder(browser, "40"), "ticket-qr-2.jpg");
+  const second = await gateOut(dispatch, await siteOrder(browser, "40"));
   const driver2 = await phone(browser, second);
   await driver2.getByTestId("driver-pin").fill("4821");
   await driver2.getByRole("button", { name: "Continuar" }).click();

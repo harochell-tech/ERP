@@ -99,6 +99,7 @@ public static class CommandEndpoints
         masterData.MapCommand<CreateLocation, CreateLocationHandler>();
         masterData.MapCommand<RenameLocation, RenameLocationHandler>();
         masterData.MapCommand<SetPlantStatus, SetPlantStatusHandler>();
+        masterData.MapCommand<SetPlantTruckScale, SetPlantTruckScaleHandler>(); // DSP-01 (E-DSP-1)
         masterData.MapCommand<SetLocationStatus, SetLocationStatusHandler>();
         masterData.MapCommand<ActivateItem, ActivateItemHandler>();
         masterData.MapCommand<RequestPartyBankAccount, RequestPartyBankAccountHandler>();
@@ -314,6 +315,7 @@ public static class CommandEndpoints
         sales.MapCommand<StartLoading, StartLoadingHandler>();
         sales.MapCommand<ConfirmLoaded, ConfirmLoadedHandler>();
         sales.MapCommand<RecordGateOut, RecordGateOutHandler>();
+        sales.MapCommand<DispatchDelivery, DispatchDeliveryHandler>(); // DSP-01 (E-DSP-3)
         sales.MapCommand<RecordPod, RecordPodHandler>();
         sales.MapCommand<SetDriverPin, SetDriverPinHandler>(); // ENT1-02 (E-ENT-2, E-ENT1-01-1)
         sales.MapCommand<Rochell.Sales.Printing.SavePrintFormatDraft, Rochell.Sales.Printing.SavePrintFormatDraftHandler>(); // PRT-02 (E-PRT-02-1…7)
@@ -436,7 +438,7 @@ public static class CommandEndpoints
         typeof(RequestPartyBankAccountHandler), typeof(VerifyPartyBankAccountHandler), typeof(RejectPartyBankAccountHandler),
         typeof(PrepareEcfSeriesHandler), typeof(ApproveEcfSeriesHandler), typeof(DiscardEcfSeriesHandler), typeof(CloseEcfSeriesHandler), typeof(CancelUnusedEcfNumbersHandler), typeof(AdvanceEcfDocumentHandler),
         typeof(NudgeEcfDocumentsHandler), typeof(ResolveEcfDocumentHandler),
-        typeof(CreatePlantHandler), typeof(CreateLocationHandler), typeof(RenameLocationHandler), typeof(SetPlantStatusHandler), typeof(SetLocationStatusHandler),
+        typeof(CreatePlantHandler), typeof(CreateLocationHandler), typeof(RenameLocationHandler), typeof(SetPlantStatusHandler), typeof(SetPlantTruckScaleHandler), typeof(SetLocationStatusHandler),
         typeof(RegisterBankAccountHandler), typeof(CloseBankAccountHandler), typeof(SetBankAccountAliasHandler),
         typeof(PrepareSupplierPaymentHandler), typeof(UpdatePreparedPaymentHandler), typeof(VoidPaymentHandler), typeof(ReleaseSupplierPaymentHandler),
         typeof(ReversePaymentHandler), typeof(PrepareBankTransferHandler), typeof(VoidBankTransferHandler), typeof(ReleaseBankTransferHandler),
@@ -468,7 +470,7 @@ public static class CommandEndpoints
         typeof(CreateSalesOrderHandler), typeof(UpdateSalesOrderDraftHandler), typeof(SubmitForCreditHandler), typeof(ApproveCreditHandler), typeof(RejectCreditHandler), typeof(CancelSalesOrderHandler),
         typeof(CreateQuoteHandler), typeof(UpdateDraftQuoteHandler), typeof(SubmitQuoteForApprovalHandler), typeof(ApproveQuotePricesHandler), typeof(ReturnQuoteToDraftHandler),
         typeof(SendQuoteHandler), typeof(MarkQuoteLostHandler), typeof(CancelQuoteHandler), typeof(CopyQuoteHandler), typeof(ConvertQuoteHandler),
-        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(RecordPodHandler), typeof(SetDriverPinHandler), typeof(Rochell.Sales.Printing.SavePrintFormatDraftHandler), typeof(Rochell.Sales.Printing.ActivatePrintFormatHandler),
+        typeof(PlanDeliveryHandler), typeof(StartLoadingHandler), typeof(ConfirmLoadedHandler), typeof(RecordGateOutHandler), typeof(DispatchDeliveryHandler), typeof(RecordPodHandler), typeof(SetDriverPinHandler), typeof(Rochell.Sales.Printing.SavePrintFormatDraftHandler), typeof(Rochell.Sales.Printing.ActivatePrintFormatHandler),
         typeof(Rochell.Sales.Printing.RestorePrintFormatHandler), typeof(Rochell.Sales.Printing.SetCompanyLogoHandler), typeof(ReopenDeliveryLinkHandler), typeof(VerifyDriverPinHandler),
         typeof(ConfirmDeliveryByDriverHandler), typeof(RecordReturnTripHandler), typeof(CancelDeliveryHandler), typeof(CloseShortSalesOrderHandler),
         typeof(CreateInvoiceFromDeliveriesHandler), typeof(CreateInvoiceFromProformasHandler), typeof(VoidProformaHandler), typeof(IssueInvoiceHandler), typeof(RecordExternalFiscalDocumentHandler), typeof(VoidUnfiscalizedInvoiceHandler),

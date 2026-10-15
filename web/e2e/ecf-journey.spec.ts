@@ -1,11 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { confirmAction, nav, pick, signIn, submit } from "./support";
-
-/** A weigh ticket: choosing the file verifies its fingerprint (E-UX3-8). */
-async function attachEvidence(page: Page, label: string, name: string) {
-  await page.getByLabel(label, { exact: true }).setInputFiles({ name, mimeType: "application/octet-stream", buffer: Buffer.from(`evidencia ${name}`) });
-  await expect(page.getByTestId("evidence-verified")).toHaveText(`✓ Huella del archivo verificada: ${name}`);
-}
 
 // VS4-04 / VS4-05 (E-VS4-04-1/2/4, E-VS4-05-1/3, E2E-ECF): against the dev stack's simulated Alanube. The Controller sets the e-CF
 // issuer's address; the Especialista fiscal registers an e-NCF range and the Controller approves it; an order picked up at the plant
@@ -59,19 +53,13 @@ test("e-CF 31 through the simulated Alanube: range, invoice accepted with its QR
   await dispatch.goto(orderUrl);
   await dispatch.getByRole("link", { name: "Planificar conduce" }).click();
   await dispatch.getByLabel("A despachar BLOQUE-6").fill("20");
-  await dispatch.getByRole("button", { name: "Planificar conduce" }).click();
-  const delivery = dispatch.getByTestId("delivery-status");
-  await expect(delivery).toHaveText("Planificado");
-  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
   await dispatch.getByLabel("Placa del cliente").fill("G765432");
   await dispatch.getByLabel("Chofer del cliente").fill("Luis Peña");
-  await dispatch.getByRole("button", { name: "Iniciar carga" }).click();
-  await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
-  await expect(delivery).toHaveText("Cargado");
-  await dispatch.getByLabel("Peso bruto (kg)").fill("4000");
-  await dispatch.getByLabel("Tara (kg)").fill("3700");
-  await attachEvidence(dispatch, "Ticket de báscula", "ticket-ecf.jpg");
-  await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
+  await dispatch.getByRole("button", { name: "Planificar conduce" }).click();
+  const delivery = dispatch.getByTestId("delivery-status");
+  await expect(delivery).toHaveText("Cargando");
+  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
+  await dispatch.getByRole("button", { name: "Despachar" }).click();
   await expect(delivery).toHaveText("Entregado");
 
   // Facturación issues the invoice: it takes the range's first e-NCF and the worker sends it.
