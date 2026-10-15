@@ -27,7 +27,7 @@ export default function Page() {
       <h1>Ensayos pendientes</h1>
       <p className="muted">
         Las roturas de probetas que cada lote debe a 1, 3 y 28 días desde que entró a curado. Un ensayo deja de estar pendiente al registrar en
-        Calidad › Laboratorio probetas de esa edad. Los productos que no se ensayan (por ejemplo el Block 4") no aparecen.
+        Calidad › Laboratorio probetas de esa edad. Los productos que no se ensayan (por ejemplo el Block 4&quot;) no aparecen.
       </p>
       {data === null ? (
         <LoadingIndicator error={error} />
