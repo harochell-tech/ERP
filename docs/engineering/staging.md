@@ -361,5 +361,10 @@ sudo chmod 400 /opt/rochell-staging/secrets/deliveries/*
 
 3. The variable `EVIDENCE_BUCKET` of the GitHub Environment `staging`, then `deploy-staging`.
 
+Since 2026-10-15 step 2 is done by `deploy-staging` instead: with `EVIDENCE_BUCKET` set, the Environment secrets `EVIDENCE_KEY_ID`
+and `EVIDENCE_KEY` travel on stdin to `evidence-keys.sh`, which writes them to `secrets/deliveries` (uid 1654, 0400, through a
+throwaway `alpine` container, no sudo) and creates `link-key` once, never replacing it. The bucket must be in the same B2 region as the
+WORM bucket (`WORM_REGION` / `WORM_ENDPOINT` serve both).
+
 Changing `link-key` invalidates every printed QR (Dispatch reopens the links of the deliveries in transit). The page lives at
 `/entrega/?c=…&d=…&g=…&k=…`; its API under `/api/v1/public/deliveries`.
