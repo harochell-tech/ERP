@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { query, type Schemas } from "@/api/client";
 import { History } from "@/components/History";
 import { ErrorBox, Loading, Money, NoPermission, ReasonAction } from "@/components/ui";
-import { formatDecimal, formatQuantity } from "@/lib/decimal";
+import { formatDecimal, formatPercent, formatQuantity } from "@/lib/decimal";
 import { formatDate, formatDateTime, statusLabel } from "@/lib/labels";
 import { useSession } from "@/lib/session";
 import { useCommand } from "@/lib/useCommand";
@@ -150,6 +150,7 @@ function OrderDetail() {
   return (
     <>
       <h1>Orden de compra {order.poNo}</h1>
+      {order.origin === "DIRECT_RECEIPT" ? <DirectReceiptBlock order={order} /> : null}
       <dl className="facts">
         <dt>Estado</dt>
         <dd data-testid="po-status">{statusLabel(order.status)}</dd>
@@ -162,7 +163,7 @@ function OrderDetail() {
         <dt>Creada por</dt>
         <dd>{order.createdBy ?? "—"}</dd>
         <dt>Aprobada por</dt>
-        <dd>{order.approvedBy ? `${order.approvedBy} (${formatDateTime(order.approvedAt)})` : order.status === "PENDING_APPROVAL" ? "Pendiente" : "—"}</dd>
+        <dd data-testid="po-approved-by">{order.approvedBy ? `${order.approvedBy} (${formatDateTime(order.approvedAt)})` : order.status === "PENDING_APPROVAL" ? "Pendiente" : "—"}</dd>
         <dt>Total (sin ITBIS)</dt>
         <dd>
           <Money value={order.total} currency testId="po-detail-total" />
@@ -236,5 +237,78 @@ export default function Page() {
     <Suspense>
       <OrderDetail />
     </Suspense>
+  );
+}
+
+type DirectOrder = Schemas["PurchaseOrderDetail"];
+
+/** REC-02 (E-REC-02-4/7): an order behind a direct receipt — what was received, our truck and driver, and each line's price check. */
+function DirectReceiptBlock({ order }: { order: DirectOrder }) {
+  const d = order.directReceipt;
+  if (!d) {
+    return null;
+  }
+  const waiting = d.closedAt === null || d.closedAt === undefined;
+  return (
+    <section className="card" data-testid="direct-receipt">
+      <h2 style={{ marginTop: 0 }}>Recepción directa</h2>
+      <p className={waiting ? "notice" : "muted"} data-testid="direct-receipt-state">
+        {waiting
+          ? "El material llegó sin orden de compra y espera aprobación: no entra al inventario hasta que otra persona apruebe esta orden."
+          : d.goodsReceiptId
+            ? "Recibida sin orden de compra; esta orden la creó Core para la recepción."
+            : "Rechazada o cancelada: no se recibió nada y el conduce quedó libre."}
+      </p>
+      <dl className="facts">
+        <dt>Llegada</dt>
+        <dd>{formatDateTime(d.occurredAt)}</dd>
+        <dt>Conduce del proveedor</dt>
+        <dd>{d.supplierDeliveryNote}</dd>
+        <dt>Camión y chofer</dt>
+        <dd>
+          {d.vehicleFleetCode ? `${d.vehicleFleetCode} · ${d.vehiclePlate}` : d.vehiclePlate} — {d.driverName}
+        </dd>
+        <dt>Ubicación</dt>
+        <dd>{d.locationCode}</dd>
+        <dt>Recibió</dt>
+        <dd>{d.receivedBy ?? "—"}</dd>
+        {d.goodsReceiptId ? (
+          <>
+            <dt>Recepción</dt>
+            <dd>
+              <Link href={`/almacen/recepcion/?id=${d.goodsReceiptId}`}>Ver la recepción</Link>
+            </dd>
+          </>
+        ) : null}
+      </dl>
+      <div className="table-wrap">
+        <table data-testid="direct-receipt-prices">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th className="num">Precio (RD$)</th>
+              <th className="num">Referencia (RD$)</th>
+              <th>De dónde</th>
+              <th className="num">Desviación</th>
+              <th>Dentro de la política</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.priceCheck.map((c) => (
+              <tr key={c.lineNo}>
+                <td>{c.lineNo}</td>
+                <td className="num">
+                  <Money value={c.unitPrice} />
+                </td>
+                <td className="num">{c.referencePrice ? <Money value={c.referencePrice} /> : "—"}</td>
+                <td>{c.source === "LAST_PURCHASE" ? `Última compra ${c.sourcePoNo ?? ""}` : c.source === "STANDARD" ? "Precio estándar" : "Sin referencia"}</td>
+                <td className="num">{c.deviationPct ? formatPercent(c.deviationPct) : "—"}</td>
+                <td>{c.withinPolicy ? "Sí" : c.allowedPct ? `No (permitido ${formatPercent(c.allowedPct)})` : "No (la política no fija la desviación)"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

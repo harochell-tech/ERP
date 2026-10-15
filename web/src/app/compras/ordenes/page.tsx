@@ -123,6 +123,12 @@ function Orders() {
                 <tr key={po.purchaseOrderId} data-testid={`po-row-${po.poNo}`}>
                   <td>
                     <Link href={`/compras/orden/?id=${po.purchaseOrderId}`}>{po.poNo}</Link>
+                    {po.origin === "DIRECT_RECEIPT" ? (
+                      <span className="badge" data-testid="po-direct">
+                        {" "}
+                        Recepción directa
+                      </span>
+                    ) : null}
                   </td>
                   <td className="wrap">{po.supplierName}</td>
                   <td>{plantName(po.plantId, po.plantCode)}</td>

@@ -78,4 +78,26 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   await nav(storekeeper, "Reporte de recepciones");
   await expect(storekeeper.getByTestId("receipt-report-totals")).toContainText("ARENA-LAVADA");
   await expect(storekeeper.getByTestId("receipt-report-rows")).toContainText("L123456");
+
+  // REC-02 (E-REC-6…8): material without an order. The proposed price is the last one (1,000.00 from the order above); the dev
+  // policy fixes no allowed deviation, so the order «Recepción directa» waits and the purchasing approver approves it.
+  await nav(storekeeper, "Recepción sin orden de compra");
+  await pickFirst(storekeeper.getByLabel("Proveedor"));
+  await pick(storekeeper.getByLabel("Material 1"), "ARENA-LAVADA");
+  await expect(storekeeper.getByTestId("reference-1")).toContainText("última compra");
+  await expect(storekeeper.getByLabel("Precio 1")).not.toHaveValue("");
+  await storekeeper.getByLabel("Cantidad 1").fill("12");
+  await storekeeper.getByLabel("Ubicación").selectOption({ label: "PATIO-A" });
+  await storekeeper.getByLabel("Conduce del proveedor").fill(`CPD-${Date.now()}`);
+  await storekeeper.getByLabel("Camión").selectOption({ index: 1 });
+  await storekeeper.getByLabel("Chofer").selectOption({ index: 1 });
+  await submit(storekeeper, "Registrar recepción");
+  await expect(storekeeper.getByTestId("direct-receipt-state")).toContainText("espera aprobación");
+  await expect(storekeeper.getByTestId("po-status")).toHaveText("Pendiente de aprobación");
+  const directUrl = storekeeper.url();
+
+  await approver.goto(directUrl);
+  await approver.getByRole("button", { name: "Aprobar" }).click();
+  await expect(approver.getByTestId("po-status")).toHaveText("Recibido");
+  await expect(approver.getByTestId("direct-receipt")).toContainText("Ver la recepción");
 });
