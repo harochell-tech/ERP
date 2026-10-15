@@ -12,7 +12,7 @@ namespace Rochell.Identity.Tests;
 public sealed class SuperadminTests(PostgresFixture postgres)
 {
     [Fact]
-    public async Task Superadmin_holds_every_permission_but_act_as_for_at_most_90_days_company_wide()
+    public async Task Superadmin_holds_every_permission_but_act_as_for_at_most_365_days_company_wide()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         var user = await h.CreateUserAsync();
@@ -20,7 +20,7 @@ public sealed class SuperadminTests(PostgresFixture postgres)
         await h.GrantAsync(h.CompanyId, user, "SUPERADMIN");
         await h.AdminExecuteAsync("INSERT INTO iam.permission (permission_code, access) VALUES ('later:thing', 'WRITE')");
 
-        Assert.Equal(TimeSpan.FromDays(90), await h.ScalarAsync<TimeSpan>(
+        Assert.Equal(TimeSpan.FromDays(365), await h.ScalarAsync<TimeSpan>(
             "SELECT valid_to - valid_from FROM iam.role_assignment ra JOIN iam.role r USING (role_id) WHERE ra.user_id = @u AND r.code = 'SUPERADMIN'", ("u", user)));
         Assert.Equal(0L, await h.ScalarAsync<long>(
             """
@@ -31,7 +31,7 @@ public sealed class SuperadminTests(PostgresFixture postgres)
         var tooLong = await h.AdminExecuteAsync(
             $"""
             INSERT INTO iam.role_assignment (assignment_id, company_id, user_id, role_id, valid_from, valid_to, granted_by)
-            SELECT gen_random_uuid(), '{h.CompanyId}', '{await h.CreateUserAsync()}', role_id, now(), now() + interval '91 days', '00000000-0000-7000-8000-00000000d001'
+            SELECT gen_random_uuid(), '{h.CompanyId}', '{await h.CreateUserAsync()}', role_id, now(), now() + interval '366 days', '00000000-0000-7000-8000-00000000d001'
             FROM iam.role WHERE code = 'SUPERADMIN'
             """);
         var plant = await Assert.ThrowsAsync<PostgresException>(async () => await h.GrantAsync(h.CompanyId, await h.CreateUserAsync(), "SUPERADMIN", await h.CreatePlantAsync()));

@@ -1601,6 +1601,10 @@ Errata approved by Alexander Rochell while implementing Vertical Slice #1. They 
 | E-MFG2-16 | MFG2-04 | When Core cannot open a run for the portal's production (no ACTIVE recipe on the machine, no ACTIVE standard cost with breakdown, machine or shift inactive) the reason is kept with the other notices of Producción › Portal de máquinas, in Spanish, naming the machine, the product and the day. Approved 2026-10-13. |
 | E-MFG2-17 | MFG2-04 | A standard cost written by hand for a product with an ACTIVE recipe is warned about where it is prepared (COST-01: the text of option 1) and marked in the Centro de configuración as «costo sin desglose» (MFG2-04). |
 | E-MFG2-18 | MFG2-04 | PRODUCTION policy parameter `portal_import_from` (date as YYYYMMDD, «Producción del portal desde»; 0 = every day read): the portal's days before it open no run and write no draft, because they are already in the opening inventory. Production sets 2026-10-13 (the physical count was taken before the 13th's shift ended); the runs of 2026-10-07…12 opened before are cancelled once. Approved 2026-10-14. |
+| E-SEC-1 | SEC-01 | The Google confirmation (step-up) stays, lasting 8 hours instead of 5 minutes (`Rochell:Identity:StepUpMaxAge`): one confirmation at the start of the day covers the day's approvals. Approved 2026-10-14. |
+| E-SEC-2 | SEC-01 | A session closes after 4 idle hours instead of 30 minutes (`Rochell:Identity:SessionIdleTimeout`); the 12-hour maximum stays. |
+| E-SEC-3 | SEC-02 | People outside the company sign in with their own Google account by invitation: only the exact e-mail an administrator registered enters, with the roles given to it; no passwords in Core; the guest needs Google's 2-step verification; a guest is never SUPERADMIN. The same invitation lets a company e-mail sign in the first time without the deployment CLI. |
+| E-SEC-4 | SEC-01 | A SUPERADMIN assignment ends within 365 days of its start (amends E-ADM-2-2, migration 0124); the assignments in force are brought to 365 days from their start; Inicio warns 30 days before the end (`SessionAssignment.validTo`). |
 
 Implementation rules derived from the above (no architectural change):
 

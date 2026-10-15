@@ -88,3 +88,12 @@ Role `SUPERADMIN` (migration `0061__superadmin.sql`) holds every permission exce
 Each waiver sets `app.controls_waived` for the transaction: `core.command_log.controls_waived` is set when the command's result
 is written and `core.state_history.controls_waived` on rows inserted after it. CONTROLS-WAIVED (WARNING) lists the waived
 commands of the cutoff's month.
+
+## SEC-01 — sessions and the superadministrator's year (migration 0124, E-SEC-1, 2, 4)
+
+- E-SEC-1 / 2: `deploy/staging/compose.yaml` sets `Rochell__Identity__StepUpMaxAge` = 08:00:00 (one Google confirmation covers the
+  working day) and `Rochell__Identity__SessionIdleTimeout` = 04:00:00; the absolute lifetime stays 12 hours. The code defaults (5 and 30
+  minutes) still apply where nothing is set.
+- E-SEC-4: `iam.role_assignment_superadmin_term` allows 365 days (default end 365 days after the start); migration 0124 brings the
+  SUPERADMIN assignments in force to 365 days from their start, with `role_assignment_guard` switched off for that statement only.
+  `/api/v1/session` gives each role's `validTo`; Inicio warns 30 days before a superadministrator role ends.
