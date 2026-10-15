@@ -331,6 +331,9 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   TAX_SUBJECT_INVALID: "No se pudo calcular el impuesto: falta el tercero, las líneas, o un artículo o proveedor no existe.",
   // Procurement
   PURCHASE_ORDER_NOT_FOUND: "La orden de compra no existe.",
+  RECEIPT_TRANSPORT_REQUIRED: "Elija uno de nuestros camiones y un chofer activos que trajeron el material.",
+  SUPPLIER_DELIVERY_NOTE_REQUIRED: "Escriba el número del conduce del proveedor (hasta 60 caracteres).",
+  SUPPLIER_DELIVERY_NOTE_USED: "Ese conduce de este proveedor ya se recibió. Revise el número.",
   ALREADY_RECEIVED: "La orden ya tiene recepciones; no se puede cancelar.",
   GOODS_RECEIPT_NOT_FOUND: "La recepción o su línea no existe.",
   RECEIPT_CORRECTION_NOT_FOUND: "La corrección de recepción no existe.",

@@ -33,15 +33,20 @@ public sealed class ReceiptTransportTests(PostgresFixture postgres)
     private static PostGoodsReceipt Receipt(TestHarness h, TestReceiving r, Guid po, string key, GoodsReceiptLineInput[] lines, Guid? vehicle, Guid? driver, string? note)
         => new(h.CompanyId, r.Storekeeper, key, r.Purchasing.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-5), lines, null, vehicle, driver, note);
 
+    private static Task SetVehicleStatusAsync(TestHarness h, Guid vehicle, string from, string to)
+        => h.RunAsync(
+            new TestTreasurySql(h.CompanyId, h.SessionId, $"vehicle-{to}", $"UPDATE log.vehicle SET status = '{to}', version = version + 1 WHERE vehicle_id = '{vehicle}'", [new TestState("Vehicle", vehicle, from, to)]),
+            new TestTreasurySqlHandler());
+
     [Fact]
     public async Task A_receipt_names_our_truck_driver_and_the_suppliers_note_once_and_the_report_lists_it()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
         var r = await h.CreateReceivingSetupAsync();
         var (po, sand, cement) = await OrderAsync(h, r);
-        await h.AdminRequireAsync($"UPDATE log.vehicle SET status = 'INACTIVE' WHERE company_id = '{h.CompanyId}'");
+        await SetVehicleStatusAsync(h, r.Vehicle, "ACTIVE", "INACTIVE");
         var inactive = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(Receipt(h, r, po, "g0", [new(sand, 4m)], r.Vehicle, r.Driver, "CP-100"), new PostGoodsReceiptHandler()));
-        await h.AdminRequireAsync($"UPDATE log.vehicle SET status = 'ACTIVE' WHERE company_id = '{h.CompanyId}'");
+        await SetVehicleStatusAsync(h, r.Vehicle, "INACTIVE", "ACTIVE");
         var noDriver = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(Receipt(h, r, po, "g1", [new(sand, 4m)], r.Vehicle, null, "CP-100"), new PostGoodsReceiptHandler()));
         var noNote = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(Receipt(h, r, po, "g2", [new(sand, 4m)], r.Vehicle, r.Driver, "  "), new PostGoodsReceiptHandler()));
         var first = await h.RunAsync(Receipt(h, r, po, "g3", [new(sand, 4m), new(cement, 2m)], r.Vehicle, r.Driver, "CP-100"), new PostGoodsReceiptHandler());

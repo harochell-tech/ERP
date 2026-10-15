@@ -35,11 +35,17 @@ public static class ReceivingSetup
 
         var vehicle = Guid.CreateVersion7();
         var driver = Guid.CreateVersion7();
-        await h.AdminRequireAsync(
-            $"""
-            INSERT INTO log.vehicle (vehicle_id, company_id, plate, capacity_kg, status, version) VALUES ('{vehicle}', '{h.CompanyId}', 'L{vehicle.ToString("N")[..6].ToUpperInvariant()}', 12000, 'ACTIVE', 1);
-            INSERT INTO log.driver (driver_id, company_id, full_name, national_id, status, version) VALUES ('{driver}', '{h.CompanyId}', 'Chofer de recepción', '{Random.Shared.NextInt64(10_000_000_000, 99_999_999_999)}', 'ACTIVE', 1);
-            """);
+        await h.RunAsync(
+            new TestTreasurySql(
+                h.CompanyId,
+                h.SessionId,
+                "receiving-fleet",
+                $"""
+                INSERT INTO log.vehicle (vehicle_id, company_id, plate, capacity_kg, status, version) VALUES ('{vehicle}', '{h.CompanyId}', 'L{Random.Shared.Next(100_000, 999_999)}', 12000, 'ACTIVE', 1);
+                INSERT INTO log.driver (driver_id, company_id, full_name, national_id, status, version) VALUES ('{driver}', '{h.CompanyId}', 'Chofer de recepción', '{Random.Shared.NextInt64(10_000_000_000, 99_999_999_999)}', 'ACTIVE', 1);
+                """,
+                [new TestState("Vehicle", vehicle, null, "ACTIVE"), new TestState("Driver", driver, null, "ACTIVE")]),
+            new TestTreasurySqlHandler());
         return new TestReceiving(p, locationA, locationB, raw, grni, await h.SessionWithRolesAsync("ALMACENISTA"), vehicle, driver);
     }
 
