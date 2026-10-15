@@ -82,7 +82,7 @@ jobs:
           EVIDENCE_BUCKET: ${{ vars.EVIDENCE_BUCKET }}
         run: |
           scp deploy/staging/compose.yaml deploy/staging/Caddyfile deploy/staging/init-roles.sql \
-              deploy/staging/deploy.sh deploy/staging/backup.sh deploy/staging/seed.sh deploy/staging/seed-vs3.sh deploy/staging/seed-mfg.sh deploy/staging/rnc-weekly.sh "${TARGET}:/opt/rochell-staging/"
+              deploy/staging/deploy.sh deploy/staging/backup.sh deploy/staging/seed.sh deploy/staging/seed-vs3.sh deploy/staging/seed-mfg.sh deploy/staging/rnc-weekly.sh deploy/staging/evidence-keys.sh "${TARGET}:/opt/rochell-staging/"
           scp -r deploy/staging/seed "${TARGET}:/opt/rochell-staging/"
           # Values travel as environment variables (never interpolated into the script); the file is mode 600 on the server.
           vars="ROCHELL_IMAGE STAGING_HOST WORKSPACE_DOMAIN DEPLOY_DB_PASSWORD APP_DB_PASSWORD SEALER_DB_PASSWORD OIDC_CLIENT_ID
@@ -101,6 +101,18 @@ jobs:
               if test -n "${value}"; then printf '%s=%s\n' "${name}" "${value}"; fi
             done
           } | ssh "${TARGET}" 'umask 077; cat > /opt/rochell-staging/.env'
+
+      # ENT-1 (E-ENT-1/5): with EVIDENCE_BUCKET set, the bucket key (secrets EVIDENCE_KEY_ID / EVIDENCE_KEY) goes to secrets/deliveries
+      # through stdin and the QR link key is created once on the server; the drivers' page turns on with this deploy.
+      - name: Drivers' page keys
+        if: ${{ vars.EVIDENCE_BUCKET != '' }}
+        env:
+          TARGET: ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}
+          EVIDENCE_KEY_ID: ${{ secrets.EVIDENCE_KEY_ID }}
+          EVIDENCE_KEY: ${{ secrets.EVIDENCE_KEY }}
+        run: |
+          test -n "${EVIDENCE_KEY_ID}" && test -n "${EVIDENCE_KEY}" || { echo "EVIDENCE_BUCKET is set but the secrets EVIDENCE_KEY_ID / EVIDENCE_KEY are missing" >&2; exit 1; }
+          printf '%s\n%s\n' "${EVIDENCE_KEY_ID}" "${EVIDENCE_KEY}" | ssh "${TARGET}" 'chmod 700 /opt/rochell-staging/evidence-keys.sh && /opt/rochell-staging/evidence-keys.sh'
 
       - name: Deploy
         env:
