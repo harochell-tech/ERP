@@ -31,7 +31,7 @@ internal static class ReceivedSeed
               FROM acc.accounting_policy_version WHERE company_id = '{h.CompanyId}' AND policy_code = 'PURCHASING' AND status = 'ACTIVE'
               ON CONFLICT DO NOTHING;
               INSERT INTO acc.accounting_policy_parameter (company_id, policy_version_id, param_code, value)
-              SELECT company_id, policy_version_id, 'direct_receipt_price_deviation_pct', to_jsonb('0.10'::text)
+              SELECT company_id, policy_version_id, 'direct_receipt_price_deviation_pct', to_jsonb('0.1'::text)
               FROM acc.accounting_policy_version WHERE company_id = '{h.CompanyId}' AND policy_code = 'PURCHASING' AND status = 'ACTIVE'
               ON CONFLICT DO NOTHING;
             END $$

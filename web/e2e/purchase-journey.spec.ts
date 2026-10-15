@@ -82,6 +82,7 @@ test("purchase order from creation to receipt", async ({ browser }) => {
   // REC-02 (E-REC-6…8): material without an order. The proposed price is the last one (1,000.00 from the order above); 1,500.00 is
   // beyond the dev policy's 10 %, so the order «Recepción directa» waits and the purchasing approver approves it.
   await nav(storekeeper, "Recepción sin orden de compra");
+  await storekeeper.getByLabel("Planta", { exact: true }).selectOption({ index: 1 });
   await pickFirst(storekeeper.getByLabel("Proveedor", { exact: true }));
   await pick(storekeeper.getByLabel("Material 1"), "ARENA-LAVADA");
   await expect(storekeeper.getByTestId("reference-1")).toContainText("última compra");
