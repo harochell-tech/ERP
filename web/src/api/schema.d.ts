@@ -477,6 +477,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/master-data/set-plant-truck-scale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SetPlantTruckScale"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/master-data/set-location-status": {
         parameters: {
             query?: never;
@@ -3463,6 +3479,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["RecordGateOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/dispatch-delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["DispatchDelivery"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6581,6 +6613,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["GetDelivery"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/deliveries/{deliveryId}/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListDispatchLots"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9821,6 +9869,8 @@ export interface components {
             history: components["schemas"]["StateChange"][];
             driverLink?: null | components["schemas"]["DriverLinkView"];
             driverConfirmation?: null | components["schemas"]["DriverConfirmationView"];
+            /** @default false */
+            plantHasTruckScale?: boolean;
         };
         DeliveryLineView: {
             /** Format: uuid */
@@ -10088,6 +10138,35 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             reason: string;
+        };
+        DispatchDelivery: {
+            /** Format: uuid */
+            deliveryId: string;
+            /** Format: int64 */
+            expectedVersion: number;
+            lines: components["schemas"]["LoadedLine"][];
+        };
+        DispatchLotList: {
+            items: components["schemas"]["DispatchLotView"][];
+        };
+        DispatchLotView: {
+            /** Format: uuid */
+            deliveryLineId: string;
+            /** Format: uuid */
+            locationId: string;
+            locationCode: string;
+            /** Format: uuid */
+            lotId: string;
+            lotCode: string;
+            /** Format: date */
+            producedOn: null | string;
+            qualityStatus: null | string;
+            verdict: null | string;
+            /** Format: decimal */
+            strength28d: null | string;
+            strengthBasis: null | string;
+            /** Format: decimal */
+            quantity: string;
         };
         DocumentIssuer: {
             rnc: string;
@@ -12274,6 +12353,12 @@ export interface components {
             /** Format: uuid */
             salesOrderId: string;
             lines: components["schemas"]["DeliveryPlanLine"][];
+            /** Format: uuid */
+            vehicleId?: null | string;
+            /** Format: uuid */
+            driverId?: null | string;
+            customerVehiclePlate?: null | string;
+            customerDriverName?: null | string;
         };
         PlantList: {
             items: components["schemas"]["PlantView"][];
@@ -12289,6 +12374,8 @@ export interface components {
             name?: null | string;
             /** @default ACTIVE */
             status?: string;
+            /** @default false */
+            hasTruckScale?: boolean;
         };
         PodLine: {
             /** Format: uuid */
@@ -13871,11 +13958,11 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
             /** Format: decimal */
-            grossKg: string;
+            grossKg?: null | string;
             /** Format: decimal */
-            tareKg: string;
-            weighTicketRef: string;
-            weighTicketSha256: string;
+            tareKg?: null | string;
+            weighTicketRef?: null | string;
+            weighTicketSha256?: null | string;
         };
         RecordMaintenanceDone: {
             /** Format: uuid */
@@ -14797,6 +14884,8 @@ export interface components {
             lotId: string;
             /** Format: int32 */
             rackNo?: null | number;
+            /** Format: decimal */
+            quantity?: null | string;
         };
         ScrapLot: {
             /** Format: uuid */
@@ -14865,6 +14954,8 @@ export interface components {
             /** Format: uuid */
             plantId: null | string;
             permissions: string[];
+            /** Format: date-time */
+            validTo?: null | string;
         };
         SessionCompany: {
             /** Format: uuid */
@@ -14997,6 +15088,11 @@ export interface components {
             /** Format: uuid */
             plantId: string;
             active: boolean;
+        };
+        SetPlantTruckScale: {
+            /** Format: uuid */
+            plantId: string;
+            hasTruckScale: boolean;
         };
         SetPortalMachine: {
             portalCode: string;
@@ -17860,6 +17956,82 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SetPlantStatus"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    SetPlantTruckScale: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPlantTruckScale"];
             };
         };
         responses: {
@@ -32140,6 +32312,82 @@ export interface operations {
             };
         };
     };
+    DispatchDelivery: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispatchDelivery"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     RecordPod: {
         parameters: {
             query?: never;
@@ -44900,6 +45148,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeliveryDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListDispatchLots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispatchLotList"];
                 };
             };
             /** @description Bad Request */

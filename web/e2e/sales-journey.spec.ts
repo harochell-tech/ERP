@@ -61,19 +61,9 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await seller.getByRole("button", { name: "Enviar a crédito" }).click();
   await expect(seller.getByTestId("order-status")).toHaveText("Confirmado");
 
-  // Dispatch: plan, load on our truck, weigh and gate out, delivery to the customer.
+  // Dispatch: plan with our truck, dispatch (no truck scale at the plant), delivery to the customer.
   const dispatch = await signIn(browser, "Despacho");
-  await nav(dispatch, "Tablero de despacho");
-  await dispatch.getByRole("link", { name: "Planificar conduce" }).first().click();
-  // V-25: nothing delivered or planned yet, so "A despachar" starts at the pending 100.
-  await expect(dispatch.getByTestId("pending:BLOQUE-6")).toHaveText("100");
-  await expect(dispatch.getByLabel("A despachar BLOQUE-6")).toHaveValue("100");
-  await submit(dispatch, "Planificar conduce");
-  const status = dispatch.getByTestId("delivery-status");
-  await expect(status).toHaveText("Planificado");
-  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
   // FLT-01 (E-FLT-1…4): the truck is picked by its ficha; a licence about to expire warns and does not block the dispatch.
-  const planned = dispatch.url();
   await dispatch.goto("/maestros/flota/");
   await expect(dispatch.getByRole("row", { name: /BR 09/ })).toContainText("AUTO-2026-000123");
   const driverRow = dispatch.getByRole("row", { name: /Juan Pérez/ });
@@ -82,14 +72,19 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await dispatch.getByRole("button", { name: "Guardar" }).click();
   await expect(dispatch.getByRole("row", { name: /Juan Pérez/ }).getByTestId("license-warning")).toHaveText("Licencia: vence en 10 días");
   await expectFits(dispatch);
-  await dispatch.goto(planned);
+  // DSP-01 (E-DSP-2): the truck and driver are chosen with the delivery, which starts loading at once.
+  await nav(dispatch, "Tablero de despacho");
+  await dispatch.getByRole("link", { name: "Planificar conduce" }).first().click();
+  // V-25: nothing delivered or planned yet, so "A despachar" starts at the pending 100.
+  await expect(dispatch.getByTestId("pending:BLOQUE-6")).toHaveText("100");
+  await expect(dispatch.getByLabel("A despachar BLOQUE-6")).toHaveValue("100");
   await dispatch.getByLabel("Camión").selectOption({ label: "BR 09 · L123456 (12,000 kg)" });
   await dispatch.getByLabel("Chofer").selectOption({ label: "Juan Pérez" });
   await expect(dispatch.getByTestId("license-warning")).toContainText("Licencia: vence en 10 días");
-  await dispatch.getByRole("button", { name: "Iniciar carga" }).click();
+  await submit(dispatch, "Planificar conduce");
+  const status = dispatch.getByTestId("delivery-status");
   await expect(status).toHaveText("Cargando");
-  await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
-  await expect(status).toHaveText("Cargado");
+  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
   // UX3-02 (E-UX3-7): the printable conduce carries "BORRADOR – NO DESPACHADO" until the truck goes out of the gate.
   const deliveryUrl = dispatch.url();
   await dispatch.getByRole("link", { name: "Imprimir conduce" }).click();
@@ -98,13 +93,10 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await expect(dispatch.getByTestId("conduce-ficha")).toContainText("Ficha BR 09");
   await expectFits(dispatch);
   await dispatch.goto(deliveryUrl);
-  await dispatch.getByLabel("Peso bruto (kg)").fill("9000");
-  await dispatch.getByLabel("Tara (kg)").fill("8000");
-  await attachEvidence(dispatch, "Ticket de báscula", "ticket-bascula.jpg");
-  await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
+  // DSP-01 (E-DSP-3 / 5): no truck scale at the plant — «Despachar» records the gate-out unweighed; with no lot chosen they leave oldest first.
+  await dispatch.getByRole("button", { name: "Despachar" }).click();
   await expect(status).toHaveText("En tránsito");
   await dispatch.getByRole("link", { name: "Imprimir conduce" }).click();
-  await expect(dispatch.getByTestId("conduce-net")).toHaveText("1,000");
   await expect(dispatch.getByTestId("watermark")).toHaveCount(0);
   await dispatch.goto(deliveryUrl);
   await dispatch.getByLabel("Recibió (nombre)").fill("Ing. María Gómez");

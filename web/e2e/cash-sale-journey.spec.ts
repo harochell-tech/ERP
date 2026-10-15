@@ -80,22 +80,15 @@ test("cash sale to a final consumer: collected, delivered and invoiced as a paid
   await dispatch.goto(saleUrl);
   await dispatch.getByRole("link", { name: "Planificar conduce" }).first().click();
   await expect(dispatch.getByLabel("A despachar BLOQUE-6")).toHaveValue("100");
-  await submit(dispatch, "Planificar conduce");
-  const delivery = dispatch.getByTestId("delivery-status");
-  await expect(delivery).toHaveText("Planificado");
-  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
-  expect(deliveryNo).not.toBe("");
   await dispatch.getByLabel("Placa del cliente").fill("G654321");
   await dispatch.getByLabel("Chofer del cliente").fill("Pedro Díaz");
-  await dispatch.getByRole("button", { name: "Iniciar carga" }).click();
+  await submit(dispatch, "Planificar conduce");
+  const delivery = dispatch.getByTestId("delivery-status");
   await expect(delivery).toHaveText("Cargando");
-  await dispatch.getByRole("button", { name: "Confirmar carga" }).click();
-  await expect(delivery).toHaveText("Cargado");
-  await dispatch.getByLabel("Peso bruto (kg)").fill("9000");
-  await dispatch.getByLabel("Tara (kg)").fill("8000");
-  await dispatch.getByLabel("Ticket de báscula", { exact: true }).setInputFiles({ name: "ticket-contado.jpg", mimeType: "application/octet-stream", buffer: Buffer.from(`ticket ${stamp}`) });
-  await expect(dispatch.getByTestId("evidence-verified")).toHaveText("✓ Huella del archivo verificada: ticket-contado.jpg");
-  await dispatch.getByRole("button", { name: "Registrar pesada y salida" }).click();
+  const deliveryNo = ((await dispatch.getByRole("heading", { level: 1 }).innerText()).match(/CD-\d+/) ?? [""])[0];
+  expect(deliveryNo).not.toBe("");
+  await expect(delivery).toHaveText("Cargando");
+  await dispatch.getByRole("button", { name: "Despachar" }).click();
   await expect(delivery).toHaveText("Entregado");
 
   // Facturación: the delivery as an e-CF 32, born paid from what Caja collected, recorded without a receiver.
