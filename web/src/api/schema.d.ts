@@ -5853,6 +5853,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/manufacturing/lab/pending-tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListPendingLabTests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/manufacturing/lab/lots": {
         parameters: {
             query?: never;
@@ -12438,6 +12454,27 @@ export interface components {
             /** Format: int64 */
             version: number;
             bankAccountAlias: null | string;
+        };
+        PendingLabTestList: {
+            items: components["schemas"]["PendingLabTestView"][];
+            /** Format: int32 */
+            dueToday: number;
+            /** Format: int32 */
+            overdue: number;
+        };
+        PendingLabTestView: {
+            /** Format: uuid */
+            lotId: string;
+            lotCode: string;
+            itemCode: string;
+            machineCode: null | string;
+            /** Format: date */
+            producedOn: string;
+            /** Format: int32 */
+            age: number;
+            /** Format: date */
+            dueOn: string;
+            overdue: boolean;
         };
         PeriodList: {
             /** Format: int32 */
@@ -42661,6 +42698,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MaintenanceTaskList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPendingLabTests: {
+        parameters: {
+            query?: {
+                daysAhead?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingLabTestList"];
                 };
             };
             /** @description Bad Request */

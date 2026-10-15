@@ -3,6 +3,7 @@ using Rochell.Platform.Commands;
 using Rochell.Platform.Data;
 using Rochell.Platform.Json;
 using Rochell.Platform.Queries;
+using Rochell.Platform.Time;
 
 namespace Rochell.Manufacturing.Quality;
 
@@ -170,6 +171,60 @@ internal static class LabReads
     public static ItemSpecView Spec(System.Data.Common.DbDataReader r)
         => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetInt32(3), r.NullableString(4), r.NullableDecimal(5), r.NullableDecimal(6), r.NullableDecimal(7),
             r.NullableDecimal(8), r.NullableDecimal(9), r.NullableDecimal(10), r.NullableString(11), r.NullableUtc(12), r.NullableDecimal(13), r.NullableDecimal(14), r.GetBoolean(15));
+}
+
+/// <summary>
+/// E-LAB1-19: the lab tests each lot of a tested product (its latest requirement has <c>lab_tested</c>) still owes — at 1 day (the
+/// initial release: a break of 1…INITIAL_RELEASE_MAX_AGE days), at 3 days (a break of 3 days or more under AGE_28D_MIN_DAYS) and at 28
+/// days (a break of AGE_28D_MIN_DAYS or more) after the lot entered curing — due up to <paramref name="DaysAhead"/> days from today,
+/// with how many are due today and how many are late. A test counts as done once a recorded (not voided) break of that age exists.
+/// </summary>
+public sealed record ListPendingLabTests(Guid CompanyId, Guid SessionId, int DaysAhead = 7) : IQuery;
+
+public sealed record PendingLabTestView(Guid LotId, string LotCode, string ItemCode, string? MachineCode, DateOnly ProducedOn, int Age, DateOnly DueOn, bool Overdue);
+
+public sealed record PendingLabTestList(IReadOnlyList<PendingLabTestView> Items, int DueToday, int Overdue);
+
+[RequiresPermission("lab:read")]
+public sealed class ListPendingLabTestsHandler : IQueryHandler<ListPendingLabTests>
+{
+    public string QueryType => "Manufacturing.ListPendingLabTests";
+
+    public async Task<string> HandleAsync(ListPendingLabTests query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var today = BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow);
+        var items = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            WITH p AS (SELECT qa.parameter_number(@c, 'AGE_28D_MIN_DAYS') AS a28, qa.parameter_number(@c, 'INITIAL_RELEASE_MAX_AGE') AS imax),
+            lots AS (
+              SELECT f.lot_id, coalesce(f.field_code, l.lot_code) AS code, i.code AS item, m.code AS machine,
+                     (f.curing_from AT TIME ZONE 'America/Santo_Domingo')::date AS produced
+              FROM mfg.fg_lot f
+              JOIN inv.lot l ON l.lot_id = f.lot_id
+              JOIN mfg.production_run r ON r.run_id = f.run_id
+              JOIN md.item i ON i.item_id = r.item_id
+              LEFT JOIN md.machine m ON m.machine_id = r.machine_id
+              WHERE f.company_id = @c AND f.status NOT IN ('SCRAPPED', 'VOIDED')
+                AND (SELECT s.lab_tested FROM qa.item_spec s WHERE s.company_id = @c AND s.item_id = r.item_id ORDER BY s.version DESC LIMIT 1))
+            SELECT lots.lot_id, lots.code, lots.item, lots.machine, lots.produced, a.age, lots.produced + a.age
+            FROM lots CROSS JOIN p CROSS JOIN (VALUES (1), (3), (28)) AS a(age)
+            WHERE lots.produced + a.age <= CAST(@until AS date)
+              AND NOT EXISTS (
+                SELECT 1 FROM qa.compression_test t
+                WHERE t.lot_id = lots.lot_id AND t.status = 'RECORDED'
+                  AND CASE a.age WHEN 1 THEN t.age_days BETWEEN 1 AND p.imax WHEN 3 THEN t.age_days >= 3 AND t.age_days < p.a28 ELSE t.age_days >= p.a28 END)
+            ORDER BY lots.produced + a.age, lots.code, a.age
+            """,
+            r => new PendingLabTestView(r.GetGuid(0), r.GetString(1), r.GetString(2), r.NullableString(3), r.Date(4), r.GetInt32(5), r.Date(6), r.Date(6) < today),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("until", today.AddDays(Math.Clamp(query.DaysAhead, 0, 60)))).ConfigureAwait(false);
+        return ApiJson.Serialize(new PendingLabTestList(items, items.Count(i => i.DueOn == today), items.Count(i => i.Overdue)));
+    }
 }
 
 [RequiresPermission("lab:read")]
