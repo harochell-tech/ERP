@@ -137,6 +137,7 @@ public static class CommandEndpoints
         procurement.MapCommand<CancelPurchaseOrder, CancelPurchaseOrderHandler>();
         procurement.MapCommand<ApproveOverReceipt, ApproveOverReceiptHandler>();
         procurement.MapCommand<PostGoodsReceipt, PostGoodsReceiptHandler>();
+        procurement.MapCommand<PostDirectGoodsReceipt, PostDirectGoodsReceiptHandler>(); // REC-02
         procurement.MapCommand<ReverseGoodsReceipt, ReverseGoodsReceiptHandler>();
         procurement.MapCommand<CreateReceiptCorrection, CreateReceiptCorrectionHandler>();
         procurement.MapCommand<ApproveReceiptCorrection, ApproveReceiptCorrectionHandler>();
@@ -445,7 +446,7 @@ public static class CommandEndpoints
         typeof(ReverseBankTransferHandler), typeof(MatchBankLineToTransferHandler), typeof(ImportBankStatementHandler), typeof(MatchBankLineHandler), typeof(MatchBankLineToReceiptHandler), typeof(MatchBankLineToRefundHandler), typeof(UnmatchBankLineHandler),
         typeof(RecognizeBankChargeHandler),
         typeof(CreatePurchaseOrderHandler), typeof(UpdatePurchaseOrderDraftHandler), typeof(SubmitPurchaseOrderHandler), typeof(ApprovePurchaseOrderHandler),
-        typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler),
+        typeof(RejectPurchaseOrderHandler), typeof(CancelPurchaseOrderHandler), typeof(ApproveOverReceiptHandler), typeof(PostGoodsReceiptHandler), typeof(PostDirectGoodsReceiptHandler),
         typeof(ReverseGoodsReceiptHandler), typeof(CreateReceiptCorrectionHandler), typeof(ApproveReceiptCorrectionHandler), typeof(RejectReceiptCorrectionHandler),
         typeof(RegisterSupplierInvoiceHandler), typeof(RegisterExpenseInvoiceHandler), typeof(CreateExpensePurchaseOrderHandler), typeof(UpdateExpensePurchaseOrderDraftHandler), typeof(CloseExpensePurchaseOrderHandler), typeof(PrepareExpenseCategoryHandler), typeof(UpdateExpenseCategoryDraftHandler), typeof(ApproveExpenseCategoriesHandler),
         typeof(DeactivateExpenseCategoryHandler), typeof(ReactivateExpenseCategoryHandler), typeof(SetExpenseCategoryIsrTypeHandler), typeof(MatchSupplierInvoiceHandler), typeof(ApproveMatchExceptionHandler), typeof(VoidSupplierInvoiceHandler),

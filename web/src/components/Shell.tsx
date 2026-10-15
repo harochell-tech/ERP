@@ -76,6 +76,7 @@ export const NAV: readonly NavGroup[] = [
     title: "Almacén",
     items: [
       { href: "/almacen/por-recibir/", label: "Por recibir", permission: "goods_receipt:post" }, // UX3-02 (E-UX3-5)
+      { href: "/almacen/recepcion-directa/", label: "Recepción sin orden de compra", permission: "goods_receipt:direct" }, // REC-02 (E-REC-02-7)
       { href: "/almacen/recepciones/", label: "Recepciones", permission: "goods_receipt:read" },
       { href: "/almacen/reporte-recepciones/", label: "Reporte de recepciones", permission: "goods_receipt:read" }, // REC-01 (E-REC-4)
       { href: "/almacen/correcciones/", label: "Correcciones", permission: "goods_receipt:read" },
@@ -104,6 +105,7 @@ export const NAV: readonly NavGroup[] = [
     title: "Calidad",
     items: [
       { href: "/calidad/laboratorio/", label: "Laboratorio", permission: "lab:read" },
+      { href: "/calidad/ensayos-pendientes/", label: "Ensayos pendientes", permission: "lab:read" }, // LAB1-04a (E-LAB1-19)
       { href: "/calidad/lotes/", label: "Lotes y veredicto", permission: "lab:read" }, // LAB1-02 (E-LAB1-02-15)
       { href: "/calidad/requisitos/", label: "Requisitos por ítem", permission: "lab:read" },
       { href: "/calidad/parametros/", label: "Parámetros", permission: "lab:read" },

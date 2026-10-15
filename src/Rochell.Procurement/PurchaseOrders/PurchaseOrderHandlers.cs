@@ -171,6 +171,13 @@ public sealed class ApprovePurchaseOrderHandler : ICommandHandler<ApprovePurchas
             extraSet: ", approved_by = @approver, approved_at = @at, policy_version_id = @policy",
             extraParameters: [("approver", approver), ("at", context.Clock.UtcNow), ("policy", policy.PolicyVersionId)]).ConfigureAwait(false);
 
+        // REC-02 (E-REC-02-4): an order behind a direct receipt receives what was entered, in this same command.
+        var receipt = await GoodsReceipts.DirectReceipts.PostOnApprovalAsync(context, header.Id, header.PlantId, command.IdempotencyKey, CommandType, cancellationToken).ConfigureAwait(false);
+        if (receipt is not null)
+        {
+            return JsonSerializer.Serialize(new { purchaseOrderId = header.Id, status = PurchaseOrderStatus.Received, version = header.Version + 2, receipt });
+        }
+
         return JsonSerializer.Serialize(new { purchaseOrderId = header.Id, status = PurchaseOrderStatus.Approved, version = header.Version + 1 });
     }
 
@@ -225,6 +232,15 @@ public sealed class RejectPurchaseOrderHandler : ICommandHandler<RejectPurchaseO
         var reason = PurchaseOrderStore.RequireReason(command.Reason);
         var header = await PurchaseOrderStore.LockAsync(context, command.PurchaseOrderId, command.PlantId, command.ExpectedVersion, cancellationToken).ConfigureAwait(false);
         PurchaseOrderStore.RequireStatus(header, PurchaseOrderStatus.PendingApproval);
+
+        // REC-02 (E-REC-02-4): rejecting a direct receipt cancels its order; nothing is received and the supplier's note is freed.
+        if (await GoodsReceipts.DirectReceipts.IsOpenAsync(context, header.Id, cancellationToken).ConfigureAwait(false))
+        {
+            await PurchaseOrderStore.TransitionAsync(context, header, PurchaseOrderStatus.Cancelled, CommandType, "PurchaseOrderRejected", new { poId = header.Id, reason }, publish: true, cancellationToken, reason).ConfigureAwait(false);
+            await GoodsReceipts.DirectReceipts.CloseAsync(context, header.Id, null, cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Serialize(new { purchaseOrderId = header.Id, status = PurchaseOrderStatus.Cancelled, version = header.Version + 1 });
+        }
+
         await PurchaseOrderStore.TransitionAsync(context, header, PurchaseOrderStatus.Draft, CommandType, "PurchaseOrderRejected", new { poId = header.Id, reason }, publish: false, cancellationToken, reason).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { purchaseOrderId = header.Id, status = PurchaseOrderStatus.Draft, version = header.Version + 1 });
     }
@@ -268,6 +284,7 @@ public sealed class CancelPurchaseOrderHandler : ICommandHandler<CancelPurchaseO
         }
 
         await PurchaseOrderStore.TransitionAsync(context, header, PurchaseOrderStatus.Cancelled, CommandType, "PurchaseOrderCancelled", new { poId = header.Id, reason }, publish: true, cancellationToken, reason).ConfigureAwait(false);
+        await GoodsReceipts.DirectReceipts.CloseAsync(context, header.Id, null, cancellationToken).ConfigureAwait(false); // REC-02: frees a waiting direct receipt's note
         return JsonSerializer.Serialize(new { purchaseOrderId = header.Id, status = PurchaseOrderStatus.Cancelled, version = header.Version + 1 });
     }
 }

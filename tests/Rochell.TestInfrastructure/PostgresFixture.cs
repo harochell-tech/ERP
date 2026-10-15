@@ -42,6 +42,9 @@ public sealed class PostgresFixture : IAsyncLifetime
             .WithDatabase("rochell_admin")
             .WithUsername("rochell_deploy")
             .WithPassword("rochell_test_only")
+            // Docker gives a container 64 MB of /dev/shm; after ~300 test databases in one container a parallel query could not get its
+            // 32 MB dynamic shared memory segment (53100 "No space left on device", seen in CC04 after REC-02 added tests).
+            .WithCreateParameterModifier(p => p.HostConfig.ShmSize = 512L * 1024 * 1024)
             .Build();
     }
 

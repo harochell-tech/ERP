@@ -1005,6 +1005,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/procurement/post-direct-goods-receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PostDirectGoodsReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/reverse-goods-receipt": {
         parameters: {
             query?: never;
@@ -5293,6 +5309,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/procurement/direct-receipt-reference": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetDirectReceiptReference"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/receiving-fleet": {
         parameters: {
             query?: never;
@@ -5813,6 +5845,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["ListMaintenanceTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/manufacturing/lab/pending-tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListPendingLabTests"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10124,6 +10172,55 @@ export interface components {
             /** Format: uuid */
             ruleVersionId: string;
         };
+        DirectReceiptLineInput: {
+            /** Format: uuid */
+            itemId: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: decimal */
+            unitPrice: string;
+        };
+        DirectReceiptPriceCheckView: {
+            /** Format: int32 */
+            lineNo: number;
+            /** Format: uuid */
+            itemId: string;
+            unitPrice: string;
+            referencePrice: null | string;
+            source: null | string;
+            sourcePoNo: null | string;
+            deviationPct: null | string;
+            allowedPct: null | string;
+            withinPolicy: boolean;
+        };
+        DirectReceiptReferenceView: {
+            /** Format: decimal */
+            referencePrice: null | string;
+            source: null | string;
+            sourcePoNo: null | string;
+            /** Format: decimal */
+            allowedDeviationPct: null | string;
+        };
+        DirectReceiptView: {
+            /** Format: uuid */
+            locationId: string;
+            locationCode: string;
+            /** Format: date-time */
+            occurredAt: string;
+            supplierDeliveryNote: string;
+            weighTicketRef: null | string;
+            vehiclePlate: string;
+            vehicleFleetCode: null | string;
+            driverName: string;
+            receivedBy: null | string;
+            requiresApproval: boolean;
+            priceCheck: components["schemas"]["DirectReceiptPriceCheckView"][];
+            /** Format: uuid */
+            goodsReceiptId: null | string;
+            /** Format: date-time */
+            closedAt: null | string;
+        };
         DiscardAssetClass: {
             /** Format: uuid */
             assetClassId: string;
@@ -12358,6 +12455,27 @@ export interface components {
             version: number;
             bankAccountAlias: null | string;
         };
+        PendingLabTestList: {
+            items: components["schemas"]["PendingLabTestView"][];
+            /** Format: int32 */
+            dueToday: number;
+            /** Format: int32 */
+            overdue: number;
+        };
+        PendingLabTestView: {
+            /** Format: uuid */
+            lotId: string;
+            lotCode: string;
+            itemCode: string;
+            machineCode: null | string;
+            /** Format: date */
+            producedOn: string;
+            /** Format: int32 */
+            age: number;
+            /** Format: date */
+            dueOn: string;
+            overdue: boolean;
+        };
         PeriodList: {
             /** Format: int32 */
             year: number;
@@ -12509,6 +12627,23 @@ export interface components {
         PostDepreciation: {
             /** Format: date */
             month: string;
+        };
+        PostDirectGoodsReceipt: {
+            /** Format: uuid */
+            plantId: string;
+            /** Format: uuid */
+            partyId: string;
+            /** Format: uuid */
+            locationId: string;
+            /** Format: date-time */
+            occurredAt: string;
+            lines: components["schemas"]["DirectReceiptLineInput"][];
+            /** Format: uuid */
+            vehicleId: null | string;
+            /** Format: uuid */
+            driverId: null | string;
+            supplierDeliveryNote: null | string;
+            weighTicketRef?: null | string;
         };
         PostFxRevaluation: {
             /** Format: date */
@@ -13226,6 +13361,9 @@ export interface components {
             docClass?: string;
             /** @default DOP */
             currency?: string;
+            /** @default ORDER */
+            origin?: string;
+            directReceipt?: null | components["schemas"]["DirectReceiptView"];
         };
         PurchaseOrderLineInput: {
             /** Format: uuid */
@@ -13365,6 +13503,8 @@ export interface components {
             docClass?: string;
             /** @default DOP */
             currency?: string;
+            /** @default ORDER */
+            origin?: string;
         };
         PurchaseOrderToReceive: {
             /** Format: uuid */
@@ -20514,6 +20654,82 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PostGoodsReceipt"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    PostDirectGoodsReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Generated by the client once per intent (e.g. when the form opens); a retry with the same key returns the first result. */
+                "Idempotency-Key": string;
+                /** @description Anti-CSRF header; must be "1". */
+                "X-Rochell-Csrf": "1";
+            };
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostDirectGoodsReceipt"];
             };
         };
         responses: {
@@ -40679,6 +40895,59 @@ export interface operations {
             };
         };
     };
+    GetDirectReceiptReference: {
+        parameters: {
+            query: {
+                partyId: string;
+                itemId: string;
+                uom: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectReceiptReferenceView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     ListReceivingFleet: {
         parameters: {
             query?: never;
@@ -42429,6 +42698,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MaintenanceTaskList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListPendingLabTests: {
+        parameters: {
+            query?: {
+                daysAhead?: number;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingLabTestList"];
                 };
             };
             /** @description Bad Request */

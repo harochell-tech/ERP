@@ -29,7 +29,8 @@ public sealed record PurchaseOrderSummary(
     long Version,
     decimal Total,
     string DocClass = "INVENTORY",
-    string Currency = "DOP");
+    string Currency = "DOP",
+    string Origin = "ORDER");
 
 public sealed record PurchaseOrderList(IReadOnlyList<PurchaseOrderSummary> Items, int Limit, int Offset);
 
@@ -48,7 +49,7 @@ public sealed class ListPurchaseOrdersHandler : IQueryHandler<ListPurchaseOrders
             context.Transaction,
             """
             SELECT po.po_id, po.po_no, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.status::text, po.version,
-                   (SELECT coalesce(sum(round(l.qty_ordered * l.unit_price, 2)), 0)::numeric(19,2) FROM pur.purchase_order_line l WHERE l.po_id = po.po_id), po.doc_class, po.currency
+                   (SELECT coalesce(sum(round(l.qty_ordered * l.unit_price, 2)), 0)::numeric(19,2) FROM pur.purchase_order_line l WHERE l.po_id = po.po_id), po.doc_class, po.currency, po.origin
             FROM pur.purchase_order po
             JOIN md.party p ON p.party_id = po.party_id
             JOIN md.plant pl ON pl.plant_id = po.plant_id
@@ -59,7 +60,7 @@ public sealed class ListPurchaseOrdersHandler : IQueryHandler<ListPurchaseOrders
             ORDER BY po.order_date DESC, po.po_no DESC
             LIMIT @limit OFFSET @offset
             """,
-            r => new PurchaseOrderSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.GetString(7), r.GetInt64(8), r.GetDecimal(9), r.GetString(10), r.GetString(11).Trim()),
+            r => new PurchaseOrderSummary(r.GetGuid(0), r.GetString(1), r.GetGuid(2), r.GetString(3), r.GetGuid(4), r.GetString(5), r.Date(6), r.GetString(7), r.GetInt64(8), r.GetDecimal(9), r.GetString(10), r.GetString(11).Trim(), r.GetString(12)),
             cancellationToken,
             ("c", context.CompanyId),
             ("plant", query.PlantId),
@@ -98,6 +99,25 @@ public sealed record PurchaseOrderLineView(
     Guid? TaxTypeId = null,
     string? TaxTypeCode = null);
 
+/// <summary>REC-02 (E-REC-02-4/7): one line's price check of a direct receipt, as it was when the receipt was entered.</summary>
+public sealed record DirectReceiptPriceCheckView(int LineNo, Guid ItemId, string UnitPrice, string? ReferencePrice, string? Source, string? SourcePoNo, string? DeviationPct, string? AllowedPct, bool WithinPolicy);
+
+/// <summary>REC-02: what the receiver entered for a direct receipt; <see cref="GoodsReceiptId"/> once posted, <see cref="ClosedAt"/> once posted or released.</summary>
+public sealed record DirectReceiptView(
+    Guid LocationId,
+    string LocationCode,
+    DateTime OccurredAt,
+    string SupplierDeliveryNote,
+    string? WeighTicketRef,
+    string VehiclePlate,
+    string? VehicleFleetCode,
+    string DriverName,
+    string? ReceivedBy,
+    bool RequiresApproval,
+    IReadOnlyList<DirectReceiptPriceCheckView> PriceCheck,
+    Guid? GoodsReceiptId,
+    DateTime? ClosedAt);
+
 public sealed record PurchaseOrderReceiptView(Guid GoodsReceiptId, string GrNo, string DocumentStatus, string AccountingStatus, DateTime OccurredAt);
 
 public sealed record PurchaseOrderDetail(
@@ -120,7 +140,9 @@ public sealed record PurchaseOrderDetail(
     IReadOnlyList<StateChange> History,
     decimal Total,
     string DocClass = "INVENTORY",
-    string Currency = "DOP");
+    string Currency = "DOP",
+    string Origin = "ORDER",
+    DirectReceiptView? DirectReceipt = null);
 
 [RequiresPermission("purchase_order:read")]
 public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
@@ -136,7 +158,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             context.Transaction,
             """
             SELECT po.po_id, po.po_no, po.revision, po.party_id, p.legal_name, po.plant_id, pl.code, po.order_date, po.status::text,
-                   coalesce(cu.display_name, cu.email), coalesce(au.display_name, au.email), po.approved_at, po.policy_version_id, po.version, po.doc_class, po.currency
+                   coalesce(cu.display_name, cu.email), coalesce(au.display_name, au.email), po.approved_at, po.policy_version_id, po.version, po.doc_class, po.currency, po.origin
             FROM pur.purchase_order po
             JOIN md.party p ON p.party_id = po.party_id
             JOIN md.plant pl ON pl.plant_id = po.plant_id
@@ -146,7 +168,7 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             """,
             r => new PurchaseOrderDetail(
                 r.GetGuid(0), r.GetString(1), r.GetInt32(2), r.GetGuid(3), r.GetString(4), r.GetGuid(5), r.GetString(6), r.Date(7), r.GetString(8),
-                r.NullableString(9), r.NullableString(10), r.NullableUtc(11), r.NullableGuid(12), r.GetInt64(13), [], [], [], 0m, r.GetString(14), r.GetString(15).Trim()),
+                r.NullableString(9), r.NullableString(10), r.NullableUtc(11), r.NullableGuid(12), r.GetInt64(13), [], [], [], 0m, r.GetString(14), r.GetString(15).Trim(), r.GetString(16)),
             cancellationToken,
             ("c", context.CompanyId),
             ("id", query.PurchaseOrderId),
@@ -191,7 +213,26 @@ public sealed class GetPurchaseOrderHandler : IQueryHandler<GetPurchaseOrder>
             ("id", query.PurchaseOrderId)).ConfigureAwait(false);
 
         var history = await StateHistory.ReadAsync(context, PurchaseOrderStore.Aggregate, query.PurchaseOrderId, cancellationToken).ConfigureAwait(false);
-        return ApiJson.Serialize(header with { Lines = lines, GoodsReceipts = receipts, History = history, Total = Money.Zero + lines.Sum(l => l.NetAmount) });
+        var direct = await Reading.SingleOrDefaultAsync(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT d.location_id, loc.code, d.occurred_at, d.supplier_delivery_note, d.weigh_ticket_ref, v.plate, v.fleet_code, dr.full_name,
+                   coalesce(u.display_name, u.email), d.requires_approval, d.price_check::text, d.gr_id, d.closed_at
+            FROM pur.direct_receipt d
+            JOIN md.location loc ON loc.location_id = d.location_id
+            JOIN log.vehicle v ON v.vehicle_id = d.vehicle_id
+            JOIN log.driver dr ON dr.driver_id = d.driver_id
+            LEFT JOIN iam.user u ON u.user_id = d.received_by
+            WHERE d.company_id = @c AND d.po_id = @id
+            """,
+            r => new DirectReceiptView(
+                r.GetGuid(0), r.GetString(1), r.Utc(2), r.GetString(3), r.NullableString(4), r.GetString(5), r.NullableString(6), r.GetString(7), r.NullableString(8), r.GetBoolean(9),
+                System.Text.Json.JsonSerializer.Deserialize<List<DirectReceiptPriceCheckView>>(r.GetString(10), ApiJson.Options) ?? [], r.NullableGuid(11), r.NullableUtc(12)),
+            cancellationToken,
+            ("c", context.CompanyId),
+            ("id", query.PurchaseOrderId)).ConfigureAwait(false);
+        return ApiJson.Serialize(header with { Lines = lines, GoodsReceipts = receipts, History = history, Total = Money.Zero + lines.Sum(l => l.NetAmount), DirectReceipt = direct });
     }
 }
 

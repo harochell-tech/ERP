@@ -30,6 +30,14 @@ export default function ToReceive() {
     <>
       <h1>Por recibir</h1>
       <p className="muted">Órdenes aprobadas o recibidas en parte, de la más antigua a la más reciente.</p>
+      {can("goods_receipt:direct") ? (
+        <p className="actions">
+          {/* REC-02 (E-REC-02-7): material that arrives without an order. */}
+          <Link className="button" href="/almacen/recepcion-directa/">
+            Recepción sin orden de compra
+          </Link>
+        </p>
+      ) : null}
       {data === null ? (
         <Loading error={error} />
       ) : data.items.length === 0 ? (

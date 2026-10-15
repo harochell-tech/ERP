@@ -142,3 +142,30 @@ public static class GoodsReceiptCsv
 
     private static string Q(decimal value) => value.ToString("0.######", CultureInfo.InvariantCulture);
 }
+
+/// <summary>
+/// REC-02 (E-REC-7, E-REC-02-2/3): the price Core proposes for a material received without an order from a supplier — the last price
+/// in that unit, else the standard price — and the deviation the PURCHASING policy allows (null: every direct receipt waits for
+/// approval).
+/// </summary>
+public sealed record GetDirectReceiptReference(Guid CompanyId, Guid SessionId, Guid PartyId, Guid ItemId, string Uom) : IQuery;
+
+public sealed record DirectReceiptReferenceView(decimal? ReferencePrice, string? Source, string? SourcePoNo, decimal? AllowedDeviationPct);
+
+[RequiresPermission("goods_receipt:direct")]
+public sealed class GetDirectReceiptReferenceHandler : IQueryHandler<GetDirectReceiptReference>
+{
+    public string QueryType => "Procurement.GetDirectReceiptReference";
+
+    public async Task<string> HandleAsync(GetDirectReceiptReference query, QueryContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(context);
+        var reference = await GoodsReceipts.DirectReceipts.ReferenceAsync(
+            context.Connection, context.Transaction, context.CompanyId, query.PartyId, query.ItemId, (query.Uom ?? string.Empty).Trim(), cancellationToken).ConfigureAwait(false);
+        var policy = await Rochell.Finance.Policies.PolicyResolver.TryResolveAsync(
+            context.Connection, context.Transaction, context.CompanyId, Rochell.Finance.Policies.PolicyCodes.Purchasing, Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(context.Clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        decimal? allowed = policy is not null && policy.Has(GoodsReceipts.DirectReceipts.PriceDeviationParameter) ? policy.Decimal(GoodsReceipts.DirectReceipts.PriceDeviationParameter) : null;
+        return ApiJson.Serialize(new DirectReceiptReferenceView(reference.Price, reference.Source, reference.SourcePoNo, allowed));
+    }
+}

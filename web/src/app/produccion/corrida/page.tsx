@@ -469,6 +469,13 @@ function RunDetail() {
             <ProductionBadge kind="lot" status={lot.status} testId="lot-status" /> · <span data-testid="lot-racks">{lot.racks}</span> racks · en curado desde{" "}
             {formatDateTime(lot.curingFrom)} · se puede liberar desde {formatDateTime(lot.releasableAt)}
           </p>
+          {can("lab:read") ? (
+            <p>
+              <Link href={`/calidad/lotes/?lote=${lot.lotId}`} data-testid="lot-quality-record">
+                Récord de calidad del lote: ensayos, resistencia, certificado y despachos
+              </Link>
+            </p>
+          ) : null}
           {remaining ? <p data-testid="lot-curing-remaining">{remaining}</p> : null}
         </>
       )}

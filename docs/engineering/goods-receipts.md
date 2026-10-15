@@ -55,3 +55,19 @@ optional; the screen asks «Fecha y hora de llegada» and folds the ticket.
 - `GetGoodsReceiptReport` (`/procurement/goods-receipt-report`, `format=csv`): one row per line of the non-reversed receipts whose
   Dominican date falls between `from` and `to` (at most a year), filtered by supplier, material, location and plant, with totals
   per material and unit. Almacén › Reporte de recepciones shows it and downloads the CSV.
+
+## Direct receipt without a purchase order (REC-02)
+
+E-REC-6…8, E-REC-02-1…7, migration 0126. `PostDirectGoodsReceipt` (`goods_receipt:direct`, Almacenista and Comprador) takes the
+supplier, location, arrival, the supplier's note, our truck and driver and the lines (item, unit, quantity, unit price). Core creates an
+order with `origin = DIRECT_RECEIPT` (DRAFT → PENDING_APPROVAL in the same command) and records `pur.direct_receipt`.
+
+- Each line is compared with its reference (`DirectReceipts.ReferenceAsync`): the last price from that supplier in that unit, else
+  the standard price; within `direct_receipt_price_deviation_pct` (PURCHASING) when abs(price − reference) ≤ reference × the value.
+- Every line within: the service identity «Recepción directa» approves the order and the receipt posts through
+  `PostGoodsReceiptHandler.PostAsync` with the command's result id; the order ends RECEIVED.
+- Otherwise the order waits. `ApprovePurchaseOrder` posts the held receipt (`DirectReceipts.PostOnApprovalAsync`) with the original
+  arrival time; rejecting or cancelling cancels the order and closes the direct receipt, freeing the note. An open direct receipt
+  holds its note against other receipts of that supplier.
+- `GetPurchaseOrder` shows `origin` and `directReceipt` (with the price check); `ListPurchaseOrders` shows `origin`;
+  `GetDirectReceiptReference` gives the screen the proposed price and the allowed deviation.
