@@ -363,8 +363,8 @@ try
                 await connection.OpenAsync();
                 await using var create = new NpgsqlCommand(
                     """
-                    INSERT INTO md.location (location_id, company_id, plant_id, code)
-                    SELECT @id, p.company_id, p.plant_id, upper(@code)
+                    INSERT INTO md.location (location_id, company_id, plant_id, code, is_transit, is_curing)
+                    SELECT @id, p.company_id, p.plant_id, upper(@code), upper(@code) = 'TRANSITO', upper(@code) = 'CURADO'
                     FROM md.plant p JOIN md.company c ON c.company_id = p.company_id
                     WHERE c.rnc = @rnc AND p.code = upper(@plant)
                     """,

@@ -171,6 +171,12 @@ internal static class Deliveries
             return id;
         }
 
+        // A location coded TRANSITO without the flag (loaded by hand) would collide with the one created here (location_code_uq).
+        if (await SalesSql.ScalarAsync<Guid?>(context, "SELECT location_id FROM md.location WHERE plant_id = @p AND code = 'TRANSITO'", cancellationToken, ("p", plantId)).ConfigureAwait(false) is not null)
+        {
+            throw new DomainException(DeliveryErrors.LocationInvalid, "The plant has a location coded TRANSITO that is not marked as its transit location; it must be marked before a site delivery leaves.");
+        }
+
         var location = context.Ids.NewId();
         await Sql.ExecuteAsync(
             context.Connection,

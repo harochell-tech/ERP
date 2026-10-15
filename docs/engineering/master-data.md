@@ -86,3 +86,8 @@ Plants and locations are never deleted (`md.plant_guard`, `md.location_guard`: o
 inactive ones out unless `includeInactive=true` (the plants screen); `ListSalesPlants` offers only active plants and locations. Machines
 and shifts stay in Producción › Máquinas y turnos; people per plant in Seguridad › Usuarios y roles. The CLI `create-plant` /
 `create-location` keep working. 252 commands. Tests: `PlantTests`, Playwright `plants-journey.spec.ts`.
+
+**Transit and curing flags (migration 0127).** `rochell-migrate create-location` now marks TRANSITO as the plant's transit location and
+CURADO as its curing location, as `CreateLocation` does (E-PLT-2). Migration 0127 marks the ones loaded before without the flag (the
+gate-out of a site delivery collided with an unmarked TRANSITO, 2026-10-15); the gate-out refuses an unmarked TRANSITO with
+`LOCATION_INVALID` instead of failing. `diagnose-staging` (Actions, main only) prints the API log around an error reference shown on screen.

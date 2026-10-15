@@ -72,6 +72,27 @@ public sealed class DispatchTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_TRANSITO_location_without_its_flag_is_refused_clearly_instead_of_colliding()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await DeliveryTests.SetupAsync(h);
+        await h.AdminRequireAsync(
+            $"""
+            DO $$ BEGIN
+              PERFORM set_config('session_replication_role', 'replica', true);
+              DELETE FROM md.location WHERE plant_id = '{s.Plant}' AND is_transit;
+              INSERT INTO md.location (location_id, company_id, plant_id, code) VALUES (gen_random_uuid(), '{h.CompanyId}', '{s.Plant}', 'TRANSITO');
+            END $$
+            """);
+        var (order, orderLine) = await DeliveryTests.ConfirmedOrderAsync(h, s, DeliveryTerms.DeliveredOwnTransport, 500m);
+        var delivery = (await h.RunAsync(new PlanDelivery(h.CompanyId, s.Dispatch, "p", order, [new(orderLine, 500m)], VehicleId: s.Truck, DriverId: s.Driver), new PlanDeliveryHandler())).ResultRef;
+        var line = await h.ScalarAsync<Guid>("SELECT delivery_line_id FROM log.delivery_line WHERE delivery_id = @d", ("d", delivery));
+
+        var refused = await Assert.ThrowsAsync<DomainException>(() => h.RunAsync(new DispatchDelivery(h.CompanyId, s.Dispatch, "d", delivery, 2, [new(line, s.Patio)]), new DispatchDeliveryHandler()));
+        Assert.Equal(DeliveryErrors.LocationInvalid, refused.Code);
+    }
+
+    [Fact]
     public async Task With_a_truck_scale_the_gate_out_is_weighed_and_Despachar_is_refused()
     {
         await using var h = await TestHarness.CreateAsync(postgres);
