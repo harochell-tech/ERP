@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import { query } from "@/api/client";
 import { LoadingIndicator } from "@/components/StateNotices";
 import { ErrorBox, FieldMessage, fieldAria, LineTable, NoPermission, useFieldErrors } from "@/components/ui";
+import { NO_TRANSPORT, TransportFields, transportBody, transportErrors, type Transport } from "@/components/TransportFields";
 import { formatQuantity, isDecimal, normalizeInput } from "@/lib/decimal";
 import { DELIVERY_TERMS, formatDate } from "@/lib/labels";
 import { useSession } from "@/lib/session";
@@ -16,6 +17,7 @@ import { isOpenDelivery, pendingWithoutArithmetic } from "@/lib/ux4bSales";
 // VS3-10a (E-VS3-04-13): plan a delivery CD-… of a confirmed order, in the order's units; the server refuses more than is still
 // open (the screen shows ordered and delivered as they come, without subtracting).
 // UX4-03 (V-25): a "Pendiente" column and "A despachar" prefilled with it when the server's figures give it without arithmetic.
+// DSP-01 (E-DSP-2): the truck and driver (or the customer's plate and driver) are chosen here; the delivery starts loading at once.
 
 function Plan() {
   const { companyId, can } = useSession();
@@ -24,7 +26,9 @@ function Plan() {
   const plan = useCommand<"/api/v1/companies/{companyId}/sales/plan-delivery", Record<string, string>>(`plan-delivery:${orderId}`, "/api/v1/companies/{companyId}/sales/plan-delivery", (_r, doc) => (doc ? `Conduce ${doc} planificado.` : "Conduce planificado."));
   const [typed, setQuantities] = useState<Record<string, string> | null>(() => plan.restored ?? null);
   const [invalid, setInvalid] = useState<string | null>(null);
+  const [transport, setTransport] = useState<Transport>(NO_TRANSPORT);
   const fe = useFieldErrors();
+  const transportFe = useFieldErrors<keyof Transport>();
   const { data: loaded, error } = useLoad(
     can("delivery:manage") && orderId
       ? async () => {
@@ -104,6 +108,8 @@ function Plan() {
           ))}
         </tbody>
       </LineTable>
+      <h2>Transporte</h2>
+      <TransportFields own={data.header.deliveryTermCode === "DELIVERED_OWN_TRANSPORT"} value={transport} onChange={setTransport} errors={transportFe.errors} />
       <div className="actions form-actions">
         {allKnown ? (
           <button type="button" onClick={() => setQuantities(known)}>
@@ -121,7 +127,9 @@ function Plan() {
                 .filter((l) => l.quantity !== "" && (!isDecimal(l.quantity, 6) || l.quantity.startsWith("-")))
                 .map((l) => [l.salesOrderLineId, "Cantidad no válida (cero o más, hasta 6 decimales)."]),
             );
-            if (!fe.check(badLines)) {
+            const own = data.header.deliveryTermCode === "DELIVERED_OWN_TRANSPORT";
+            const transportOk = transportFe.check(transportErrors(own, transport));
+            if (!fe.check(badLines) || !transportOk) {
               setInvalid(null);
               return;
             }
@@ -131,7 +139,7 @@ function Plan() {
               return;
             }
             setInvalid(null);
-            const response = await plan.run({ salesOrderId: orderId, lines }, quantities);
+            const response = await plan.run({ salesOrderId: orderId, lines, ...transportBody(data.header.deliveryTermCode === "DELIVERED_OWN_TRANSPORT", transport) }, quantities);
             if (response) {
               router.push(`/despacho/conduce/?id=${response.resultRef}`);
             }
