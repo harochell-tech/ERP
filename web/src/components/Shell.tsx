@@ -43,6 +43,7 @@ export const NAV: readonly NavGroup[] = [
     title: "Despacho",
     items: [
       { href: "/despacho/tablero/", label: "Tablero de despacho", permission: "sales:read" },
+      { href: "/despacho/reporte-despachos/", label: "Reporte de despachos", permission: "sales:read" }, // REC-03 (E-REC-03-2)
       { href: "/maestros/flota/", label: "Vehículos y choferes", permission: "sales:read" },
     ],
   },
@@ -52,6 +53,7 @@ export const NAV: readonly NavGroup[] = [
       { href: "/facturacion/por-facturar/", label: "Por facturar", permission: "sales:read" },
       { href: "/facturacion/proformas/", label: "Proformas", permission: "sales:read" }, // FIS1b-07 (E-FIS1b-9)
       { href: "/facturacion/facturas/", label: "Facturas", permission: "sales:read" },
+      { href: "/facturacion/reporte-ventas/", label: "Reporte de ventas", permission: "sales:read" }, // REC-03 (E-REC-03-4)
       { href: "/facturacion/notas/", label: "Notas de crédito", permission: "sales:read" },
       { href: "/cobros/recibos/", label: "Recibos", permission: "sales:read" },
       { href: "/cobros/depositos/", label: "Depósitos", permission: "sales:read" },

@@ -6653,6 +6653,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/sales/dispatch-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetDispatchReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/sales/sales-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetSalesReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/sales/deliveries": {
         parameters: {
             query?: never;
@@ -10252,6 +10284,11 @@ export interface components {
             expectedVersion: number;
             reason: string;
         };
+        DispatchCustomerTotal: {
+            customerName: string;
+            /** Format: int32 */
+            deliveries: number;
+        };
         DispatchDelivery: {
             /** Format: uuid */
             deliveryId: string;
@@ -10280,6 +10317,43 @@ export interface components {
             strengthBasis: null | string;
             /** Format: decimal */
             quantity: string;
+        };
+        DispatchProductTotal: {
+            itemCode: string;
+            itemDescription: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: int32 */
+            deliveries: number;
+        };
+        DispatchReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            rows: components["schemas"]["DispatchReportRow"][];
+            productTotals: components["schemas"]["DispatchProductTotal"][];
+            customerTotals: components["schemas"]["DispatchCustomerTotal"][];
+        };
+        DispatchReportRow: {
+            /** Format: date-time */
+            gateOutAt: string;
+            deliveryNo: string;
+            orderNo: string;
+            customerName: string;
+            itemCode: string;
+            itemDescription: string;
+            lotCode: string;
+            /** Format: decimal */
+            quantity: string;
+            uom: string;
+            vehicleFleetCode: null | string;
+            vehiclePlate: null | string;
+            driverName: null | string;
+            deliveryTerm: string;
+            status: string;
+            plantCode: string;
         };
         DocumentIssuer: {
             rnc: string;
@@ -15061,6 +15135,51 @@ export interface components {
             freightUnitPrice?: null | string;
             /** Format: decimal */
             freightAmount?: null | string;
+        };
+        SalesReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            rows: components["schemas"]["SalesReportRow"][];
+            productTotals: components["schemas"]["SalesTotal"][];
+            customerTotals: components["schemas"]["SalesTotal"][];
+            invoices: components["schemas"]["SalesTotal"];
+            creditNotes: components["schemas"]["SalesTotal"];
+            netSales: components["schemas"]["SalesTotal"];
+        };
+        SalesReportRow: {
+            /** Format: date */
+            date: string;
+            kind: string;
+            documentNo: string;
+            encf: null | string;
+            customerName: string;
+            customerRnc: null | string;
+            itemCode: string;
+            itemDescription: string;
+            lineKind: string;
+            /** Format: decimal */
+            quantity: null | string;
+            uom: null | string;
+            /** Format: decimal */
+            unitPrice: null | string;
+            /** Format: decimal */
+            net: string;
+            /** Format: decimal */
+            itbis: string;
+            /** Format: decimal */
+            total: string;
+        };
+        SalesTotal: {
+            key: string;
+            name: string;
+            /** Format: decimal */
+            net: string;
+            /** Format: decimal */
+            itbis: string;
+            /** Format: decimal */
+            total: string;
         };
         SavePrintFormatDraft: {
             documentType: string;
@@ -45485,6 +45604,122 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetDispatchReport: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                partyId?: string;
+                itemId?: string;
+                vehicleId?: string;
+                driverId?: string;
+                plantId?: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispatchReport"];
+                    "text/csv": components["schemas"]["DispatchReport"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetSalesReport: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                partyId?: string;
+                itemId?: string;
+                plantId?: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesReport"];
+                    "text/csv": components["schemas"]["SalesReport"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

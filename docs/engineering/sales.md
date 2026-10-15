@@ -306,3 +306,12 @@ completar». No schema change.
 Screens: Despacho › Planificar asks the transport; the conduce lists the lots to choose per line, the rack scanner folded as optional
 (E-DSP-4), and the button «Despachar» without a scale. Tests: `DispatchTests`; the Playwright journeys plan with the transport and
 press «Despachar».
+
+## Dispatch and sales reports (REC-03)
+
+E-REC-03-1…4. `GetDispatchReport` (`/sales/dispatch-report`) lists, one row per line and lot in base units, the deliveries whose
+Dominican gate-out date falls in the period, with the truck (fleet code and plate, or the customer's plate at a pickup) and the driver,
+totals per product and per customer. `GetSalesReport` (`/sales/sales-report`) lists the lines of the issued invoices by invoice date
+(voided ones left out) with net, ITBIS (the invoice's tax determination) and total, and the confirmed commercial credit notes of the
+period as negative rows; totals per product and per customer and the summary invoices / credit notes / net sale. Both take
+`format=csv`, cover at most a year and read with `sales:read`. Screens: Despacho › Reporte de despachos, Facturación › Reporte de ventas.

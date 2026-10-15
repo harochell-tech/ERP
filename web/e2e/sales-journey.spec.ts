@@ -187,4 +187,12 @@ test("sales order to a reconciled receipt (E2E-S1)", async ({ browser }) => {
   await treasurer.getByRole("button", { name: /^Conciliar con cobro por transferencia REC-\d+/ }).click();
   await expect(treasurer.getByRole("tab", { name: "Conciliadas (1)" })).toBeVisible();
   await expect(treasurer.getByTestId("bank-gl-difference")).toHaveText("0.00");
+
+  // REC-03 (E-REC-03-1…4): the dispatch and the sales of the month in their reports, each downloadable as CSV.
+  await nav(dispatch, "Reporte de despachos");
+  await expect(dispatch.getByTestId("dispatch-report-rows")).toContainText("Constructora Uno");
+  await expect(dispatch.getByTestId("dispatch-report-csv")).toHaveAttribute("href", /format=csv/);
+  await nav(billing, "Reporte de ventas");
+  await expect(billing.getByTestId("sales-report-summary")).toContainText("Venta neta");
+  await expect(billing.getByTestId("sales-report-rows")).toContainText("Constructora Uno");
 });

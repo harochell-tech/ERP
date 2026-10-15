@@ -45378,6 +45378,262 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/sales/dispatch-report": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "operationId": "GetDispatchReport",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "partyId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "vehicleId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "driverId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "plantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/sales/sales-report": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "operationId": "GetSalesReport",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "partyId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "plantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/sales/deliveries": {
       "get": {
         "tags": [
@@ -60512,6 +60768,23 @@
         },
         "additionalProperties": false
       },
+      "DispatchCustomerTotal": {
+        "required": [
+          "customerName",
+          "deliveries"
+        ],
+        "type": "object",
+        "properties": {
+          "customerName": {
+            "type": "string"
+          },
+          "deliveries": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "DispatchDelivery": {
         "required": [
           "deliveryId",
@@ -60623,6 +60896,156 @@
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
             "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DispatchProductTotal": {
+        "required": [
+          "itemCode",
+          "itemDescription",
+          "uom",
+          "quantity",
+          "deliveries"
+        ],
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string"
+          },
+          "itemDescription": {
+            "type": "string"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "deliveries": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DispatchReport": {
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "productTotals",
+          "customerTotals"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispatchReportRow"
+            }
+          },
+          "productTotals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispatchProductTotal"
+            }
+          },
+          "customerTotals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispatchCustomerTotal"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "DispatchReportRow": {
+        "required": [
+          "gateOutAt",
+          "deliveryNo",
+          "orderNo",
+          "customerName",
+          "itemCode",
+          "itemDescription",
+          "lotCode",
+          "quantity",
+          "uom",
+          "vehicleFleetCode",
+          "vehiclePlate",
+          "driverName",
+          "deliveryTerm",
+          "status",
+          "plantCode"
+        ],
+        "type": "object",
+        "properties": {
+          "gateOutAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deliveryNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemDescription": {
+            "type": "string"
+          },
+          "lotCode": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "vehicleFleetCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vehiclePlate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "driverName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deliveryTerm": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "plantCode": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -78473,6 +78896,185 @@
               "null",
               "string"
             ],
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesReport": {
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "productTotals",
+          "customerTotals",
+          "invoices",
+          "creditNotes",
+          "netSales"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesReportRow"
+            }
+          },
+          "productTotals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTotal"
+            }
+          },
+          "customerTotals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTotal"
+            }
+          },
+          "invoices": {
+            "$ref": "#/components/schemas/SalesTotal"
+          },
+          "creditNotes": {
+            "$ref": "#/components/schemas/SalesTotal"
+          },
+          "netSales": {
+            "$ref": "#/components/schemas/SalesTotal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesReportRow": {
+        "required": [
+          "date",
+          "kind",
+          "documentNo",
+          "encf",
+          "customerName",
+          "customerRnc",
+          "itemCode",
+          "itemDescription",
+          "lineKind",
+          "quantity",
+          "uom",
+          "unitPrice",
+          "net",
+          "itbis",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "documentNo": {
+            "type": "string"
+          },
+          "encf": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerRnc": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemDescription": {
+            "type": "string"
+          },
+          "lineKind": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "uom": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unitPrice": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "decimal"
+          },
+          "net": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbis": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "total": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTotal": {
+        "required": [
+          "key",
+          "name",
+          "net",
+          "itbis",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "net": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "itbis": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "total": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
             "format": "decimal"
           }
         },
