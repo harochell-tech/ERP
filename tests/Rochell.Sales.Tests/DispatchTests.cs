@@ -57,6 +57,21 @@ public sealed class DispatchTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task Without_a_truck_scale_a_site_delivery_with_our_truck_is_dispatched_from_a_chosen_lot_without_a_quantity()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var s = await DeliveryTests.SetupAsync(h);
+        var (order, orderLine) = await DeliveryTests.ConfirmedOrderAsync(h, s, DeliveryTerms.DeliveredOwnTransport, 500m);
+        var delivery = (await h.RunAsync(new PlanDelivery(h.CompanyId, s.Dispatch, "p", order, [new(orderLine, 500m)], VehicleId: s.Truck, DriverId: s.Driver), new PlanDeliveryHandler())).ResultRef;
+        var line = await h.ScalarAsync<Guid>("SELECT delivery_line_id FROM log.delivery_line WHERE delivery_id = @d", ("d", delivery));
+        var lot1 = await h.ScalarAsync<Guid>("SELECT lot_id FROM inv.lot WHERE lot_code LIKE '%-1' AND item_id = @i", ("i", s.Block));
+
+        var dispatched = JsonDocument.Parse((await h.RunAsync(
+            new DispatchDelivery(h.CompanyId, s.Dispatch, "d", delivery, 2, [new(line, s.Patio, [new ScannedRack(lot1)])]), new DispatchDeliveryHandler())).ResultPayload).RootElement;
+        Assert.Equal("IN_TRANSIT", dispatched.GetProperty("status").GetString());
+    }
+
+    [Fact]
     public async Task With_a_truck_scale_the_gate_out_is_weighed_and_Despachar_is_refused()
     {
         await using var h = await TestHarness.CreateAsync(postgres);

@@ -1,0 +1,46 @@
+name: diagnose-staging
+
+# Read-only: the API log around an error reference that a screen showed («Error inesperado del sistema. Referencia: …»).
+# ApiProblems logs every unexpected error with its correlation id, which is that reference. Manual, from main only.
+on:
+  workflow_dispatch:
+    inputs:
+      reference:
+        description: Error reference (UUID) shown on screen
+        required: true
+      hours:
+        description: How many hours of the API log to search
+        required: false
+        default: "72"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: staging
+    steps:
+      - name: Validate the inputs
+        env:
+          REFERENCE: ${{ inputs.reference }}
+          HOURS: ${{ inputs.hours }}
+        run: |
+          echo "${REFERENCE}" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          echo "${HOURS}" | grep -Eq '^[0-9]{1,4}$'
+
+      - name: SSH setup
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.STAGING_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: API log around the reference
+        env:
+          TARGET: ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}
+          REFERENCE: ${{ inputs.reference }}
+          HOURS: ${{ inputs.hours }}
+        run: |
+          ssh "${TARGET}" "cd /opt/rochell-staging && docker compose logs --no-color --since ${HOURS}h api 2>&1 | grep -F -A 80 '${REFERENCE}' | head -300"
