@@ -5293,6 +5293,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/companies/{companyId}/procurement/receiving-fleet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ListReceivingFleet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/companies/{companyId}/procurement/goods-receipt-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GetGoodsReceiptReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/companies/{companyId}/procurement/goods-receipts": {
         parameters: {
             query?: never;
@@ -10999,6 +11031,41 @@ export interface components {
             /** Format: int32 */
             offset: number;
         };
+        GoodsReceiptReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            rows: components["schemas"]["GoodsReceiptReportRow"][];
+            totals: components["schemas"]["GoodsReceiptReportTotal"][];
+        };
+        GoodsReceiptReportRow: {
+            /** Format: date-time */
+            occurredAt: string;
+            grNo: string;
+            poNo: string;
+            supplierName: string;
+            supplierDeliveryNote: null | string;
+            vehiclePlate: null | string;
+            vehicleFleetCode: null | string;
+            driverName: null | string;
+            itemCode: string;
+            itemName: string;
+            /** Format: decimal */
+            quantity: string;
+            uom: string;
+            locationCode: string;
+            weighTicketRef: null | string;
+        };
+        GoodsReceiptReportTotal: {
+            itemCode: string;
+            itemName: string;
+            uom: string;
+            /** Format: decimal */
+            quantity: string;
+            /** Format: int32 */
+            receipts: number;
+        };
         GoodsReceiptReversalView: {
             /** Format: uuid */
             reversalId: string;
@@ -12458,6 +12525,11 @@ export interface components {
             occurredAt: string;
             lines: components["schemas"]["GoodsReceiptLineInput"][];
             weighTicketRef?: null | string;
+            /** Format: uuid */
+            vehicleId?: null | string;
+            /** Format: uuid */
+            driverId?: null | string;
+            supplierDeliveryNote?: null | string;
         };
         PostOpeningInventory: {
             /** Format: uuid */
@@ -13721,6 +13793,21 @@ export interface components {
             allocated: string;
             /** Format: decimal */
             available: string;
+        };
+        ReceivingDriverView: {
+            /** Format: uuid */
+            driverId: string;
+            fullName: string;
+        };
+        ReceivingFleet: {
+            vehicles: components["schemas"]["ReceivingVehicleView"][];
+            drivers: components["schemas"]["ReceivingDriverView"][];
+        };
+        ReceivingVehicleView: {
+            /** Format: uuid */
+            vehicleId: string;
+            plate: string;
+            fleetCode: null | string;
         };
         RecipeDetail: {
             recipe: components["schemas"]["RecipeSummary"];
@@ -40561,6 +40648,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PurchaseOrderPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    ListReceivingFleet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingFleet"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    GetGoodsReceiptReport: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                supplierId?: string;
+                itemId?: string;
+                locationId?: string;
+                plantId?: string;
+                format?: string;
+            };
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoodsReceiptReport"];
+                    "text/csv": components["schemas"]["GoodsReceiptReport"];
                 };
             };
             /** @description Bad Request */

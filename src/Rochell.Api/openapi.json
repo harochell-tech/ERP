@@ -38150,6 +38150,200 @@
         ]
       }
     },
+    "/api/v1/companies/{companyId}/procurement/receiving-fleet": {
+      "get": {
+        "tags": [
+          "Procurement"
+        ],
+        "operationId": "ListReceivingFleet",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingFleet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{companyId}/procurement/goods-receipt-report": {
+      "get": {
+        "tags": [
+          "Procurement"
+        ],
+        "operationId": "GetGoodsReceiptReport",
+        "parameters": [
+          {
+            "name": "companyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "supplierId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "locationId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "plantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsReceiptReport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoodsReceiptReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/companies/{companyId}/procurement/goods-receipts": {
       "get": {
         "tags": [
@@ -63165,6 +63359,151 @@
         },
         "additionalProperties": false
       },
+      "GoodsReceiptReport": {
+        "required": [
+          "from",
+          "to",
+          "rows",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsReceiptReportRow"
+            }
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoodsReceiptReportTotal"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "GoodsReceiptReportRow": {
+        "required": [
+          "occurredAt",
+          "grNo",
+          "poNo",
+          "supplierName",
+          "supplierDeliveryNote",
+          "vehiclePlate",
+          "vehicleFleetCode",
+          "driverName",
+          "itemCode",
+          "itemName",
+          "quantity",
+          "uom",
+          "locationCode",
+          "weighTicketRef"
+        ],
+        "type": "object",
+        "properties": {
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "grNo": {
+            "type": "string"
+          },
+          "poNo": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "supplierDeliveryNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vehiclePlate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vehicleFleetCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "driverName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "locationCode": {
+            "type": "string"
+          },
+          "weighTicketRef": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "GoodsReceiptReportTotal": {
+        "required": [
+          "itemCode",
+          "itemName",
+          "uom",
+          "quantity",
+          "receipts"
+        ],
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "uom": {
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string",
+            "format": "decimal"
+          },
+          "receipts": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "GoodsReceiptReversalView": {
         "required": [
           "reversalId",
@@ -68697,6 +69036,26 @@
               "null",
               "string"
             ]
+          },
+          "vehicleId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "driverId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "supplierDeliveryNote": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -73325,6 +73684,69 @@
             "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
             "type": "string",
             "format": "decimal"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReceivingDriverView": {
+        "required": [
+          "driverId",
+          "fullName"
+        ],
+        "type": "object",
+        "properties": {
+          "driverId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReceivingFleet": {
+        "required": [
+          "vehicles",
+          "drivers"
+        ],
+        "type": "object",
+        "properties": {
+          "vehicles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceivingVehicleView"
+            }
+          },
+          "drivers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceivingDriverView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReceivingVehicleView": {
+        "required": [
+          "vehicleId",
+          "plate",
+          "fleetCode"
+        ],
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plate": {
+            "type": "string"
+          },
+          "fleetCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
