@@ -100,7 +100,7 @@ internal static class LoadProgram
                     try
                     {
                         await h.RunAsync(
-                            new PostGoodsReceipt(h.CompanyId, r.Storekeeper, $"pf01-{i}", r.Purchasing.PlantId, po, i % 2 == 0 ? r.LocationA : r.LocationB, h.Clock.UtcNow.AddSeconds(-1), [new(poLine, 1m)]),
+                            new PostGoodsReceipt(h.CompanyId, r.Storekeeper, $"pf01-{i}", r.Purchasing.PlantId, po, i % 2 == 0 ? r.LocationA : r.LocationB, h.Clock.UtcNow.AddSeconds(-1), [new(poLine, 1m)]).WithTransport(r),
                             new PostGoodsReceiptHandler());
                         latencies.Add(watch.ElapsedTicks);
                     }

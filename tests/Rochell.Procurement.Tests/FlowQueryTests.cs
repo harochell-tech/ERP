@@ -19,7 +19,7 @@ public sealed class FlowQueryTests(PostgresFixture postgres)
 
     private static Task<CommandResult> Receive(TestHarness h, TestInvoicing s, string key, decimal quantity)
         => h.RunAsync(
-            new PostGoodsReceipt(h.CompanyId, s.Receiving.Storekeeper, key, s.Purchasing.PlantId, s.PurchaseOrderId, s.Receiving.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(s.PoLineId, quantity)]),
+            new PostGoodsReceipt(h.CompanyId, s.Receiving.Storekeeper, key, s.Purchasing.PlantId, s.PurchaseOrderId, s.Receiving.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(s.PoLineId, quantity)]).WithTransport(s.Receiving),
             new PostGoodsReceiptHandler());
 
     [Fact]

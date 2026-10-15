@@ -24,7 +24,7 @@ public static class InvoicingSetup
         await h.RunAsync(new ApprovePurchaseOrder(h.CompanyId, p.Controller, "inv-po-a", p.PlantId, po, 2), new ApprovePurchaseOrderHandler());
         var poLine = await h.ScalarAsync<Guid>("SELECT po_line_id FROM pur.purchase_order_line WHERE po_id = @p", ("p", po));
         var gr = await h.RunAsync(
-            new PostGoodsReceipt(h.CompanyId, r.Storekeeper, "inv-gr", p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-5), [new(poLine, received)]),
+            new PostGoodsReceipt(h.CompanyId, r.Storekeeper, "inv-gr", p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-5), [new(poLine, received)]).WithTransport(r),
             new PostGoodsReceiptHandler());
         var grLine = JsonDocument.Parse(gr.ResultPayload).RootElement.GetProperty("lines")[0].GetProperty("grLineId").GetGuid();
         return new TestInvoicing(r, po, poLine, gr.ResultRef, grLine, await h.SessionWithRolesAsync("CUENTAS_POR_PAGAR"));

@@ -120,7 +120,7 @@ public sealed class ConcurrencySoakTests(PostgresFixture postgres, ITestOutputHe
                         await Attempt("receive", async () =>
                         {
                             var result = await h.RunAsync(
-                                new PostGoodsReceipt(h.CompanyId, r.Storekeeper, Key("gr"), p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddSeconds(-1), [new(poLine, 2m)]),
+                                new PostGoodsReceipt(h.CompanyId, r.Storekeeper, Key("gr"), p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddSeconds(-1), [new(poLine, 2m)]).WithTransport(r),
                                 new PostGoodsReceiptHandler());
                             var line = JsonDocument.Parse(result.ResultPayload).RootElement.GetProperty("lines")[0];
                             receipts.Add(new Receipt(result.ResultRef, line.GetProperty("grLineId").GetGuid(), line.GetProperty("lotId").GetGuid(), poLine));

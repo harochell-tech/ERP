@@ -7,7 +7,8 @@ public sealed record GoodsReceiptLineInput(Guid PurchaseOrderLineId, decimal Qua
 
 /// <summary>
 /// T-02 PostGoodsReceipt (§11.2, C-01): receives material of an APPROVED / PARTIALLY_RECEIVED order into a location of its plant.
-/// <paramref name="OccurredAt"/> is the physical time of the receipt (weighing); the business date is its Dominican calendar date.
+/// <paramref name="OccurredAt"/> is the physical time of the receipt (arrival); the business date is its Dominican calendar date.
+/// E-REC-1/2: it names our truck and driver and the supplier's delivery note (all three required); the weigh ticket stays optional.
 /// </summary>
 public sealed record PostGoodsReceipt(
     Guid CompanyId,
@@ -18,7 +19,10 @@ public sealed record PostGoodsReceipt(
     Guid LocationId,
     DateTime OccurredAt,
     IReadOnlyList<GoodsReceiptLineInput> Lines,
-    string? WeighTicketRef = null) : IPlantScopedCommand;
+    string? WeighTicketRef = null,
+    Guid? VehicleId = null,
+    Guid? DriverId = null,
+    string? SupplierDeliveryNote = null) : IPlantScopedCommand;
 
 /// <summary>T-03 ReverseGoodsReceipt (E-8 §5.2, Patch 1 P-4): reverses a whole POSTED receipt whose lots are untouched.</summary>
 public sealed record ReverseGoodsReceipt(Guid CompanyId, Guid SessionId, string IdempotencyKey, Guid GoodsReceiptId, string Reason) : ICommand;

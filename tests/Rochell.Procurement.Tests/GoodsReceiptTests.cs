@@ -36,7 +36,7 @@ public sealed class GoodsReceiptTests(PostgresFixture postgres)
 
     private static Task<CommandResult> Receive(TestHarness h, TestReceiving r, Guid po, string key, GoodsReceiptLineInput[] lines, Guid? location = null, DateTime? occurredAt = null, string? ticket = null, Guid? session = null)
         => h.RunAsync(
-            new PostGoodsReceipt(h.CompanyId, session ?? r.Storekeeper, key, r.Purchasing.PlantId, po, location ?? r.LocationA, occurredAt ?? h.Clock.UtcNow.AddMinutes(-5), lines, ticket),
+            new PostGoodsReceipt(h.CompanyId, session ?? r.Storekeeper, key, r.Purchasing.PlantId, po, location ?? r.LocationA, occurredAt ?? h.Clock.UtcNow.AddMinutes(-5), lines, ticket).WithTransport(r),
             new PostGoodsReceiptHandler());
 
     private static Task<string?> Snapshot(TestHarness h, Guid po)

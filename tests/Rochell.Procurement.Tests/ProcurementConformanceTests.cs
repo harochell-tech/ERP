@@ -30,7 +30,7 @@ public sealed class ProcurementConformanceTests(PostgresFixture postgres)
     private static async Task<(Guid Gr, Guid Line, Guid Lot)> ReceiveAsync(TestHarness h, TestReceiving r, Guid po, Guid poLine, decimal qty, string key)
     {
         var result = await h.RunAsync(
-            new PostGoodsReceipt(h.CompanyId, r.Storekeeper, key, r.Purchasing.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-5), [new(poLine, qty)]),
+            new PostGoodsReceipt(h.CompanyId, r.Storekeeper, key, r.Purchasing.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-5), [new(poLine, qty)]).WithTransport(r),
             new PostGoodsReceiptHandler());
         var line = JsonDocument.Parse(result.ResultPayload).RootElement.GetProperty("lines")[0];
         return (result.ResultRef, line.GetProperty("grLineId").GetGuid(), line.GetProperty("lotId").GetGuid());

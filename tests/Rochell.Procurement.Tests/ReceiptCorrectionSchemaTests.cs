@@ -24,7 +24,7 @@ public sealed class ReceiptCorrectionSchemaTests(PostgresFixture postgres)
         await h.RunAsync(new SubmitPurchaseOrder(h.CompanyId, p.Buyer, "s", p.PlantId, po, 1), new SubmitPurchaseOrderHandler());
         await h.RunAsync(new ApprovePurchaseOrder(h.CompanyId, p.Controller, "a", p.PlantId, po, 2), new ApprovePurchaseOrderHandler());
         var poLine = await h.ScalarAsync<Guid>("SELECT po_line_id FROM pur.purchase_order_line WHERE po_id = @p", ("p", po));
-        var gr = await h.RunAsync(new PostGoodsReceipt(h.CompanyId, r.Storekeeper, "gr", p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(poLine, 20m)]), new PostGoodsReceiptHandler());
+        var gr = await h.RunAsync(new PostGoodsReceipt(h.CompanyId, r.Storekeeper, "gr", p.PlantId, po, r.LocationA, h.Clock.UtcNow.AddMinutes(-1), [new(poLine, 20m)]).WithTransport(r), new PostGoodsReceiptHandler());
         var grLine = JsonDocument.Parse(gr.ResultPayload).RootElement.GetProperty("lines")[0].GetProperty("grLineId").GetGuid();
         var rc = await h.RunAsync(new CreateReceiptCorrection(h.CompanyId, r.Storekeeper, "rc", p.PlantId, gr.ResultRef, grLine, -8m, "x", "BAS-1"), new CreateReceiptCorrectionHandler());
         return (h, rc.ResultRef);

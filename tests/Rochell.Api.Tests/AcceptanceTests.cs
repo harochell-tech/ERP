@@ -327,6 +327,9 @@ public sealed class AcceptanceTests(PostgresFixture postgres)
                 occurredAt = DateTime.UtcNow.AddMinutes(-10 + i),
                 lines = new[] { new { purchaseOrderLineId = poLine, quantity = "20" } },
                 weighTicketRef = $"TK-{i + 1}",
+                vehicleId = r.Vehicle,
+                driverId = r.Driver,
+                supplierDeliveryNote = $"CP-{i + 1}",
             });
             receipts[i] = response.GetProperty("resultRef").GetGuid();
         }

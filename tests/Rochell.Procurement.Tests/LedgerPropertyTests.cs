@@ -146,7 +146,7 @@ public sealed class LedgerPropertyTests(PostgresFixture postgres, ITestOutputHel
                     var qty = Quantity(8000);
                     await Step($"receive {qty} on {poLine}", async () =>
                     {
-                        var result = await h.RunAsync(new PostGoodsReceipt(h.CompanyId, r.Storekeeper, Key(), p.PlantId, po, random.Next(2) == 0 ? r.LocationA : r.LocationB, h.Clock.UtcNow.AddSeconds(-1), [new(poLine, qty)]), new PostGoodsReceiptHandler());
+                        var result = await h.RunAsync(new PostGoodsReceipt(h.CompanyId, r.Storekeeper, Key(), p.PlantId, po, random.Next(2) == 0 ? r.LocationA : r.LocationB, h.Clock.UtcNow.AddSeconds(-1), [new(poLine, qty)]).WithTransport(r), new PostGoodsReceiptHandler());
                         var line = JsonDocument.Parse(result.ResultPayload).RootElement.GetProperty("lines")[0];
                         receipts.Add(new Receipt(result.ResultRef, line.GetProperty("grLineId").GetGuid(), line.GetProperty("lotId").GetGuid(), poLine));
                     });
