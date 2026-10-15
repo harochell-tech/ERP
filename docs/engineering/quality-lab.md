@@ -221,3 +221,12 @@ recall and Calidad's actions (final release, block, unblock, evaluate again). La
 
 The control chart, the age curve on screen and the history before Core,
 `qa.legacy_lot` (LAB1-04, E-LAB1-01-15).
+
+## LAB1-04a — pending tests (E-LAB1-19 / 20)
+
+`ListPendingLabTests` (`GET …/manufacturing/lab/pending-tests?daysAhead=7`, lab:read): for every lot not scrapped or voided whose
+product's latest requirement has `lab_tested`, the breaks still owed at 1, 3 and 28 days after the lot entered curing (its date in
+America/Santo_Domingo), due up to `daysAhead` days from today, with `dueToday` and `overdue`. A break counts when a RECORDED
+compression test of that age exists: 1 → 1…`INITIAL_RELEASE_MAX_AGE`, 3 → 3 to under `AGE_28D_MIN_DAYS`, 28 → `AGE_28D_MIN_DAYS` or more.
+No table: it is read from `mfg.fg_lot`, `qa.item_spec` and `qa.compression_test`. Screen Calidad › Ensayos pendientes; Inicio «Ensayos de
+laboratorio para hoy» / «… atrasados»; the run page links its lot's quality record (E-LAB1-20). Test: `PendingLabTestsTests`.

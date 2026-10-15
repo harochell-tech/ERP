@@ -80,7 +80,7 @@ public static class QueryEndpoints
         typeof(ListProformasHandler), typeof(GetProformaHandler), typeof(ListCustomerRefundsHandler), typeof(GetCustomerRefundHandler), typeof(ListDocumentMailHandler), typeof(GetDocumentMailPdfHandler),
         typeof(ListSalesOrdersHandler), typeof(GetSalesOrderHandler), typeof(GetCashSaleSetupHandler), typeof(ListQuotesHandler), typeof(GetQuoteHandler), typeof(GetQuotePrintHandler), typeof(GetCustomerExposureHandler), typeof(ListDeliveriesHandler), typeof(GetDeliveryHandler), typeof(GetDeliveryPrintHandler), typeof(GetDriverEvidenceHandler), typeof(GetDriverDeliveryHandler), typeof(Rochell.Sales.Printing.GetPrintDocumentHandler), typeof(Rochell.Sales.Printing.ListPrintFormatsHandler), typeof(Rochell.Sales.Printing.GetPrintFormatHandler),
         typeof(Rochell.Sales.Printing.PreviewPrintFormatHandler),
-        typeof(Rochell.Manufacturing.Quality.ListLabLotsHandler), typeof(Rochell.Manufacturing.Quality.GetLabLotHandler), typeof(Rochell.Manufacturing.Quality.ListItemSpecsHandler), typeof(Rochell.Manufacturing.Quality.GetLabSettingsHandler), typeof(Rochell.Manufacturing.Quality.PreviewCompressionTestsHandler), typeof(Rochell.Manufacturing.Quality.GetLotRecallHandler), typeof(Rochell.Manufacturing.Quality.GetDeliveryRecallHandler),
+        typeof(Rochell.Manufacturing.Quality.ListLabLotsHandler), typeof(Rochell.Manufacturing.Quality.ListPendingLabTestsHandler), typeof(Rochell.Manufacturing.Quality.GetLabLotHandler), typeof(Rochell.Manufacturing.Quality.ListItemSpecsHandler), typeof(Rochell.Manufacturing.Quality.GetLabSettingsHandler), typeof(Rochell.Manufacturing.Quality.PreviewCompressionTestsHandler), typeof(Rochell.Manufacturing.Quality.GetLotRecallHandler), typeof(Rochell.Manufacturing.Quality.GetDeliveryRecallHandler),
         typeof(Rochell.Sales.Printing.GetLabCertificatePrintHandler), typeof(Rochell.Sales.Printing.GetRackLabelPrintHandler), typeof(Rochell.Manufacturing.Quality.VerifyLabCertificateHandler),
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
@@ -249,6 +249,10 @@ public static class QueryEndpoints
                 => runner.RunAsync(http, s => new Rochell.Manufacturing.Maintenance.ListMaintenanceTasks(companyId, s), handler, ct))
             .Describe<Rochell.Manufacturing.Maintenance.MaintenanceTaskList>(nameof(Rochell.Manufacturing.Maintenance.ListMaintenanceTasks));
         // LAB1-01 (E-LAB1-01-13/14): the lab's lots, a lot with its tests, the per-item requirements, the parameters, and what specimens would give.
+        // LAB1-04a (E-LAB1-19): the lab tests the lots still owe.
+        manufacturing.MapGet("/lab/pending-tests", (HttpContext http, Guid companyId, int? daysAhead, Rochell.Manufacturing.Quality.ListPendingLabTestsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.ListPendingLabTests(companyId, s, daysAhead ?? 7), handler, ct))
+            .Describe<Rochell.Manufacturing.Quality.PendingLabTestList>(nameof(Rochell.Manufacturing.Quality.ListPendingLabTests));
         manufacturing.MapGet("/lab/lots", (HttpContext http, Guid companyId, string? search, int? limit, string? view, Rochell.Manufacturing.Quality.ListLabLotsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new Rochell.Manufacturing.Quality.ListLabLots(companyId, s, search, limit ?? DefaultLimit, view), handler, ct))
             .Describe<Rochell.Manufacturing.Quality.LabLotList>(nameof(Rochell.Manufacturing.Quality.ListLabLots));

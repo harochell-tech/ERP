@@ -368,6 +368,19 @@ const TASKS: readonly Task[] = [
       (await query("/api/v1/companies/{companyId}/manufacturing/lots", { path: { companyId }, query: { plantId, status: "CURING", limit: COUNT_LIMIT } })).items.filter(isReadyToRelease)
         .length,
   },
+  // LAB1-04a (E-LAB1-19): the breaks due today and the late ones.
+  {
+    href: "/calidad/ensayos-pendientes/",
+    label: "Ensayos de laboratorio para hoy",
+    permission: "lab:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/lab/pending-tests", { path: { companyId }, query: { daysAhead: 0 } })).dueToday,
+  },
+  {
+    href: "/calidad/ensayos-pendientes/",
+    label: "Ensayos de laboratorio atrasados",
+    permission: "lab:read",
+    count: async (companyId) => (await query("/api/v1/companies/{companyId}/manufacturing/lab/pending-tests", { path: { companyId }, query: { daysAhead: 0 } })).overdue,
+  },
   // LAB1-02 (E-LAB1-02-15): what the lab left for Calidad — lots it blocked and lots ready for their final release.
   {
     href: "/calidad/lotes/#bloqueados",
