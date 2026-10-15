@@ -51,6 +51,35 @@ public sealed class CreditNoteTests(PostgresFixture postgres)
         => h.ScalarAsync<string>(
             "SELECT i.commercial_status || ':' || a.open_amount::numeric(19,2)::text FROM sal.invoice i JOIN fin.ar_document a ON a.ar_doc_id = i.ar_doc_id WHERE i.invoice_id = @i", ("i", w.Invoice));
 
+    /// <summary>
+    /// REC-03 (E-REC-03-1…4): the dispatch report lists the 1,000 blocks that left from lot AP-…-1 at a pickup; the sales report lists
+    /// FA-000001 (50,000.00 + 9,000.00) and NC-000001 in negative (5,000.00 + 900.00): net sale 45,000.00 + 8,100.00 = 53,100.00.
+    /// </summary>
+    [Fact]
+    public async Task The_dispatch_and_sales_reports_list_the_lots_that_left_and_the_net_sale_with_credit_notes_in_negative()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var w = await WorldAsync(h);
+        var note = JsonDocument.Parse((await Create(h, w, "nc", 5000.00m)).ResultPayload).RootElement.GetProperty("creditNoteId").GetGuid();
+        await Issue(h, w, note, "nc-issue");
+        var today = Rochell.Platform.Time.BusinessCalendar.DefaultBusinessDate(h.Clock.UtcNow);
+
+        var dispatch = JsonDocument.Parse(await h.QueryAsync(new GetDispatchReport(h.CompanyId, w.Billing, today, today), new GetDispatchReportHandler())).RootElement;
+        var row = dispatch.GetProperty("rows")[0];
+        Assert.Equal((1, "1000", "PICKUP_AT_PLANT"), (dispatch.GetProperty("rows").GetArrayLength(), decimal.Parse(row.GetProperty("quantity").GetString()!, System.Globalization.CultureInfo.InvariantCulture).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), row.GetProperty("deliveryTerm").GetString()));
+        Assert.EndsWith("-1", row.GetProperty("lotCode").GetString(), StringComparison.Ordinal);
+        Assert.Equal(1, dispatch.GetProperty("productTotals")[0].GetProperty("deliveries").GetInt32());
+
+        var sales = JsonDocument.Parse(await h.QueryAsync(new GetSalesReport(h.CompanyId, w.Billing, today, today), new GetSalesReportHandler())).RootElement;
+        string Line(JsonElement t) => $"{t.GetProperty("net").GetString()}/{t.GetProperty("itbis").GetString()}/{t.GetProperty("total").GetString()}";
+        Assert.Equal("INVOICE:FA-000001|CREDIT_NOTE:NC-000001", string.Join('|', sales.GetProperty("rows").EnumerateArray().Select(r => $"{r.GetProperty("kind").GetString()}:{r.GetProperty("documentNo").GetString()}")));
+        Assert.Equal(("50000.00/9000.00/59000.00", "-5000.00/-900.00/-5900.00", "45000.00/8100.00/53100.00"),
+            (Line(sales.GetProperty("invoices")), Line(sales.GetProperty("creditNotes")), Line(sales.GetProperty("netSales"))));
+        var csv = SalesReportCsv.Sales(await h.QueryAsync(new GetSalesReport(h.CompanyId, w.Billing, today, today), new GetSalesReportHandler()));
+        Assert.StartsWith("Fecha,Tipo,Documento,e-NCF,Cliente,RNC,Producto", csv, StringComparison.Ordinal);
+        Assert.Contains("Nota de crédito", csv, StringComparison.Ordinal);
+    }
+
     [Trait("AcceptanceVs3", "SAL-08")]
     [Fact]
     public async Task SAL08_a_partial_credit_note_posts_P22_lowers_the_receivable_and_references_the_original_eNCF()
