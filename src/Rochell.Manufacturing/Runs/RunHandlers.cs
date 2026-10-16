@@ -167,15 +167,40 @@ public sealed class CancelProductionRunHandler : ICommandHandler<CancelProductio
             throw new DomainException(ManufacturingErrors.InvalidState, $"The run is {run.Status}.");
         }
 
-        if (await MfgSql.ScalarAsync<Guid?>(context, "SELECT summary_id FROM mfg.shift_summary WHERE run_id = @r LIMIT 1", cancellationToken, ("r", run.RunId)).ConfigureAwait(false) is not null)
+        // E-MFG2-19: a summary ever posted blocks the cancellation (it is reversed instead); a draft is discarded with the run.
+        if (await MfgSql.ScalarAsync<Guid?>(
+                context, "SELECT summary_id FROM mfg.shift_summary WHERE run_id = @r AND status <> 'DRAFT' LIMIT 1", cancellationToken, ("r", run.RunId)).ConfigureAwait(false) is not null)
         {
-            throw new DomainException(ManufacturingErrors.SummaryExists, "The run has a shift summary; it cannot be cancelled.");
+            throw new DomainException(ManufacturingErrors.SummaryExists, "The run has a posted shift summary; reverse it instead of cancelling the run.");
         }
+
+        var draft = await Reading.ListAsync(
+            context.Connection,
+            context.Transaction,
+            "SELECT summary_id, version FROM mfg.shift_summary WHERE run_id = @r AND status = 'DRAFT' FOR UPDATE",
+            r => (Id: r.GetGuid(0), Version: r.GetInt64(1)),
+            cancellationToken,
+            ("r", run.RunId)).ConfigureAwait(false);
 
         var next = run.Version + 1;
         var eventId = await context.AppendEventAsync(
-            new EventDraft("ProductionRunCancelled", 1, Runs.RunAggregate, run.RunId, next, JsonSerializer.Serialize(new { runId = run.RunId, runNo = run.RunNo, reason }), Publish: true),
+            new EventDraft("ProductionRunCancelled", 1, Runs.RunAggregate, run.RunId, next, JsonSerializer.Serialize(new { runId = run.RunId, runNo = run.RunNo, reason, discardedSummaryId = draft.Count == 1 ? draft[0].Id : (Guid?)null }), Publish: true),
             cancellationToken).ConfigureAwait(false);
+        if (draft.Count == 1)
+        {
+            var (summaryId, summaryVersion) = draft[0];
+            var discarded = await context.AppendEventAsync(
+                new EventDraft("ShiftSummaryDiscarded", 1, Runs.SummaryAggregate, summaryId, summaryVersion + 1, JsonSerializer.Serialize(new { summaryId, runId = run.RunId, reason }), Publish: false),
+                cancellationToken).ConfigureAwait(false);
+            await Sql.ExecuteAsync(
+                context.Connection,
+                context.Transaction,
+                "UPDATE mfg.shift_summary SET status = 'DISCARDED', version = version + 1 WHERE summary_id = @s",
+                cancellationToken,
+                ("s", summaryId)).ConfigureAwait(false);
+            await context.AppendStateAsync(Runs.SummaryAggregate, summaryId, "DOCUMENT", "DRAFT", "DISCARDED", CommandType, discarded, cancellationToken, reason).ConfigureAwait(false);
+        }
+
         await Runs.SetRunStatusAsync(context, run, "CANCELLED", CommandType, eventId, cancellationToken, reason).ConfigureAwait(false);
         return JsonSerializer.Serialize(new { runId = run.RunId, status = "CANCELLED", version = next });
     }

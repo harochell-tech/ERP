@@ -307,3 +307,11 @@ PRODUCTION policy parameter `portal_import_from` («Producción del portal desde
 version in force today decides; `SyncPortalShift` returns without opening a run or writing a draft for a portal day before it
 (`PortalCutoff`), because those days are already in the opening inventory. Runs opened before the parameter was set are cancelled
 with `CancelProductionRun` and are not opened again. Test: `PortalSyncTests.Days_before_the_policys_portal_start_open_no_run_and_no_draft`.
+
+## MFG2-05 — cancelling a run with a draft summary (E-MFG2-19, migration 0128)
+
+`CancelProductionRun` cancels a run whose shift summary is still a DRAFT: the summary becomes DISCARDED (`mfg.shift_summary`
+status, its guard allows DRAFT → DISCARDED without changing quantities), with event `ShiftSummaryDiscarded` and the reason in
+`core.state_history`; no journal and no inventory movement. A summary ever posted (POSTED or REVERSED) still refuses the
+cancellation. Every reader already keeps to DRAFT / POSTED summaries, so a discarded one is invisible to queries, the portal sync and
+the reconciliations. Used on 2026-10-15 for the portal drafts of 2026-10-07…12, already counted in the opening inventory.
