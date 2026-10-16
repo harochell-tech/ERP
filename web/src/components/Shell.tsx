@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { actAs, loginUrl, logout, query, stopActingAs } from "@/api/client";
+import { actAs, guestLoginUrl, loginUrl, logout, query, stopActingAs } from "@/api/client";
 import { ErrorBox } from "./ui";
 import { LoadingIndicator } from "./StateNotices";
 import { useSession } from "@/lib/session";
@@ -716,6 +716,11 @@ export function Shell({ children }: { children: ReactNode }) {
           <a className="button primary login-button" href={loginUrl(pathname)}>
             Entrar con Google
           </a>
+          {/* SEC-02 (E-SEC-02-3): people outside the company enter with their own Google account, only once invited. */}
+          <a className="button login-button" href={guestLoginUrl(pathname)} data-testid="guest-login">
+            Entrar con otra cuenta de Google (invitados)
+          </a>
+          <p className="muted">Si le invitaron desde fuera de la empresa, use el segundo botón con el correo de la invitación.</p>
           <EnvironmentTag />
         </section>
       </main>

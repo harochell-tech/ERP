@@ -17,6 +17,18 @@ public sealed record IdentityOptions
 
     /// <summary>last_activity_at is refreshed at most this often, to avoid locking the session row on every command.</summary>
     public TimeSpan ActivityTouchInterval { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>E-SEC-02-6: the address of Core written in an invitation e-mail (e.g. https://core.industriasrochell.com.do).</summary>
+    public string? PublicBaseUrl { get; init; }
+
+    /// <summary>E-SEC-02-6: days an approved invitation can be used.</summary>
+    public int InvitationDays { get; init; } = 7;
+
+    /// <summary>E-SEC-02-5: days a guest's roles last when the invitation names no end.</summary>
+    public int GuestRoleDays { get; init; } = 90;
+
+    /// <summary>E-SEC-02-5: the latest a guest's roles may end, in days from the invitation.</summary>
+    public int GuestRoleMaxDays { get; init; } = 365;
 }
 
 public static class IdentityConstants

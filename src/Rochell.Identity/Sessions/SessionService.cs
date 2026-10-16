@@ -78,7 +78,8 @@ public sealed class SessionService
     {
         ValidateClaims(claims);
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var userId = await FindActiveHumanAsync(connection, claims.Subject, cancellationToken).ConfigureAwait(false);
+        var userId = await FindActiveHumanAsync(connection, claims, cancellationToken).ConfigureAwait(false)
+            ?? await AcceptInvitationAsync(connection, claims, cancellationToken).ConfigureAwait(false);
         await RememberNameAsync(connection, userId, claims.Name, cancellationToken).ConfigureAwait(false);
 
         var sessionId = _ids.NewId();
@@ -139,7 +140,8 @@ public sealed class SessionService
     {
         ValidateClaims(claims);
         await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var userId = await FindActiveHumanAsync(connection, claims.Subject, cancellationToken).ConfigureAwait(false);
+        var userId = await FindActiveHumanAsync(connection, claims, cancellationToken).ConfigureAwait(false)
+            ?? throw new DomainException(LoginRejected, "No active user is linked to this Google account.");
         await RememberNameAsync(connection, userId, claims.Name, cancellationToken).ConfigureAwait(false);
         var now = _clock.UtcNow;
 
@@ -160,6 +162,15 @@ public sealed class SessionService
         {
             throw new DomainException(LoginRejected, "Re-authentication does not match an open session of this user.");
         }
+    }
+
+    /// <summary>E-SEC-02-3: whether the session belongs to a guest (its step-up uses Google without the organization's domain hint).</summary>
+    public async Task<bool> IsGuestSessionAsync(Guid sessionId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = Sql.Command(
+            connection, null, "SELECT u.kind = 'GUEST' FROM iam.session s JOIN iam.user u ON u.user_id = s.user_id WHERE s.session_id = @s", ("s", sessionId));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true;
     }
 
     /// <summary>
@@ -454,23 +465,94 @@ public sealed class SessionService
         {
             throw new DomainException(LoginRejected, "The e-mail of the Google account is not verified.");
         }
-
-        if (!string.Equals(claims.HostedDomain, _options.HostedDomain, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new DomainException(LoginRejected, "The Google account does not belong to the organization's domain.");
-        }
     }
 
-    private static async Task<Guid> FindActiveHumanAsync(DbConnection connection, string subject, CancellationToken cancellationToken)
+    /// <summary>A Google account of the organization's domain (claim "hd"); any other account is a guest's (E-SEC-02-3).</summary>
+    private bool OfTheOrganization(OidcClaims claims) => string.Equals(claims.HostedDomain, _options.HostedDomain, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The active person linked to the Google account: a HUMAN only from the organization's domain, a GUEST only from outside it
+    /// (E-SEC-02-3). Null when the account is linked to nobody yet (the first sign-in of an invitation); a disabled user is refused.
+    /// </summary>
+    private async Task<Guid?> FindActiveHumanAsync(DbConnection connection, OidcClaims claims, CancellationToken cancellationToken)
     {
-        await using var command = Sql.Command(
+        var rows = await Reading.ListAsync(
             connection,
             null,
-            "SELECT user_id FROM iam.user WHERE oidc_subject = @subject AND kind = 'HUMAN' AND status = 'ACTIVE' AND employee_id IS NOT NULL",
-            ("subject", subject));
-        var value = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-        return value is Guid userId
-            ? userId
-            : throw new DomainException(LoginRejected, "No active user is linked to this Google account.");
+            "SELECT user_id, kind, status FROM iam.user WHERE oidc_subject = @subject AND kind IN ('HUMAN', 'GUEST') AND (kind = 'GUEST' OR employee_id IS NOT NULL)",
+            r => (Id: r.GetGuid(0), Kind: r.GetString(1), Status: r.GetString(2)),
+            cancellationToken,
+            ("subject", claims.Subject)).ConfigureAwait(false);
+        if (rows.Count == 0)
+        {
+            return null;
+        }
+
+        var user = rows[0];
+        if (user.Status != "ACTIVE")
+        {
+            throw new DomainException(LoginRejected, "The user is disabled.");
+        }
+
+        return (user.Kind == "HUMAN") == OfTheOrganization(claims)
+            ? user.Id
+            : throw new DomainException(LoginRejected, "The Google account does not match the kind of user it is linked to.");
+    }
+
+    /// <summary>
+    /// E-SEC-02-2: the first sign-in of an invitation — an APPROVED, unexpired invitation for exactly this verified e-mail, of the same
+    /// kind (company or guest) as the Google account. The user is created bound to the Google account with the invitation's roles
+    /// (granted by its approver; a guest's until the invitation's end) and the invitation becomes ACCEPTED, in one transaction.
+    /// </summary>
+    private async Task<Guid> AcceptInvitationAsync(DbConnection connection, OidcClaims claims, CancellationToken cancellationToken)
+    {
+        var email = (claims.Email ?? string.Empty).Trim().ToLowerInvariant();
+        if (email.Length == 0)
+        {
+            throw new DomainException(LoginRejected, "No active user is linked to this Google account.");
+        }
+
+        var now = _clock.UtcNow;
+        var found = await Reading.ListAsync(
+            connection, null, "SELECT company_id, invitation_id FROM iam.open_invitation_for(@e, @now)", r => (Company: r.GetGuid(0), Id: r.GetGuid(1)), cancellationToken,
+            ("e", email), ("now", now)).ConfigureAwait(false);
+        if (found.Count == 0)
+        {
+            throw new DomainException(LoginRejected, "No active user is linked to this Google account.");
+        }
+
+        var (companyId, invitationId) = found[0];
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await Sql.ExecuteAsync(connection, transaction, "SELECT set_config('app.company_id', @c, true)", cancellationToken, ("c", companyId.ToString())).ConfigureAwait(false);
+        var guest = await Reading.ListAsync(
+            connection, transaction, "SELECT guest FROM iam.invitation WHERE invitation_id = @id", r => r.GetBoolean(0), cancellationToken, ("id", invitationId)).ConfigureAwait(false);
+        if (guest.Count == 0 || guest[0] == OfTheOrganization(claims))
+        {
+            throw new DomainException(LoginRejected, "No active user is linked to this Google account.");
+        }
+
+        var userId = _ids.NewId();
+        try
+        {
+            await Sql.ExecuteAsync(
+                connection,
+                transaction,
+                "SELECT iam.accept_invitation(@inv, @e, @sub, @name, @user, @employee, @now)",
+                cancellationToken,
+                ("inv", invitationId),
+                ("e", email),
+                ("sub", claims.Subject),
+                ("name", claims.Name ?? string.Empty),
+                ("user", userId),
+                ("employee", _ids.NewId()),
+                ("now", now)).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbException ex)
+        {
+            throw new DomainException(LoginRejected, $"The invitation could not be accepted: {ex.Message}");
+        }
+
+        return userId;
     }
 }

@@ -42,6 +42,8 @@ services:
       # E-SEC-1 / E-SEC-2: one Google confirmation covers the working day; a session closes after four idle hours (twelve at most).
       Rochell__Identity__StepUpMaxAge: "08:00:00"
       Rochell__Identity__SessionIdleTimeout: "04:00:00"
+      # E-SEC-02-6: the address written in invitation e-mails.
+      Rochell__Identity__PublicBaseUrl: https://${STAGING_HOST:?}
       Rochell__Oidc__Authority: https://accounts.google.com
       Rochell__Oidc__ClientId: ${OIDC_CLIENT_ID:?}
       Rochell__Oidc__ClientSecret: ${OIDC_CLIENT_SECRET:?}

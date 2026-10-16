@@ -29,7 +29,7 @@ internal static class RoleChangeSql
         await using var command = Sql.Command(
             context.Connection,
             context.Transaction,
-            "SELECT EXISTS (SELECT 1 FROM iam.user WHERE user_id = @id AND kind = 'HUMAN' AND status = 'ACTIVE')",
+            "SELECT EXISTS (SELECT 1 FROM iam.user WHERE user_id = @id AND kind IN ('HUMAN', 'GUEST') AND status = 'ACTIVE')",
             ("id", userId));
         if (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not true)
         {
@@ -53,6 +53,22 @@ internal static class RoleChangeSql
             ("plant_id", plantId),
             ("now", context.Clock.UtcNow));
         return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as Guid?;
+    }
+
+    public static async Task<bool> GuestSecurityRoleAsync(CommandContext context, Guid userId, Guid roleId, CancellationToken cancellationToken)
+    {
+        await using var command = Sql.Command(
+            context.Connection,
+            context.Transaction,
+            """
+            SELECT (SELECT kind FROM iam.user WHERE user_id = @u) = 'GUEST'
+               AND ((SELECT code FROM iam.role WHERE role_id = @r) = 'SUPERADMIN' OR EXISTS (
+                     SELECT 1 FROM iam.role_permission rp JOIN iam.permission p ON p.permission_code = rp.permission_code
+                     WHERE rp.role_id = @r AND p.access = 'SECURITY'))
+            """,
+            ("u", userId),
+            ("r", roleId));
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is true;
     }
 
     public static async Task<string> CreateRequestAsync(
@@ -81,6 +97,12 @@ internal static class RoleChangeSql
         if (action == "ASSIGN" && active is not null)
         {
             throw new DomainException(RoleChangeErrors.AlreadyAssigned, "The user already has that role.");
+        }
+
+        // E-SEC-02-5: a guest never holds SUPERADMIN nor a role carrying a security permission.
+        if (action == "ASSIGN" && await GuestSecurityRoleAsync(context, targetUserId, roleId, cancellationToken).ConfigureAwait(false))
+        {
+            throw new DomainException(Invitations.InvitationErrors.RoleNotForGuest, $"A guest from outside the company cannot hold {roleCode} (E-SEC-02-5).");
         }
 
         var payload = JsonSerializer.Serialize(new { requestId = context.ResultRef, action, userId = targetUserId, roleCode, plantId, requestedBy = requester });
@@ -226,8 +248,13 @@ public sealed class ApproveRoleChangeHandler : ICommandHandler<ApproveRoleChange
                 context.Connection,
                 context.Transaction,
                 """
-                INSERT INTO iam.role_assignment (assignment_id, company_id, user_id, role_id, plant_id, valid_from, granted_by)
-                VALUES (@id, @company_id, @user_id, @role_id, @plant_id, @valid_from, @granted_by)
+                INSERT INTO iam.role_assignment (assignment_id, company_id, user_id, role_id, plant_id, valid_from, valid_to, granted_by)
+                SELECT @id, @company_id, @user_id, @role_id, @plant_id, @valid_from,
+                       CASE WHEN u.kind = 'GUEST' THEN coalesce(
+                         (SELECT max(x.valid_to) FROM iam.role_assignment x WHERE x.user_id = u.user_id AND x.company_id = @company_id AND x.valid_to > @valid_from),
+                         @valid_from + interval '90 days') END,
+                       @granted_by
+                FROM iam.user u WHERE u.user_id = @user_id
                 """,
                 cancellationToken,
                 ("id", assignmentId),

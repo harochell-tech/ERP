@@ -11,6 +11,7 @@ using Rochell.Finance.Explain;
 using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
+using Rochell.Identity.Invitations;
 using Rochell.Identity.Queries;
 using Rochell.Manufacturing.Portal;
 using Rochell.Manufacturing.Queries;
@@ -85,7 +86,7 @@ public static class QueryEndpoints
         typeof(ListInvoicesHandler), typeof(GetInvoiceHandler), typeof(GetInvoiceFiscalPackageHandler), typeof(ListBillableDeliveriesHandler),
         typeof(ListCreditNotesHandler), typeof(GetCreditNoteHandler), typeof(GetCreditNoteFiscalPackageHandler),
         typeof(ListReceiptsHandler), typeof(GetReceiptHandler), typeof(ListDepositsHandler), typeof(GetDepositHandler), typeof(GetArAgingHandler), typeof(GetCustomerStatementHandler), typeof(ListSalesPlantsHandler), typeof(ListSalesBankAccountsHandler),
-        typeof(ListUsersHandler), typeof(ListRolesHandler), typeof(ListRoleRequestsHandler), typeof(ListLedgerDigestsHandler),
+        typeof(ListUsersHandler), typeof(ListRolesHandler), typeof(ListRoleRequestsHandler), typeof(ListInvitationsHandler), typeof(ListUserStatusRequestsHandler), typeof(ListLedgerDigestsHandler),
     ];
 
     public static void MapQueryEndpoints(this RouteGroupBuilder company)
@@ -712,6 +713,13 @@ public static class QueryEndpoints
         identity.MapGet("/users", (HttpContext http, Guid companyId, ListUsersHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListUsers(companyId, s), handler, ct))
             .Describe<UserList>(nameof(ListUsers));
+        // SEC-02 (E-SEC-02-8): invitations and the requests to disable or enable a user.
+        identity.MapGet("/invitations", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListInvitationsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListInvitations(companyId, s, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
+            .Describe<InvitationList>(nameof(ListInvitations));
+        identity.MapGet("/user-status-requests", (HttpContext http, Guid companyId, string? status, ListUserStatusRequestsHandler handler, QueryRunner runner, CancellationToken ct)
+                => runner.RunAsync(http, s => new ListUserStatusRequests(companyId, s, status), handler, ct))
+            .Describe<UserStatusRequestList>(nameof(ListUserStatusRequests));
         identity.MapGet("/role-requests", (HttpContext http, Guid companyId, string? status, int? limit, int? offset, ListRoleRequestsHandler handler, QueryRunner runner, CancellationToken ct)
                 => runner.RunAsync(http, s => new ListRoleRequests(companyId, s, status, limit ?? DefaultLimit, offset ?? 0), handler, ct))
             .Describe<RoleRequestList>(nameof(ListRoleRequests));
