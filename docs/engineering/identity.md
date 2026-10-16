@@ -97,3 +97,22 @@ commands of the cutoff's month.
 - E-SEC-4: `iam.role_assignment_superadmin_term` allows 365 days (default end 365 days after the start); migration 0124 brings the
   SUPERADMIN assignments in force to 365 days from their start, with `role_assignment_guard` switched off for that statement only.
   `/api/v1/session` gives each role's `validTo`; Inicio warns 30 days before a superadministrator role ends.
+
+## SEC-02 — invitations and disabling users (E-SEC-02-1…8, migration 0129)
+
+- **Invitation.** `InviteUser` (`role:assign`) records `iam.invitation` (e-mail, name, guest = outside `HostedDomain`, the guest's
+  roles end `roles_valid_to`) and `iam.invitation_role`; `ApproveInvitation` / `RejectInvitation` (`role:second_approve`, four-eyes
+  trigger with the superadministrator's waiver) and `CancelInvitation`. Approval sets `expires_at` (+`InvitationDays`, 7) and queues
+  the invitation e-mail (`core.mail_message` type INVITATION) with `PublicBaseUrl` and the steps.
+- **First sign-in.** `SessionService.StartOidcSessionAsync` looks the Google subject up (HUMAN only from the organization's domain,
+  GUEST only from outside it, DISABLED refused); with no user, `iam.open_invitation_for(email, now)` (security definer, no company
+  yet) finds the approved invitation and `iam.accept_invitation` creates the user (HUMAN with a fresh employee id, or GUEST), its
+  role assignments (granted by the approver) and marks the invitation ACCEPTED. The application role still has no INSERT / UPDATE
+  on `iam.user`.
+- **Guests.** `/api/v1/auth/guest-login` starts Google without the `hd` hint (`prompt=select_account`); `/step-up` does the same
+  for a guest session (`IsGuestSessionAsync`). A guest never gets SUPERADMIN or a role with a SECURITY permission (invitation and
+  `RequestRoleAssignment`); a role approved later for a guest ends with its other roles, or in 90 days.
+- **Disable / enable.** `RequestUserStatusChange` (`role:revoke`) → `ApproveUserStatusChange` (`role:second_approve`) →
+  `iam.apply_user_status_request` sets the status; sessions check the user's status on every request.
+- **Queries.** `ListInvitations` (state EXPIRED for an approved one past its date), `ListUserStatusRequests`. Screen: Seguridad ›
+  Usuarios y roles. 2-step verification is not visible to Core (E-SEC-02-4).

@@ -78,6 +78,9 @@ public sealed class IdentitySettings
     public TimeSpan SessionAbsoluteLifetime { get; set; } = TimeSpan.FromHours(12);
 
     public TimeSpan SessionIdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
+
+    /// <summary>E-SEC-02-6: the address of Core in invitation e-mails.</summary>
+    public string? PublicBaseUrl { get; set; }
 }
 
 /// <summary>E-PR18-2: OIDC authorization code against Google Workspace (A-03 pending; CI uses a simulated IdP).</summary>

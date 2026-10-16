@@ -48,6 +48,7 @@ services.AddSingleton(new IdentityOptions
     StepUpMaxAge = settings.Identity.StepUpMaxAge,
     SessionAbsoluteLifetime = settings.Identity.SessionAbsoluteLifetime,
     SessionIdleTimeout = settings.Identity.SessionIdleTimeout,
+    PublicBaseUrl = settings.Identity.PublicBaseUrl,
 });
 services.AddSingleton<ICommandAuthorizer>(sp => new SqlCommandAuthorizer(sp.GetRequiredService<IdentityOptions>(), sp.GetRequiredService<IClock>()));
 services.AddSingleton(sp =>

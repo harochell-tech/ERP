@@ -125,6 +125,11 @@ export async function logout(): Promise<void> {
   await fetch("/api/v1/auth/logout", { method: "POST", credentials: "same-origin", headers: { [CSRF_HEADER]: "1" } });
 }
 
+/** E-SEC-02-3: an invited guest signs in with their own Google account (no organization domain hint). */
+export function guestLoginUrl(returnPath: string): string {
+  return `/api/v1/auth/guest-login?returnUrl=${encodeURIComponent(returnPath)}`;
+}
+
 export function loginUrl(returnPath: string): string {
   return `/api/v1/auth/login?returnUrl=${encodeURIComponent(returnPath)}`;
 }

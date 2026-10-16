@@ -10,7 +10,7 @@ test("a role requested by the security admin is approved by a second person", as
   await nav(admin, "Usuarios y roles");
   const newcomer = (await admin.locator("tr", { hasText: "Sin roles" }).locator("td").first().innerText()).trim();
   await admin.locator("form").getByLabel("Usuario").selectOption({ label: newcomer });
-  await admin.locator("form").getByLabel("Rol").selectOption({ label: "Comprador" });
+  await admin.locator("form").getByLabel("Rol", { exact: true }).selectOption({ label: "Comprador" });
   await admin.getByRole("button", { name: "Solicitar", exact: true }).click();
   await expect(admin.getByText("Solicitud enviada")).toBeVisible();
 
@@ -23,6 +23,26 @@ test("a role requested by the security admin is approved by a second person", as
   const employee = await signIn(browser, "Empleado nuevo (sin roles)");
   await expect(employee.getByRole("navigation", { name: "Menú principal" }).locator("a", { hasText: "Órdenes de compra" })).toHaveCount(1); // E-UX6-1: in its folded group
   await expect(employee.getByRole("navigation", { name: "Menú principal" }).locator("a", { hasText: "Usuarios y roles" })).toHaveCount(0); // E-UX6-1: in its folded group
+});
+
+// SEC-02 (E-SEC-02-1/8): the security administrator invites someone from outside the company; the second approver approves it
+// and the invitation reads «Enviada» (its first sign-in needs the person's own Google account).
+test("an invitation is requested by the security admin and approved by a second person", async ({ browser }) => {
+  const admin = await signIn(browser, "Administrador de seguridad");
+  await nav(admin, "Usuarios y roles");
+  const email = `contador-${Date.now()}@ejemplo.com`;
+  await admin.getByText("Invitar usuario").click();
+  await admin.getByLabel("Correo de la invitación").fill(email);
+  await admin.getByLabel("Nombre del invitado").fill("Contador Externo");
+  await admin.getByLabel("Rol 1 de la invitación").selectOption({ label: "Contador" });
+  await admin.getByRole("button", { name: "Invitar", exact: true }).click();
+  await expect(admin.getByTestId(`invitation:${email}`)).toContainText("Pendiente de aprobación");
+  await expect(admin.getByTestId(`invitation:${email}`)).toContainText("Invitado hasta");
+
+  const approver = await signIn(browser, "Segundo aprobador de seguridad");
+  await nav(approver, "Usuarios y roles");
+  await confirmAction(approver.getByTestId(`invitation:${email}`), "Aprobar");
+  await expect(approver.getByTestId(`invitation:${email}`)).toContainText("Enviada");
 });
 
 test("the read-only audit and master screens open for their readers", async ({ browser }) => {

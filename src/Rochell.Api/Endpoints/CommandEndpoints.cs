@@ -12,6 +12,7 @@ using Rochell.Finance.Configuration;
 using Rochell.Finance.ExchangeRates;
 using Rochell.Finance.Ledger;
 using Rochell.Finance.Policies;
+using Rochell.Identity.Invitations;
 using Rochell.Identity.RoleChanges;
 using Rochell.MasterData.BankAccounts;
 using Rochell.MasterData.Company;
@@ -426,6 +427,14 @@ public static class CommandEndpoints
         identity.MapCommand<RequestRoleAssignment, RequestRoleAssignmentHandler>();
         identity.MapCommand<RequestRoleRevocation, RequestRoleRevocationHandler>();
         identity.MapCommand<ApproveRoleChange, ApproveRoleChangeHandler>();
+        // SEC-02 (E-SEC-02-1…8): invitations and disabling / enabling users.
+        identity.MapCommand<InviteUser, InviteUserHandler>();
+        identity.MapCommand<ApproveInvitation, ApproveInvitationHandler>();
+        identity.MapCommand<RejectInvitation, RejectInvitationHandler>();
+        identity.MapCommand<CancelInvitation, CancelInvitationHandler>();
+        identity.MapCommand<RequestUserStatusChange, RequestUserStatusChangeHandler>();
+        identity.MapCommand<ApproveUserStatusChange, ApproveUserStatusChangeHandler>();
+        identity.MapCommand<RejectUserStatusChange, RejectUserStatusChangeHandler>();
         identity.MapCommand<RejectRoleChange, RejectRoleChangeHandler>();
     }
 
@@ -495,7 +504,8 @@ public static class CommandEndpoints
         typeof(Rochell.Manufacturing.Quality.SetItemSpecHandler), typeof(Rochell.Manufacturing.Quality.SetLabParameterHandler), typeof(Rochell.Manufacturing.Quality.DefineFailureTypeHandler), typeof(Rochell.Manufacturing.Quality.SetFailureTypeStatusHandler), typeof(Rochell.Manufacturing.Quality.SetMachineShortCodeHandler),
         typeof(Rochell.Manufacturing.Quality.RecordCompressionTestsHandler), typeof(Rochell.Manufacturing.Quality.VoidCompressionTestHandler), typeof(Rochell.Manufacturing.Quality.RecordAbsorptionTestsHandler), typeof(Rochell.Manufacturing.Quality.VoidAbsorptionTestHandler), typeof(Rochell.Manufacturing.Quality.ReevaluateLotHandler), typeof(Rochell.Manufacturing.Quality.FinalReleaseLotHandler),
         typeof(Rochell.Manufacturing.Quality.IssueLabCertificateHandler), typeof(Rochell.Manufacturing.Quality.VoidLabCertificateHandler),
-        typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler),
+        typeof(RequestRoleAssignmentHandler), typeof(RequestRoleRevocationHandler), typeof(ApproveRoleChangeHandler), typeof(RejectRoleChangeHandler), typeof(InviteUserHandler), typeof(ApproveInvitationHandler), typeof(RejectInvitationHandler), typeof(CancelInvitationHandler),
+        typeof(RequestUserStatusChangeHandler), typeof(ApproveUserStatusChangeHandler), typeof(RejectUserStatusChangeHandler),
         typeof(PrepareAssetClassHandler), typeof(ApproveAssetClassHandler), typeof(DiscardAssetClassHandler), typeof(PutFixedAssetInServiceHandler),
         typeof(TransferFixedAssetHandler), typeof(UpdateFixedAssetHandler), typeof(CreateCardsForPostedInvoicesHandler),
         typeof(PostDepreciationHandler), typeof(UndoDepreciationHandler), typeof(PrepareAssetDisposalHandler), typeof(CancelAssetDisposalHandler), typeof(ApproveAssetDisposalHandler),

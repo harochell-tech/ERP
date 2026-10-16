@@ -21,6 +21,9 @@ public static class OidcAuthentication
     public const string Scheme = OpenIdConnectDefaults.AuthenticationScheme;
     public const string CallbackPath = "/api/v1/auth/callback";
 
+    /// <summary>OIDC state item: the sign-in of a guest, without the organization's domain hint (E-SEC-02-3).</summary>
+    private const string GuestItem = "rochell_guest";
+
     /// <summary>OIDC state item: the protected id of the session being re-authenticated (step-up).</summary>
     private const string StepUpSessionItem = "rochell.step_up_session";
 
@@ -59,7 +62,16 @@ public static class OidcAuthentication
                     OnRedirectToIdentityProvider = context =>
                     {
                         // Google shows only accounts of the organization's domain; the domain is still checked on the token.
-                        context.ProtocolMessage.SetParameter("hd", hostedDomain);
+                        // E-SEC-02-3: the guests' sign-in shows any account (the server accepts only an invited guest).
+                        if (!context.Properties.Items.ContainsKey(GuestItem))
+                        {
+                            context.ProtocolMessage.SetParameter("hd", hostedDomain);
+                        }
+                        else
+                        {
+                            context.ProtocolMessage.Prompt = "select_account";
+                        }
+
                         if (context.Properties.Items.ContainsKey(StepUpSessionItem))
                         {
                             context.ProtocolMessage.Prompt = "login";
@@ -88,7 +100,17 @@ public static class OidcAuthentication
             .WithSummary("Starts the Google Workspace sign-in (browser navigation).")
             .Produces(StatusCodes.Status302Found);
 
-        auth.MapGet("/step-up", (HttpContext http, string? returnUrl, SessionCookie cookie) =>
+        auth.MapGet("/guest-login", (string? returnUrl) =>
+            {
+                var properties = new AuthenticationProperties { RedirectUri = SafeReturnUrl(returnUrl) };
+                properties.Items[GuestItem] = "1";
+                return Results.Challenge(properties, [Scheme]);
+            })
+            .WithName("GuestLogin")
+            .WithSummary("E-SEC-02-3: starts the sign-in of an invited guest with any Google account (browser navigation).")
+            .Produces(StatusCodes.Status302Found);
+
+        auth.MapGet("/step-up", async (HttpContext http, string? returnUrl, SessionCookie cookie, SessionService sessions, CancellationToken cancellationToken) =>
             {
                 var sessionId = cookie.Read(http);
                 if (sessionId is null)
@@ -98,6 +120,11 @@ public static class OidcAuthentication
 
                 var properties = new AuthenticationProperties { RedirectUri = SafeReturnUrl(returnUrl) };
                 properties.Items[StepUpSessionItem] = cookie.Protect(sessionId.Value);
+                if (await sessions.IsGuestSessionAsync(sessionId.Value, cancellationToken).ConfigureAwait(false))
+                {
+                    properties.Items[GuestItem] = "1"; // E-SEC-02-3: a guest re-authenticates with their own (non-organization) account
+                }
+
                 return Results.Challenge(properties, [Scheme]);
             })
             .WithName("StepUp")
