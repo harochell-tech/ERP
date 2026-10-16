@@ -611,6 +611,7 @@ public sealed class GetDriverEvidenceHandler(Rochell.Platform.Files.IEvidenceSto
             throw new DomainException(QueryErrors.NotFound, "The photo is not in the evidence store, or it is not the one recorded.");
         }
 
-        return JsonSerializer.Serialize(new DriverEvidenceContent(file.ContentType, Convert.ToBase64String(file.Content), Convert.ToHexStringLower(evidence.Sha256)));
+        // The screen reads camelCase fields (contentType, contentBase64), like every other query: ApiJson, not the default writer.
+        return Rochell.Platform.Json.ApiJson.Serialize(new DriverEvidenceContent(file.ContentType, Convert.ToBase64String(file.Content), Convert.ToHexStringLower(evidence.Sha256)));
     }
 }
