@@ -41,6 +41,28 @@ public sealed class DriverConfirmationTests(PostgresFixture postgres)
     private static async Task<JsonElement> ConfirmAsync(TestHarness h, Trip t, string key, DriverLinkAccess access, DriverReport report)
         => JsonDocument.Parse((await h.RunAsync(new ConfirmDeliveryByDriver(h.CompanyId, t.Service, key, access, report), new ConfirmDeliveryByDriverHandler(Key))).ResultPayload).RootElement;
 
+    private sealed class OnePhotoStore(byte[] photo) : Rochell.Platform.Files.IEvidenceStore
+    {
+        public Task PutAsync(string key, byte[] content, string contentType, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<Rochell.Platform.Files.EvidenceFile?> GetAsync(string key, CancellationToken cancellationToken)
+            => Task.FromResult<Rochell.Platform.Files.EvidenceFile?>(new Rochell.Platform.Files.EvidenceFile(photo, "image/jpeg"));
+    }
+
+    [Fact]
+    public async Task The_drivers_photo_reads_back_with_the_field_names_the_screen_uses()
+    {
+        await using var h = await TestHarness.CreateAsync(postgres);
+        var t = await TripAsync(h);
+        byte[] photo = [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4];
+        var sha = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(photo));
+        await ConfirmAsync(h, t, "ok", Access(h, t, "4821"), new DriverReport("Ing. María Gómez", null, "FULL", null, null, null, null, null, "PHOTO", "entregas/x/d/c.jpg", sha));
+
+        var file = JsonDocument.Parse(await h.QueryAsync(new GetDriverEvidence(h.CompanyId, t.S.Seller, t.Delivery), new GetDriverEvidenceHandler(new OnePhotoStore(photo)))).RootElement;
+
+        Assert.Equal(("image/jpeg", Convert.ToBase64String(photo), sha), (file.GetProperty("contentType").GetString(), file.GetProperty("contentBase64").GetString(), file.GetProperty("sha256").GetString()));
+    }
+
     [Fact]
     public async Task A_wrong_pin_is_kept_and_a_full_receipt_becomes_the_pod()
     {
