@@ -9,8 +9,9 @@ test("a role requested by the security admin is approved by a second person", as
   const admin = await signIn(browser, "Administrador de seguridad");
   await nav(admin, "Usuarios y roles");
   const newcomer = (await admin.locator("tr", { hasText: "Sin roles" }).locator("td").first().innerText()).trim();
-  await admin.locator("form").getByLabel("Usuario").selectOption({ label: newcomer });
-  await admin.locator("form").getByLabel("Rol", { exact: true }).selectOption({ label: "Comprador" });
+  const requestForm = admin.locator("form", { hasText: "Solicitar un rol" });
+  await requestForm.getByLabel("Usuario").selectOption({ label: newcomer });
+  await requestForm.getByLabel("Rol").selectOption({ label: "Comprador" });
   await admin.getByRole("button", { name: "Solicitar", exact: true }).click();
   await expect(admin.getByText("Solicitud enviada")).toBeVisible();
 

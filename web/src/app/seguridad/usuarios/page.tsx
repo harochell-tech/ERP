@@ -263,9 +263,9 @@ function InvitationActions({ invitation, onDone }: { invitation: Invitation; onD
   );
 }
 
-function Invitations() {
+function Invitations({ version }: { version: number }) {
   const { companyId } = useSession();
-  const { data, error, reload } = useLoad(() => query("/api/v1/companies/{companyId}/identity/invitations", { path: { companyId } }), [companyId]);
+  const { data, error, reload } = useLoad(() => query("/api/v1/companies/{companyId}/identity/invitations", { path: { companyId } }), [companyId, version]);
   if (data === null) {
     return <LoadingIndicator error={error} />;
   }
@@ -400,6 +400,7 @@ export default function Page() {
   const describe = (code: string) => roleItems.find((r) => r.code === code)?.description ?? undefined;
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [invitesVersion, setInvitesVersion] = useState(0);
   if (!can("iam:read")) {
     return <NoPermission />;
   }
@@ -413,8 +414,16 @@ export default function Page() {
   return (
     <>
       <h1>Usuarios y roles</h1>
-      {can("role:assign") ? <InviteForm roles={roleItems} onDone={reload} /> : null}
-      <Invitations />
+      {can("role:assign") ? (
+        <InviteForm
+          roles={roleItems}
+          onDone={() => {
+            reload();
+            setInvitesVersion((v) => v + 1);
+          }}
+        />
+      ) : null}
+      <Invitations version={invitesVersion} />
       <StatusRequests onDone={reload} />
       {data && can("role:assign") ? <RequestForm users={data.items} roles={roleItems} onDone={reload} /> : null}
       <div className="inline-form" role="search">
