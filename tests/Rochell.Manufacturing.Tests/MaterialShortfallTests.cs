@@ -17,7 +17,7 @@ namespace Rochell.Manufacturing.Tests;
 /// MATERIAL_SHORTFALL) and the patio is left at zero. Reversing the summary cancels it; posted again, an opening of 3,000 kg of cement in the
 /// patio covers 3,000 kg of it: the area holds also 1,000 kg at 10.00 elsewhere, so the moving average is 34,000 ÷ 4,000 = 8.50 and the
 /// settlement costs 25,500.00 against 24,000.00 at standard — 1,500.00 to price variance. 2,000 kg (16,000.00) stay open: MP-NEGATIVO
-/// blocks INV-MOV until justified, the summary can no longer be reversed, and the inventory still matches the ledger.
+/// blocks INV-MOV until justified, the summary can no longer be reversed, and the inventory and WIP (with the shortfall) still match the ledger.
 /// </summary>
 [Collection(PostgresTestGroup.Name)]
 public sealed class MaterialShortfallTests(PostgresFixture postgres)
@@ -99,8 +99,8 @@ public sealed class MaterialShortfallTests(PostgresFixture postgres)
         var after = await Reconcile(h, controller, "recon-2");
 
         Assert.Equal((ManufacturingErrors.ShortfallSettled, ManufacturingErrors.ReasonRequired), (noReverse.Code, noReason.Code));
-        Assert.Equal("INV-VALUE-GL:MATCHED,MP-NEGATIVO:EXCEPTIONS,VALUE-GL-LINK:MATCHED", recon);
-        Assert.Equal("INV-VALUE-GL:MATCHED,MP-NEGATIVO:EXCEPTIONS,VALUE-GL-LINK:MATCHED", after);
+        Assert.Equal("INV-VALUE-GL:MATCHED,MP-NEGATIVO:EXCEPTIONS,VALUE-GL-LINK:MATCHED,WIP-GL:MATCHED", recon);
+        Assert.Equal("INV-VALUE-GL:MATCHED,MP-NEGATIVO:EXCEPTIONS,VALUE-GL-LINK:MATCHED,WIP-GL:MATCHED", after);
         Assert.Equal("MATERIAL_SHORTFALL_JUSTIFIED:WARNING:-:16000.0000", await h.ScalarAsync<string>(
             """
             SELECT x.classification || ':' || x.severity || ':' || coalesce(x.component, '-') || ':' || x.value_a FROM rec.recon_exception x JOIN rec.recon_run r ON r.run_id = x.run_id
@@ -110,7 +110,7 @@ public sealed class MaterialShortfallTests(PostgresFixture postgres)
 
     private static async Task<string> Reconcile(TestHarness h, Guid controller, string key)
     {
-        var result = JsonDocument.Parse((await h.RunAsync(new RunReconciliation(h.CompanyId, controller, key, ["MP-NEGATIVO", "INV-VALUE-GL", "VALUE-GL-LINK"]), new RunReconciliationHandler()))
+        var result = JsonDocument.Parse((await h.RunAsync(new RunReconciliation(h.CompanyId, controller, key, ["MP-NEGATIVO", "INV-VALUE-GL", "VALUE-GL-LINK", "WIP-GL"]), new RunReconciliationHandler()))
             .ResultPayload).RootElement;
         return string.Join(',', result.GetProperty("runs").EnumerateArray().Select(r => $"{r.GetProperty("code").GetString()}:{r.GetProperty("status").GetString()}").Order(StringComparer.Ordinal));
     }

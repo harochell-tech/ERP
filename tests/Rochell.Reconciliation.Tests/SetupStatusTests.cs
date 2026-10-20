@@ -37,6 +37,7 @@ public sealed class SetupStatusTests(PostgresFixture postgres)
         Assert.Equal(("WARNING", "ADMIN_SEGURIDAD,SEGUNDO_APROBADOR_SEGURIDAD"), fresh["USERS"]); // the Controller is there
         Assert.Equal(("PENDING", "BALANCE_SHEET,INCOME_STATEMENT"), fresh["REPORT_STRUCTURES"]);
         Assert.NotEqual("DONE", fresh["POLICIES"].Status);
+        Assert.DoesNotContain("BANK", fresh["ACCOUNT_MAPS"].Missing.Split(',')); // each bank account carries its own account
         Assert.Equal("WARNING", unnamed["PLANTS"].Status);
         Assert.NotEqual(string.Empty, unnamed["PLANTS"].Missing);
         Assert.Equal(("DONE", string.Empty), named["PLANTS"]);
