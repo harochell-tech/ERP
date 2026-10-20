@@ -26,7 +26,7 @@ public sealed class GetSetupStatusHandler : IQueryHandler<GetSetupStatus>
         rule_roles AS (
           SELECT DISTINCT l.line ->> 'account_role' AS role
           FROM fin.posting_rule_version v CROSS JOIN LATERAL jsonb_array_elements(v.definition -> 'lines') AS l (line), today
-          WHERE v.status = 'ACTIVE' AND (v.effective_to IS NULL OR v.effective_to > today.d) AND l.line ->> 'account_role' NOT IN ('MANUAL_ADJUSTMENT', 'PURCHASE_EXPENSE', 'FIXED_ASSET_COST', 'FIXED_ASSET_ACCUMULATED', 'FIXED_ASSET_DEPRECIATION')),
+          WHERE v.status = 'ACTIVE' AND (v.effective_to IS NULL OR v.effective_to > today.d) AND l.line ->> 'account_role' NOT IN ('MANUAL_ADJUSTMENT', 'PURCHASE_EXPENSE', 'FIXED_ASSET_COST', 'FIXED_ASSET_ACCUMULATED', 'FIXED_ASSET_DEPRECIATION', 'BANK')),
         s AS (
           SELECT 1 AS n, 'COMPANY' AS code, 'EMPRESA' AS area, ARRAY[]::text[] AS missing, true AS started
           UNION ALL
@@ -55,9 +55,12 @@ public sealed class GetSetupStatusHandler : IQueryHandler<GetSetupStatus>
           UNION ALL
           SELECT 7, 'ACCOUNT_MAPS', 'CONTABILIDAD',
                  ARRAY(SELECT role FROM rule_roles
+                       -- BANK comes from each bank account; delivered-not-invoiced goes to CONTRACT_ASSET or UNBILLED_RECEIVABLE (policy
+                       -- unbilled_delivery_presentation), so one of the two mapped is enough.
                        WHERE NOT EXISTS (SELECT 1 FROM fin.account_role_map m, today
-                                         WHERE m.company_id = @c AND m.account_role = rule_roles.role AND m.status = 'ACTIVE'
-                                           AND m.effective_from <= today.d AND (m.effective_to IS NULL OR m.effective_to > today.d))
+                                         WHERE m.company_id = @c AND m.status = 'ACTIVE' AND m.effective_from <= today.d AND (m.effective_to IS NULL OR m.effective_to > today.d)
+                                           AND (m.account_role = rule_roles.role
+                                                OR (rule_roles.role IN ('CONTRACT_ASSET', 'UNBILLED_RECEIVABLE') AND m.account_role IN ('CONTRACT_ASSET', 'UNBILLED_RECEIVABLE'))))
                        ORDER BY role),
                  EXISTS (SELECT 1 FROM fin.account_role_map WHERE company_id = @c)
           UNION ALL

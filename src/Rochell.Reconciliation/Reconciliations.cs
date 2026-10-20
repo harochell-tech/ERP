@@ -439,8 +439,12 @@ public static class Reconciliations
             Findings + """
             -- E-MFG1-05-4: WIP by collector in the GL = consumption of posted summaries − their material standard − settled variances.
             WITH g AS (SELECT subledger_ref AS col, sum(debit - credit) AS b FROM fin.gl_entry WHERE company_id = @c AND account_role = 'WIP' GROUP BY 1),
-                 s AS (SELECT r.collector_id AS col, sum(ci.value) AS cons
-                       FROM mfg.consumption_issue ci JOIN mfg.shift_summary ss ON ss.summary_id = ci.summary_id JOIN mfg.production_run r ON r.run_id = ss.run_id
+                 -- E-VS3-02c-1: what a summary consumed without stock entered WIP as a shortfall at standard (P-47), not as an issue.
+                 s AS (SELECT r.collector_id AS col, sum(x.value) AS cons
+                       FROM (SELECT ci.summary_id, ci.value FROM mfg.consumption_issue ci
+                             UNION ALL
+                             SELECT f.source_id, f.value FROM inv.material_shortfall f WHERE f.company_id = @c AND f.source_type = 'SHIFT_SUMMARY' AND f.status <> 'CANCELLED') x
+                       JOIN mfg.shift_summary ss ON ss.summary_id = x.summary_id JOIN mfg.production_run r ON r.run_id = ss.run_id
                        WHERE ss.company_id = @c AND ss.status = 'POSTED' GROUP BY 1),
                  m AS (SELECT r.collector_id AS col, sum(round(ss.good_units * c.material_cost, 2)) AS std
                        FROM mfg.shift_summary ss JOIN mfg.production_run r ON r.run_id = ss.run_id JOIN md.standard_cost_version c ON c.cost_version_id = r.cost_version_id
@@ -453,6 +457,8 @@ public static class Reconciliations
             """,
             """
             SELECT (SELECT coalesce(sum(ci.value), 0) FROM mfg.consumption_issue ci JOIN mfg.shift_summary ss ON ss.summary_id = ci.summary_id WHERE ss.company_id = @c AND ss.status = 'POSTED')
+                   + (SELECT coalesce(sum(f.value), 0) FROM inv.material_shortfall f JOIN mfg.shift_summary ss ON ss.summary_id = f.source_id
+                      WHERE f.company_id = @c AND f.source_type = 'SHIFT_SUMMARY' AND f.status <> 'CANCELLED' AND ss.status = 'POSTED')
                    - (SELECT coalesce(sum(round(ss.good_units * c.material_cost, 2)), 0) FROM mfg.shift_summary ss JOIN mfg.production_run r ON r.run_id = ss.run_id
                       JOIN md.standard_cost_version c ON c.cost_version_id = r.cost_version_id WHERE ss.company_id = @c AND ss.status = 'POSTED')
                    - (SELECT coalesce(sum(coalesce(usage_variance, 0) + coalesce(price_variance, 0)), 0) FROM mfg.cost_collector WHERE company_id = @c),

@@ -78,7 +78,7 @@ is SETTLED for good and its runs can no longer be reversed.
 
 | Reconciliation | Checks | Blocks |
 | --- | --- | --- |
-| WIP-GL | GL WIP per collector = consumption − material standard − settled variances | COST-SET |
+| WIP-GL | GL WIP per collector = consumption (issues plus the shortfalls of posted summaries, P-47) − material standard − settled variances | COST-SET |
 | WIP-OPEN | Collectors of months ended by the cutoff still OPEN | COST-SET |
 | SHIFT-OPEN | Runs up to the cutoff still IN_PROGRESS | OP-DAY, COST-SET |
 | USAGE-TOLERANCE | Real vs theoretical beyond PRODUCTION.usage_tolerance_pct | — (warning) |

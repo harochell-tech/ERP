@@ -26,6 +26,7 @@ public sealed partial class ReconciliationTextTests(PostgresFixture postgres)
         "IMPORT_CLEARING", "CUSTOMS_DECLARATION", // the role and the document kind IMPORT-CLEARING reads (E-USD1-06-4)
         "AWAITING_SERVICE", "IN_SERVICE", // the card statuses FA-GL reads (E-AF1-04-7)
         "MATERIAL_SHORTFALL", // the bridge account MP-NEGATIVO reads (E-VS3-02c-4)
+        "SHIFT_SUMMARY", // the shortfall source WIP-GL adds to consumption (E-VS3-02c-1)
         "ECF_SENDING", "ECF_REJECTED", "ECF_ACTION", // the fiscal statuses FISC-DOC reads (E-VS4-03-1)
     };
 
